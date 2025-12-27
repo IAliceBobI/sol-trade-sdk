@@ -58,7 +58,17 @@ async fn main() -> AnyResult<()> {
     let client = SolanaTrade::new(Arc::new(payer), trade_config).await;
 
     // 设置 PumpFun 的 gas 策略
-    sol_trade_sdk::common::GasFeeStrategy::set_global_fee_strategy(200000, 1000000, 0.005, 0.01);
+    let gas_fee_strategy = sol_trade_sdk::common::GasFeeStrategy::new();
+    gas_fee_strategy.set_global_fee_strategy(
+        200000,      // buy_cu_limit
+        1000000,     // sell_cu_limit
+        500000,      // buy_cu_price
+        500000,      // sell_cu_price
+        0.005,       // buy_tip
+        0.01,        // sell_tip
+        256 * 1024,  // buy_data_size_limit
+        0,           // sell_data_size_limit
+    );
 
     println!("✅ 客户端初始化完成\n");
 
@@ -97,6 +107,8 @@ async fn main() -> AnyResult<()> {
         0,                  // real_token_reserves
         0,                  // real_sol_reserves
         None,               // close_token_account_when_sell
+        Pubkey::default(),  // fee_recipient
+        sol_trade_sdk::constants::TOKEN_PROGRAM,  // token_program
     );
 
     let buy_params = TradeBuyParams {
@@ -106,27 +118,31 @@ async fn main() -> AnyResult<()> {
         input_token_amount: buy_amount,
         slippage_basis_points: Some(slippage),
         recent_blockhash: Some(recent_blockhash),
-        extension_params: Box::new(params),
+        extension_params: sol_trade_sdk::trading::core::params::DexParamEnum::PumpFun(params),
         address_lookup_table_account: None,
         wait_transaction_confirmed: false,  // 不等待确认，测试最快提交速度
         create_input_token_ata: true,
         close_input_token_ata: true,
         create_mint_ata: true,
-        open_seed_optimize: false,
         durable_nonce: None,
         fixed_output_token_amount: None,
+        gas_fee_strategy: gas_fee_strategy.clone(),
+        simulate: false,
     };
 
     println!("⏱️  开始执行买入流程...");
     println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
 
     match client.buy(buy_params).await {
-        Ok((success, signature)) => {
+        Ok((success, signatures, _error)) => {
             println!("\n================================");
             println!("  ✅ 买入流程完成");
             println!("================================");
             println!("✅ 提交成功: {}", success);
-            println!("📝 签名: {}", signature);
+            println!("📝 签名数量: {}", signatures.len());
+            for (i, sig) in signatures.iter().enumerate() {
+                println!("📝 签名 #{}: {}", i + 1, sig);
+            }
             println!("================================\n");
         }
         Err(e) => {
