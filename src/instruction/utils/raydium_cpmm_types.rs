@@ -3,6 +3,29 @@ use serde::{Deserialize, Serialize};
 use solana_sdk::pubkey::Pubkey;
 
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, BorshDeserialize)]
+pub struct AmmConfig {
+    pub bump: u8,
+    pub disable_create_pool: bool,
+    pub index: u16,
+    pub trade_fee_rate: u64,
+    pub protocol_fee_rate: u64,
+    pub fund_fee_rate: u64,
+    pub create_pool_fee: u64,
+    pub protocol_owner: Pubkey,
+    pub fund_owner: Pubkey,
+    pub padding: [u64; 16],
+}
+
+pub const AMM_CONFIG_SIZE: usize = 228;
+
+pub fn amm_config_decode(data: &[u8]) -> Option<AmmConfig> {
+    if data.len() < AMM_CONFIG_SIZE {
+        return None;
+    }
+    borsh::from_slice::<AmmConfig>(&data[..AMM_CONFIG_SIZE]).ok()
+}
+
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, BorshDeserialize)]
 pub struct PoolState {
     pub amm_config: Pubkey,
     pub pool_creator: Pubkey,

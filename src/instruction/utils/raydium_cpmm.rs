@@ -1,10 +1,13 @@
 use crate::{
     common::SolanaRpcClient,
-    instruction::utils::raydium_cpmm_types::{pool_state_decode, PoolState},
+    instruction::utils::raydium_cpmm_types::{PoolState, pool_state_decode, POOL_STATE_SIZE},
     trading::core::params::RaydiumCpmmParams,
 };
 use anyhow::anyhow;
 use solana_sdk::pubkey::Pubkey;
+use solana_account_decoder::UiAccountData;
+use base64::Engine;
+use base64::engine::general_purpose::STANDARD;
 
 /// Constants used as seeds for deriving PDAs (Program Derived Addresses)
 pub mod seeds {
@@ -99,24 +102,245 @@ pub async fn get_pool_token_balances(
     Ok((token0_amount, token1_amount))
 }
 
-/// Calculate token price (token1/token0)
+/// Quote an exact-in swap against a Raydium CPMM pool.
 ///
-/// # Returns
-/// Returns the price of token1 relative to token0
-pub async fn calculate_price(
-    token0_amount: u64,
-    token1_amount: u64,
-    mint0_decimals: u8,
-    mint1_decimals: u8,
-) -> Result<f64, anyhow::Error> {
-    if token0_amount == 0 {
-        return Err(anyhow!("Token0 balance is zero, cannot calculate price"));
+/// - If `is_token0_in=true`: token0 -> token1
+/// - If `is_token0_in=false`: token1 -> token0
+pub async fn quote_exact_in(
+    rpc: &SolanaRpcClient,
+    pool_address: &Pubkey,
+    amount_in: u64,
+    is_token0_in: bool,
+) -> Result<crate::utils::quote::QuoteExactInResult, anyhow::Error> {
+    let pool_state = fetch_pool_state(rpc, pool_address).await?;
+    let (token0_reserve, token1_reserve) =
+        get_pool_token_balances(rpc, pool_address, &pool_state.token0_mint, &pool_state.token1_mint)
+            .await?;
+
+    let q = crate::utils::calc::raydium_cpmm::compute_swap_amount(
+        token0_reserve,
+        token1_reserve,
+        is_token0_in,
+        amount_in,
+        0,
+    );
+    Ok(crate::utils::quote::QuoteExactInResult {
+        amount_out: q.amount_out,
+        fee_amount: q.fee,
+        price_impact_bps: None,
+        extra_accounts_read: 2,
+    })
+}
+
+/// Find CPMM pool by mint address using getProgramAccounts
+/// This searches for pools containing the given mint as either token0 or token1
+pub async fn find_pool_by_mint(
+    rpc: &SolanaRpcClient,
+    mint: &Pubkey,
+) -> Result<(Pubkey, PoolState), anyhow::Error> {
+    use solana_account_decoder::UiAccountEncoding;
+    use solana_rpc_client_api::{
+        config::RpcProgramAccountsConfig,
+        filter::RpcFilterType,
+    };
+    use solana_client::rpc_filter::Memcmp;
+
+    // Try to find pool by token0_mint (offset 40 in PoolState after discriminator)
+    // PoolState structure: discriminator(8) + amm_config(32) + pool_creator(32) + ... + token0_mint(32) at offset 40
+    let filters_token0 = vec![
+        RpcFilterType::DataSize(POOL_STATE_SIZE as u64),
+        RpcFilterType::Memcmp(
+            Memcmp::new_base58_encoded(40, &mint.to_bytes()),
+        ),
+    ];
+
+    let config = RpcProgramAccountsConfig {
+        filters: Some(filters_token0),
+        account_config: solana_rpc_client_api::config::RpcAccountInfoConfig {
+            encoding: Some(UiAccountEncoding::Base64),
+            data_slice: None,
+            commitment: None,
+            min_context_slot: None,
+        },
+        with_context: None,
+        sort_results: None,
+    };
+
+    
+    let accounts = rpc.get_program_ui_accounts_with_config(&accounts::RAYDIUM_CPMM, config).await?;
+    
+    if !accounts.is_empty() {
+        for (addr, acc) in accounts {
+            let data_bytes = match &acc.data {
+                UiAccountData::Binary(base64_str, _) => {
+                    match STANDARD.decode(base64_str) {
+                        Ok(bytes) => bytes,
+                        Err(_) => continue,
+                    }
+                }
+                _ => continue,
+            };
+            if data_bytes.len() > 8 {
+                if let Some(pool_state) = pool_state_decode(&data_bytes[8..]) {
+                    // Verify it's the correct mint
+                    if pool_state.token0_mint == *mint || pool_state.token1_mint == *mint {
+                        return Ok((addr, pool_state));
+                    }
+                }
+            }
+        }
     }
-    // Consider decimal precision
-    let token0_adjusted = token0_amount as f64 / 10_f64.powi(mint0_decimals as i32);
-    let token1_adjusted = token1_amount as f64 / 10_f64.powi(mint1_decimals as i32);
-    let price = token1_adjusted / token0_adjusted;
-    Ok(price)
+
+    // Try to find pool by token1_mint (offset 72 in PoolState)
+    let filters_token1 = vec![
+        RpcFilterType::DataSize(POOL_STATE_SIZE as u64),
+        RpcFilterType::Memcmp(
+            Memcmp::new_base58_encoded(72, &mint.to_bytes()),
+        ),
+    ];
+
+    let config = RpcProgramAccountsConfig {
+        filters: Some(filters_token1),
+        account_config: solana_rpc_client_api::config::RpcAccountInfoConfig {
+            encoding: Some(UiAccountEncoding::Base64),
+            data_slice: None,
+            commitment: None,
+            min_context_slot: None,
+        },
+        with_context: None,
+        sort_results: None,
+    };
+
+    
+    let accounts = rpc.get_program_ui_accounts_with_config(&accounts::RAYDIUM_CPMM, config).await?;
+    
+    if !accounts.is_empty() {
+        for (addr, acc) in accounts {
+            let data_bytes = match &acc.data {
+                UiAccountData::Binary(base64_str, _) => {
+                    match STANDARD.decode(base64_str) {
+                        Ok(bytes) => bytes,
+                        Err(_) => continue,
+                    }
+                }
+                _ => continue,
+            };
+            if data_bytes.len() > 8 {
+                if let Some(pool_state) = pool_state_decode(&data_bytes[8..]) {
+                    // Verify it's the correct mint
+                    if pool_state.token0_mint == *mint || pool_state.token1_mint == *mint {
+                        return Ok((addr, pool_state));
+                    }
+                }
+            }
+        }
+    }
+
+    Err(anyhow::anyhow!("No CPMM pool found for mint {}", mint))
+}
+
+/// List all CPMM pools that contain the given mint as token0 or token1.
+///
+/// This is a discovery helper for routing/selection layers. It does NOT pick a best pool.
+
+pub async fn list_pools_by_mint(
+    rpc: &SolanaRpcClient,
+    mint: &Pubkey,
+) -> Result<Vec<(Pubkey, PoolState)>, anyhow::Error> {
+    use solana_account_decoder::UiAccountEncoding;
+    use solana_rpc_client_api::{config::RpcProgramAccountsConfig, filter::RpcFilterType};
+    use solana_client::rpc_filter::Memcmp;
+    use std::collections::HashSet;
+
+    let mut out: Vec<(Pubkey, PoolState)> = Vec::new();
+    let mut seen: HashSet<String> = HashSet::new();
+
+    // token0_mint offset 40
+    let filters_token0 = vec![
+        RpcFilterType::DataSize(POOL_STATE_SIZE as u64),
+        RpcFilterType::Memcmp(Memcmp::new_base58_encoded(40, &mint.to_bytes())),
+    ];
+    let config = RpcProgramAccountsConfig {
+        filters: Some(filters_token0),
+        account_config: solana_rpc_client_api::config::RpcAccountInfoConfig {
+            encoding: Some(UiAccountEncoding::Base64),
+            data_slice: None,
+            commitment: None,
+            min_context_slot: None,
+        },
+        with_context: None,
+        sort_results: None,
+    };
+    let accounts = rpc
+        .get_program_ui_accounts_with_config(&accounts::RAYDIUM_CPMM, config)
+        .await?;
+    for (addr, acc) in accounts {
+        let data_bytes = match &acc.data {
+            UiAccountData::Binary(base64_str, _) => {
+                match STANDARD.decode(base64_str) {
+                    Ok(bytes) => bytes,
+                    Err(_) => continue,
+                }
+            }
+            _ => continue,
+        };
+        if data_bytes.len() > 8 {
+            if let Some(pool_state) = pool_state_decode(&data_bytes[8..]) {
+                if pool_state.token0_mint == *mint || pool_state.token1_mint == *mint {
+                    let k = addr.to_string();
+                    if seen.insert(k) {
+                        out.push((addr, pool_state));
+                    }
+                }
+            }
+        }
+    }
+
+    // token1_mint offset 72
+    let filters_token1 = vec![
+        RpcFilterType::DataSize(POOL_STATE_SIZE as u64),
+        RpcFilterType::Memcmp(Memcmp::new_base58_encoded(72, &mint.to_bytes())),
+    ];
+    let config = RpcProgramAccountsConfig {
+        filters: Some(filters_token1),
+        account_config: solana_rpc_client_api::config::RpcAccountInfoConfig {
+            encoding: Some(UiAccountEncoding::Base64),
+            data_slice: None,
+            commitment: None,
+            min_context_slot: None,
+        },
+        with_context: None,
+        sort_results: None,
+    };
+    let accounts = rpc
+        .get_program_ui_accounts_with_config(&accounts::RAYDIUM_CPMM, config)
+        .await?;
+    for (addr, acc) in accounts {
+        let data_bytes = match &acc.data {
+            UiAccountData::Binary(base64_str, _) => {
+                match STANDARD.decode(base64_str) {
+                    Ok(bytes) => bytes,
+                    Err(_) => continue,
+                }
+            }
+            _ => continue,
+        };
+        if data_bytes.len() > 8 {
+            if let Some(pool_state) = pool_state_decode(&data_bytes[8..]) {
+                if pool_state.token0_mint == *mint || pool_state.token1_mint == *mint {
+                    let k = addr.to_string();
+                    if seen.insert(k) {
+                        out.push((addr, pool_state));
+                    }
+                }
+            }
+        }
+    }
+
+    if out.is_empty() {
+        return Err(anyhow::anyhow!("No CPMM pool found for mint {}", mint));
+    }
+    Ok(out)
 }
 
 /// Helper function to get token vault account address
