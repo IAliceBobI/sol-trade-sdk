@@ -5,6 +5,7 @@ pub mod raydium_amm_v4;
 pub mod raydium_clmm;
 pub mod raydium_cpmm;
 pub mod meteora_damm_v2;
+pub mod raydium_launchlab;
 
 // types
 pub mod bonk_types;

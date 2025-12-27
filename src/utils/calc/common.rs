@@ -25,7 +25,7 @@ pub const fn compute_fee(amount: u128, fee_basis_points: u128) -> u128 {
 /// Returns the ceiling result of a/b
 #[inline(always)]
 pub const fn ceil_div(a: u128, b: u128) -> u128 {
-    (a + b - 1) / b
+    a.div_ceil(b)
 }
 
 /// Calculate buy amount with slippage protection
@@ -59,9 +59,5 @@ pub const fn calculate_with_slippage_buy(amount: u64, basis_points: u64) -> u64 
 /// * basis_points = 500 -> 5% slippage
 #[inline(always)]
 pub const fn calculate_with_slippage_sell(amount: u64, basis_points: u64) -> u64 {
-    if amount <= basis_points / 10000 {
-        1
-    } else {
-        amount - (amount * basis_points / 10000)
-    }
+    if amount <= basis_points / 10000 { 1 } else { amount - (amount * basis_points / 10000) }
 }

@@ -74,19 +74,19 @@ impl BondingCurveAccount {
         let account = if bonding_curve != Pubkey::default() {
             bonding_curve
         } else {
-            get_bonding_curve_pda(&mint).unwrap()
+            get_bonding_curve_pda(mint).unwrap()
         };
         Self {
             discriminator: 0,
-            account: account,
+            account,
             virtual_token_reserves: INITIAL_VIRTUAL_TOKEN_RESERVES - dev_token_amount,
             virtual_sol_reserves: INITIAL_VIRTUAL_SOL_RESERVES + dev_sol_amount,
             real_token_reserves: INITIAL_REAL_TOKEN_RESERVES - dev_token_amount,
             real_sol_reserves: dev_sol_amount,
             token_total_supply: TOKEN_TOTAL_SUPPLY,
             complete: false,
-            creator: creator,
-            is_mayhem_mode: is_mayhem_mode,
+            creator,
+            is_mayhem_mode,
         }
     }
 
@@ -107,15 +107,15 @@ impl BondingCurveAccount {
         };
         Self {
             discriminator: 0,
-            account: account,
-            virtual_token_reserves: virtual_token_reserves,
-            virtual_sol_reserves: virtual_sol_reserves,
-            real_token_reserves: real_token_reserves,
-            real_sol_reserves: real_sol_reserves,
+            account,
+            virtual_token_reserves,
+            virtual_sol_reserves,
+            real_token_reserves,
+            real_sol_reserves,
             token_total_supply: TOKEN_TOTAL_SUPPLY,
             complete: false,
-            creator: creator,
-            is_mayhem_mode: is_mayhem_mode,
+            creator,
+            is_mayhem_mode,
         }
     }
 
@@ -240,9 +240,127 @@ impl BondingCurveAccount {
     }
 
     pub fn get_token_price(&self) -> f64 {
-        let v_sol = self.virtual_sol_reserves as f64 / 100_000_000.0;
-        let v_tokens = self.virtual_token_reserves as f64 / 100_000.0;
-        let token_price = v_sol / v_tokens;
-        token_price
+        // SOL has 9 decimals, so divide by 10^9
+        let v_sol = self.virtual_sol_reserves as f64 / 1_000_000_000.0;
+        // Token decimals vary, but for Raydium LaunchLab, we need to use the actual token decimals
+        // For now, use a reasonable default (6 decimals like PumpFun)
+        // This should be updated to use actual token decimals when available
+        let v_tokens = self.virtual_token_reserves as f64 / 1_000_000.0;
+
+        if v_tokens == 0.0 {
+            return 0.0;
+        }
+        v_sol / v_tokens
+    }
+
+    /// Get token price with explicit decimals
+    pub fn get_token_price_with_decimals(&self, token_decimals: u8) -> f64 {
+        // SOL has 9 decimals
+        let v_sol = self.virtual_sol_reserves as f64 / 1_000_000_000.0;
+        // Use actual token decimals
+        let token_scale = 10_f64.powi(token_decimals as i32);
+        let v_tokens = self.virtual_token_reserves as f64 / token_scale;
+
+        if v_tokens == 0.0 {
+            return 0.0;
+        }
+        v_sol / v_tokens
+    }
+
+    /// Calculates the amount of tokens received for a given SOL amount
+    /// using Raydium LaunchLab's constant product curve formula.
+    /// 
+    /// This differs from PumpFun's formula:
+    /// - Raydium uses dynamic reserves: inputReserve = virtualB + realB, outputReserve = virtualA - realA
+    /// - PumpFun uses: inputReserve = virtualB, outputReserve = virtualA
+    /// 
+    /// # Arguments
+    /// * `sol_amount` - Amount of SOL to spend (after fees have been deducted)
+    /// 
+    /// # Returns
+    /// * `Ok(u64)` - Amount of tokens that would be received
+    /// * `Err(&str)` - Error message if curve is complete
+    pub fn get_buy_price_raydium(&self, sol_amount: u64) -> Result<u64, &'static str> {
+        if self.complete {
+            return Err("Curve is complete");
+        }
+
+        if sol_amount == 0 {
+            return Ok(0);
+        }
+
+        // Raydium LaunchLab formula:
+        // inputReserve = virtualB + realB (virtual_sol_reserves + real_sol_reserves)
+        // outputReserve = virtualA - realA (virtual_token_reserves - real_token_reserves)
+        // amountOut = amountIn * outputReserve / (inputReserve + amountIn)
+        
+        let input_reserve: u128 = (self.virtual_sol_reserves as u128) + (self.real_sol_reserves as u128);
+        let output_reserve: u128 = (self.virtual_token_reserves as u128).saturating_sub(self.real_token_reserves as u128);
+        
+        if output_reserve == 0 {
+            return Ok(0);
+        }
+        
+        let amount_in: u128 = sol_amount as u128;
+        let numerator: u128 = amount_in * output_reserve;
+        let denominator: u128 = input_reserve + amount_in;
+        
+        let amount_out = numerator / denominator;
+        
+        // Cap at remaining real token reserves
+        let amount_out_u64 = amount_out as u64;
+        Ok(if amount_out_u64 < self.real_token_reserves { 
+            amount_out_u64 
+        } else { 
+            self.real_token_reserves 
+        })
+    }
+
+    /// Calculates the amount of tokens received after applying Raydium LaunchLab fees.
+    /// 
+    /// # Arguments
+    /// * `sol_amount` - Amount of SOL to spend (before fees)
+    /// * `protocol_fee_rate` - Protocol fee rate (from GlobalConfig.trade_fee_rate, in basis points * 100, e.g. 10000 = 1%)
+    /// * `platform_fee_rate` - Platform fee rate (from PlatformConfig.fee_rate, in basis points * 100)
+    /// * `creator_fee_rate` - Creator fee rate (from PlatformConfig.creator_fee_rate, in basis points * 100)
+    /// * `share_fee_rate` - Share fee rate (typically 0)
+    /// 
+    /// # Returns
+    /// * `Ok(u64)` - Amount of tokens that would be received after fees
+    /// * `Err(&str)` - Error message if calculation fails
+    pub fn get_buy_price_raydium_with_fees(
+        &self, 
+        sol_amount: u64,
+        protocol_fee_rate: u64,
+        platform_fee_rate: u64,
+        creator_fee_rate: u64,
+        share_fee_rate: u64,
+    ) -> Result<u64, &'static str> {
+        if self.complete {
+            return Err("Curve is complete");
+        }
+
+        if sol_amount == 0 {
+            return Ok(0);
+        }
+
+        // Calculate total fee rate
+        // Fee rate denominator is 1_000_000 (FEE_RATE_DENOMINATOR_VALUE in SDK)
+        const FEE_RATE_DENOMINATOR: u128 = 1_000_000;
+        let total_fee_rate = protocol_fee_rate as u128 
+            + platform_fee_rate as u128 
+            + creator_fee_rate as u128 
+            + share_fee_rate as u128;
+        
+        // Calculate fee amount using ceiling division
+        // fee = ceil(amount * fee_rate / denominator)
+        let sol_amount_u128 = sol_amount as u128;
+        let fee = (sol_amount_u128 * total_fee_rate + FEE_RATE_DENOMINATOR - 1) / FEE_RATE_DENOMINATOR;
+        
+        // Amount after fees
+        let amount_less_fee = sol_amount_u128.saturating_sub(fee) as u64;
+        
+        // Calculate tokens using Raydium formula
+        self.get_buy_price_raydium(amount_less_fee)
     }
 }
