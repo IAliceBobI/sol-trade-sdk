@@ -187,13 +187,27 @@ impl SIMDMemoryOps {
     unsafe fn memcmp_small(a: *const u8, b: *const u8, len: usize) -> bool {
         match len {
             1 => *a == *b,
-            2 => *(a as *const u16) == *(b as *const u16),
-            3 => {
-                *(a as *const u16) == *(b as *const u16) &&
-                *a.add(2) == *b.add(2)
+            2 => {
+                // 使用 unaligned read 避免对齐问题
+                let a_val = (a as *const u16).read_unaligned();
+                let b_val = (b as *const u16).read_unaligned();
+                a_val == b_val
             }
-            4 => *(a as *const u32) == *(b as *const u32),
-            5..=8 => *(a as *const u64) == *(b as *const u64),
+            3 => {
+                let a_val = (a as *const u16).read_unaligned();
+                let b_val = (b as *const u16).read_unaligned();
+                a_val == b_val && *a.add(2) == *b.add(2)
+            }
+            4 => {
+                let a_val = (a as *const u32).read_unaligned();
+                let b_val = (b as *const u32).read_unaligned();
+                a_val == b_val
+            }
+            5..=8 => {
+                let a_val = (a as *const u64).read_unaligned();
+                let b_val = (b as *const u64).read_unaligned();
+                a_val == b_val
+            }
             _ => unreachable!(),
         }
     }

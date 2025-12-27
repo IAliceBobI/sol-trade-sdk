@@ -764,8 +764,8 @@ mod tests {
         assert_eq!(config.syscall_cache_size, 10000);
     }
     
-    #[test]
-    fn test_userspace_allocation() {
+    #[tokio::test]
+    async fn test_userspace_allocation() {
         let config = SyscallBypassConfig::default();
         let manager = SystemCallBypassManager::new(config).unwrap();
         

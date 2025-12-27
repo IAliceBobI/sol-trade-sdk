@@ -1,0 +1,16 @@
+[package]
+name = "pumpfun_buy_test"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "pumpfun_buy_test"
+path = "src/main.rs"
+
+[dependencies]
+sol-trade-sdk = { path = "../.." }
+solana-sdk = "3.0.0"
+solana-commitment-config = "3.0.0"
+tokio = { version = "1", features = ["full"] }
+anyhow = "1.0"
+env_logger = "0.11"

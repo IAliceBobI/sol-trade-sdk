@@ -786,7 +786,7 @@ impl TradingClient {
     ///
     /// # Example
     ///
-    /// ```no_run
+    /// ```ignore
     /// use sol_trade_sdk::SolanaTrade;
     /// use solana_sdk::signature::Keypair;
     /// use std::sync::Arc;

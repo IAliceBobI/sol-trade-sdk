@@ -16,6 +16,7 @@ readme = "README.md"
 
 [workspace]
 members = [
+    "examples/pumpfun_buy_test",
     "examples/trading_client",
     "examples/middleware_system",
     "examples/pumpfun_copy_trading",
