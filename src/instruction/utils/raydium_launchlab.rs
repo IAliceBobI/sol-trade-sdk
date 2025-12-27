@@ -1,13 +1,9 @@
 use crate::common::{SolanaRpcClient, bonding_curve::BondingCurveAccount};
 use solana_sdk::{
     instruction::{AccountMeta, Instruction},
-    pubkey,
     pubkey::Pubkey,
 };
 use std::sync::Arc;
-use solana_account_decoder::UiAccountData;
-use base64::Engine;
-use base64::engine::general_purpose::STANDARD;
 
 /// Constants used as seeds for deriving PDAs (Program Derived Addresses)
 pub mod seeds {
@@ -189,7 +185,7 @@ pub struct MigrateNftInfo {
 
 /// PlatformConfig structure for Raydium LaunchLab
 /// Based on SDK layout.ts:
-/// ```
+/// ```ignore
 /// export const PlatformConfig = struct([
 ///   u64(),  // discriminator
 ///   u64("epoch"),
