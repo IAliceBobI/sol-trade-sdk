@@ -1,5 +1,5 @@
 use sol_trade_sdk::common::address_lookup::fetch_address_lookup_table_account;
-use sol_trade_sdk::common::{gas_fee_strategy, GasFeeStrategy, TradeConfig};
+use sol_trade_sdk::common::{GasFeeStrategy, TradeConfig};
 use sol_trade_sdk::{
     common::AnyResult,
     swqos::SwqosConfig,
