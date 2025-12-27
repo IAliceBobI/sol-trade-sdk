@@ -5,32 +5,32 @@ pub mod perf;
 pub mod swqos;
 pub mod trading;
 pub mod utils;
-use crate::common::nonce_cache::DurableNonceInfo;
 use crate::common::GasFeeStrategy;
 use crate::common::TradeConfig;
-use crate::constants::trade::trade::DEFAULT_SLIPPAGE;
+use crate::common::nonce_cache::DurableNonceInfo;
 use crate::constants::SOL_TOKEN_ACCOUNT;
 use crate::constants::USD1_TOKEN_ACCOUNT;
 use crate::constants::USDC_TOKEN_ACCOUNT;
 use crate::constants::WSOL_TOKEN_ACCOUNT;
-use crate::swqos::common::TradeError;
+#[cfg(feature = "perf-trace")]
+use crate::constants::trade::trade::DEFAULT_SLIPPAGE;
 use crate::swqos::SwqosClient;
 use crate::swqos::SwqosConfig;
 use crate::swqos::TradeType;
-use crate::trading::core::params::BonkParams;
-use crate::trading::core::params::MeteoraDammV2Params;
-use crate::trading::core::params::PumpFunParams;
-use crate::trading::core::params::PumpSwapParams;
-use crate::trading::core::params::RaydiumAmmV4Params;
-use crate::trading::core::params::RaydiumCpmmParams;
-use crate::trading::core::params::DexParamEnum;
-use crate::trading::factory::DexType;
+use crate::swqos::common::TradeError;
 use crate::trading::MiddlewareManager;
 use crate::trading::SwapParams;
 use crate::trading::TradeFactory;
+use crate::trading::core::params::BonkParams;
+use crate::trading::core::params::DexParamEnum;
+use crate::trading::core::params::MeteoraDammV2Params;
+use crate::trading::core::params::PumpFunParams;
+use crate::trading::core::params::PumpSwapParams;
+use crate::trading::core::params::{RaydiumAmmV4Params, RaydiumClmmParams, RaydiumCpmmParams};
+use crate::trading::factory::DexType;
 use common::SolanaRpcClient;
 use parking_lot::Mutex;
-use rustls::crypto::{ring::default_provider, CryptoProvider};
+use rustls::crypto::{CryptoProvider, ring::default_provider};
 use solana_sdk::hash::Hash;
 use solana_sdk::message::AddressLookupTableAccount;
 use solana_sdk::signer::Signer;
@@ -56,7 +56,7 @@ pub struct TradingClient {
     pub payer: Arc<Keypair>,
     /// RPC client for blockchain interactions
     pub rpc: Arc<SolanaRpcClient>,
-    /// SWQOS clients for transaction priority and routing
+    /// SWQOS (Stake-Weighted Quality of Service) clients for transaction priority and routing
     pub swqos_clients: Vec<Arc<SwqosClient>>,
     /// Optional middleware manager for custom transaction processing
     pub middleware_manager: Option<Arc<MiddlewareManager>>,
@@ -171,14 +171,12 @@ pub struct TradeSellParams {
 impl TradingClient {
     /// Creates a new SolTradingSDK instance with the specified configuration
     ///
-    /// This function initializes the trading system with RPC connection, SWQOS settings,
-    /// and sets up necessary components for trading operations.
+    /// 此函数负责初始化整个交易系统的所有必要组件，包括 RPC 连接、SWQOS 配置、
+    /// 加密提供者、缓存预热等，确保实例创建后即可立即用于交易操作。
     ///
-    /// # Arguments
-    /// * `payer` - The keypair used for signing transactions
-    /// * `rpc_url` - Solana RPC endpoint URL
-    /// * `commitment` - Transaction commitment level for RPC calls
-    /// * `swqos_settings` - List of SWQOS (Solana Web Quality of Service) configurations
+    /// # 参数
+    /// * `payer` - 用于签名所有交易的密钥对（Keypair），此账户将用于支付交易费用和代币交易
+    /// * `trade_config` - 交易配置对象，包含 RPC URL、SWQOS 配置、确认级别等设置
     ///
     /// # Returns
     /// Returns a configured `SolTradingSDK` instance ready for trading operations
@@ -198,20 +196,9 @@ impl TradingClient {
         let mut swqos_clients: Vec<Arc<SwqosClient>> = vec![];
 
         for swqos in swqos_configs {
-            // Check blacklist, skip disabled providers
-            if swqos.is_blacklisted() {
-                eprintln!("\u{26a0}\u{fe0f} SWQOS {:?} is blacklisted, skipping", swqos.swqos_type());
-                continue;
-            }
-            match SwqosConfig::get_swqos_client(rpc_url.clone(), commitment.clone(), swqos.clone())
-                .await
-            {
-                Ok(swqos_client) => swqos_clients.push(swqos_client),
-                Err(err) => eprintln!(
-                    "failed to create {:?} swqos client: {err}. Excluding from swqos list",
-                    swqos.swqos_type()
-                ),
-            }
+            let swqos_client =
+                SwqosConfig::get_swqos_client(rpc_url.clone(), commitment.clone(), swqos.clone());
+            swqos_clients.push(swqos_client);
         }
 
         let rpc =
@@ -440,6 +427,9 @@ impl TradingClient {
             DexType::RaydiumAmmV4 => {
                 protocol_params.as_any().downcast_ref::<RaydiumAmmV4Params>().is_some()
             }
+            DexType::RaydiumClmm => {
+                protocol_params.as_any().downcast_ref::<RaydiumClmmParams>().is_some()
+            }
             DexType::MeteoraDammV2 => {
                 protocol_params.as_any().downcast_ref::<MeteoraDammV2Params>().is_some()
             }
@@ -555,6 +545,9 @@ impl TradingClient {
             DexType::RaydiumAmmV4 => {
                 protocol_params.as_any().downcast_ref::<RaydiumAmmV4Params>().is_some()
             }
+            DexType::RaydiumClmm => {
+                protocol_params.as_any().downcast_ref::<RaydiumClmmParams>().is_some()
+            }
             DexType::MeteoraDammV2 => {
                 protocol_params.as_any().downcast_ref::<MeteoraDammV2Params>().is_some()
             }
@@ -584,7 +577,7 @@ impl TradingClient {
     ///
     /// # Returns
     ///
-    /// Returns `Ok(Signature)` with the transaction signature if the sell order is successfully executed,
+    /// Returns `Ok((bool, Vec<Signature>, Option<TradeError>))` with success flag and all transaction signatures,
     /// or an error if the transaction fails.
     ///
     /// # Errors
@@ -731,8 +724,10 @@ impl TradingClient {
     /// - 交易执行或确认失败
     /// - 网络或 RPC 错误
     pub async fn wrap_wsol_to_sol(&self, amount: u64) -> Result<String, anyhow::Error> {
-        use crate::trading::common::wsol_manager::{wrap_wsol_to_sol as wrap_wsol_to_sol_internal, wrap_wsol_to_sol_without_create};
         use crate::common::seed::get_associated_token_address_with_program_id_use_seed;
+        use crate::trading::common::wsol_manager::{
+            wrap_wsol_to_sol as wrap_wsol_to_sol_internal, wrap_wsol_to_sol_without_create,
+        };
         use solana_sdk::transaction::Transaction;
 
         // 检查临时seed账户是否已存在
@@ -753,9 +748,147 @@ impl TradingClient {
         };
 
         let recent_blockhash = self.rpc.get_latest_blockhash().await?;
-        let mut transaction = Transaction::new_with_payer(&instructions, Some(&self.payer.pubkey()));
+        let mut transaction =
+            Transaction::new_with_payer(&instructions, Some(&self.payer.pubkey()));
         transaction.sign(&[&*self.payer], recent_blockhash);
         let signature = self.rpc.send_and_confirm_transaction(&transaction).await?;
         Ok(signature.to_string())
+    }
+
+    /// Creates a new token on PumpFun bonding curve
+    ///
+    /// This function creates a new SPL token and initializes its bonding curve on PumpFun.
+    /// You can choose between the traditional `create` instruction (Token program) or
+    /// the newer `create_v2` instruction (Token2022 with Mayhem mode support).
+    ///
+    /// # Arguments
+    /// * `name` - Token name
+    /// * `symbol` - Token symbol (max 10 characters)
+    /// * `uri` - Metadata URI (JSON metadata URL)
+    /// * `use_v2` - Whether to use create_v2 (Token2022 + Mayhem support). If false, uses traditional create
+    /// * `is_mayhem_mode` - Whether to enable Mayhem mode (only for create_v2)
+    ///
+    /// # Returns
+    /// * `Ok((Pubkey, String))` - Tuple of (mint address, transaction signature) if successful
+    /// * `Err(anyhow::Error)` - If the transaction fails to execute
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if:
+    /// - Token name or symbol is empty
+    /// - Symbol exceeds 10 characters
+    /// - Mint keypair generation fails
+    /// - Transaction fails to execute or confirm
+    /// - Network or RPC errors occur
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// use sol_trade_sdk::SolanaTrade;
+    /// use solana_sdk::signature::Keypair;
+    /// use std::sync::Arc;
+    ///
+    /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+    /// let payer = Arc::new(Keypair::new());
+    /// let trade_config = /* ... */;
+    /// let solana_trade = SolanaTrade::new(payer, trade_config).await;
+    ///
+    /// // Create token with create_v2 (Token2022 + Mayhem support)
+    /// let (mint, signature) = solana_trade
+    ///     .create_pumpfun_token(
+    ///         "My Token".to_string(),
+    ///         "MTK".to_string(),
+    ///         "https://example.com/metadata.json".to_string(),
+    ///         true,  // use_v2
+    ///         false, // is_mayhem_mode
+    ///     )
+    ///     .await?;
+    ///
+    /// println!("Token created! Mint: {}, Signature: {}", mint, signature);
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn create_pumpfun_token(
+        &self,
+        name: String,
+        symbol: String,
+        uri: String,
+        use_v2: bool,
+        is_mayhem_mode: bool,
+    ) -> Result<(Pubkey, String), anyhow::Error> {
+        use crate::instruction::pumpfun::{CreateTokenParams, PumpFunInstructionBuilder};
+        use solana_sdk::transaction::Transaction;
+
+        // Validate inputs
+        if name.trim().is_empty() {
+            return Err(anyhow::anyhow!("Token name cannot be empty"));
+        }
+        if symbol.trim().is_empty() {
+            return Err(anyhow::anyhow!("Token symbol cannot be empty"));
+        }
+        if symbol.len() > 10 {
+            return Err(anyhow::anyhow!("Token symbol must be 10 characters or less"));
+        }
+        if use_v2 && is_mayhem_mode {
+            // Mayhem mode is experimental and high-risk
+            // We allow it but don't enforce any restrictions here
+        }
+
+        // Generate mint keypair
+        let mint = Arc::new(Keypair::new());
+
+        // Build create instruction
+        let create_params = CreateTokenParams {
+            mint: mint.clone(),
+            name,
+            symbol,
+            uri,
+            creator: self.payer.pubkey(),
+            use_v2,
+            is_mayhem_mode,
+        };
+
+        let instruction = if use_v2 {
+            PumpFunInstructionBuilder::build_create_v2_instruction(&create_params)?
+        } else {
+            PumpFunInstructionBuilder::build_create_instruction(&create_params)?
+        };
+
+        // Build and send transaction
+        // Reference: pumpfun-bonkfun-bot uses Transaction([payer, mint_keypair], message, recent_blockhash)
+        // Signers order: payer first (as fee payer), then mint (as instruction signer)
+        let recent_blockhash = self.rpc.get_latest_blockhash().await?;
+
+        // Build message first, then create transaction with signers
+        // Reference: pumpfun-bonkfun-bot uses Transaction([payer, mint_keypair], message, recent_blockhash)
+        // Signers order: payer first (as fee payer), then mint (as instruction signer)
+
+        // 为什么需要 Message？
+        // 在 Solana 中，Transaction 由两部分组成：
+        // 1. Message: 包含交易的逻辑信息（指令、账户、fee payer、blockhash 等）
+        // 2. signatures: 签名数组
+        //
+        // 为什么使用 Message::new() + Transaction::new_unsigned()？
+        // - 需要精确控制签名者顺序：payer 作为 fee payer（必须在 message.account_keys[0]），
+        //   mint 作为 instruction signer（在指令账户列表中标记为 signer）
+        // - 如果使用 Transaction::new_with_payer()，签名顺序可能不符合要求
+        //
+        // 与 IDL 的关系：
+        // - IDL 文件定义了程序的接口（指令名称、参数、账户结构），主要用于代码生成和接口定义
+        // - 这里手动构建了 instruction（通过 build_create_instruction），不依赖 IDL 来创建 Message
+        // - IDL 不直接参与运行时交易构建，Message 的创建使用的是 Solana SDK 的底层 API
+        use solana_sdk::message::Message;
+        let message = Message::new(&[instruction], Some(&self.payer.pubkey()));
+
+        // Create transaction with signers in correct order: [payer, mint]
+        // payer is fee payer (first in message.account_keys), mint is instruction signer
+        let mut transaction = Transaction::new_unsigned(message);
+
+        // Sign transaction: payer first (as fee payer), then mint (as instruction signer)
+        transaction.sign(&[&*self.payer, &*mint], recent_blockhash);
+
+        let signature = self.rpc.send_and_confirm_transaction(&transaction).await?;
+
+        Ok((mint.pubkey(), signature.to_string()))
     }
 }
