@@ -15,6 +15,13 @@
 - [TRADING_PARAMETERS.md](file://docs/TRADING_PARAMETERS.md)
 </cite>
 
+## 更新摘要
+**已更改内容**  
+- 在“PumpSwap交换指令构造”部分新增了“池发现与优先级排序”子章节，详细说明了`find_by_mint`函数的优先级排序逻辑
+- 在“价格计算与滑点管理”部分新增了“交换报价功能”子章节，介绍了`quote_exact_in`函数的使用
+- 更新了“PumpSwap交易模式”部分的流程图，以反映新的池发现流程
+- 更新了相关代码示例的引用
+
 ## 目录
 1. [简介](#简介)
 2. [PumpSwap交易模式](#pumpswap交易模式)
@@ -76,6 +83,20 @@ PumpSwap交换指令的构造是交易执行的核心环节。指令构造过程
 
 在PumpSwap中，交易路径的选择基于流动性池的配置。每个池由一个基础代币（base token）和一个报价代币（quote token）组成，通常报价代币是SOL或USDC。SDK通过`find_by_mint`函数根据代币的mint地址查找对应的流动性池。该函数会同时检查基础代币和报价代币的匹配情况，确保找到正确的交易路径。
 
+### 池发现与优先级排序
+
+`find_by_mint`函数实现了多级优先级的池发现机制，确保找到最优的交易池。该函数的优先级排序逻辑如下：
+
+1. **优先级1：查找规范池（Canonical Pool）** - 首先尝试查找规范池（mint/WSOL配对），这是PumpFun迁移代币最常见的场景。通过`calculate_canonical_pool_pda`函数计算规范池的PDA地址，并验证其是否为mint/WSOL池。
+
+2. **优先级2：列出所有池并优先选择WSOL配对** - 如果规范池不存在，则列出指定代币的所有池，并优先选择与WSOL配对的池。这些池按流动性提供者（LP）供应量排序，优先选择流动性最高的WSOL配对池。
+
+3. **优先级3：选择流动性最高的池** - 如果没有找到WSOL配对的池，则返回所有池中流动性最高的池。
+
+4. **后备方案：尝试单独的查找函数** - 作为向后兼容的后备方案，尝试使用`find_by_base_mint`和`find_by_quote_mint`函数。
+
+这种优先级排序机制确保了交易能够优先使用流动性最好的WSOL配对池，从而获得最优的交易执行价格。
+
 ### 指令构造流程
 
 指令构造流程从参数验证开始，确保所有必要参数都已正确设置。然后进行交易计算，确定输入输出金额。最后，构造包含多个步骤的指令序列，包括创建关联代币账户（ATA）、执行交换和关闭临时账户。
@@ -100,6 +121,7 @@ J --> K[返回指令序列]
 **Section sources**
 - [pumpswap.rs](file://src/instruction/pumpswap.rs#L28-L214)
 - [pumpswap_types.rs](file://src/instruction/utils/pumpswap_types.rs#L1-L28)
+- [pumpswap.rs](file://src/instruction/utils/pumpswap.rs#L355-L408)
 
 ## 价格计算与滑点管理
 
@@ -115,6 +137,16 @@ PumpSwap的价格计算基于常数乘积公式。当用户购买代币时，需
 
 滑点容忍度通过`slippage_basis_points`参数设置，以基点（basis points）为单位。例如，500个基点等于5%的滑点容忍度。在指令构造过程中，SDK会根据设置的滑点计算最大可接受的输入金额或最小可接受的输出金额，以保护交易者免受价格剧烈波动的影响。
 
+### 交换报价功能
+
+SDK新增了`quote_exact_in`函数，用于对PumpSwap池进行精确输入的交换报价。该函数可以根据指定的输入金额，预计算出预期的输出金额和交易费用，而无需实际执行交易。这对于交易策略的模拟和优化非常有用。
+
+`quote_exact_in`函数支持两种交换方向：
+- 当`is_base_in=true`时，执行基础代币到报价代币的交换（base -> quote）
+- 当`is_base_in=false`时，执行报价代币到基础代币的交换（quote -> base）
+
+该函数返回一个`QuoteExactInResult`结构体，包含预计的输出金额、交易费用和额外读取的账户数量等信息。通过使用此功能，开发者可以在提交交易前准确评估交易的执行效果，从而做出更明智的交易决策。
+
 ```mermaid
 flowchart TD
 A[开始] --> B[获取池储备量]
@@ -127,10 +159,12 @@ E --> F[返回计算结果]
 **Diagram sources**
 - [calc.rs](file://src/utils/calc/pumpswap.rs#L1-L276)
 - [price.rs](file://src/utils/price/pumpswap.rs#L1-L48)
+- [pumpswap.rs](file://src/instruction/utils/pumpswap.rs#L522-L572)
 
 **Section sources**
 - [calc.rs](file://src/utils/calc/pumpswap.rs#L1-L276)
 - [price.rs](file://src/utils/price/pumpswap.rs#L1-L48)
+- [pumpswap.rs](file://src/instruction/utils/pumpswap.rs#L522-L572)
 
 ## 直接交易模式
 

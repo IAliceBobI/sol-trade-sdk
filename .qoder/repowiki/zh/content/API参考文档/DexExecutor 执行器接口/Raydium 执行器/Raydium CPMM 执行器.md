@@ -14,6 +14,13 @@
 - [main.rs](file://examples/raydium_cpmm_trading/src/main.rs)
 </cite>
 
+## 更新摘要
+**已更改内容**
+- 新增了池发现功能的详细说明，包括`find_pool_by_mint`和`list_pools_by_mint`函数的实现和使用
+- 更新了交换计算逻辑部分，增加了`quote_exact_in`函数的说明
+- 扩展了PDA派生逻辑与作用章节，增加了池发现相关的PDA查询机制
+- 更新了交换金额计算逻辑部分，增加了链上查询和验证的流程
+
 ## 目录
 1. [简介](#简介)
 2. [核心组件](#核心组件)
@@ -116,6 +123,9 @@ ACCOUNT_META }o-- OBSERVATION_STATE_ACCOUNT : "Observation State Account"
 ### Vault Account PDA
 `get_vault_account`函数使用`get_vault_pda`派生金库账户，种子为`"pool_vault"`、池状态和代币铸币。这些账户存储池中的代币余额。
 
+### 池发现机制
+新增了池发现功能，通过`find_pool_by_mint`和`list_pools_by_mint`函数实现。这些函数使用RPC查询在Raydium CPMM程序中查找包含指定代币铸币的池。查询通过`get_program_ui_accounts_with_config`方法执行，使用`DataSize`和`Memcmp`过滤器来定位池状态账户。
+
 ```mermaid
 classDiagram
 class PdaDeriver {
@@ -128,16 +138,23 @@ class Seeds {
 +OBSERVATION_STATE_SEED : &[u8]
 +POOL_VAULT_SEED : &[u8]
 }
+class PoolDiscovery {
++find_pool_by_mint(rpc, mint) Result<(Pubkey, PoolState)>
++list_pools_by_mint(rpc, mint) Result<Vec<(Pubkey, PoolState)>>
+}
 PdaDeriver --> Seeds : "使用"
+PoolDiscovery --> PdaDeriver : "依赖"
 ```
 
 **Diagram sources**
 - [raydium_cpmm.rs](file://src/instruction/utils/raydium_cpmm.rs#L51-L71)
 - [raydium_cpmm.rs](file://src/instruction/utils/raydium_cpmm.rs#L131-L142)
+- [raydium_cpmm.rs](file://src/instruction/utils/raydium_cpmm.rs#L134-L239)
 
 **Section sources**
 - [raydium_cpmm.rs](file://src/instruction/utils/raydium_cpmm.rs#L51-L71)
 - [raydium_cpmm.rs](file://src/instruction/utils/raydium_cpmm.rs#L131-L142)
+- [raydium_cpmm.rs](file://src/instruction/utils/raydium_cpmm.rs#L134-L239)
 
 ## 指令数据编码差异
 
@@ -183,6 +200,8 @@ E --> F
 
 `compute_swap_amount`函数在集中流动性场景下执行交换金额计算。计算过程考虑交易费用、协议费用和滑点保护。首先确定输入和输出储备，然后调用`swap_base_input`计算交换结果。交易费用使用上限除法计算，而协议和基金费用使用下限除法。最小输出金额通过应用滑点百分比计算得出。
 
+新增了`quote_exact_in`函数，用于在执行交易前预估交换结果。该函数通过RPC查询获取池状态和储备信息，然后调用`compute_swap_amount`进行计算。这为交易者提供了在提交交易前了解预期结果的能力。
+
 ```mermaid
 flowchart TD
 A[开始计算] --> B[确定输入/输出储备]
@@ -191,13 +210,19 @@ C --> D[计算协议/基金费用]
 D --> E[计算交换金额]
 E --> F[应用滑点保护]
 F --> G[返回计算结果]
+H[预估交换] --> I[查询池状态]
+I --> J[获取储备信息]
+J --> K[调用计算函数]
+K --> G
 ```
 
 **Diagram sources**
 - [raydium_cpmm.rs](file://src/utils/calc/raydium_cpmm.rs#L163-L196)
+- [raydium_cpmm.rs](file://src/instruction/utils/raydium_cpmm.rs#L104-L132)
 
 **Section sources**
 - [raydium_cpmm.rs](file://src/utils/calc/raydium_cpmm.rs#L163-L196)
+- [raydium_cpmm.rs](file://src/instruction/utils/raydium_cpmm.rs#L104-L132)
 
 ## 双代币程序支持机制
 
