@@ -14,25 +14,95 @@
 - [swqos.rs](file://src/swqos/mod.rs)
 - [NONCE_CACHE_CN.md](file://docs/NONCE_CACHE_CN.md)
 - [TRADING_PARAMETERS_CN.md](file://docs/TRADING_PARAMETERS_CN.md)
+- [lib.rs](file://src/lib.rs)
 </cite>
+
+## 更新摘要
+**已更改内容**   
+- 在“PumpFun平台支持概述”部分增加了代币创建功能的说明
+- 新增了“代币创建功能”章节，详细说明参数配置、指令构建流程和`create_pumpfun_token`公共API
+- 更新了“交易指令构建流程”部分，增加了创建代币指令的构建说明
+- 更新了“性能优化策略”部分，补充了代币创建场景下的优化建议
 
 ## 目录
 1. [PumpFun平台支持概述](#pumpfun平台支持概述)
-2. [狙击交易与复制交易机制](#狙击交易与复制交易机制)
-3. [交易指令构建流程](#交易指令构建流程)
-4. [价格与数量计算模型](#价格与数量计算模型)
-5. [快速交易通道配置](#快速交易通道配置)
-6. [性能优化策略](#性能优化策略)
-7. [常见失败场景应对](#常见失败场景应对)
+2. [代币创建功能](#代币创建功能)
+3. [狙击交易与复制交易机制](#狙击交易与复制交易机制)
+4. [交易指令构建流程](#交易指令构建流程)
+5. [价格与数量计算模型](#价格与数量计算模型)
+6. [快速交易通道配置](#快速交易通道配置)
+7. [性能优化策略](#性能优化策略)
+8. [常见失败场景应对](#常见失败场景应对)
 
 ## PumpFun平台支持概述
 
 sol-trade-sdk为PumpFun平台提供了全面的交易支持，重点实现了狙击交易（sniping）和复制交易（copy trading）两种高级策略。SDK通过监听PumpFun的新代币创建事件，结合超低延迟交易通道（SWQOS），实现了毫秒级的快速买入能力。系统支持完整的交易生命周期管理，包括代币创建、买入、卖出和账户清理等操作。
 
-SDK通过`PumpFunInstructionBuilder`实现了PumpFun协议的指令构建，支持买入和卖出两种操作。在买入操作中，系统会根据提供的SOL金额计算可购买的代币数量，并构建相应的交易指令。在卖出操作中，系统会计算出售代币后可获得的SOL数量，并支持在交易完成后自动关闭代币账户以回收租金。
+SDK通过`PumpFunInstructionBuilder`实现了PumpFun协议的指令构建，支持买入、卖出和代币创建三种操作。在买入操作中，系统会根据提供的SOL金额计算可购买的代币数量，并构建相应的交易指令。在卖出操作中，系统会计算出售代币后可获得的SOL数量，并支持在交易完成后自动关闭代币账户以回收租金。在代币创建操作中，系统支持使用传统SPL Token程序或Token2022程序创建新代币，并可选择是否启用Mayhem模式。
 
 **Section sources**
 - [pumpfun.rs](file://src/instruction/pumpfun.rs#L23-L290)
+
+## 代币创建功能
+
+### 代币创建API
+
+SDK提供了`create_pumpfun_token`公共API用于在PumpFun平台上创建新代币。该API支持两种创建方式：传统的`create`指令（使用SPL Token程序）和新的`create_v2`指令（使用Token2022程序并支持Mayhem模式）。
+
+```rust
+pub async fn create_pumpfun_token(
+    &self,
+    name: String,
+    symbol: String,
+    uri: String,
+    use_v2: bool,
+    is_mayhem_mode: bool,
+) -> Result<(Pubkey, String), anyhow::Error>
+```
+
+该函数返回一个元组，包含新创建代币的mint地址和交易签名。
+
+### 参数配置
+
+代币创建需要配置以下参数：
+
+- **name**：代币名称，不能为空
+- **symbol**：代币符号，长度不能超过10个字符
+- **uri**：元数据URI，指向包含代币详细信息的JSON文件
+- **use_v2**：是否使用`create_v2`指令（支持Token2022和Mayhem模式）
+- **is_mayhem_mode**：是否启用Mayhem模式（仅在`use_v2`为true时有效）
+
+### 指令构建流程
+
+代币创建指令的构建分为两个主要流程：传统创建流程和v2创建流程。
+
+#### 传统创建流程
+
+传统创建流程使用SPL Token程序和Metaplex Token Metadata程序存储元数据。构建流程如下：
+
+1. 验证输入参数的有效性
+2. 生成新的mint密钥对
+3. 计算bonding curve PDA地址
+4. 计算bonding curve关联代币账户（ATA）地址
+5. 计算Metaplex元数据PDA地址
+6. 构建指令数据，包括代币名称、符号、URI和创建者地址
+7. 构建账户列表，按指令要求的顺序排列
+
+#### v2创建流程
+
+v2创建流程使用Token2022程序的内置元数据功能，不需要单独的Metaplex metadata账户。构建流程如下：
+
+1. 验证输入参数的有效性
+2. 生成新的mint密钥对
+3. 计算bonding curve PDA地址
+4. 计算bonding curve关联代币账户（ATA）地址
+5. 计算Mayhem程序相关的PDA地址，包括全局参数、SOL金库、状态PDA和代币金库
+6. 构建指令数据，包括代币名称、符号、URI、创建者地址和Mayhem模式标志
+7. 构建账户列表，按指令要求的顺序排列
+
+**Section sources**
+- [lib.rs](file://src/lib.rs#L760-L895)
+- [pumpfun.rs](file://src/instruction/pumpfun.rs#L294-L648)
 
 ## 狙击交易与复制交易机制
 
