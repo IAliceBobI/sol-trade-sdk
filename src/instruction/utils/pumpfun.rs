@@ -1,4 +1,4 @@
-use crate::common::{bonding_curve::BondingCurveAccount, SolanaRpcClient};
+use crate::common::{SolanaRpcClient, bonding_curve::BondingCurveAccount};
 use anyhow::anyhow;
 use solana_sdk::pubkey::Pubkey;
 use std::sync::Arc;
@@ -89,6 +89,12 @@ pub mod global_constants {
     pub const PUMPFUN_AMM_FEE_6: Pubkey = pubkey!("FWsW1xNtWscwNmKv6wVsU1iTzRN6wmmk3MjxRP5tT7hz"); // Pump.fun AMM: Protocol Fee 6
     pub const PUMPFUN_AMM_FEE_7: Pubkey = pubkey!("G5UZAVbAf46s7cKWoyKu8kYTip9DGTpbLZ2qa9Aq69dP");
     // Pump.fun AMM: Protocol Fee 7
+
+    /// Mint authority PDA for PumpFun
+    pub const MINT_AUTHORITY: Pubkey = pubkey!("TSLvdd1pWpHVjahSpsvCXUbgwsL3JAcvokwaKt1eokM");
+
+    /// Mayhem Program ID
+    pub const MAYHEM_PROGRAM_ID: Pubkey = pubkey!("MAyhSmzXzV1pTf7LsNkrNwkWKTo4ougAJ1PPg47MD4e");
 }
 
 /// Constants related to program accounts and authorities

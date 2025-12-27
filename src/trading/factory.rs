@@ -3,19 +3,21 @@ use std::sync::Arc;
 use crate::instruction::{
     bonk::BonkInstructionBuilder, meteora_damm_v2::MeteoraDammV2InstructionBuilder,
     pumpfun::PumpFunInstructionBuilder, pumpswap::PumpSwapInstructionBuilder,
-    raydium_amm_v4::RaydiumAmmV4InstructionBuilder, raydium_cpmm::RaydiumCpmmInstructionBuilder,
+    raydium_amm_v4::RaydiumAmmV4InstructionBuilder, raydium_clmm::RaydiumClmmInstructionBuilder,
+    raydium_cpmm::RaydiumCpmmInstructionBuilder,
 };
 
 use super::core::{executor::GenericTradeExecutor, traits::TradeExecutor};
 
 /// 支持的交易协议
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum DexType {
     PumpFun,
     PumpSwap,
     Bonk,
     RaydiumCpmm,
     RaydiumAmmV4,
+    RaydiumClmm,
     MeteoraDammV2,
 }
 
@@ -31,6 +33,7 @@ impl TradeFactory {
             DexType::Bonk => Self::bonk_executor(),
             DexType::RaydiumCpmm => Self::raydium_cpmm_executor(),
             DexType::RaydiumAmmV4 => Self::raydium_amm_v4_executor(),
+            DexType::RaydiumClmm => Self::raydium_clmm_executor(),
             DexType::MeteoraDammV2 => Self::meteora_damm_v2_executor(),
         }
     }
@@ -82,6 +85,16 @@ impl TradeFactory {
             std::sync::LazyLock::new(|| {
                 let instruction_builder = Arc::new(RaydiumAmmV4InstructionBuilder);
                 Arc::new(GenericTradeExecutor::new(instruction_builder, "RaydiumAmmV4"))
+            });
+        INSTANCE.clone()
+    }
+
+    #[inline]
+    fn raydium_clmm_executor() -> Arc<dyn TradeExecutor> {
+        static INSTANCE: std::sync::LazyLock<Arc<dyn TradeExecutor>> =
+            std::sync::LazyLock::new(|| {
+                let instruction_builder = Arc::new(RaydiumClmmInstructionBuilder);
+                Arc::new(GenericTradeExecutor::new(instruction_builder, "RaydiumClmm"))
             });
         INSTANCE.clone()
     }

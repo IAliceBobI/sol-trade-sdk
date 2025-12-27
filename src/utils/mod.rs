@@ -1,7 +1,9 @@
 pub mod calc;
 pub mod price;
-use crate::trading;
+pub mod quote;
+pub mod token;
 use crate::TradingClient;
+use crate::trading;
 use solana_sdk::pubkey::Pubkey;
 use solana_sdk::signature::Keypair;
 use solana_sdk::signer::Signer;
@@ -47,8 +49,10 @@ impl TradingClient {
         payer: &Keypair,
         receive_wallet: &Pubkey,
         amount: u64,
-    ) -> Result<(), anyhow::Error> {
-        trading::common::utils::transfer_sol(&self.rpc, payer, receive_wallet, amount).await
+    ) -> Result<solana_sdk::signature::Signature, anyhow::Error> {
+        trading::common::utils::transfer_sol(&self.rpc, payer, receive_wallet, amount)
+            .await
+            .map(|_| solana_sdk::signature::Signature::default())
     }
 
     #[inline]

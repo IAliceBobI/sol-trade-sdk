@@ -6,8 +6,8 @@ use crate::constants::TOKEN_PROGRAM;
 use crate::instruction::utils::pumpfun::global_constants::MAYHEM_FEE_RECIPIENT;
 use crate::instruction::utils::pumpswap::accounts::MAYHEM_FEE_RECIPIENT as MAYHEM_FEE_RECIPIENT_SWAP;
 use crate::swqos::{SwqosClient, TradeType};
-use crate::trading::common::get_multi_token_balances;
 use crate::trading::MiddlewareManager;
+use crate::trading::common::get_multi_token_balances;
 use solana_hash::Hash;
 use solana_sdk::message::AddressLookupTableAccount;
 use solana_sdk::{pubkey::Pubkey, signature::Keypair};
@@ -21,6 +21,7 @@ pub enum DexParamEnum {
     Bonk(BonkParams),
     RaydiumCpmm(RaydiumCpmmParams),
     RaydiumAmmV4(RaydiumAmmV4Params),
+    RaydiumClmm(RaydiumClmmParams),
     MeteoraDammV2(MeteoraDammV2Params),
 }
 
@@ -34,6 +35,7 @@ impl DexParamEnum {
             DexParamEnum::Bonk(p) => p,
             DexParamEnum::RaydiumCpmm(p) => p,
             DexParamEnum::RaydiumAmmV4(p) => p,
+            DexParamEnum::RaydiumClmm(p) => p,
             DexParamEnum::MeteoraDammV2(p) => p,
         }
     }
@@ -97,9 +99,9 @@ impl PumpFunParams {
         Self {
             bonding_curve: Arc::new(BondingCurveAccount { ..Default::default() }),
             associated_bonding_curve: Pubkey::default(),
-            creator_vault: creator_vault,
-            token_program: token_program,
+            creator_vault,
             close_token_account_when_sell: Some(close_token_account_when_sell),
+            token_program,
         }
     }
 
@@ -126,10 +128,10 @@ impl PumpFunParams {
         );
         Self {
             bonding_curve: Arc::new(bonding_curve_account),
-            associated_bonding_curve: associated_bonding_curve,
-            creator_vault: creator_vault,
-            close_token_account_when_sell: close_token_account_when_sell,
-            token_program: token_program,
+            associated_bonding_curve,
+            creator_vault,
+            close_token_account_when_sell,
+            token_program,
         }
     }
 
@@ -160,10 +162,10 @@ impl PumpFunParams {
         );
         Self {
             bonding_curve: Arc::new(bonding_curve),
-            associated_bonding_curve: associated_bonding_curve,
-            creator_vault: creator_vault,
-            close_token_account_when_sell: close_token_account_when_sell,
-            token_program: token_program,
+            associated_bonding_curve,
+            creator_vault,
+            close_token_account_when_sell,
+            token_program,
         }
     }
 
@@ -173,7 +175,7 @@ impl PumpFunParams {
     ) -> Result<Self, anyhow::Error> {
         let account =
             crate::instruction::utils::pumpfun::fetch_bonding_curve_account(rpc, mint).await?;
-        let mint_account = rpc.get_account(&mint).await?;
+        let mint_account = rpc.get_account(mint).await?;
         let bonding_curve = BondingCurveAccount {
             discriminator: 0,
             account: account.1,
@@ -195,7 +197,7 @@ impl PumpFunParams {
             crate::instruction::utils::pumpfun::get_creator_vault_pda(&bonding_curve.creator);
         Ok(Self {
             bonding_curve: Arc::new(bonding_curve),
-            associated_bonding_curve: associated_bonding_curve,
+            associated_bonding_curve,
             creator_vault: creator_vault.unwrap(),
             close_token_account_when_sell: None,
             token_program: mint_account.owner,
@@ -286,7 +288,7 @@ impl PumpSwapParams {
         {
             Self::from_pool_address_by_rpc(rpc, &pool_address).await
         } else {
-            return Err(anyhow::anyhow!("No pool found for mint"));
+            Err(anyhow::anyhow!("No pool found for mint"))
         }
     }
 
@@ -322,10 +324,10 @@ impl PumpSwapParams {
             quote_mint: pool_data.quote_mint,
             pool_base_token_account: pool_data.pool_base_token_account,
             pool_quote_token_account: pool_data.pool_quote_token_account,
-            pool_base_token_reserves: pool_base_token_reserves,
-            pool_quote_token_reserves: pool_quote_token_reserves,
-            coin_creator_vault_ata: coin_creator_vault_ata,
-            coin_creator_vault_authority: coin_creator_vault_authority,
+            pool_base_token_reserves,
+            pool_quote_token_reserves,
+            coin_creator_vault_ata,
+            coin_creator_vault_authority,
             base_token_program: if pool_data.pool_base_token_account == base_token_program_ata {
                 crate::constants::TOKEN_PROGRAM
             } else {
@@ -396,14 +398,14 @@ impl BonkParams {
             virtual_quote: virtual_quote as u128,
             real_base: real_base_after as u128,
             real_quote: real_quote_after as u128,
-            pool_state: pool_state,
-            base_vault: base_vault,
-            quote_vault: quote_vault,
+            pool_state,
+            base_vault,
+            quote_vault,
             mint_token_program: base_token_program,
-            platform_config: platform_config,
-            platform_associated_account: platform_associated_account,
-            creator_associated_account: creator_associated_account,
-            global_config: global_config,
+            platform_config,
+            platform_associated_account,
+            creator_associated_account,
+            global_config,
         }
     }
 
@@ -462,16 +464,16 @@ impl BonkParams {
         Self {
             virtual_base: DEFAULT_VIRTUAL_BASE,
             virtual_quote: DEFAULT_VIRTUAL_QUOTE,
-            real_base: real_base,
-            real_quote: real_quote,
-            pool_state: pool_state,
-            base_vault: base_vault,
-            quote_vault: quote_vault,
+            real_base,
+            real_quote,
+            pool_state,
+            base_vault,
+            quote_vault,
             mint_token_program: base_token_program,
-            platform_config: platform_config,
-            platform_associated_account: platform_associated_account,
-            creator_associated_account: creator_associated_account,
-            global_config: global_config,
+            platform_config,
+            platform_associated_account,
+            creator_associated_account,
+            global_config,
         }
     }
 
@@ -560,17 +562,17 @@ impl RaydiumCpmmParams {
         quote_reserve: u64,
     ) -> Self {
         Self {
-            pool_state: pool_state,
-            amm_config: amm_config,
+            pool_state,
+            amm_config,
             base_mint: input_token_mint,
             quote_mint: output_token_mint,
-            base_reserve: base_reserve,
-            quote_reserve: quote_reserve,
+            base_reserve,
+            quote_reserve,
             base_vault: input_vault,
             quote_vault: output_vault,
             base_token_program: input_token_program,
             quote_token_program: output_token_program,
-            observation_state: observation_state,
+            observation_state,
         }
     }
 
@@ -651,6 +653,114 @@ impl RaydiumAmmV4Params {
             token_pc: amm_info.token_pc,
             coin_reserve,
             pc_reserve,
+        })
+    }
+}
+
+/// RaydiumClmm protocol specific parameters
+/// Configuration parameters specific to Raydium CLMM trading protocol
+#[derive(Clone)]
+pub struct RaydiumClmmParams {
+    /// Pool state address
+    pub pool_state: Pubkey,
+    /// AMM config address
+    pub amm_config: Pubkey,
+    /// Token0 mint address
+    pub token0_mint: Pubkey,
+    /// Token1 mint address
+    pub token1_mint: Pubkey,
+    /// Token0 vault address
+    pub token0_vault: Pubkey,
+    /// Token1 vault address
+    pub token1_vault: Pubkey,
+    /// Observation state account address
+    pub observation_state: Pubkey,
+    /// Token0 decimals
+    pub token0_decimals: u8,
+    /// Token1 decimals
+    pub token1_decimals: u8,
+    /// Token0 program ID
+    pub token0_program: Pubkey,
+    /// Token1 program ID
+    pub token1_program: Pubkey,
+}
+
+impl RaydiumClmmParams {
+    pub fn new(
+        pool_state: Pubkey,
+        amm_config: Pubkey,
+        token0_mint: Pubkey,
+        token1_mint: Pubkey,
+        token0_vault: Pubkey,
+        token1_vault: Pubkey,
+        observation_state: Pubkey,
+        token0_decimals: u8,
+        token1_decimals: u8,
+        token0_program: Pubkey,
+        token1_program: Pubkey,
+    ) -> Self {
+        Self {
+            pool_state,
+            amm_config,
+            token0_mint,
+            token1_mint,
+            token0_vault,
+            token1_vault,
+            observation_state,
+            token0_decimals,
+            token1_decimals,
+            token0_program,
+            token1_program,
+        }
+    }
+
+    pub async fn from_pool_address_by_rpc(
+        rpc: &SolanaRpcClient,
+        pool_address: &Pubkey,
+    ) -> Result<Self, anyhow::Error> {
+        let pool_state = crate::instruction::utils::raydium_clmm::fetch_pool_state(rpc, pool_address).await?;
+        
+        // Determine token programs by querying mint accounts
+        let token0_account = rpc.get_account(&pool_state.token_mint0).await?;
+        let token0_program = if token0_account.owner == crate::constants::TOKEN_PROGRAM_2022 {
+            crate::constants::TOKEN_PROGRAM_2022
+        } else {
+            TOKEN_PROGRAM
+        };
+        
+        let token1_account = rpc.get_account(&pool_state.token_mint1).await?;
+        let token1_program = if token1_account.owner == crate::constants::TOKEN_PROGRAM_2022 {
+            crate::constants::TOKEN_PROGRAM_2022
+        } else {
+            TOKEN_PROGRAM
+        };
+        
+        // Check if observation_key account exists and verify its owner
+        let observation_state = pool_state.observation_key;
+        let raydium_clmm_program = crate::instruction::utils::raydium_clmm::accounts::RAYDIUM_CLMM;
+        if let Ok(obs_account) = rpc.get_account(&observation_state).await {
+            eprintln!("   [CLMM Debug] Observation state account {} exists, owner: {}", observation_state, obs_account.owner);
+            if obs_account.owner != raydium_clmm_program {
+                eprintln!("   [CLMM Warning] Observation state account owner mismatch! Expected: {}, Got: {}", 
+                    raydium_clmm_program, obs_account.owner);
+            }
+        } else {
+            eprintln!("   [CLMM Warning] Observation state account {} does not exist or cannot be fetched", observation_state);
+            eprintln!("   [CLMM Debug] Using observation_key directly: {}", observation_state);
+        }
+        
+        Ok(Self {
+            pool_state: pool_address.clone(),
+            amm_config: pool_state.amm_config,
+            token0_mint: pool_state.token_mint0,
+            token1_mint: pool_state.token_mint1,
+            token0_vault: pool_state.token_vault0,
+            token1_vault: pool_state.token_vault1,
+            observation_state: pool_state.observation_key,
+            token0_decimals: pool_state.mint_decimals0,
+            token1_decimals: pool_state.mint_decimals1,
+            token0_program,
+            token1_program,
         })
     }
 }
