@@ -37,7 +37,7 @@ struct TaskResult {
     success: bool,
     signature: Signature,
     error: Option<anyhow::Error>,
-    swqos_type: SwqosType,  // 🔧 增加：记录SWQOS类型
+    _swqos_type: SwqosType,  // 🔧 增加：记录SWQOS类型
     landed_on_chain: bool,  // 🔧 Whether tx landed on-chain (even if failed)
 }
 
@@ -338,7 +338,7 @@ pub async fn execute_parallel(
                         success: false,
                         signature: Signature::default(),
                         error: Some(e),
-                        swqos_type,  // 🔧 记录SWQOS类型
+                        _swqos_type: swqos_type,  // 🔧 记录SWQOS类型
                         landed_on_chain: false,  // Build failed, tx never sent
                     });
                     return;
@@ -349,7 +349,7 @@ pub async fn execute_parallel(
 
             let _send_start = Instant::now();
             let mut err: Option<anyhow::Error> = None;
-            let mut landed_on_chain = false;
+            let landed_on_chain;
             let success = match swqos_client
                 .send_transaction(
                     if is_buy { TradeType::Buy } else { TradeType::Sell },
@@ -377,7 +377,7 @@ pub async fn execute_parallel(
                     success,
                     signature: *signature,
                     error: err,
-                    swqos_type,  // 🔧 记录SWQOS类型
+                    _swqos_type: swqos_type,  // 🔧 记录SWQOS类型
                     landed_on_chain,  // 🔧 Whether tx landed (even if it failed)
                 });
             }
