@@ -1,9 +1,13 @@
 use crate::common::{SolanaRpcClient, bonding_curve::BondingCurveAccount};
 use solana_sdk::{
     instruction::{AccountMeta, Instruction},
+    pubkey,
     pubkey::Pubkey,
 };
 use std::sync::Arc;
+use solana_account_decoder::UiAccountData;
+use base64::Engine;
+use base64::engine::general_purpose::STANDARD;
 
 /// Constants used as seeds for deriving PDAs (Program Derived Addresses)
 pub mod seeds {
@@ -336,7 +340,6 @@ pub fn parse_platform_config(account_data: &[u8]) -> Result<PlatformConfig, anyh
 }
 
 /// Fetch and parse PlatformConfig from RPC
-/// Structure based on SDK layout.ts - uses fixed-size byte arrays for name/web/img
 pub async fn fetch_platform_config(
     rpc: &SolanaRpcClient,
     platform_config_address: &Pubkey,
@@ -445,7 +448,7 @@ pub mod discriminators {
     pub const SELL_EXACT_IN: [u8; 8] = [149, 39, 222, 155, 211, 124, 152, 26];
     
     /// initialize discriminator: [175, 175, 109, 31, 13, 251, 127, 237]
-    pub const INITIALIZE: [u8; 8] = [175, 175, 109, 31, 13, 251, 127, 237];
+    pub const INITIALIZE: [u8; 8] = [175, 175, 109, 31, 13, 152, 155, 237];
     
     /// initialize_v2 discriminator: [67, 153, 175, 39, 218, 16, 38, 32]
     pub const INITIALIZE_V2: [u8; 8] = [67, 153, 175, 39, 218, 16, 38, 32];
@@ -732,4 +735,762 @@ pub fn build_sell_exact_in_instruction(
     })
 }
 
-// ... rest of file identical to temp version ...
+
+/// Get global config PDA
+/// Seeds: ["global_config", quote_token_mint, curve_type, index]
+pub fn get_global_config_pda(
+    quote_mint: &Pubkey,
+    curve_type: u8,
+    index: u16,
+) -> Result<(Pubkey, u8), anyhow::Error> {
+    let curve_type_bytes = curve_type.to_le_bytes();
+    let index_bytes = index.to_le_bytes();
+    Pubkey::try_find_program_address(
+        &[
+            b"global_config",
+            quote_mint.as_ref(),
+            &curve_type_bytes,
+            &index_bytes,
+        ],
+        &accounts::LAUNCHLAB_PROGRAM,
+    )
+    .ok_or_else(|| anyhow::anyhow!("Failed to find global config PDA"))
+}
+
+/// Try to find global_config by querying common configurations
+/// This is a helper function that tries common curve_type and index values
+pub async fn find_global_config(
+    rpc: &SolanaRpcClient,
+    quote_mint: &Pubkey,
+) -> Result<Pubkey, anyhow::Error> {
+    use crate::constants::WSOL_TOKEN_ACCOUNT;
+    
+    // Try common configurations: curve_type=0 (ConstantProduct), index=0
+    let (config_pda, _) = get_global_config_pda(quote_mint, 0, 0)?;
+    
+    // Try to fetch the account to verify it exists
+    match rpc.get_account(&config_pda).await {
+        Ok(_) => Ok(config_pda),
+        Err(_) => {
+            // Try index=1
+            let (config_pda, _) = get_global_config_pda(quote_mint, 0, 1)?;
+            match rpc.get_account(&config_pda).await {
+                Ok(_) => Ok(config_pda),
+                Err(_) => {
+                    // If quote_mint is USD1, try known USD1 global config
+                    // USD1 mint: USD1ttGY1N17NEEHLmELoaybftRBUSErhqYiQzvEmuB
+                    let usd1_mint = pubkey!("USD1ttGY1N17NEEHLmELoaybftRBUSErhqYiQzvEmuB");
+                    if quote_mint == &usd1_mint {
+                        match rpc.get_account(&accounts::USD1_GLOBAL_CONFIG).await {
+                            Ok(_) => {
+                                println!("   ℹ️  使用已知的 USD1 global_config: {}", accounts::USD1_GLOBAL_CONFIG);
+                                return Ok(accounts::USD1_GLOBAL_CONFIG);
+                            }
+                            Err(_) => {}
+                        }
+                    }
+                    
+                    // If quote_mint is WSOL, we could add known WSOL global config here if available
+                    if quote_mint == &WSOL_TOKEN_ACCOUNT {
+                        // TODO: Add known WSOL global config if available
+                    }
+                    
+                    Err(anyhow::anyhow!(
+                        "Could not find global_config. Please provide it explicitly. Tried PDA derivation and known addresses."
+                    ))
+                }
+            }
+        }
+    }
+}
+
+/// Try to find platform_config by querying with payer as platform_admin
+/// In many cases, the payer is also the platform_admin
+/// This function tries multiple approaches:
+/// 1. Derive PDA from platform_admin
+/// 2. Try known platform_config addresses (e.g., LetsBonk.fun)
+pub async fn find_platform_config(
+    rpc: &SolanaRpcClient,
+    platform_admin: &Pubkey,
+) -> Result<Pubkey, anyhow::Error> {
+    // First, try to derive PDA from platform_admin
+    let (config_pda, _) = get_platform_config_pda(platform_admin)?;
+    
+    // Try to fetch the account to verify it exists
+    if rpc.get_account(&config_pda).await.is_ok() {
+        return Ok(config_pda);
+    }
+    
+    // If not found, try known platform_config addresses
+    let known_configs = vec![
+        accounts::LETSBONK_PLATFORM_CONFIG,
+    ];
+    
+    for known_config in known_configs {
+        if rpc.get_account(&known_config).await.is_ok() {
+            println!("   ℹ️  使用已知的 platform_config: {}", known_config);
+            return Ok(known_config);
+        }
+    }
+    
+    Err(anyhow::anyhow!(
+        "Could not find platform_config. Please provide it explicitly. Tried: {} and known addresses",
+        config_pda
+    ))
+}
+
+/// Parameters for creating a token mint
+#[derive(Clone, Debug)]
+pub struct MintParams {
+    pub decimals: u8,
+    pub name: String,
+    pub symbol: String,
+    pub uri: String,
+}
+
+/// Curve parameters for bonding curve
+#[derive(Clone, Debug)]
+pub enum CurveParams {
+    Constant {
+        supply: u64,
+        total_base_sell: u64,
+        total_quote_fund_raising: u64,
+        migrate_type: u8, // 0: amm, 1: cpswap
+    },
+    Fixed {
+        supply: u64,
+        total_quote_fund_raising: u64,
+        migrate_type: u8,
+    },
+    Linear {
+        supply: u64,
+        total_quote_fund_raising: u64,
+        migrate_type: u8,
+    },
+}
+
+/// Vesting parameters
+#[derive(Clone, Debug)]
+pub struct VestingParams {
+    pub total_locked_amount: u64,
+    pub cliff_period: u64,
+    pub unlock_period: u64,
+}
+
+/// AMM creator fee configuration
+#[derive(Clone, Debug)]
+pub enum AmmCreatorFeeOn {
+    QuoteToken, // Creator fee only on quote token
+    BothToken,  // Creator fee on both tokens
+}
+
+/// Serialize AmmCreatorFeeOn to bytes
+fn serialize_amm_creator_fee_on(fee_on: &AmmCreatorFeeOn) -> Vec<u8> {
+    match fee_on {
+        AmmCreatorFeeOn::QuoteToken => vec![0], // Variant discriminator: 0
+        AmmCreatorFeeOn::BothToken => vec![1], // Variant discriminator: 1
+    }
+}
+
+/// Serialize MintParams to bytes
+fn serialize_mint_params(params: &MintParams) -> Vec<u8> {
+    let mut data = Vec::new();
+    
+    // decimals: u8
+    data.push(params.decimals);
+    
+    // name: String (4 bytes length + bytes)
+    let name_bytes = params.name.as_bytes();
+    data.extend_from_slice(&(name_bytes.len() as u32).to_le_bytes());
+    data.extend_from_slice(name_bytes);
+    
+    // symbol: String (4 bytes length + bytes)
+    let symbol_bytes = params.symbol.as_bytes();
+    data.extend_from_slice(&(symbol_bytes.len() as u32).to_le_bytes());
+    data.extend_from_slice(symbol_bytes);
+    
+    // uri: String (4 bytes length + bytes)
+    let uri_bytes = params.uri.as_bytes();
+    data.extend_from_slice(&(uri_bytes.len() as u32).to_le_bytes());
+    data.extend_from_slice(uri_bytes);
+    
+    data
+}
+
+/// Serialize CurveParams to bytes
+fn serialize_curve_params(params: &CurveParams) -> Vec<u8> {
+    let mut data = Vec::new();
+    
+    match params {
+        CurveParams::Constant {
+            supply,
+            total_base_sell,
+            total_quote_fund_raising,
+            migrate_type,
+        } => {
+            // Variant discriminator: 0 for Constant
+            data.push(0);
+            // ConstantCurve data
+            data.extend_from_slice(&supply.to_le_bytes());
+            data.extend_from_slice(&total_base_sell.to_le_bytes());
+            data.extend_from_slice(&total_quote_fund_raising.to_le_bytes());
+            data.push(*migrate_type);
+        }
+        CurveParams::Fixed {
+            supply,
+            total_quote_fund_raising,
+            migrate_type,
+        } => {
+            // Variant discriminator: 1 for Fixed
+            data.push(1);
+            // FixedCurve data
+            data.extend_from_slice(&supply.to_le_bytes());
+            data.extend_from_slice(&total_quote_fund_raising.to_le_bytes());
+            data.push(*migrate_type);
+        }
+        CurveParams::Linear {
+            supply,
+            total_quote_fund_raising,
+            migrate_type,
+        } => {
+            // Variant discriminator: 2 for Linear
+            data.push(2);
+            // LinearCurve data
+            data.extend_from_slice(&supply.to_le_bytes());
+            data.extend_from_slice(&total_quote_fund_raising.to_le_bytes());
+            data.push(*migrate_type);
+        }
+    }
+    
+    data
+}
+
+/// Serialize VestingParams to bytes
+fn serialize_vesting_params(params: &VestingParams) -> Vec<u8> {
+    let mut data = Vec::new();
+    data.extend_from_slice(&params.total_locked_amount.to_le_bytes());
+    data.extend_from_slice(&params.cliff_period.to_le_bytes());
+    data.extend_from_slice(&params.unlock_period.to_le_bytes());
+    data
+}
+
+/// Calculate Metaplex metadata PDA
+/// Seeds: ["metadata", METADATA_PROGRAM_ID, mint]
+pub fn get_metadata_pda(mint: &Pubkey) -> Pubkey {
+    Pubkey::find_program_address(
+        &[
+            b"metadata",
+            accounts::METADATA_PROGRAM.as_ref(),
+            mint.as_ref(),
+        ],
+        &accounts::METADATA_PROGRAM,
+    )
+    .0
+}
+
+/// Build initialize instruction for creating a token on Raydium LaunchLab
+pub fn build_initialize_instruction(
+    payer: &Pubkey,
+    creator: &Pubkey,
+    mint: &Pubkey, // mint pubkey (must be signer in transaction)
+    quote_mint: &Pubkey,
+    global_config: &Pubkey,
+    platform_config: &Pubkey,
+    mint_params: &MintParams,
+    curve_params: &CurveParams,
+    vesting_params: &VestingParams,
+) -> Result<Instruction, anyhow::Error> {
+    // Calculate PDAs
+    let (pool_state, _) = get_pool_state_pda(mint, quote_mint)?;
+    let (authority, _) = get_vault_authority_pda()?;
+    let (event_authority, _) = get_event_authority_pda()?;
+    let (base_vault, _) = get_pool_vault_pda(&pool_state, mint)?;
+    let (quote_vault, _) = get_pool_vault_pda(&pool_state, quote_mint)?;
+    
+    // Calculate metadata PDA (even though we're not creating it, we need the address)
+    let metadata_account = get_metadata_pda(mint);
+    
+    // Build instruction data
+    let mut data = Vec::new();
+    data.extend_from_slice(&discriminators::INITIALIZE);
+    
+    // Serialize arguments
+    let mint_params_bytes = serialize_mint_params(mint_params);
+    let curve_params_bytes = serialize_curve_params(curve_params);
+    let vesting_params_bytes = serialize_vesting_params(vesting_params);
+    
+    data.extend_from_slice(&mint_params_bytes);
+    data.extend_from_slice(&curve_params_bytes);
+    data.extend_from_slice(&vesting_params_bytes);
+    
+    // Build accounts (order matters!)
+    let accounts = vec![
+        AccountMeta::new(*payer, true), // payer
+        AccountMeta::new_readonly(*creator, false), // creator
+        AccountMeta::new_readonly(*global_config, false), // global_config
+        AccountMeta::new_readonly(*platform_config, false), // platform_config
+        AccountMeta::new_readonly(authority, false), // authority
+        AccountMeta::new(pool_state, false), // pool_state
+        AccountMeta::new(*mint, true), // base_mint (signer!)
+        AccountMeta::new_readonly(*quote_mint, false), // quote_mint
+        AccountMeta::new(base_vault, false), // base_vault
+        AccountMeta::new(quote_vault, false), // quote_vault
+        AccountMeta::new(metadata_account, false), // metadata_account (PDA, may not exist yet)
+        AccountMeta::new_readonly(crate::constants::TOKEN_PROGRAM, false), // base_token_program
+        AccountMeta::new_readonly(crate::constants::TOKEN_PROGRAM, false), // quote_token_program
+        AccountMeta::new_readonly(accounts::METADATA_PROGRAM, false), // metadata_program
+        AccountMeta::new_readonly(accounts::SYSTEM_PROGRAM, false), // system_program
+        AccountMeta::new_readonly(accounts::RENT_SYSVAR, false), // rent_program
+        AccountMeta::new_readonly(event_authority, false), // event_authority
+        AccountMeta::new_readonly(accounts::LAUNCHLAB_PROGRAM, false), // program
+    ];
+    
+    Ok(Instruction {
+        program_id: accounts::LAUNCHLAB_PROGRAM,
+        accounts,
+        data,
+    })
+}
+
+/// Build initialize_v2 instruction for creating a token on Raydium LaunchLab
+/// This is the recommended instruction (initialize is deprecated)
+pub fn build_initialize_v2_instruction(
+    payer: &Pubkey,
+    creator: &Pubkey,
+    mint: &Pubkey, // mint pubkey (must be signer in transaction)
+    quote_mint: &Pubkey,
+    global_config: &Pubkey,
+    platform_config: &Pubkey,
+    mint_params: &MintParams,
+    curve_params: &CurveParams,
+    vesting_params: &VestingParams,
+    amm_fee_on: &AmmCreatorFeeOn,
+) -> Result<Instruction, anyhow::Error> {
+    // Calculate PDAs
+    let (pool_state, _) = get_pool_state_pda(mint, quote_mint)?;
+    let (authority, _) = get_vault_authority_pda()?;
+    let (event_authority, _) = get_event_authority_pda()?;
+    let (base_vault, _) = get_pool_vault_pda(&pool_state, mint)?;
+    let (quote_vault, _) = get_pool_vault_pda(&pool_state, quote_mint)?;
+    
+    // Calculate metadata PDA (even though we're not creating it, we need the address)
+    let metadata_account = get_metadata_pda(mint);
+    
+    // Build instruction data
+    let mut data = Vec::new();
+    data.extend_from_slice(&discriminators::INITIALIZE_V2);
+    
+    // Serialize arguments
+    let mint_params_bytes = serialize_mint_params(mint_params);
+    let curve_params_bytes = serialize_curve_params(curve_params);
+    let vesting_params_bytes = serialize_vesting_params(vesting_params);
+    let amm_fee_on_bytes = serialize_amm_creator_fee_on(amm_fee_on);
+    
+    data.extend_from_slice(&mint_params_bytes);
+    data.extend_from_slice(&curve_params_bytes);
+    data.extend_from_slice(&vesting_params_bytes);
+    data.extend_from_slice(&amm_fee_on_bytes);
+    
+    // Build accounts (order matters! - same as initialize)
+    let accounts = vec![
+        AccountMeta::new(*payer, true), // payer
+        AccountMeta::new_readonly(*creator, false), // creator
+        AccountMeta::new_readonly(*global_config, false), // global_config
+        AccountMeta::new_readonly(*platform_config, false), // platform_config
+        AccountMeta::new_readonly(authority, false), // authority
+        AccountMeta::new(pool_state, false), // pool_state
+        AccountMeta::new(*mint, true), // base_mint (signer!)
+        AccountMeta::new_readonly(*quote_mint, false), // quote_mint
+        AccountMeta::new(base_vault, false), // base_vault
+        AccountMeta::new(quote_vault, false), // quote_vault
+        AccountMeta::new(metadata_account, false), // metadata_account (PDA, may not exist yet)
+        AccountMeta::new_readonly(crate::constants::TOKEN_PROGRAM, false), // base_token_program
+        AccountMeta::new_readonly(crate::constants::TOKEN_PROGRAM, false), // quote_token_program
+        AccountMeta::new_readonly(accounts::METADATA_PROGRAM, false), // metadata_program
+        AccountMeta::new_readonly(accounts::SYSTEM_PROGRAM, false), // system_program
+        AccountMeta::new_readonly(accounts::RENT_SYSVAR, false), // rent_program
+        AccountMeta::new_readonly(event_authority, false), // event_authority
+        AccountMeta::new_readonly(accounts::LAUNCHLAB_PROGRAM, false), // program
+    ];
+    
+    Ok(Instruction {
+        program_id: accounts::LAUNCHLAB_PROGRAM,
+        accounts,
+        data,
+    })
+}
+
+/// Query all AmmConfig accounts from CPMM program
+/// Returns a list of (config_address, amm_config) tuples
+async fn query_all_amm_configs(
+    rpc: &SolanaRpcClient,
+    cpmm_program: &Pubkey,
+) -> Result<Vec<(Pubkey, crate::instruction::utils::raydium_cpmm_types::AmmConfig)>, anyhow::Error> {
+    use solana_rpc_client_api::config::RpcProgramAccountsConfig;
+    use solana_rpc_client_api::filter::RpcFilterType;
+    use solana_account_decoder::UiAccountEncoding;
+    use crate::instruction::utils::raydium_cpmm_types::{AMM_CONFIG_SIZE, amm_config_decode};
+    
+    // AmmConfig account size: 228 bytes (data) + 8 bytes (discriminator) = 236 bytes
+    let config = RpcProgramAccountsConfig {
+        filters: Some(vec![
+            RpcFilterType::DataSize(236), // AmmConfig size
+        ]),
+        account_config: solana_rpc_client_api::config::RpcAccountInfoConfig {
+            encoding: Some(UiAccountEncoding::Base64),
+            data_slice: None,
+            commitment: None,
+            min_context_slot: None,
+        },
+        with_context: None,
+        sort_results: None,
+    };
+    
+    
+    let accounts = rpc.get_program_ui_accounts_with_config(cpmm_program, config).await?;
+    
+    let mut configs = Vec::new();
+    for (addr, acc) in accounts {
+        // Skip discriminator (first 8 bytes) and decode AmmConfig
+        let data_bytes = match &acc.data {
+            UiAccountData::Binary(base64_str, _) => {
+                match STANDARD.decode(base64_str) {
+                    Ok(bytes) => bytes,
+                    Err(_) => continue,
+                }
+            }
+            _ => continue,
+        };
+        if data_bytes.len() >= 8 + AMM_CONFIG_SIZE {
+            if let Some(amm_config) = amm_config_decode(&data_bytes[8..8 + AMM_CONFIG_SIZE]) {
+                // Verify owner is CPMM program (owner is a string in UiAccount, convert to Pubkey for comparison)
+                if let Ok(owner_pubkey) = acc.owner.parse::<Pubkey>() {
+                    if owner_pubkey == *cpmm_program {
+                        configs.push((addr, amm_config));
+                    }
+                }
+            }
+        }
+    }
+    
+    Ok(configs)
+}
+
+/// Try to use known config address, trying both mainnet and devnet
+async fn try_known_config_address(
+    rpc: &SolanaRpcClient,
+) -> Option<(Pubkey, Pubkey)> {
+    // Try mainnet config first
+    let mainnet_config = accounts::CPMM_CONFIG_MAINNET;
+    match rpc.get_account(&mainnet_config).await {
+        Ok(account) => {
+            if account.owner == accounts::CPMM_PROGRAM {
+                println!("   ✅ 使用已知的 CPMM config 地址: {} (主网)", mainnet_config);
+                return Some((mainnet_config, accounts::CPMM_CREATE_POOL_FEE));
+            }
+        }
+        Err(_) => {}
+    }
+    
+    // Try devnet config
+    let devnet_config = accounts::CPMM_CONFIG_DEVNET;
+    match rpc.get_account(&devnet_config).await {
+        Ok(account) => {
+            if account.owner == accounts::CPMM_PROGRAM_DEVNET {
+                println!("   ✅ 使用已知的 CPMM config 地址: {} (Devnet)", devnet_config);
+                return Some((devnet_config, accounts::CPMM_CREATE_POOL_FEE));
+            }
+        }
+        Err(_) => {}
+    }
+    
+    None
+}
+
+/// Find CPMM config by querying an existing pool
+/// Returns (cpswap_config, cpswap_create_pool_fee_account)
+/// Note: cpswap_create_pool_fee_account might be the same as cpswap_config or a separate account
+pub async fn find_cpswap_config(
+    rpc: &SolanaRpcClient,
+) -> Result<(Pubkey, Pubkey), anyhow::Error> {
+    use crate::instruction::utils::raydium_cpmm::find_pool_by_mint;
+    use crate::constants::WSOL_TOKEN_ACCOUNT;
+    
+    // Method 1: Try known config addresses first (simplest and most reliable)
+    if let Some((config, fee)) = try_known_config_address(rpc).await {
+        return Ok((config, fee));
+    }
+    
+    // Method 2: Try to find an existing CPMM pool (using WSOL as a common token)
+    match find_pool_by_mint(rpc, &WSOL_TOKEN_ACCOUNT).await {
+        Ok((_pool_address, pool_state)) => {
+            let cpswap_config = pool_state.amm_config;
+            
+            // Use the known CPMM Create Pool Fee address
+            let cpswap_create_pool_fee = accounts::CPMM_CREATE_POOL_FEE;
+            
+            println!("   ℹ️  通过 WSOL pool 找到 CPMM config: {}", cpswap_config);
+            println!("   ℹ️  使用 CPMM Create Pool Fee: {}", cpswap_create_pool_fee);
+            
+            return Ok((cpswap_config, cpswap_create_pool_fee));
+        }
+        Err(e) => {
+            println!("   ⚠️  通过 WSOL 查找 CPMM pool 失败: {}", e);
+        }
+    }
+    
+    // Method 3: Try to query program accounts directly to find any CPMM pool
+    // This is a fallback for fork mainnet environments
+    use solana_rpc_client_api::config::RpcProgramAccountsConfig;
+    use solana_rpc_client_api::filter::RpcFilterType;
+    use solana_account_decoder::UiAccountEncoding;
+    
+    // Try mainnet program first, then devnet
+    let cpmm_programs = vec![accounts::CPMM_PROGRAM, accounts::CPMM_PROGRAM_DEVNET];
+    
+    let config = RpcProgramAccountsConfig {
+        filters: Some(vec![
+            RpcFilterType::DataSize(629), // CPMM PoolState size (8 discriminator + 621 data)
+        ]),
+        account_config: solana_rpc_client_api::config::RpcAccountInfoConfig {
+            encoding: Some(UiAccountEncoding::Base64),
+            data_slice: None,
+            commitment: None,
+            min_context_slot: None,
+        },
+        with_context: None,
+        sort_results: None,
+    };
+    
+    for cpmm_program in &cpmm_programs {
+        
+        match rpc.get_program_ui_accounts_with_config(cpmm_program, config.clone()).await {
+            Ok(accounts) => {
+                if !accounts.is_empty() {
+                    // Try to decode the first pool to get amm_config
+                    use crate::instruction::utils::raydium_cpmm_types::pool_state_decode;
+                    for (_addr, acc) in accounts.iter().take(5) { // Try first 5 pools
+                        let data_bytes = match &acc.data {
+                            UiAccountData::Binary(base64_str, _) => {
+                                match STANDARD.decode(base64_str) {
+                                    Ok(bytes) => bytes,
+                                    Err(_) => continue,
+                                }
+                            }
+                            _ => continue,
+                        };
+                        if data_bytes.len() > 8 {
+                            if let Some(pool_state) = pool_state_decode(&data_bytes[8..]) {
+                                let cpswap_config = pool_state.amm_config;
+                                let cpswap_create_pool_fee = accounts::CPMM_CREATE_POOL_FEE;
+                                
+                                println!("   ℹ️  通过程序账户查询找到 CPMM config: {}", cpswap_config);
+                                println!("   ℹ️  使用 CPMM Create Pool Fee: {}", cpswap_create_pool_fee);
+                                
+                                return Ok((cpswap_config, cpswap_create_pool_fee));
+                            }
+                        }
+                    }
+                }
+            }
+            Err(e) => {
+                println!("   ⚠️  通过程序账户查询失败 (程序: {}): {}", cpmm_program, e);
+            }
+        }
+    }
+    
+    // Method 4: Query all AmmConfig accounts directly
+    for cpmm_program in &cpmm_programs {
+        match query_all_amm_configs(rpc, cpmm_program).await {
+            Ok(configs) => {
+                if !configs.is_empty() {
+                    // Use the first config found
+                    let (config_address, _amm_config) = &configs[0];
+                    let cpswap_create_pool_fee = accounts::CPMM_CREATE_POOL_FEE;
+                    
+                    println!("   ℹ️  通过查询所有 AmmConfig 账户找到 CPMM config: {}", config_address);
+                    println!("   ℹ️  找到 {} 个 config 账户，使用第一个", configs.len());
+                    println!("   ℹ️  使用 CPMM Create Pool Fee: {}", cpswap_create_pool_fee);
+                    
+                    return Ok((*config_address, cpswap_create_pool_fee));
+                }
+            }
+            Err(e) => {
+                println!("   ⚠️  查询所有 AmmConfig 账户失败 (程序: {}): {}", cpmm_program, e);
+            }
+        }
+    }
+    
+    // If all approaches fail, return error with helpful message
+    Err(anyhow::anyhow!(
+        "Could not find CPMM config. Tried:\n\
+        - Known config addresses (mainnet: {}, devnet: {})\n\
+        - Querying pools by WSOL mint\n\
+        - Querying program accounts for pools\n\
+        - Querying all AmmConfig accounts\n\
+        Please provide cpswap_config explicitly.\n\
+        Note: CPMM Create Pool Fee is: {}",
+        accounts::CPMM_CONFIG_MAINNET,
+        accounts::CPMM_CONFIG_DEVNET,
+        accounts::CPMM_CREATE_POOL_FEE
+    ))
+}
+
+/// Calculate CPMM pool PDA
+/// Seeds: ["pool", cpswap_config, token_0_mint, token_1_mint]
+fn get_cpswap_pool_pda(
+    cpswap_config: &Pubkey,
+    token_0_mint: &Pubkey,
+    token_1_mint: &Pubkey,
+) -> Result<(Pubkey, u8), anyhow::Error> {
+    use crate::instruction::utils::raydium_cpmm::seeds as cpmm_seeds;
+    Pubkey::try_find_program_address(
+        &[
+            cpmm_seeds::POOL_SEED,
+            cpswap_config.as_ref(),
+            token_0_mint.as_ref(),
+            token_1_mint.as_ref(),
+        ],
+        &accounts::CPMM_PROGRAM,
+    )
+    .ok_or_else(|| anyhow::anyhow!("Failed to find CPMM pool PDA"))
+}
+
+/// Calculate CPMM authority PDA
+/// Seeds: ["vault_and_lp_mint_auth_seed"]
+/// Note: We use the known CPMM_AUTHORITY address instead, but this function is kept as a fallback
+#[allow(dead_code)]
+fn get_cpswap_authority_pda() -> Result<(Pubkey, u8), anyhow::Error> {
+    Pubkey::try_find_program_address(
+        &[b"vault_and_lp_mint_auth_seed"],
+        &accounts::CPMM_PROGRAM,
+    )
+    .ok_or_else(|| anyhow::anyhow!("Failed to find CPMM authority PDA"))
+}
+
+/// Calculate CPMM LP mint PDA
+/// Seeds: ["pool_lp_mint", cpswap_pool]
+fn get_cpswap_lp_mint_pda(cpswap_pool: &Pubkey) -> Result<(Pubkey, u8), anyhow::Error> {
+    Pubkey::try_find_program_address(
+        &[b"pool_lp_mint", cpswap_pool.as_ref()],
+        &accounts::CPMM_PROGRAM,
+    )
+    .ok_or_else(|| anyhow::anyhow!("Failed to find CPMM LP mint PDA"))
+}
+
+/// Calculate CPMM vault PDA
+/// Seeds: ["pool_vault", cpswap_pool, mint]
+fn get_cpswap_vault_pda(cpswap_pool: &Pubkey, mint: &Pubkey) -> Result<(Pubkey, u8), anyhow::Error> {
+    use crate::instruction::utils::raydium_cpmm::seeds as cpmm_seeds;
+    Pubkey::try_find_program_address(
+        &[cpmm_seeds::POOL_VAULT_SEED, cpswap_pool.as_ref(), mint.as_ref()],
+        &accounts::CPMM_PROGRAM,
+    )
+    .ok_or_else(|| anyhow::anyhow!("Failed to find CPMM vault PDA"))
+}
+
+/// Calculate CPMM observation PDA
+/// Seeds: ["observation", cpswap_pool]
+fn get_cpswap_observation_pda(cpswap_pool: &Pubkey) -> Result<(Pubkey, u8), anyhow::Error> {
+    use crate::instruction::utils::raydium_cpmm::seeds as cpmm_seeds;
+    Pubkey::try_find_program_address(
+        &[cpmm_seeds::OBSERVATION_STATE_SEED, cpswap_pool.as_ref()],
+        &accounts::CPMM_PROGRAM,
+    )
+    .ok_or_else(|| anyhow::anyhow!("Failed to find CPMM observation PDA"))
+}
+
+/// Calculate lock authority PDA
+/// Seeds: ["lock_cp_authority_seed"]
+fn get_lock_authority_pda() -> Result<(Pubkey, u8), anyhow::Error> {
+    Pubkey::try_find_program_address(
+        &[b"lock_cp_authority_seed"],
+        &accounts::LOCK_PROGRAM,
+    )
+    .ok_or_else(|| anyhow::anyhow!("Failed to find lock authority PDA"))
+}
+
+/// Build migrate_to_cpswap instruction
+pub fn build_migrate_to_cpswap_instruction(
+    payer: &Pubkey,
+    base_mint: &Pubkey,
+    quote_mint: &Pubkey,
+    platform_config: &Pubkey,
+    global_config: &Pubkey,
+    cpswap_config: &Pubkey,
+    cpswap_create_pool_fee: &Pubkey,
+) -> Result<Instruction, anyhow::Error> {
+    // Calculate LaunchLab PDAs
+    let (pool_state, _) = get_pool_state_pda(base_mint, quote_mint)?;
+    let (authority, _) = get_vault_authority_pda()?;
+    let (base_vault, _) = get_pool_vault_pda(&pool_state, base_mint)?;
+    let (quote_vault, _) = get_pool_vault_pda(&pool_state, quote_mint)?;
+    
+    // Calculate CPMM PDAs
+    // Note: token order matters for CPMM pool. We'll use base_mint as token0 and quote_mint as token1
+    let (cpswap_pool, _) = get_cpswap_pool_pda(cpswap_config, base_mint, quote_mint)?;
+    // Use known CPMM Authority address (more reliable than PDA derivation)
+    // If PDA derivation is needed, use get_cpswap_authority_pda() instead
+    let cpswap_authority = accounts::CPMM_AUTHORITY;
+    let (cpswap_lp_mint, _) = get_cpswap_lp_mint_pda(&cpswap_pool)?;
+    let (cpswap_base_vault, _) = get_cpswap_vault_pda(&cpswap_pool, base_mint)?;
+    let (cpswap_quote_vault, _) = get_cpswap_vault_pda(&cpswap_pool, quote_mint)?;
+    let (cpswap_observation, _) = get_cpswap_observation_pda(&cpswap_pool)?;
+    let (lock_authority, _) = get_lock_authority_pda()?;
+    
+    // Calculate pool_lp_token (user's LP token account for receiving LP tokens)
+    use crate::common::fast_fn::get_associated_token_address_with_program_id_fast;
+    use crate::constants::TOKEN_PROGRAM;
+    let pool_lp_token = get_associated_token_address_with_program_id_fast(
+        payer,
+        &cpswap_lp_mint,
+        &TOKEN_PROGRAM,
+    );
+    
+    // lock_lp_vault - Use known address from mainnet transaction
+    // From transaction: 4NkRLPVhpr2EB9mxVtf2sP7Ftn1BfxBTPw6HgK1pkPeLNbnGtSVZdVtecVJwozEgKdM6C9TAT1S1LBRmQWaovJ1a
+    // Note: This might be a PDA or fixed address. If it's a PDA, we may need to calculate it dynamically.
+    let lock_lp_vault = accounts::LOCK_LP_VAULT;
+    
+    // Build instruction data (no args for migrate_to_cpswap)
+    let mut data = Vec::new();
+    data.extend_from_slice(&discriminators::MIGRATE_TO_CPSWAP);
+    
+    // Build accounts (order matters!)
+    let accounts = vec![
+        AccountMeta::new(*payer, true), // payer
+        AccountMeta::new(*base_mint, false), // base_mint
+        AccountMeta::new_readonly(*quote_mint, false), // quote_mint
+        AccountMeta::new_readonly(*platform_config, false), // platform_config
+        AccountMeta::new_readonly(accounts::CPMM_PROGRAM, false), // cpswap_program
+        AccountMeta::new(cpswap_pool, false), // cpswap_pool
+        AccountMeta::new_readonly(cpswap_authority, false), // cpswap_authority
+        AccountMeta::new(cpswap_lp_mint, false), // cpswap_lp_mint
+        AccountMeta::new(cpswap_base_vault, false), // cpswap_base_vault
+        AccountMeta::new(cpswap_quote_vault, false), // cpswap_quote_vault
+        AccountMeta::new_readonly(*cpswap_config, false), // cpswap_config
+        AccountMeta::new(*cpswap_create_pool_fee, false), // cpswap_create_pool_fee
+        AccountMeta::new(cpswap_observation, false), // cpswap_observation
+        AccountMeta::new_readonly(accounts::LOCK_PROGRAM, false), // lock_program
+        AccountMeta::new_readonly(lock_authority, false), // lock_authority
+        AccountMeta::new(lock_lp_vault, false), // lock_lp_vault (placeholder)
+        AccountMeta::new(authority, false), // authority
+        AccountMeta::new(pool_state, false), // pool_state
+        AccountMeta::new_readonly(*global_config, false), // global_config
+        AccountMeta::new(base_vault, false), // base_vault
+        AccountMeta::new(quote_vault, false), // quote_vault
+        AccountMeta::new(pool_lp_token, false), // pool_lp_token
+        AccountMeta::new_readonly(TOKEN_PROGRAM, false), // base_token_program
+        AccountMeta::new_readonly(TOKEN_PROGRAM, false), // quote_token_program
+        AccountMeta::new_readonly(accounts::ASSOCIATED_TOKEN_PROGRAM, false), // associated_token_program
+        AccountMeta::new_readonly(accounts::SYSTEM_PROGRAM, false), // system_program
+        AccountMeta::new_readonly(accounts::RENT_SYSVAR, false), // rent_program
+        AccountMeta::new_readonly(accounts::METADATA_PROGRAM, false), // metadata_program
+    ];
+    
+    Ok(Instruction {
+        program_id: accounts::LAUNCHLAB_PROGRAM,
+        accounts,
+        data,
+    })
+}
