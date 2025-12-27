@@ -61,7 +61,7 @@ pub async fn transfer_sol(
     payer: &Keypair,
     receive_wallet: &Pubkey,
     amount: u64,
-) -> Result<(), anyhow::Error> {
+) -> Result<solana_sdk::signature::Signature, anyhow::Error> {
     if amount == 0 {
         return Err(anyhow!("transfer_sol: Amount cannot be zero"));
     }
@@ -82,9 +82,9 @@ pub async fn transfer_sol(
         recent_blockhash,
     );
 
-    rpc.send_and_confirm_transaction(&transaction).await?;
+    let signature = rpc.send_and_confirm_transaction(&transaction).await?;
 
-    Ok(())
+    Ok(signature)
 }
 
 /// Close token account

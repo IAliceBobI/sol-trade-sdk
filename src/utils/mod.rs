@@ -50,9 +50,7 @@ impl TradingClient {
         receive_wallet: &Pubkey,
         amount: u64,
     ) -> Result<solana_sdk::signature::Signature, anyhow::Error> {
-        trading::common::utils::transfer_sol(&self.rpc, payer, receive_wallet, amount)
-            .await
-            .map(|_| solana_sdk::signature::Signature::default())
+        trading::common::utils::transfer_sol(&self.rpc, payer, receive_wallet, amount).await
     }
 
     #[inline]
