@@ -143,7 +143,7 @@ async fn pumpfun_copy_trade_with_grpc(trade_info: PumpFunTradeEvent) -> AnyResul
             trade_info.mint,
             trade_info.creator,
             trade_info.creator_vault,
-            trade_info.virtual_sol_reserves,
+            trade_info.virtual_token_reserves,
             trade_info.virtual_sol_reserves,
             trade_info.real_token_reserves,
             trade_info.real_sol_reserves,
