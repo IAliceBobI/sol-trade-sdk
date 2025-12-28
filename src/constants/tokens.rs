@@ -13,7 +13,7 @@ pub const SOL_MINT: Pubkey = pubkey!("So1111111111111111111111111111111111111111
 pub const USDC_MINT: Pubkey = pubkey!("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v");
 
 /// USDT Mint (mainnet)
-pub const USDT_MINT: Pubkey = pubkey!("Es9vMFrzaCERmZfrR8Sg919rNTmkKpZ4KmnKGYNuNT12");
+pub const USDT_MINT: Pubkey = pubkey!("Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB");
 
 /// RAY (Raydium) Mint
-pub const RAY_MINT: Pubkey = pubkey!("4k3Dyjzvzp8eMZWUXbBCjEv2SkMr3SAN6doe9kQk4S2E");
+pub const RAY_MINT: Pubkey = pubkey!("4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R");
