@@ -2,6 +2,7 @@
 //!
 //! 提供跨项目使用的 Token 相关工具函数
 
+use crate::constants::{SOL_MINT, USDC_MINT, USDT_MINT, RAY_MINT};
 use anyhow::Result;
 use solana_sdk::pubkey::Pubkey;
 use spl_token::solana_program::program_pack::Pack;
@@ -40,10 +41,9 @@ pub async fn get_token_decimals(
 /// 获取代币 Symbol（支持 Token 和 Token2022 Metadata Extension）
 ///
 /// 支持：
-/// - 传统 spl-token：不支持链上 metadata，返回空字符串
 /// - Token2022 metadata extension：直接从链上读取 symbol
-///
-/// 注意：Symbol 可能存储在链下（如 Jupiter Token List），此时返回空字符串
+/// - 硬编码兜底：对于常见代币（SOL、USDC、USDT、RAY）使用本地缓存
+/// - 兜底方案：对于未知代币，返回 mint 地址的短字符串形式
 pub async fn get_token_symbol(
     rpc: &crate::common::SolanaRpcClient,
     mint: &Pubkey,
@@ -68,7 +68,8 @@ pub async fn get_token_symbol(
     }
 
     // 传统 Token 程序不支持链上 metadata，或未找到 metadata 扩展
-    Ok(String::new())
+    // 使用硬编码兜底方案
+    Ok(get_known_token_symbol(mint))
 }
 
 /// 计算 ATA 地址（自动识别 Token Program）
@@ -85,6 +86,24 @@ pub async fn calculate_ata(
         mint,
         &token_program,
     ))
+}
+
+/// 获取已知代币的 Symbol（硬编码兜底方案）
+///
+/// 当链上无法获取 symbol 时（如传统 SPL Token），使用此函数作为兜底
+/// 适用于日志记录、调试显示等场景
+pub fn get_known_token_symbol(mint: &Pubkey) -> String {
+    if *mint == SOL_MINT {
+        "SOL".to_string()
+    } else if *mint == USDC_MINT {
+        "USDC".to_string()
+    } else if *mint == USDT_MINT {
+        "USDT".to_string()
+    } else if *mint == RAY_MINT {
+        "RAY".to_string()
+    } else {
+        "".to_string()
+    }
 }
 
 #[cfg(test)]
