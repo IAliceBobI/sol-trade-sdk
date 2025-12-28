@@ -1,7 +1,7 @@
 use sol_trade_sdk::{common::TradeConfig, swqos::SwqosConfig, SolanaTrade};
 use solana_commitment_config::CommitmentConfig;
 use solana_sdk::signature::Keypair;
-use std::sync::Arc;
+use std::{fs, sync::Arc};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -77,8 +77,24 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 /// Create and initialize SolanaTrade client
 async fn create_solana_trade_client() -> Result<SolanaTrade, Box<dyn std::error::Error>> {
     println!("🚀 Initializing SolanaTrade client...");
-    let payer = Keypair::from_base58_string("use_your_payer_keypair_here");
-    let rpc_url = "https://api.mainnet-beta.solana.com".to_string();
+    
+    // Read payer keypair from ~/.config/solana/id.json
+    let home_dir = std::env::var("HOME").expect("HOME environment variable not set");
+    let keypair_path = format!("{}/.config/solana/id.json", home_dir);
+    println!("Loading keypair from: {}", keypair_path);
+    
+    let keypair_data = fs::read_to_string(&keypair_path)
+        .expect(&format!("Failed to read keypair file: {}", keypair_path));
+    
+    // Parse JSON and extract private key array
+    let private_key: Vec<u8> = serde_json::from_str(&keypair_data)
+        .expect("Failed to parse keypair JSON");
+    
+    // Use the first 32 bytes as the secret key
+    let secret_key: [u8; 32] = private_key[0..32].try_into().expect("Invalid key length");
+    let payer = Keypair::new_from_array(secret_key);
+    
+    let rpc_url = "http://127.0.0.1:8899".to_string();
     let commitment = CommitmentConfig::confirmed();
     let swqos_configs: Vec<SwqosConfig> = vec![SwqosConfig::Default(rpc_url.clone())];
     let trade_config = TradeConfig::new(rpc_url, swqos_configs, commitment);
