@@ -49,9 +49,9 @@ solana-client = "3.0.8"
 solana-program = "3.0.0"
 solana-rpc-client = "3.0.8"
 solana-rpc-client-api = "3.0.8"
-solana-transaction-status = "3.0.8"
-solana-account-decoder = "3.0.8"
-solana-hash = "3.0.0"
+solana-transaction-status = "3"
+solana-account-decoder = "3"
+solana-hash = "4.0"
 solana-entry = "3.0.8"
 solana-rpc-client-nonce-utils = "3.0.8"
 solana-perf = "3.0.8"
@@ -59,8 +59,8 @@ solana-metrics = "3.0.8"
 solana-nonce = "3.0.0"
 solana-address-lookup-table-interface = "3.0.0"
 solana-compute-budget-interface = "3.0.0"
-solana-commitment-config = { version = "3.0.0", features = ["serde"] }
-solana-transaction-status-client-types = "3.0.0"
+solana-commitment-config = { version = "3", features = ["serde"] }
+solana-transaction-status-client-types = "3"
 
 spl-token = "9.0.0"
 spl-token-2022 = "10.0.0"
@@ -70,7 +70,7 @@ spl-token-2022-interface = "2"
 
 solana-tls-utils = "3.0.8"
 
-borsh = { version = "1.5.3", features = ["derive"] }
+borsh = { version = "1.6", features = ["derive"] }
 isahc = "1.7.2"
 serde = { version = "1.0.215", features = ["derive"] }
 serde_json = "1.0.134"
@@ -79,7 +79,7 @@ futures-util = "0.3.31"
 base64 = "0.22.1"
 bs58 = "0.5.1"
 rand = "0.9.2"
-bincode = "1.3.3"
+bincode = "1.3"
 anyhow = "1.0.90"
 reqwest = { version = "0.12.12", features = ["json", "multipart"] }
 tokio = { version = "1.42.0" , features = ["full", "rt-multi-thread"]}
@@ -104,9 +104,9 @@ num-traits = "0.2.19"
 hex = "0.4.3"
 bytemuck = { version = "1.4.0" }
 arrayref = "0.3.6"
-borsh-derive = "1.5.5"
+borsh-derive = "1.6"
 indicatif = "0.18.0"
-solana-system-interface = { version = "2.0.0", features = ["bincode"] }
+solana-system-interface = { version = "3.0", features = ["bincode"] }
 fnv = "1.0.7"
 dashmap = "6.1.0"
 clru = "0.6"
