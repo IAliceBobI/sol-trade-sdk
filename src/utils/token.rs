@@ -39,20 +39,35 @@ pub async fn get_token_decimals(
 
 /// 获取代币 Symbol（支持 Token 和 Token2022 Metadata Extension）
 ///
-/// 注意：
-/// - 传统 spl-token 不支持链上 metadata，返回空字符串
-/// - Token2022 metadata extension 需要使用 spl_token_2022_interface，在 mm_service 中实现
-/// - Symbol 通常存储在链下（如 Jupiter Token List）
-/// 
-/// TODO: 待 spl-token-metadata-interface 版本统一后实现
+/// 支持：
+/// - 传统 spl-token：不支持链上 metadata，返回空字符串
+/// - Token2022 metadata extension：直接从链上读取 symbol
+///
+/// 注意：Symbol 可能存储在链下（如 Jupiter Token List），此时返回空字符串
 pub async fn get_token_symbol(
     rpc: &crate::common::SolanaRpcClient,
     mint: &Pubkey,
 ) -> Result<String> {
-    let _account = rpc.get_account(mint).await?;
-    
-    // 暂时返回空字符串，等待依赖版本统一
-    // 实际的 symbol 查询需要在 mm_service 中使用 TokenMetadataService
+    let account = rpc.get_account(mint).await?;
+
+    // 尝试解析为 Token2022 的 Mint（支持 Metadata Extension）
+    if account.owner == spl_token_2022::ID {
+        use spl_token_2022::extension::{BaseStateWithExtensions, StateWithExtensions};
+        use spl_token_2022::state::Mint as Mint2022;
+        if let Ok(mint_account) = StateWithExtensions::<Mint2022>::unpack(&account.data) {
+            // get_variable_len_extension 已经返回解析好的类型
+            if let Ok(metadata) = mint_account
+                .get_variable_len_extension::<spl_token_metadata_interface::state::TokenMetadata>()
+            {
+                let symbol = metadata.symbol.to_string();
+                if !symbol.is_empty() {
+                    return Ok(symbol);
+                }
+            }
+        }
+    }
+
+    // 传统 Token 程序不支持链上 metadata，或未找到 metadata 扩展
     Ok(String::new())
 }
 
@@ -96,6 +111,20 @@ mod tests {
         
         let decimals = get_token_decimals(&rpc, &usdc).await.unwrap();
         assert_eq!(decimals, 6);
+    }
+
+    #[tokio::test]
+    #[ignore] // 需要 RPC 连接
+    async fn test_get_token_symbol_pumpfun() {
+        use solana_client::nonblocking::rpc_client::RpcClient;
+        let rpc = RpcClient::new("https://api.mainnet-beta.solana.com".to_string());
+        // Pump.fun 测试代币
+        let pump = Pubkey::from_str_const("pumpCmXqMfrsAkQ5r49WcJnRayYRqmXz6ae8H7H9Dfn");
+        
+        let symbol = get_token_symbol(&rpc, &pump).await.unwrap();
+        // Pump.fun 代币的 symbol 应该在链上
+        assert!(!symbol.is_empty(), "Pump.fun token should have symbol");
+        println!("Pump.fun token symbol: {}", symbol);
     }
 }
 
