@@ -7,7 +7,7 @@ use solana_sdk::pubkey::Pubkey;
 
 /// Constants used as seeds for deriving PDAs (Program Derived Addresses)
 pub mod seeds {
-    pub const POOL_SEED: &[u8] = b"pool";
+    pub const POOL_SEED: &[u8] = b"bonkswappoolv1";
     pub const POOL_VAULT_SEED: &[u8] = b"pool_vault";
 }
 
@@ -19,7 +19,7 @@ pub mod accounts {
     pub const GLOBAL_CONFIG: Pubkey = pubkey!("6s1xP3hpbAfFoNtUNF8mfHsjr2Bd97JxFJRWLbL6aHuX");
     pub const USD1_GLOBAL_CONFIG: Pubkey = pubkey!("EPiZbnrThjyLnoQ6QQzkxeFqyL5uyg9RzNHHAudUPxBz");
     pub const EVENT_AUTHORITY: Pubkey = pubkey!("2DPAtwB8L12vrMRExbLuyGnC7n2J5LNoZQSejeQGpwkr");
-    pub const BONK: Pubkey = pubkey!("LanMV9sAd7wArD4vJFi2qDdfnVhFxYSUg6eADduJ3uj");
+    pub const BONK: Pubkey = pubkey!("BSwp6bEBihVLdqJRKGgzjcGLHkcTuzmSo1TQkHepzH8p");
 
     pub const PLATFORM_FEE_RATE: u128 = 100; // 1%
     pub const PROTOCOL_FEE_RATE: u128 = 25; // 0.25%
@@ -192,4 +192,41 @@ pub fn get_creator_associated_account(creator: &Pubkey) -> Option<Pubkey> {
     let program_id: &Pubkey = &accounts::BONK;
     let pda: Option<(Pubkey, u8)> = Pubkey::try_find_program_address(seeds, program_id);
     pda.map(|pubkey| pubkey.0)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use solana_sdk::pubkey::Pubkey;
+    use std::str::FromStr;
+
+    #[test]
+    fn test_get_pool_pda_returns_valid_pda() {
+        // Test with known mint addresses
+        let base_mint = Pubkey::from_str("EPeUFDgHRxs9xxEPVaL6kfGQvCon7jmAWKVUHuux1Tpz").unwrap();
+        let quote_mint = Pubkey::from_str("So11111111111111111111111111111111111111112").unwrap();
+
+        let result = get_pool_pda(&base_mint, &quote_mint);
+
+        // Should return Some(Pubkey)
+        assert!(result.is_some());
+
+        let pool_pda = result.unwrap();
+
+        println!("计算得到的池子地址: {}", pool_pda);
+
+        // 验证池子地址是否正确
+        let expected_pool = Pubkey::from_str("HytrL5NCP55DyJJtD8Rx7BTKw59ZPZx558GuGW2AP2od").unwrap();
+        println!("期望的池子地址: {}", expected_pool);
+
+        assert_eq!(pool_pda, expected_pool, "池子地址不匹配!");
+
+        // 同时验证PDA推导是否正确
+        let seeds: &[&[u8]; 3] = &[seeds::POOL_SEED, base_mint.as_ref(), quote_mint.as_ref()];
+        let (derived_pda, _bump) = Pubkey::find_program_address(seeds, &accounts::BONK);
+        println!("通过find_program_address推导的地址: {}", derived_pda);
+
+        assert_eq!(pool_pda, derived_pda, "PDA推导结果不一致!");
+    }
+ 
 }

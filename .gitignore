@@ -30,4 +30,6 @@ tmp_*.log
 .serena/
 
 /temp
+/dexprojs
+
 
