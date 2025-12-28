@@ -7,12 +7,16 @@ Sol Trade SDK 是一个用 Rust 编写的综合性 Solana DEX（去中心化交�
 ### 核心特性
 
 - **多协议支持**：统一的交易接口支持 7 个主流 DEX 协议
-- **MEV 保护**：集成 9 个 MEV 保护服务（Jito、ZeroSlot、Temporal、Bloxroute、FlashBlock、BlockRazor、Node1、Astralane）
-- **并发交易**：支持通过多个 MEV 服务同时发送交易，最快成功的交易生效
+- **MEV 保护**：集成 13 个 MEV 保护服务（Jito、ZeroSlot、Temporal、Bloxroute、FlashBlock、BlockRazor、Node1、Astralane、Stellium、Lightspeed、Soyas、NextBlock）
+- **并发交易**：支持通过多个 MEV 服务同时发送交易，返回所有交易签名，最快成功的交易生效
 - **中间件系统**：支持自定义指令中间件，在交易执行前修改、添加或删除指令
 - **性能优化**：采用零开销抽象、SIMD 优化、零拷贝 I/O 等技术实现超低延迟
 - **地址查找表**：支持 ALT 优化交易大小和减少费用
 - **Nonce 缓存**：支持 Durable Nonce 实现交易重放保护和优化
+- **Seed 优化**：支持 Seed 优化减少交易大小和费用
+- **WSOL 管理**：自动 WSOL ATA 创建和管理，支持包装/解包装操作
+- **百分比交易**：支持按百分比卖出代币
+- **自定义 URL**：每个 SWQOS 服务支持自定义端点 URL
 
 ### 技术栈
 
@@ -22,6 +26,7 @@ Sol Trade SDK 是一个用 Rust 编写的综合性 Solana DEX（去中心化交�
 - **加密**：Rustls、Ring
 - **序列化**：Borsh、Bincode、Serde
 - **网络**：Reqwest、Isahc、gRPC (Tonic/Quinn)
+- **性能优化**：crossbeam、memmap2、core_affinity、dashmap、clru、parking_lot
 
 ## 项目结构
 
@@ -36,6 +41,10 @@ src/
 │   ├── global.rs            # 全局配置
 │   ├── nonce_cache.rs       # Nonce 缓存
 │   ├── seed.rs              # Seed 优化
+│   ├── spl_associated_token_account.rs  # SPL 关联代币账户
+│   ├── spl_token.rs         # SPL Token
+│   ├── spl_token_2022.rs    # SPL Token 2022
+│   ├── subscription_handle.rs  # 订阅处理
 │   └── types.rs             # 通用类型定义
 ├── constants/           # 常量定义
 │   ├── accounts.rs          # 账户地址常量
@@ -62,7 +71,7 @@ src/
 │   ├── syscall_bypass.rs          # 系统调用绕过
 │   ├── ultra_low_latency.rs       # 超低延迟
 │   └── zero_copy_io.rs            # 零拷贝 I/O
-├── swqos/                # MEV 服务客户端
+├── swqos/                # MEV 服务客户端（13 个服务）
 │   ├── jito.rs              # Jito 客户端
 │   ├── zeroslot.rs          # ZeroSlot 客户端
 │   ├── temporal.rs          # Temporal 客户端
@@ -71,8 +80,14 @@ src/
 │   ├── blockrazor.rs        # BlockRazor 客户端
 │   ├── node1.rs             # Node1 客户端
 │   ├── astralane.rs         # Astralane 客户端
+│   ├── stellium.rs          # Stellium 客户端
+│   ├── lightspeed.rs        # Lightspeed 客户端
+│   ├── soyas.rs             # Soyas 客户端
+│   ├── nextblock.rs         # NextBlock 客户端（默认禁用）
 │   ├── solana_rpc.rs        # Solana RPC 客户端
-│   └── common.rs            # SWQOS 通用功能
+│   ├── common.rs            # SWQOS 通用功能
+│   ├── serialization.rs     # 序列化工具
+│   └── mod.rs               # SWQOS 模块导出
 ├── trading/              # 统一交易引擎
 │   ├── factory.rs           # 交易工厂（创建不同协议执行器）
 │   ├── common/              # 通用交易工具
@@ -93,30 +108,36 @@ src/
 │   └── price/               # 价格计算工具
 └── lib.rs                # 主库文件（导出公共 API）
 
-examples/              # 示例程序（16 个独立 workspace 成员）
-├── trading_client/           # 创建 TradingClient 实例
-├── pumpfun_sniper_trading/   # PumpFun 狙击交易
-├── pumpfun_copy_trading/     # PumpFun 跟单交易
-├── pumpswap_trading/         # PumpSwap 交易
-├── pumpswap_direct_trading/  # PumpSwap 直接交易
-├── raydium_cpmm_trading/     # Raydium CPMM 交易
-├── raydium_amm_v4_trading/   # Raydium AMM V4 交易
+examples/              # 示例程序（18 个独立 workspace 成员）
+├── trading_client/               # 创建 TradingClient 实例
+├── pumpfun_sniper_trading/       # PumpFun 狙击交易
+├── pumpfun_copy_trading/         # PumpFun 跟单交易
+├── pumpfun_buy_test/             # PumpFun 买入测试
+├── pumpswap_trading/             # PumpSwap 交易
+├── pumpswap_direct_trading/      # PumpSwap 直接交易
+├── raydium_cpmm_trading/         # Raydium CPMM 交易
+├── raydium_amm_v4_trading/       # Raydium AMM V4 交易
 ├── meteora_damm_v2_direct_trading/  # Meteora DAMM V2 交易
-├── bonk_sniper_trading/      # Bonk 狙击交易
-├── bonk_copy_trading/        # Bonk 跟单交易
-├── middleware_system/        # 中间件系统示例
-├── address_lookup/           # 地址查找表示例
-├── nonce_cache/              # Nonce 缓存示例
-├── wsol_wrapper/             # WSOL 包装示例
-├── seed_trading/             # Seed 优化交易示例
-├── gas_fee_strategy/         # Gas 费用策略示例
-└── cli_trading/              # CLI 交易工具
+├── bonk_sniper_trading/          # Bonk 狙击交易
+├── bonk_copy_trading/            # Bonk 跟单交易
+├── middleware_system/            # 中间件系统示例
+├── address_lookup/               # 地址查找表示例
+├── nonce_cache/                  # Nonce 缓存示例
+├── wsol_wrapper/                 # WSOL 包装示例
+├── seed_trading/                 # Seed 优化交易示例
+├── gas_fee_strategy/             # Gas 费用策略示例
+└── cli_trading/                  # CLI 交易工具
 
-docs/                  # 文档
-├── ADDRESS_LOOKUP_TABLE.md      # 地址查找表指南
-├── GAS_FEE_STRATEGY.md          # Gas 费用策略指南
-├── NONCE_CACHE.md               # Nonce 缓存指南
-└── TRADING_PARAMETERS.md        # 交易参数参考
+docs/                  # 文档（包含中英文版本）
+├── ADDRESS_LOOKUP_TABLE.md      # 地址查找表指南（英文）
+├── ADDRESS_LOOKUP_TABLE_CN.md   # 地址查找表指南（中文）
+├── GAS_FEE_STRATEGY.md          # Gas 费用策略指南（英文）
+├── GAS_FEE_STRATEGY_CN.md       # Gas 费用策略指南（中文）
+├── MIN_TIP_AMOUNT.md            # Node1 最小小费金额限制
+├── NONCE_CACHE.md               # Nonce 缓存指南（英文）
+├── NONCE_CACHE_CN.md            # Nonce 缓存指南（中文）
+├── TRADING_PARAMETERS.md        # 交易参数参考（英文）
+└── TRADING_PARAMETERS_CN.md     # 交易参数参考（中文）
 ```
 
 ## 构建和运行
@@ -129,6 +150,9 @@ cargo build
 
 # Release 构建（推荐生产环境）
 cargo build --release
+
+# 启用性能追踪特性（仅用于调试，生产环境应禁用）
+cargo build --release --features perf-trace
 ```
 
 ### 运行示例
@@ -145,8 +169,14 @@ cargo run --package pumpfun_sniper_trading
 # PumpFun 代币跟单交易
 cargo run --package pumpfun_copy_trading
 
+# PumpFun 买入测试
+cargo run --package pumpfun_buy_test
+
 # PumpSwap 交易
 cargo run --package pumpswap_trading
+
+# PumpSwap 直接交易
+cargo run --package pumpswap_direct_trading
 
 # Raydium CPMM 交易
 cargo run --package raydium_cpmm_trading
@@ -180,6 +210,9 @@ cargo run --package seed_trading
 
 # Gas 费用策略示例
 cargo run --package gas_fee_strategy
+
+# CLI 交易工具
+cargo run --package cli_trading
 ```
 
 ### 测试方法
@@ -224,6 +257,7 @@ sol-trade-sdk = "3.3.6"
 3. **中间件模式**：`MiddlewareManager` 支持链式中间件处理
 4. **策略模式**：`GasFeeStrategy` 支持不同的 Gas 费用策略
 5. **类型安全**：使用 `DexParamEnum` 枚举确保协议参数类型安全
+6. **单例模式**：支持全局单例访问（`get_instance`）
 
 ### 性能优化配置
 
@@ -231,14 +265,27 @@ sol-trade-sdk = "3.3.6"
 
 ```toml
 [profile.release]
-opt-level = 3              # 最高优化级别
-lto = "thin"               # 瘦 LTO - 平衡性能与编译速度
-codegen-units = 16         # 16 个代码生成单元 - 并行编译
+opt-level = 3              # 最高优化级别（不影响编译速度）
+lto = "thin"               # 瘦 LTO - 平衡性能与编译速度（比 fat 快 5-10 倍）
+codegen-units = 16         # 16 个代码生成单元 - 并行编译（比 1 快 10 倍）
 panic = "abort"            # 恐慌即中止
 overflow-checks = false    # 禁用溢出检查
+debug = false              # 禁用调试信息
+debug-assertions = false   # 禁用调试断言
 strip = true               # 去除符号表
-incremental = true         # 增量编译
+incremental = true         # 增量编译 - 大幅加速重新编译
+
+[profile.dev]
+overflow-checks = true     # 开发时启用溢出检查
+opt-level = 0
+debug = 1
+codegen-units = 256        # 保持高并行度
 ```
+
+### 编译特性
+
+- **default**：默认特性，无额外依赖
+- **perf-trace**：性能追踪特性，用于调试和性能分析，生产环境应禁用以获得最佳性能
 
 ### 关键设计原则
 
@@ -247,6 +294,8 @@ incremental = true         # 增量编译
 3. **零拷贝**：尽可能使用引用和智能指针避免数据拷贝
 4. **异步优先**：使用 Tokio 异步运行时处理所有 I/O 操作
 5. **错误处理**：使用 `anyhow::Result` 统一错误处理
+6. **黑名单机制**：支持 SWQOS 服务黑名单配置（如 NextBlock 默认禁用）
+7. **智能检测**：自动检测并调整 Node1 最小小费限制
 
 ## 核心 API 使用
 
@@ -268,14 +317,49 @@ let swqos_configs: Vec<SwqosConfig> = vec![
     SwqosConfig::Default(rpc_url.clone()),
     SwqosConfig::Jito("your_uuid".to_string(), SwqosRegion::Frankfurt, None),
     SwqosConfig::Bloxroute("your_api_token".to_string(), SwqosRegion::Frankfurt, None),
-    // ... 更多 SWQOS 服务
+    SwqosConfig::ZeroSlot("your_api_token".to_string(), SwqosRegion::Frankfurt, None),
+    SwqosConfig::Temporal("your_api_token".to_string(), SwqosRegion::Frankfurt, None),
+    SwqosConfig::FlashBlock("your_api_token".to_string(), SwqosRegion::Frankfurt, None),
+    SwqosConfig::BlockRazor("your_api_token".to_string(), SwqosRegion::Frankfurt, None),
+    SwqosConfig::Node1("your_api_token".to_string(), SwqosRegion::Frankfurt, None),
+    SwqosConfig::Astralane("your_api_token".to_string(), SwqosRegion::Frankfurt, None),
+    SwqosConfig::Stellium("your_api_token".to_string(), SwqosRegion::Frankfurt, None),
+    SwqosConfig::Lightspeed("your_api_token".to_string(), SwqosRegion::Frankfurt, None),
+    SwqosConfig::Soyas("your_api_token".to_string(), SwqosRegion::Frankfurt, None),
 ];
 
 // 创建交易配置
 let trade_config = TradeConfig::new(rpc_url, swqos_configs, commitment);
 
+// 可选：自定义 WSOL ATA 和 Seed 优化设置
+// let trade_config = TradeConfig::new(rpc_url, swqos_configs, commitment)
+//     .with_wsol_ata_config(
+//         true,  // create_wsol_ata_on_startup: 启动时检查并创建 WSOL ATA（默认：true）
+//         true   // use_seed_optimize: 全局启用 seed 优化（默认：true）
+//     );
+
 // 创建 TradingClient
 let client = SolanaTrade::new(payer, trade_config).await;
+```
+
+### 使用自定义 URL
+
+每个 SWQOS 服务现在支持可选的自定义 URL 参数：
+
+```rust
+// 使用自定义 URL（第三个参数）
+let jito_config = SwqosConfig::Jito(
+    "your_uuid".to_string(),
+    SwqosRegion::Frankfurt, // 此参数仍然需要但会被忽略
+    Some("https://custom-jito-endpoint.com".to_string()) // 自定义 URL
+);
+
+// 使用默认区域端点（第三个参数为 None）
+let bloxroute_config = SwqosConfig::Bloxroute(
+    "your_api_token".to_string(),
+    SwqosRegion::NewYork, // 将使用此区域的默认端点
+    None // 无自定义 URL，使用 SwqosRegion
+);
 ```
 
 ### 执行买入交易
@@ -285,7 +369,7 @@ use sol_trade_sdk::{TradeBuyParams, TradeTokenType, factory::DexType, trading::c
 
 // 配置 Gas 费用策略
 let gas_fee_strategy = GasFeeStrategy::new();
-gas_fee_strategy.set_global_fee_strategy(150000, 500000, 0.001, 0.001);
+gas_fee_strategy.set_global_fee_strategy(150000, 150000, 500000, 500000, 0.001, 0.001, 256 * 1024, 0);
 
 // 构建买入参数
 let buy_params = TradeBuyParams {
@@ -302,12 +386,13 @@ let buy_params = TradeBuyParams {
     close_input_token_ata: true,
     create_mint_ata: true,
     durable_nonce: None,
-    fixed_output_token_amount: None,
+    fixed_output_token_amount: None,  // 可选：指定精确的输出金额
     gas_fee_strategy: gas_fee_strategy.clone(),
     simulate: false,
 };
 
 // 执行买入
+// 返回：(是否至少有一个交易成功, 所有交易签名, 最后一个错误（如果全部失败）)
 let (success, signatures, error) = client.buy(buy_params).await?;
 ```
 
@@ -332,6 +417,31 @@ let sell_params = TradeSellParams {
 let (success, signatures, error) = client.sell(sell_params).await?;
 ```
 
+### 按百分比卖出
+
+```rust
+// 按百分比卖出代币
+// percent: 1-100，其中 100 = 100%
+let (success, signatures, error) = client.sell_by_percent(
+    sell_params,
+    total_token_amount,  // 总代币数量
+    50  // 卖出 50%
+).await?;
+```
+
+### WSOL 管理
+
+```rust
+// 包装 SOL 为 WSOL
+let signature = client.wrap_sol_to_wsol(amount_lamports).await?;
+
+// 关闭 WSOL 账户并解包为 SOL
+let signature = client.close_wsol().await?;
+
+// 创建 WSOL ATA（不包装 SOL）
+let signature = client.create_wsol_ata().await?;
+```
+
 ### 使用中间件
 
 ```rust
@@ -354,6 +464,67 @@ let client = SolanaTrade::new(payer, trade_config)
     .with_middleware_manager(middleware_manager);
 ```
 
+### 获取全局实例
+
+```rust
+// 获取全局单例实例
+let client = SolanaTrade::get_instance();
+```
+
+### 获取 RPC 客户端
+
+```rust
+// 获取 RPC 客户端进行直接区块链交互
+let rpc = client.get_rpc();
+```
+
+## SWQOS 服务配置
+
+### 支持的 MEV 保护服务
+
+SDK 支持 13 个 MEV 保护服务，可通过 `SwqosConfig` 配置：
+
+| 服务 | 状态 | 说明 | 最小小费 |
+|------|------|------|----------|
+| Default | ✅ 可用 | 默认 Solana RPC | - |
+| Jito | ✅ 可用 | Jito MEV 保护 | - |
+| ZeroSlot | ✅ 可用 | ZeroSlot MEV 保护 | - |
+| Temporal | ✅ 可用 | Temporal MEV 保护 | - |
+| Bloxroute | ✅ 可用 | Bloxroute MEV 保护 | - |
+| FlashBlock | ✅ 可用 | FlashBlock MEV 保护 | - |
+| BlockRazor | ✅ 可用 | BlockRazor MEV 保护 | - |
+| Node1 | ✅ 可用 | Node1 MEV 保护 | 0.002 SOL |
+| Astralane | ✅ 可用 | Astralane MEV 保护 | - |
+| Stellium | ✅ 可用 | Stellium MEV 保护 | - |
+| Lightspeed | ✅ 可用 | Lightspeed MEV 保护 | 0.001 SOL |
+| Soyas | ✅ 可用 | Soyas MEV 保护 | - |
+| NextBlock | ⚠️ 默认禁用 | NextBlock MEV 保护（在黑名单中） | - |
+
+### Node1 最小小费限制
+
+Node1 节点要求最小小费金额为 **0.002 SOL**，低于此金额的交易可能会被拒绝。
+
+SDK 已自动添加智能检测，只对 Node1 的 tip_account 应用最小小费金额检查。其他 SWQOS 服务不受影响。
+
+详见文档：`docs/MIN_TIP_AMOUNT.md`
+
+### 区域配置
+
+支持多个区域配置：
+
+```rust
+pub enum SwqosRegion {
+    NewYork,
+    Frankfurt,
+    Amsterdam,
+    SLC,
+    Tokyo,
+    London,
+    LosAngeles,
+    Default,
+}
+```
+
 ## 重要注意事项
 
 1. **充分测试**：在主网使用前务必在测试网充分测试
@@ -362,6 +533,10 @@ let client = SolanaTrade::new(payer, trade_config)
 4. **滑点设置**：合理设置滑点避免交易失败
 5. **余额监控**：监控余额和交易费用
 6. **合规性**：遵守相关法律法规
+7. **Node1 小费**：使用 Node1 时注意最小小费限制（0.002 SOL）
+8. **性能特性**：生产环境应禁用 `perf-trace` 特性以获得最佳性能
+9. **并发交易**：使用多个 SWQOS 服务时会返回多个交易签名，需要正确处理
+10. **WSOL 管理**：SDK 会自动管理 WSOL ATA，但也可以手动控制
 
 ## 相关资源
 
