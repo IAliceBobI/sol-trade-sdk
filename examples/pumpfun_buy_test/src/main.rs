@@ -66,8 +66,6 @@ async fn main() -> AnyResult<()> {
         500000,      // sell_cu_price
         0.005,       // buy_tip
         0.01,        // sell_tip
-        256 * 1024,  // buy_data_size_limit
-        0,           // sell_data_size_limit
     );
 
     println!("✅ 客户端初始化完成\n");
