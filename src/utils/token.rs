@@ -92,7 +92,6 @@ mod tests {
     use super::*;
 
     #[tokio::test]
-    #[ignore] // 需要 RPC 连接
     async fn test_get_token_decimals_wsol() {
         use solana_client::nonblocking::rpc_client::RpcClient;
         let rpc = RpcClient::new("https://api.mainnet-beta.solana.com".to_string());
@@ -103,7 +102,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[ignore] // 需要 RPC 连接
     async fn test_get_token_decimals_usdc() {
         use solana_client::nonblocking::rpc_client::RpcClient;
         let rpc = RpcClient::new("https://api.mainnet-beta.solana.com".to_string());
@@ -114,7 +112,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[ignore] // 需要 RPC 连接
     async fn test_get_token_symbol_pumpfun() {
         use solana_client::nonblocking::rpc_client::RpcClient;
         let rpc = RpcClient::new("https://api.mainnet-beta.solana.com".to_string());
