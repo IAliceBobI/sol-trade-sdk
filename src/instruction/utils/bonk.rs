@@ -67,6 +67,7 @@ pub async fn fetch_pool_state(
     if account.owner != accounts::BONK {
         return Err(anyhow!("Account is not owned by Bonk program"));
     }
+    // Skip the 8-byte discriminator
     let pool_state = pool_state_decode(&account.data[8..])
         .ok_or_else(|| anyhow!("Failed to decode pool state"))?;
     Ok(pool_state)
@@ -199,6 +200,7 @@ mod tests {
     use super::*;
     use solana_sdk::pubkey::Pubkey;
     use std::str::FromStr;
+    use solana_client::nonblocking::rpc_client::RpcClient;
 
     #[test]
     fn test_get_pool_pda_returns_valid_pda() {
@@ -228,5 +230,59 @@ mod tests {
 
         assert_eq!(pool_pda, derived_pda, "PDA推导结果不一致!");
     }
- 
+
+    #[tokio::test]
+    async fn test_fetch_pool_state() {
+        // Test pool address provided by user
+        let pool_address = Pubkey::from_str("5UUBHfBssdFDtqFrcuPYA8xvYftYwYWEawucDuAH45KX").unwrap();
+        
+        // Use public Solana RPC endpoint
+        let rpc_url = "https://api.mainnet-beta.solana.com";
+        let rpc = RpcClient::new(rpc_url.to_string());
+
+        // Call fetch_pool_state
+        let result = fetch_pool_state(&rpc, &pool_address).await;
+
+        // Verify the result
+        assert!(result.is_ok(), "Failed to fetch pool state: {:?}", result.err());
+
+        let pool_state = result.unwrap();
+        
+        // Print pool state for verification
+        println!("Pool State fetched successfully!");
+        println!("  Token X: {}", pool_state.token_x);
+        println!("  Token Y: {}", pool_state.token_y);
+        println!("  Token X Reserve: {}", pool_state.token_x_reserve.v);
+        println!("  Token Y Reserve: {}", pool_state.token_y_reserve.v);
+        println!("  Price: {}", pool_state.price.v);
+        println!("  LP Fee: {}", pool_state.lp_fee.v);
+        println!("  Buyback Fee: {}", pool_state.buyback_fee.v);
+        println!("  Project Fee: {}", pool_state.project_fee.v);
+        println!("  Mercanti Fee: {}", pool_state.mercanti_fee.v);
+        println!("  Const K: {}", pool_state.const_k.v);
+        println!("  Farm Count: {}", pool_state.farm_count);
+        println!("  Bump: {}", pool_state.bump);
+
+        // Verify basic field constraints
+        assert!(pool_state.token_x_reserve.v > 0, "Token X reserve should be positive");
+        assert!(pool_state.token_y_reserve.v > 0, "Token Y reserve should be positive");
+        assert!(!pool_state.token_x.eq(&Pubkey::default()), "Token X should not be zero");
+        assert!(!pool_state.token_y.eq(&Pubkey::default()), "Token Y should not be zero");
+    }
+
+    #[tokio::test]
+    async fn test_fetch_pool_state_owner_validation() {
+        // Test that fetch_pool_state validates the program owner
+        let invalid_address = Pubkey::from_str("11111111111111111111111111111111").unwrap(); // System program
+        
+        let rpc_url = "https://api.mainnet-beta.solana.com";
+        let rpc = RpcClient::new(rpc_url.to_string());
+
+        let result = fetch_pool_state(&rpc, &invalid_address).await;
+
+        // Should fail because system program is not the BONK program
+        assert!(result.is_err(), "Expected error for invalid program owner");
+        let err = result.unwrap_err();
+        assert!(err.to_string().contains("Bonk program"), "Error should mention Bonk program");
+    }
 }
