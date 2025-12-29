@@ -206,6 +206,7 @@ pub async fn execute_parallel(
     wait_transaction_confirmed: bool,
     with_tip: bool,
     gas_fee_strategy: GasFeeStrategy,
+    on_transaction_signed: Option<crate::trading::CallbackRef>,
 ) -> Result<(bool, Vec<Signature>, Option<anyhow::Error>)> {
     let _exec_start = Instant::now();
 
@@ -296,6 +297,7 @@ pub async fn execute_parallel(
         let tip_account_str = swqos_client.get_tip_account()?;
         let tip_account = Arc::new(Pubkey::from_str(&tip_account_str).unwrap_or_default());
         let collector = collector.clone();
+        let on_transaction_signed = on_transaction_signed.clone();
 
         let tip = gas_fee_strategy_config.2.tip;
         let unit_limit = gas_fee_strategy_config.2.cu_limit;
@@ -343,7 +345,32 @@ pub async fn execute_parallel(
                 }
             };
 
-            // Transaction built
+            // 🎯 调用交易签名回调（在发送前）
+            // 使用 tokio::spawn 异步执行，不阻塞交易发送
+            if let Some(callback) = &on_transaction_signed {
+                let callback_clone = callback.clone();
+                let tx_clone = transaction.clone();
+                let swqos_type_clone = swqos_type;
+                let trade_type_clone = if is_buy { TradeType::Buy } else { TradeType::Sell };
+                let with_tip_clone = swqos_type != SwqosType::Default;
+                let tip_amount_clone = tip_amount;
+
+                tokio::spawn(async move {
+                    use crate::trading::CallbackContext;
+                    let context = CallbackContext::new(
+                        tx_clone,
+                        swqos_type_clone,
+                        trade_type_clone,
+                        with_tip_clone,
+                        tip_amount_clone,
+                    );
+                    if let Err(e) = callback_clone.on_transaction_signed(context).await {
+                        eprintln!("[Callback Error] on_transaction_signed failed: {:?}", e);
+                    }
+                });
+            }
+
+            // Transaction sent
 
             let _send_start = Instant::now();
             let mut err: Option<anyhow::Error> = None;

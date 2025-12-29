@@ -12,6 +12,10 @@ use crate::constants::SOL_TOKEN_ACCOUNT;
 use crate::constants::USD1_TOKEN_ACCOUNT;
 use crate::constants::USDC_TOKEN_ACCOUNT;
 use crate::constants::WSOL_TOKEN_ACCOUNT;
+pub use crate::trading::CallbackRef;
+pub use crate::trading::TransactionLifecycleCallback;
+pub use crate::trading::CallbackContext;
+pub use crate::trading::NoopCallback;
 #[cfg(feature = "perf-trace")]
 use crate::constants::trade::trade::DEFAULT_SLIPPAGE;
 use crate::swqos::SwqosClient;
@@ -27,7 +31,7 @@ use crate::trading::core::params::MeteoraDammV2Params;
 use crate::trading::core::params::PumpFunParams;
 use crate::trading::core::params::PumpSwapParams;
 use crate::trading::core::params::{RaydiumAmmV4Params, RaydiumClmmParams, RaydiumCpmmParams};
-use crate::trading::factory::DexType;
+pub use crate::trading::factory::DexType;
 use common::SolanaRpcClient;
 use parking_lot::Mutex;
 use rustls::crypto::{CryptoProvider, ring::default_provider};
@@ -122,6 +126,9 @@ pub struct TradeBuyParams {
     pub gas_fee_strategy: GasFeeStrategy,
     /// Whether to simulate the transaction instead of executing it
     pub simulate: bool,
+    /// 交易签名后回调（可选）
+    /// 用于在交易发送前获取签名后的交易实体，用于入库等操作
+    pub on_transaction_signed: Option<CallbackRef>,
 }
 
 /// Parameters for executing sell orders across different DEX protocols
@@ -166,6 +173,9 @@ pub struct TradeSellParams {
     pub gas_fee_strategy: GasFeeStrategy,
     /// Whether to simulate the transaction instead of executing it
     pub simulate: bool,
+    /// 交易签名后回调（可选）
+    /// 用于在交易发送前获取签名后的交易实体，用于入库等操作
+    pub on_transaction_signed: Option<CallbackRef>,
 }
 
 impl TradingClient {
@@ -409,6 +419,7 @@ impl TradingClient {
             fixed_output_amount: params.fixed_output_token_amount,
             gas_fee_strategy: params.gas_fee_strategy,
             simulate: params.simulate,
+            on_transaction_signed: params.on_transaction_signed,
         };
 
         // Validate protocol params
@@ -521,6 +532,7 @@ impl TradingClient {
             fixed_output_amount: params.fixed_output_token_amount,
             gas_fee_strategy: params.gas_fee_strategy,
             simulate: params.simulate,
+            on_transaction_signed: params.on_transaction_signed,
         };
 
         // Validate protocol params

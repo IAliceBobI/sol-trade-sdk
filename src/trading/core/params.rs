@@ -69,6 +69,9 @@ pub struct SwapParams {
     pub fixed_output_amount: Option<u64>,
     pub gas_fee_strategy: GasFeeStrategy,
     pub simulate: bool,
+    /// 交易签名后回调（可选）
+    /// 用于在交易发送前获取签名后的交易实体，用于入库等操作
+    pub on_transaction_signed: Option<crate::trading::CallbackRef>,
 }
 
 impl std::fmt::Debug for SwapParams {
