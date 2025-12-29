@@ -6,6 +6,106 @@
 
 ## 架构设计
 
+### 回调执行模式
+
+SDK 支持两种回调执行模式，满足不同业务场景的需求：
+
+| 模式 | 交易延迟 | 失败影响 | 适用场景 |
+|------|---------|---------|---------|
+| **Async**（异步） | 0ms（不阻塞） | 不影响交易发送 | 监控、日志、非关键业务 |
+| **Sync**（同步） | 取决于回调执行时间 | 阻止交易发送 | 入库、审计、关键业务 |
+
+#### 异步模式（Async，默认）
+
+```rust
+// 默认行为：异步执行，不阻塞交易发送
+let trade_config = TradeConfig::new(rpc_url, swqos_configs, commitment)
+    .with_callback_execution_mode(CallbackExecutionMode::Async);
+
+// 回调使用 tokio::spawn 异步执行
+tokio::spawn(async move {
+    if let Err(e) = callback.on_transaction_signed(context).await {
+        eprintln!("[Callback Error] {:?}", e);
+    }
+});
+```
+
+**特性**：
+- 回调失败不影响交易发送
+- 使用 `tokio::spawn` 异步执行
+- 交易延迟：0ms
+- 适合：监控、日志、非关键业务
+
+#### 同步模式（Sync）
+
+```rust
+// 同步模式：等待回调完成后再发送交易
+let trade_config = TradeConfig::new(rpc_url, swqos_configs, commitment)
+    .with_callback_execution_mode(CallbackExecutionMode::Sync);
+
+// 回调使用 .await 同步等待
+if let Err(e) = callback.on_transaction_signed(context).await {
+    // 回调失败会阻止交易发送
+    eprintln!("[Callback Error] {:?}", e);
+    return Err(e);
+}
+```
+
+**特性**：
+- 回调失败会阻止交易发送
+- 使用 `.await` 同步等待
+- 交易延迟：取决于回调执行时间
+- 适合：入库、审计、关键业务
+
+### 配置层级
+
+```
+TradeConfig (全局默认)
+    ↓
+TradeBuyParams / TradeSellParams (单次交易覆盖)
+    ↓
+async_executor (执行)
+```
+
+#### 全局配置
+
+```rust
+let trade_config = TradeConfig::new(rpc_url, swqos_configs, commitment)
+    .with_callback_execution_mode(CallbackExecutionMode::Sync); // 全局默认：同步模式
+```
+
+#### 单次交易覆盖
+
+```rust
+let buy_params = TradeBuyParams {
+    // ... 其他参数
+    on_transaction_signed: Some(callback),
+    callback_execution_mode: Some(CallbackExecutionMode::Async), // 覆盖全局配置
+};
+```
+
+#### 混合使用
+
+```rust
+// 全局默认异步
+let trade_config = TradeConfig::new(rpc_url, swqos_configs, commitment)
+    .with_callback_execution_mode(CallbackExecutionMode::Async);
+
+// 关键交易使用同步模式（先入库再发送）
+let critical_params = TradeBuyParams {
+    // ... 其他参数
+    on_transaction_signed: Some(database_callback),
+    callback_execution_mode: Some(CallbackExecutionMode::Sync),
+};
+
+// 普通交易使用异步模式
+let normal_params = TradeBuyParams {
+    // ... 其他参数
+    on_transaction_signed: Some(log_callback),
+    callback_execution_mode: None, // 使用全局默认（异步）
+};
+```
+
 ### 回调时机
 
 ```

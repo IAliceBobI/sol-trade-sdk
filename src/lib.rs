@@ -7,6 +7,7 @@ pub mod trading;
 pub mod utils;
 use crate::common::GasFeeStrategy;
 use crate::common::TradeConfig;
+use crate::common::CallbackExecutionMode;
 use crate::common::nonce_cache::DurableNonceInfo;
 use crate::constants::SOL_TOKEN_ACCOUNT;
 use crate::constants::USD1_TOKEN_ACCOUNT;
@@ -67,6 +68,8 @@ pub struct TradingClient {
     /// Whether to use seed optimization for all ATA operations (default: true)
     /// Applies to all token account creations across buy and sell operations
     pub use_seed_optimize: bool,
+    /// 回调执行模式（全局默认配置）
+    pub callback_execution_mode: CallbackExecutionMode,
 }
 
 static INSTANCE: Mutex<Option<Arc<TradingClient>>> = Mutex::new(None);
@@ -82,6 +85,7 @@ impl Clone for TradingClient {
             swqos_clients: self.swqos_clients.clone(),
             middleware_manager: self.middleware_manager.clone(),
             use_seed_optimize: self.use_seed_optimize,
+            callback_execution_mode: self.callback_execution_mode,
         }
     }
 }
@@ -129,6 +133,12 @@ pub struct TradeBuyParams {
     /// 交易签名后回调（可选）
     /// 用于在交易发送前获取签名后的交易实体，用于入库等操作
     pub on_transaction_signed: Option<CallbackRef>,
+    /// 回调执行模式（可选，覆盖全局配置）
+    ///
+    /// - `Some(Async)`：异步执行，不阻塞交易发送
+    /// - `Some(Sync)`：同步执行，等待回调完成后再发送交易
+    /// - `None`：使用全局配置（TradeConfig.callback_execution_mode）
+    pub callback_execution_mode: Option<CallbackExecutionMode>,
 }
 
 /// Parameters for executing sell orders across different DEX protocols
@@ -176,6 +186,12 @@ pub struct TradeSellParams {
     /// 交易签名后回调（可选）
     /// 用于在交易发送前获取签名后的交易实体，用于入库等操作
     pub on_transaction_signed: Option<CallbackRef>,
+    /// 回调执行模式（可选，覆盖全局配置）
+    ///
+    /// - `Some(Async)`：异步执行，不阻塞交易发送
+    /// - `Some(Sync)`：同步执行，等待回调完成后再发送交易
+    /// - `None`：使用全局配置（TradeConfig.callback_execution_mode）
+    pub callback_execution_mode: Option<CallbackExecutionMode>,
 }
 
 impl TradingClient {
@@ -289,6 +305,7 @@ impl TradingClient {
             swqos_clients,
             middleware_manager: None,
             use_seed_optimize: trade_config.use_seed_optimize,
+            callback_execution_mode: trade_config.callback_execution_mode,
         };
 
         let mut current = INSTANCE.lock();
@@ -420,6 +437,7 @@ impl TradingClient {
             gas_fee_strategy: params.gas_fee_strategy,
             simulate: params.simulate,
             on_transaction_signed: params.on_transaction_signed,
+            callback_execution_mode: params.callback_execution_mode.or(Some(self.callback_execution_mode)),
         };
 
         // Validate protocol params
@@ -533,6 +551,7 @@ impl TradingClient {
             gas_fee_strategy: params.gas_fee_strategy,
             simulate: params.simulate,
             on_transaction_signed: params.on_transaction_signed,
+            callback_execution_mode: params.callback_execution_mode.or(Some(self.callback_execution_mode)),
         };
 
         // Validate protocol params

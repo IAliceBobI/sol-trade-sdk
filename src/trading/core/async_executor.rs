@@ -207,6 +207,7 @@ pub async fn execute_parallel(
     with_tip: bool,
     gas_fee_strategy: GasFeeStrategy,
     on_transaction_signed: Option<crate::trading::CallbackRef>,
+    callback_execution_mode: crate::common::CallbackExecutionMode,
 ) -> Result<(bool, Vec<Signature>, Option<anyhow::Error>)> {
     let _exec_start = Instant::now();
 
@@ -346,7 +347,7 @@ pub async fn execute_parallel(
             };
 
             // 🎯 调用交易签名回调（在发送前）
-            // 使用 tokio::spawn 异步执行，不阻塞交易发送
+            // 根据 callback_execution_mode 选择同步或异步执行
             if let Some(callback) = &on_transaction_signed {
                 let callback_clone = callback.clone();
                 let tx_clone = transaction.clone();
@@ -354,20 +355,41 @@ pub async fn execute_parallel(
                 let trade_type_clone = if is_buy { TradeType::Buy } else { TradeType::Sell };
                 let with_tip_clone = swqos_type != SwqosType::Default;
                 let tip_amount_clone = tip_amount;
+                let execution_mode = callback_execution_mode;
 
-                tokio::spawn(async move {
-                    use crate::trading::CallbackContext;
-                    let context = CallbackContext::new(
-                        tx_clone,
-                        swqos_type_clone,
-                        trade_type_clone,
-                        with_tip_clone,
-                        tip_amount_clone,
-                    );
-                    if let Err(e) = callback_clone.on_transaction_signed(context).await {
-                        eprintln!("[Callback Error] on_transaction_signed failed: {:?}", e);
+                use crate::trading::CallbackContext;
+                let context = CallbackContext::new(
+                    tx_clone,
+                    swqos_type_clone,
+                    trade_type_clone,
+                    with_tip_clone,
+                    tip_amount_clone,
+                );
+
+                match execution_mode {
+                    crate::common::CallbackExecutionMode::Sync => {
+                        // 同步模式：等待回调完成，失败则阻止交易发送
+                        if let Err(e) = callback_clone.on_transaction_signed(context).await {
+                            eprintln!("[Callback Error] on_transaction_signed failed (Sync mode): {:?}", e);
+                            collector.submit(TaskResult {
+                                success: false,
+                                signature: Signature::default(),
+                                error: Some(anyhow!("Callback failed: {}", e)),
+                                _swqos_type: swqos_type,
+                                landed_on_chain: false,
+                            });
+                            return;
+                        }
                     }
-                });
+                    crate::common::CallbackExecutionMode::Async => {
+                        // 异步模式：不阻塞交易发送
+                        tokio::spawn(async move {
+                            if let Err(e) = callback_clone.on_transaction_signed(context).await {
+                                eprintln!("[Callback Error] on_transaction_signed failed (Async mode): {:?}", e);
+                            }
+                        });
+                    }
+                }
             }
 
             // Transaction sent

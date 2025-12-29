@@ -72,6 +72,12 @@ pub struct SwapParams {
     /// 交易签名后回调（可选）
     /// 用于在交易发送前获取签名后的交易实体，用于入库等操作
     pub on_transaction_signed: Option<crate::trading::CallbackRef>,
+    /// 回调执行模式（可选，覆盖全局配置）
+    ///
+    /// - `Some(Async)`：异步执行，不阻塞交易发送
+    /// - `Some(Sync)`：同步执行，等待回调完成后再发送交易
+    /// - `None`：使用全局配置（TradeConfig.callback_execution_mode）
+    pub callback_execution_mode: Option<crate::common::CallbackExecutionMode>,
 }
 
 impl std::fmt::Debug for SwapParams {
