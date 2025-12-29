@@ -140,6 +140,7 @@ async fn main() -> Result<()> {
         gas_fee_strategy: sol_trade_sdk::common::GasFeeStrategy::new(),
         simulate: true, // 模拟模式，不实际发送交易
         on_transaction_signed: Some(custom_callback),
+        callback_execution_mode: None,
     };
 
     println!("执行买入交易（模拟模式）...");
@@ -176,6 +177,7 @@ async fn main() -> Result<()> {
         gas_fee_strategy: sol_trade_sdk::common::GasFeeStrategy::new(),
         simulate: true, // 模拟模式，不实际发送交易
         on_transaction_signed: Some(callback_with_pool),
+        callback_execution_mode: None,
     };
 
     println!("执行买入交易（模拟模式）...");
@@ -210,6 +212,7 @@ async fn main() -> Result<()> {
         gas_fee_strategy: sol_trade_sdk::common::GasFeeStrategy::new(),
         simulate: true, // 模拟模式，不实际发送交易
         on_transaction_signed: None, // 不使用回调
+        callback_execution_mode: None,
     };
 
     println!("执行买入交易（模拟模式，无回调）...");

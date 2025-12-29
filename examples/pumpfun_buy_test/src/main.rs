@@ -126,6 +126,8 @@ async fn main() -> AnyResult<()> {
         fixed_output_token_amount: None,
         gas_fee_strategy: gas_fee_strategy.clone(),
         simulate: false,
+        on_transaction_signed: None,
+        callback_execution_mode: None,
     };
 
     println!("⏱️  开始执行买入流程...");

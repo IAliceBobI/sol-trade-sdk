@@ -46,6 +46,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         fixed_output_token_amount: None,
         gas_fee_strategy: gas_fee_strategy.clone(),
         simulate: false,
+        on_transaction_signed: None,
+        callback_execution_mode: None,
     };
     client.buy(buy_params).await?;
 
@@ -86,6 +88,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         fixed_output_token_amount: None,
         gas_fee_strategy: gas_fee_strategy,
         simulate: false,
+        on_transaction_signed: None,
+        callback_execution_mode: None,
     };
     client.sell(sell_params).await?;
 
