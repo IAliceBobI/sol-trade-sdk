@@ -1,5 +1,10 @@
 # Sol Trade SDK 项目文档
 
+## 测试
+
+测试的时候不要用 --release 选项，因为太慢了。
+本地 8899 端口是 surfpool 的端口，是fork了solana mainnet.
+
 ## 项目概述
 
 Sol Trade SDK 是一个用 Rust 编写的综合性 Solana DEX（去中心化交易所）交易 SDK，为开发者提供统一、高效的交易接口。该项目支持多个 Solana 生态中的主流 DEX 协议，包括 PumpFun、PumpSwap、Bonk、Raydium（AMM V4、CPMM、CLMM）和 Meteora DAMM V2。
@@ -10,6 +15,8 @@ Sol Trade SDK 是一个用 Rust 编写的综合性 Solana DEX（去中心化交�
 - **MEV 保护**：集成 13 个 MEV 保护服务（Jito、ZeroSlot、Temporal、Bloxroute、FlashBlock、BlockRazor、Node1、Astralane、Stellium、Lightspeed、Soyas、NextBlock）
 - **并发交易**：支持通过多个 MEV 服务同时发送交易，返回所有交易签名，最快成功的交易生效
 - **中间件系统**：支持自定义指令中间件，在交易执行前修改、添加或删除指令
+- **交易生命周期回调**：支持在交易签名后、发送前拦截交易，用于数据库入库、审计等场景
+- **回调执行模式**：支持同步和异步两种回调执行模式，满足不同业务需求
 - **性能优化**：采用零开销抽象、SIMD 优化、零拷贝 I/O 等技术实现超低延迟
 - **地址查找表**：支持 ALT 优化交易大小和减少费用
 - **Nonce 缓存**：支持 Durable Nonce 实现交易重放保护和优化
@@ -45,11 +52,13 @@ src/
 │   ├── spl_token.rs         # SPL Token
 │   ├── spl_token_2022.rs    # SPL Token 2022
 │   ├── subscription_handle.rs  # 订阅处理
-│   └── types.rs             # 通用类型定义
+│   ├── types.rs             # 通用类型定义
+│   └── wsol_manager.rs      # WSOL 管理
 ├── constants/           # 常量定义
 │   ├── accounts.rs          # 账户地址常量
 │   ├── decimals.rs          # 小数位常量
 │   ├── swqos.rs             # SWQOS 常量
+│   ├── tokens.rs            # 代币地址常量
 │   ├── trade_platform.rs    # 交易平台常量
 │   └── trade.rs             # 交易常量
 ├── instruction/          # 指令构建
@@ -90,6 +99,7 @@ src/
 │   └── mod.rs               # SWQOS 模块导出
 ├── trading/              # 统一交易引擎
 │   ├── factory.rs           # 交易工厂（创建不同协议执行器）
+│   ├── lifecycle.rs         # 交易生命周期回调系统
 │   ├── common/              # 通用交易工具
 │   │   ├── compute_budget_manager.rs  # 计算预算管理
 │   │   ├── nonce_manager.rs           # Nonce 管理
@@ -97,6 +107,7 @@ src/
 │   │   ├── utils.rs                  # 交易工具
 │   │   └── wsol_manager.rs           # WSOL 管理
 │   ├── core/                # 核心交易引擎
+│   │   ├── async_executor.rs  # 异步执行器
 │   │   ├── executor.rs       # 交易执行器
 │   │   ├── params.rs         # 交易参数
 │   │   └── execution.rs      # 执行逻辑
@@ -108,7 +119,7 @@ src/
 │   └── price/               # 价格计算工具
 └── lib.rs                # 主库文件（导出公共 API）
 
-examples/              # 示例程序（18 个独立 workspace 成员）
+examples/              # 示例程序（19 个独立 workspace 成员）
 ├── trading_client/               # 创建 TradingClient 实例
 ├── pumpfun_sniper_trading/       # PumpFun 狙击交易
 ├── pumpfun_copy_trading/         # PumpFun 跟单交易
@@ -126,7 +137,8 @@ examples/              # 示例程序（18 个独立 workspace 成员）
 ├── wsol_wrapper/                 # WSOL 包装示例
 ├── seed_trading/                 # Seed 优化交易示例
 ├── gas_fee_strategy/             # Gas 费用策略示例
-└── cli_trading/                  # CLI 交易工具
+├── cli_trading/                  # CLI 交易工具
+└── transaction_callback/         # 交易生命周期回调示例
 
 docs/                  # 文档（包含中英文版本）
 ├── ADDRESS_LOOKUP_TABLE.md      # 地址查找表指南（英文）
@@ -137,7 +149,8 @@ docs/                  # 文档（包含中英文版本）
 ├── NONCE_CACHE.md               # Nonce 缓存指南（英文）
 ├── NONCE_CACHE_CN.md            # Nonce 缓存指南（中文）
 ├── TRADING_PARAMETERS.md        # 交易参数参考（英文）
-└── TRADING_PARAMETERS_CN.md     # 交易参数参考（中文）
+├── TRADING_PARAMETERS_CN.md     # 交易参数参考（中文）
+└── TRANSACTION_CALLBACK.md      # 交易生命周期回调指南
 ```
 
 ## 构建和运行
@@ -213,6 +226,9 @@ cargo run --package gas_fee_strategy
 
 # CLI 交易工具
 cargo run --package cli_trading
+
+# 交易生命周期回调示例
+cargo run --package transaction_callback
 ```
 
 ### 测试方法
@@ -258,6 +274,7 @@ sol-trade-sdk = "3.3.6"
 4. **策略模式**：`GasFeeStrategy` 支持不同的 Gas 费用策略
 5. **类型安全**：使用 `DexParamEnum` 枚举确保协议参数类型安全
 6. **单例模式**：支持全局单例访问（`get_instance`）
+7. **回调模式**：`TransactionLifecycleCallback` 支持交易生命周期拦截
 
 ### 性能优化配置
 
@@ -296,6 +313,7 @@ codegen-units = 256        # 保持高并行度
 5. **错误处理**：使用 `anyhow::Result` 统一错误处理
 6. **黑名单机制**：支持 SWQOS 服务黑名单配置（如 NextBlock 默认禁用）
 7. **智能检测**：自动检测并调整 Node1 最小小费限制
+8. **回调优先**：支持交易签名后的回调处理，满足入库和审计需求
 
 ## 核心 API 使用
 
@@ -331,12 +349,13 @@ let swqos_configs: Vec<SwqosConfig> = vec![
 // 创建交易配置
 let trade_config = TradeConfig::new(rpc_url, swqos_configs, commitment);
 
-// 可选：自定义 WSOL ATA 和 Seed 优化设置
+// 可选：自定义 WSOL ATA、Seed 优化和回调执行模式设置
 // let trade_config = TradeConfig::new(rpc_url, swqos_configs, commitment)
 //     .with_wsol_ata_config(
 //         true,  // create_wsol_ata_on_startup: 启动时检查并创建 WSOL ATA（默认：true）
 //         true   // use_seed_optimize: 全局启用 seed 优化（默认：true）
-//     );
+//     )
+//     .with_callback_execution_mode(CallbackExecutionMode::Sync); // 全局回调执行模式
 
 // 创建 TradingClient
 let client = SolanaTrade::new(payer, trade_config).await;
@@ -388,6 +407,8 @@ let buy_params = TradeBuyParams {
     durable_nonce: None,
     fixed_output_token_amount: None,  // 可选：指定精确的输出金额
     gas_fee_strategy: gas_fee_strategy.clone(),
+    on_transaction_signed: None,     // 可选：交易签名后回调
+    callback_execution_mode: None,   // 可选：回调执行模式（覆盖全局配置）
     simulate: false,
 };
 
@@ -411,6 +432,8 @@ let sell_params = TradeSellParams {
     with_tip: true,
     extension_params: DexParamEnum::PumpSwap(params),
     // ... 其他参数
+    on_transaction_signed: None,     // 可选：交易签名后回调
+    callback_execution_mode: None,   // 可选：回调执行模式（覆盖全局配置）
     simulate: false,
 };
 
@@ -463,6 +486,50 @@ let client = SolanaTrade::new(payer, trade_config)
     .await
     .with_middleware_manager(middleware_manager);
 ```
+
+### 使用交易生命周期回调
+
+交易生命周期回调系统允许在交易签名后、发送前拦截交易，用于数据库入库、审计等场景：
+
+```rust
+use sol_trade_sdk::{
+    CallbackContext, TransactionLifecycleCallback,
+    CallbackExecutionMode, CallbackRef,
+};
+use std::sync::Arc;
+use futures::future::BoxFuture;
+
+// 自定义回调实现
+#[derive(Clone)]
+struct DatabaseCallback;
+
+impl TransactionLifecycleCallback for DatabaseCallback {
+    fn on_transaction_signed(&self, context: CallbackContext) -> BoxFuture<'static, anyhow::Result<()>> {
+        let context_clone = context.clone();
+        Box::pin(async move {
+            // 在这里实现数据库入库逻辑
+            println!("Saving transaction: {}", context_clone.signature);
+            Ok(())
+        })
+    }
+}
+
+// 使用回调
+let callback: CallbackRef = Arc::new(DatabaseCallback);
+
+let buy_params = TradeBuyParams {
+    // ... 其他参数
+    on_transaction_signed: Some(callback),
+    callback_execution_mode: Some(CallbackExecutionMode::Sync), // 同步模式：先入库再发送
+};
+```
+
+**回调执行模式**：
+
+- **Async（异步）**：不阻塞交易发送，适合监控、日志场景
+- **Sync（同步）**：等待回调完成后再发送，适合入库、审计场景
+
+详见文档：`docs/TRANSACTION_CALLBACK.md`
 
 ### 获取全局实例
 
@@ -537,6 +604,8 @@ pub enum SwqosRegion {
 8. **性能特性**：生产环境应禁用 `perf-trace` 特性以获得最佳性能
 9. **并发交易**：使用多个 SWQOS 服务时会返回多个交易签名，需要正确处理
 10. **WSOL 管理**：SDK 会自动管理 WSOL ATA，但也可以手动控制
+11. **回调执行**：同步模式下回调失败会阻止交易发送，异步模式下不影响
+12. **Token 类型**：PumpSwap 等协议使用 WSOL 而非原生 SOL，请使用 `TradeTokenType::WSOL`
 
 ## 相关资源
 

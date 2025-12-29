@@ -14,7 +14,7 @@ use std::fs;
 use std::{str::FromStr, sync::Arc};
 
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
+async fn main() -> Result<(), anyhow::Error> {
     println!("Testing PumpSwap trading...");
 
     let client = create_solana_trade_client().await?;
@@ -51,7 +51,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         on_transaction_signed: None,
         callback_execution_mode: None,
     };
-    client.buy(buy_params).await?;
+
+    let (success, signatures, trade_error) = client.buy(buy_params).await?;
+    if !success {
+        if let Some(error) = trade_error {
+            return Err(anyhow::anyhow!("Buy failed: {:?}", error));
+        }
+        return Err(anyhow::anyhow!("Buy failed: Unknown error"));
+    }
+    println!("Buy successful! Signatures: {:?}", signatures);
 
     // Sell tokens
     println!("Selling tokens from PumpSwap...");
@@ -90,14 +98,22 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         on_transaction_signed: None,
         callback_execution_mode: None,
     };
-    client.sell(sell_params).await?;
+
+    let (success, signatures, trade_error) = client.sell(sell_params).await?;
+    if !success {
+        if let Some(error) = trade_error {
+            return Err(anyhow::anyhow!("Sell failed: {:?}", error));
+        }
+        return Err(anyhow::anyhow!("Sell failed: Unknown error"));
+    }
+    println!("Sell successful! Signatures: {:?}", signatures);
 
     tokio::signal::ctrl_c().await?;
     Ok(())
 }
 
 /// Create and initialize SolanaTrade client
-async fn create_solana_trade_client() -> Result<SolanaTrade, Box<dyn std::error::Error>> {
+async fn create_solana_trade_client() -> Result<SolanaTrade, anyhow::Error> {
     println!("🚀 Initializing SolanaTrade client...");
 
     // Read payer keypair from ~/.config/solana/id.json
