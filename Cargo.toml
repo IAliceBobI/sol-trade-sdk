@@ -29,6 +29,7 @@ members = [
     "examples/address_lookup",
     "examples/nonce_cache",
     "examples/pumpswap_direct_trading",
+    "examples/pumpswap_direct_trading_new_pool",
     "examples/wsol_wrapper",
     "examples/seed_trading",
     "examples/cli_trading",
