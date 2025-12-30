@@ -2,7 +2,6 @@
 
 ## 测试
 
-测试的时候不要用 --release 选项，因为太慢了。
 本地 8899 端口是 surfpool 的端口，是fork了solana mainnet.
 
 ## 项目概述
@@ -160,12 +159,8 @@ docs/                  # 文档（包含中英文版本）
 ```bash
 # 开发构建
 cargo build
-
-# Release 构建（推荐生产环境）
-cargo build --release
-
 # 启用性能追踪特性（仅用于调试，生产环境应禁用）
-cargo build --release --features perf-trace
+cargo build --debug --features perf-trace
 ```
 
 ### 运行示例
