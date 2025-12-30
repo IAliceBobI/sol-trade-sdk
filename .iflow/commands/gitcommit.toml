@@ -1,0 +1,46 @@
+# Command: commit
+# Description: Add, commit with AI-generated message, and push to repository
+# Category: git
+# Version: 1
+# Author: iFlow
+
+description = "添加追踪内容、提交并推送到仓库"
+
+prompt = """
+执行 git 操作：添加追踪内容、提交并推送到仓库。
+
+## 当前项目状态：
+
+Git 状态：
+!{git status --porcelain}
+
+Git 变更内容：
+!{git diff HEAD}
+
+最近提交历史（参考提交信息风格）：
+!{git log -n 3 --pretty=format:"%h - %s"}
+
+## 执行步骤：
+
+1. **添加文件**：根据 git status 将相关文件添加到暂存区（`git add`）
+2. **分析变更**：基于上面的 git diff 内容，分析代码改动
+3. **生成提交信息**：根据变更内容生成具体的提交信息
+4. **提交**：执行 `git commit -m "<AI生成的具体提交信息>"`
+5. **推送**：执行 `git push` 推送到远程仓库
+
+## 提交信息生成规则：
+
+**必须基于上面的 git diff 实际变更内容生成提交信息。**
+
+提交信息应该：
+- 清晰简洁地描述变更内容
+- 参考上面最近提交历史的风格
+- 优先说明"为什么"而不是"是什么"
+- 使用中文（项目主要使用中文注释）
+
+## 注意事项：
+
+- 推送前先确认提交信息准确无误
+- 如果推送失败（如远程有新提交），需要先拉取（`git pull`）
+- 确保所有相关文件都已添加到暂存区
+"""

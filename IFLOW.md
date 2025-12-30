@@ -1,9 +1,5 @@
 # Sol Trade SDK 项目文档
 
-## 测试
-
-本地 8899 端口是 surfpool 的端口，是fork了solana mainnet.
-
 ## 项目概述
 
 Sol Trade SDK 是一个用 Rust 编写的综合性 Solana DEX（去中心化交易所）交易 SDK，为开发者提供统一、高效的交易接口。该项目支持多个 Solana 生态中的主流 DEX 协议，包括 PumpFun、PumpSwap、Bonk、Raydium（AMM V4、CPMM、CLMM）和 Meteora DAMM V2。
