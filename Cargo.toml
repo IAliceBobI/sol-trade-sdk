@@ -36,6 +36,7 @@ members = [
     "examples/gas_fee_strategy",
     "examples/meteora_damm_v2_direct_trading",
     "examples/transaction_callback",
+    "examples/test_wsol_ata_config",
 ]
 
 [lib]

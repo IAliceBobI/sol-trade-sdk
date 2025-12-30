@@ -42,7 +42,7 @@ async fn main() -> Result<(), anyhow::Error> {
         address_lookup_table_account: None,
         wait_transaction_confirmed: true,
         create_input_token_ata: true,
-        close_input_token_ata: true,
+        close_input_token_ata: false, // 修改：不自动关闭 WSOL ATA，避免连续交易时状态不一致
         create_mint_ata: true,
         durable_nonce: None,
         fixed_output_token_amount: None,
@@ -89,7 +89,7 @@ async fn main() -> Result<(), anyhow::Error> {
         address_lookup_table_account: None,
         wait_transaction_confirmed: true,
         create_output_token_ata: true,
-        close_output_token_ata: true,
+        close_output_token_ata: false, // 修改：不自动关闭 WSOL ATA，保持账户复用
         close_mint_token_ata: false,
         durable_nonce: None,
         fixed_output_token_amount: None,
@@ -108,7 +108,6 @@ async fn main() -> Result<(), anyhow::Error> {
     }
     println!("Sell successful! Signatures: {:?}", signatures);
 
-    tokio::signal::ctrl_c().await?;
     Ok(())
 }
 
@@ -155,7 +154,10 @@ async fn create_solana_trade_client() -> Result<SolanaTrade, anyhow::Error> {
 
     // Now create SolanaTrade client (after airdrop, before ATA creation)
     let swqos_configs: Vec<SwqosConfig> = vec![SwqosConfig::Default(rpc_url.clone())];
-    let trade_config = TradeConfig::new(rpc_url, swqos_configs, commitment);
+    let trade_config = TradeConfig::new(rpc_url, swqos_configs, commitment).with_wsol_ata_config(
+        true,  // create_wsol_ata_on_startup: 禁用启动时自动创建
+        false, // use_seed_optimize: 启用 Seed 优化
+    );
     let solana_trade = SolanaTrade::new(Arc::new(payer), trade_config).await;
 
     println!("✅ SolanaTrade client initialized successfully!");
