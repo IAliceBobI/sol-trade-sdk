@@ -138,6 +138,12 @@ async fn create_solana_trade_client() -> Result<SolanaTrade, anyhow::Error> {
     let trade_config = TradeConfig::new(rpc_url, swqos_configs, commitment);
     let solana_trade = SolanaTrade::new(Arc::new(payer), trade_config).await;
 
+    // Airdrop 10 SOL to the account
+    println!("💸 Airdropping 10 SOL to account...");
+    let airdrop_amount = 10_000_000_000; // 10 SOL in lamports
+    let _ = solana_trade.rpc.request_airdrop(&solana_trade.payer.pubkey(), airdrop_amount).await?;
+    println!("✅ Airdrop successful!");
+
     let sol_balance = solana_trade.rpc.get_balance(&solana_trade.payer.pubkey()).await?;
     let sol_balance_sol = sol_balance as f64 / 1e9;
     println!("💰 Payer SOL balance: {:.9} SOL", sol_balance_sol);

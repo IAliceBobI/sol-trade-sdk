@@ -134,13 +134,29 @@ async fn create_solana_trade_client() -> Result<SolanaTrade, anyhow::Error> {
 
     let rpc_url = "http://127.0.0.1:8899".to_string();
     let commitment = CommitmentConfig::confirmed();
+
+    // Create RPC client for airdrop (before SolanaTrade initialization)
+    let rpc_client = sol_trade_sdk::common::SolanaRpcClient::new_with_commitment(
+        rpc_url.clone(),
+        commitment.clone(),
+    );
+
+    let sol_balance = rpc_client.get_balance(&payer.pubkey()).await?;
+    let sol_balance_sol = sol_balance as f64 / 1e9;
+    println!("💰 Payer SOL balance: {:.9} SOL", sol_balance_sol);
+
+    if sol_balance_sol < 10.0 {
+        // Airdrop 10 SOL to the account
+        println!("💸 Airdropping 10 SOL to account...");
+        let airdrop_amount = 10_000_000_000; // 10 SOL in lamports
+        let _ = rpc_client.request_airdrop(&payer.pubkey(), airdrop_amount).await?;
+        println!("✅ Airdrop successful!");
+    }
+
+    // Now create SolanaTrade client (after airdrop, before ATA creation)
     let swqos_configs: Vec<SwqosConfig> = vec![SwqosConfig::Default(rpc_url.clone())];
     let trade_config = TradeConfig::new(rpc_url, swqos_configs, commitment);
     let solana_trade = SolanaTrade::new(Arc::new(payer), trade_config).await;
-
-    let sol_balance = solana_trade.rpc.get_balance(&solana_trade.payer.pubkey()).await?;
-    let sol_balance_sol = sol_balance as f64 / 1e9;
-    println!("💰 Payer SOL balance: {:.9} SOL", sol_balance_sol);
 
     println!("✅ SolanaTrade client initialized successfully!");
     Ok(solana_trade)
