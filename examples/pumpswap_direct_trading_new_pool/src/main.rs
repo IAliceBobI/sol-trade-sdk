@@ -23,6 +23,9 @@ async fn main() -> Result<(), anyhow::Error> {
     let pool = Pubkey::from_str("2xHRmdXSKURh8CkMERbNhYCiQGHGsjLWMgckEP9bmLKK").unwrap();
     let mint_pubkey = Pubkey::from_str("Ew8KqgSitYucieR5KnSAL2SUFspcwA8AgSuZ5xWspump").unwrap();
 
+    // let pool = Pubkey::from_str("69AU8DkW4XxrzA6hoSi4fibMYKjt6Uefo9o4cRUS4vne").unwrap();
+    // let mint_pubkey = Pubkey::from_str("3iC63FgnB7EhcPaiSaC51UkVweeBDkqu17SaRyy2pump").unwrap();
+
     let gas_fee_strategy = sol_trade_sdk::common::GasFeeStrategy::new();
     gas_fee_strategy.set_global_fee_strategy(150000, 150000, 500000, 500000, 0.001, 0.001);
 
@@ -66,7 +69,8 @@ async fn main() -> Result<(), anyhow::Error> {
 
     let rpc = client.rpc.clone();
     let payer = client.payer.pubkey();
-    let program_id = sol_trade_sdk::constants::TOKEN_PROGRAM_2022;
+    let mint_account = rpc.get_account(&mint_pubkey).await?;
+    let program_id = mint_account.owner;
     let account = get_associated_token_address_with_program_id_fast_use_seed(
         &payer,
         &mint_pubkey,

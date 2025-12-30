@@ -66,7 +66,8 @@ async fn main() -> Result<(), anyhow::Error> {
 
     let rpc = client.rpc.clone();
     let payer = client.payer.pubkey();
-    let program_id = sol_trade_sdk::constants::TOKEN_PROGRAM_2022;
+    let mint_account = rpc.get_account(&mint_pubkey).await?;
+    let program_id = mint_account.owner;
     let account = get_associated_token_address_with_program_id_fast_use_seed(
         &payer,
         &mint_pubkey,
