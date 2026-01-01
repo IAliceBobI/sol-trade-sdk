@@ -31,3 +31,14 @@ tmp_*.log
 
 /temp
 /dexprojs
+
+.iflow
+IFLOW.md
+.iflowignore
+.claude
+CLAUDE.md
+.mcp.json
+.claudeignore
+.qoder
+.qoderignore
+
