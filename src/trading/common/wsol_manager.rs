@@ -191,3 +191,138 @@ pub fn wrap_wsol_to_sol_without_create(
 
     Ok(instructions)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::constants::{SYSTEM_PROGRAM, TOKEN_PROGRAM, WSOL_TOKEN_ACCOUNT};
+
+    #[test]
+    fn test_handle_wsol_instructions_count() {
+        let payer = &Pubkey::new_unique();
+        let amount_in = 1_000_000;
+
+        let instructions = handle_wsol(payer, amount_in);
+
+        // 应该生成3条指令：创建ATA、转账、sync_native
+        assert_eq!(instructions.len(), 3);
+    }
+
+    #[test]
+    fn test_handle_wsol_ata_address() {
+        let payer = &Pubkey::new_unique();
+        let amount_in = 1_000_000;
+
+        let expected_ata = crate::common::fast_fn::get_associated_token_address_with_program_id_fast(
+            payer,
+            &WSOL_TOKEN_ACCOUNT,
+            &TOKEN_PROGRAM,
+        );
+
+        let instructions = handle_wsol(payer, amount_in);
+
+        // 第一条指令应该是创建 ATA
+        let create_ata_instruction = &instructions[0];
+        assert_eq!(create_ata_instruction.program_id, spl_associated_token_account::ID);
+
+        // 转账指令的目标应该是 WSOL ATA
+        let transfer_instruction = &instructions[1];
+        assert_eq!(transfer_instruction.accounts.len(), 2);
+        assert_eq!(transfer_instruction.accounts[1].pubkey, expected_ata);
+
+        // sync_native 指令的目标应该是 WSOL ATA
+        let sync_instruction = &instructions[2];
+        assert_eq!(sync_instruction.program_id, TOKEN_PROGRAM);
+        assert_eq!(sync_instruction.accounts[0].pubkey, expected_ata);
+        assert_eq!(sync_instruction.data, vec![17]); // sync_native 的 opcode
+    }
+
+    #[test]
+    fn test_close_wsol_instructions_count() {
+        let payer = &Pubkey::new_unique();
+        let instructions = close_wsol(payer);
+
+        // 应该生成1条指令：关闭账户
+        assert_eq!(instructions.len(), 1);
+    }
+
+    #[test]
+    fn test_create_wsol_ata() {
+        let payer = &Pubkey::new_unique();
+        let instructions = create_wsol_ata(payer);
+
+        // 应该生成1条指令：创建 ATA
+        assert_eq!(instructions.len(), 1);
+        assert_eq!(instructions[0].program_id, spl_associated_token_account::ID);
+    }
+
+    #[test]
+    fn test_wrap_sol_only_instructions_count() {
+        let payer = &Pubkey::new_unique();
+        let amount_in = 1_000_000;
+
+        let instructions = wrap_sol_only(payer, amount_in);
+
+        // 应该生成2条指令：转账、sync_native（不创建ATA）
+        assert_eq!(instructions.len(), 2);
+    }
+
+    #[test]
+    fn test_wrap_sol_only_no_create_ata() {
+        let payer = &Pubkey::new_unique();
+        let amount_in = 1_000_000;
+
+        let instructions = wrap_sol_only(payer, amount_in);
+
+        // 第一条应该是系统转账，不是创建 ATA
+        let transfer_instruction = &instructions[0];
+        assert_ne!(transfer_instruction.program_id, spl_associated_token_account::ID);
+        assert_eq!(transfer_instruction.program_id, SYSTEM_PROGRAM);
+    }
+
+    #[test]
+    fn test_handle_wsol_amount_transfer() {
+        let payer = &Pubkey::new_unique();
+        let amount_in = 2_500_000_000; // 2.5 SOL
+
+        let instructions = handle_wsol(payer, amount_in);
+
+        // 检查转账指令的金额
+        let transfer_instruction = &instructions[1];
+        // 转账指令的数据包含 lamports 金额
+        let lamports = u64::from_le_bytes(
+            transfer_instruction.data[4..12]
+                .try_into()
+                .expect("should have 8 bytes for lamports"),
+        );
+        assert_eq!(lamports, amount_in);
+    }
+
+    #[test]
+    fn test_sync_native_opcode() {
+        let payer = &Pubkey::new_unique();
+        let instructions = handle_wsol(payer, 1_000_000);
+
+        let sync_instruction = &instructions[2];
+        // sync_native 的 opcode 是 17
+        assert_eq!(sync_instruction.data, vec![17]);
+    }
+
+    #[test]
+    fn test_wsol_address_pda_derivation() {
+        // 测试 WSOL ATA 地址推导是否正确
+        let payer = Pubkey::new_from_array([
+            1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16,
+            17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32,
+        ]);
+        let wsol_ata = crate::common::fast_fn::get_associated_token_address_with_program_id_fast(
+            &payer,
+            &WSOL_TOKEN_ACCOUNT,
+            &TOKEN_PROGRAM,
+        );
+
+        // 验证推导出的地址不是零地址
+        assert_ne!(wsol_ata, Pubkey::default());
+        assert_ne!(wsol_ata, payer);
+    }
+}
