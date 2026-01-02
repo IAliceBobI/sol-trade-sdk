@@ -167,6 +167,32 @@ mod tests {
         assert_eq!(decimals, 6, "Pump.fun token decimals should be 6");
         println!("Pump.fun token decimals: {}", decimals);
     }
+
+    #[tokio::test]
+    async fn test_decimals_cache_miss() {
+        use solana_client::nonblocking::rpc_client::RpcClient;
+        let rpc = RpcClient::new("https://api.mainnet-beta.solana.com".to_string());
+        let wsol = Pubkey::from_str_const("So11111111111111111111111111111111111111112");
+
+        // 清除缓存确保冷启动
+        DECIMALS_CACHE.remove(&wsol);
+
+        let decimals = get_token_decimals(&rpc, &wsol).await.unwrap();
+        assert_eq!(decimals, 9);
+    }
+
+    #[tokio::test]
+    async fn test_symbol_cache_miss() {
+        use solana_client::nonblocking::rpc_client::RpcClient;
+        let rpc = RpcClient::new("https://api.mainnet-beta.solana.com".to_string());
+        let pump = Pubkey::from_str_const("pumpCmXqMfrsAkQ5r49WcJnRayYRqmXz6ae8H7H9Dfn");
+
+        // 清除缓存确保冷启动
+        SYMBOL_CACHE.remove(&pump);
+
+        let symbol = get_token_symbol(&rpc, &pump).await.unwrap();
+        assert!(!symbol.is_empty());
+    }
 }
 
 use std::str::FromStr;
