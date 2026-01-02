@@ -205,6 +205,41 @@ mod tests {
         let symbol = get_token_symbol(&rpc, &pump).await.unwrap();
         assert!(!symbol.is_empty());
     }
+
+    #[tokio::test]
+    async fn test_decimals_cache_hit() {
+        use solana_client::nonblocking::rpc_client::RpcClient;
+        let rpc = RpcClient::new("https://api.mainnet-beta.solana.com".to_string());
+        let usdc = Pubkey::from_str_const("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v");
+
+        // 先触发一次缓存填充
+        let _ = get_token_decimals(&rpc, &usdc).await.unwrap();
+
+        // 第二次调用应该命中缓存
+        let decimals1 = get_token_decimals(&rpc, &usdc).await.unwrap();
+        let decimals2 = get_token_decimals(&rpc, &usdc).await.unwrap();
+
+        assert_eq!(decimals1, 6);
+        assert_eq!(decimals2, 6);
+        assert_eq!(decimals1, decimals2);
+    }
+
+    #[tokio::test]
+    async fn test_symbol_cache_hit() {
+        use solana_client::nonblocking::rpc_client::RpcClient;
+        let rpc = RpcClient::new("https://api.mainnet-beta.solana.com".to_string());
+        let pump = Pubkey::from_str_const("pumpCmXqMfrsAkQ5r49WcJnRayYRqmXz6ae8H7H9Dfn");
+
+        // 先触发一次缓存填充
+        let _ = get_token_symbol(&rpc, &pump).await.unwrap();
+
+        // 第二次调用应该命中缓存
+        let symbol1 = get_token_symbol(&rpc, &pump).await.unwrap();
+        let symbol2 = get_token_symbol(&rpc, &pump).await.unwrap();
+
+        assert!(!symbol1.is_empty());
+        assert_eq!(symbol1, symbol2);
+    }
 }
 
 use std::str::FromStr;
