@@ -4,9 +4,22 @@
 
 use crate::constants::{SOL_MINT, USDC_MINT, USDT_MINT, RAY_MINT};
 use anyhow::Result;
+use dashmap::DashMap;
+use once_cell::sync::Lazy;
 use solana_sdk::pubkey::Pubkey;
 use spl_token::solana_program::program_pack::Pack;
 use spl_token::state::Mint;
+
+// Increased cache sizes for better performance
+const MAX_TOKEN_METADATA_CACHE_SIZE: usize = 100_000;
+
+/// 全局 Token Decimal 缓存
+static DECIMALS_CACHE: Lazy<DashMap<Pubkey, u8>> =
+    Lazy::new(|| DashMap::with_capacity(MAX_TOKEN_METADATA_CACHE_SIZE));
+
+/// 全局 Token Symbol 缓存
+static SYMBOL_CACHE: Lazy<DashMap<Pubkey, String>> =
+    Lazy::new(|| DashMap::with_capacity(MAX_TOKEN_METADATA_CACHE_SIZE));
 
 /// 获取代币精度（统一实现，支持 Token 和 Token2022）
 ///
