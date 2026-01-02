@@ -23,24 +23,32 @@ static SYMBOL_CACHE: Lazy<DashMap<Pubkey, String>> =
 
 /// 获取代币精度（统一实现，支持 Token 和 Token2022）
 ///
-/// 这是项目中所有 get_token_decimals 的标准实现
-/// 所有模块应引用此函数，避免重复实现
+/// 使用全局缓存减少 RPC 调用
 pub async fn get_token_decimals(
     rpc: &crate::common::SolanaRpcClient,
     mint: &Pubkey,
 ) -> Result<u8> {
+    // Fast path: 检查缓存
+    if let Some(cached) = DECIMALS_CACHE.get(mint) {
+        return Ok(*cached);
+    }
+
     let account = rpc.get_account(mint).await?;
 
     // 尝试解析为传统 Token 程序的 Mint
     if let Ok(mint_account) = Mint::unpack(&account.data) {
-        return Ok(mint_account.decimals);
+        let decimals = mint_account.decimals;
+        DECIMALS_CACHE.insert(*mint, decimals);
+        return Ok(decimals);
     }
 
     // 尝试解析为 Token2022 的 Mint
     use spl_token_2022::extension::StateWithExtensions;
     use spl_token_2022::state::Mint as Mint2022;
     if let Ok(mint_account) = StateWithExtensions::<Mint2022>::unpack(&account.data) {
-        return Ok(mint_account.base.decimals);
+        let decimals = mint_account.base.decimals;
+        DECIMALS_CACHE.insert(*mint, decimals);
+        return Ok(decimals);
     }
 
     Err(anyhow::anyhow!(
