@@ -61,14 +61,16 @@ pub async fn get_token_decimals(
 
 /// 获取代币 Symbol（支持 Token 和 Token2022 Metadata Extension）
 ///
-/// 支持：
-/// - Token2022 metadata extension：直接从链上读取 symbol
-/// - 硬编码兜底：对于常见代币（SOL、USDC、USDT、RAY）使用本地缓存
-/// - 兜底方案：对于未知代币，返回 mint 地址的短字符串形式
+/// 使用全局缓存减少 RPC 调用
 pub async fn get_token_symbol(
     rpc: &crate::common::SolanaRpcClient,
     mint: &Pubkey,
 ) -> Result<String> {
+    // Fast path: 检查缓存
+    if let Some(cached) = SYMBOL_CACHE.get(mint) {
+        return Ok(cached.clone());
+    }
+
     let account = rpc.get_account(mint).await?;
 
     // 尝试解析为 Token2022 的 Mint（支持 Metadata Extension）
@@ -76,21 +78,23 @@ pub async fn get_token_symbol(
         use spl_token_2022::extension::{BaseStateWithExtensions, StateWithExtensions};
         use spl_token_2022::state::Mint as Mint2022;
         if let Ok(mint_account) = StateWithExtensions::<Mint2022>::unpack(&account.data) {
-            // get_variable_len_extension 已经返回解析好的类型
             if let Ok(metadata) = mint_account
                 .get_variable_len_extension::<spl_token_metadata_interface::state::TokenMetadata>()
             {
                 let symbol = metadata.symbol.to_string();
                 if !symbol.is_empty() {
+                    SYMBOL_CACHE.insert(*mint, symbol.clone());
                     return Ok(symbol);
                 }
             }
         }
     }
 
-    // 传统 Token 程序不支持链上 metadata，或未找到 metadata 扩展
+    // 传统 Token 程序不支持链上 metadata
     // 使用硬编码兜底方案
-    Ok(get_known_token_symbol(mint))
+    let symbol = get_known_token_symbol(mint);
+    SYMBOL_CACHE.insert(*mint, symbol.clone());
+    Ok(symbol)
 }
 
 /// 计算 ATA 地址（自动识别 Token Program）
