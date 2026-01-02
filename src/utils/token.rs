@@ -136,11 +136,23 @@ mod tests {
         let rpc = RpcClient::new("https://api.mainnet-beta.solana.com".to_string());
         // Pump.fun 测试代币
         let pump = Pubkey::from_str_const("pumpCmXqMfrsAkQ5r49WcJnRayYRqmXz6ae8H7H9Dfn");
-        
+
         let symbol = get_token_symbol(&rpc, &pump).await.unwrap();
         // Pump.fun 代币的 symbol 应该在链上
         assert!(!symbol.is_empty(), "Pump.fun token should have symbol");
         println!("Pump.fun token symbol: {}", symbol);
+    }
+
+    #[tokio::test]
+    async fn test_get_token_decimals_pumpfun() {
+        use solana_client::nonblocking::rpc_client::RpcClient;
+        let rpc = RpcClient::new("https://api.mainnet-beta.solana.com".to_string());
+        // Pump.fun 测试代币
+        let pump = Pubkey::from_str_const("pumpCmXqMfrsAkQ5r49WcJnRayYRqmXz6ae8H7H9Dfn");
+
+        let decimals = get_token_decimals(&rpc, &pump).await.unwrap();
+        assert_eq!(decimals, 6, "Pump.fun token decimals should be 6");
+        println!("Pump.fun token decimals: {}", decimals);
     }
 }
 
