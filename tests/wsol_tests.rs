@@ -66,7 +66,8 @@ async fn test_wsol_wrap_complete_flow() {
     }
 
     // 打印解包装后余额
-    let (sol_after_unwrap, wsol_after_unwrap) = print_balances(&rpc_url, &payer_pubkey).await.unwrap();
+    let (sol_after_unwrap, wsol_after_unwrap) =
+        print_balances(&rpc_url, &payer_pubkey).await.unwrap();
     assert!(sol_after_unwrap > sol_after_wrap, "SOL 余额应该增加");
     assert!(wsol_after_unwrap < wsol_after_wrap, "WSOL 余额应该减少");
 
@@ -152,52 +153,44 @@ async fn test_wsol_ata_creation_idempotent() {
 /// 测试：交易中使用 WSOL
 ///
 /// 使用 PumpSwap 进行买入交易，验证 WSOL 自动处理
-#[ignore]
 #[tokio::test]
 async fn test_trade_with_wsol() {
+    // cargo test --package sol-trade-sdk --test wsol_tests -- test_trade_with_wsol --exact --nocapture
     let client = create_test_client().await;
 
     println!("=== 测试交易中使用 WSOL ===");
 
     // 使用一个已知的 PumpSwap 池进行测试
-    // 注意：需要替换为实际存在的池地址
-    let pool_address = std::env::var("TEST_PUMP_SWAP_POOL")
-        .unwrap_or_else(|_| "7qbRF6YsyGuLUVs6Y1q64bdVrfe4WcLzN1pVN3dRNwDq".to_string());
+    let pool = Pubkey::from_str("539m4mVWt6iduB6W8rDGPMarzNCMesuqY5eUTiiYHAgR")
+        .expect("Invalid pool address");
 
-    let pool = Pubkey::from_str(&pool_address).expect("Invalid pool address");
-    let mint = std::env::var("TEST_MINT")
-        .unwrap_or_else(|_| "4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R".to_string());
-    let mint = Pubkey::from_str(&mint).expect("Invalid mint");
+    // 从 RPC 获取真实的池信息（参考 single_buy.rs）
+    let pump_swap_params = PumpSwapParams::from_pool_address_by_rpc(&client.rpc, &pool)
+        .await
+        .expect("Failed to fetch pool info from RPC");
+
+    // 从 RPC 获取最新的 blockhash
+    let recent_blockhash =
+        client.rpc.get_latest_blockhash().await.expect("Failed to get latest blockhash");
 
     // 设置 Gas 策略
     let gas_fee_strategy = GasFeeStrategy::new();
-    gas_fee_strategy.set_global_fee_strategy(100_000, 100_000, 300_000, 300_000, 0.001, 0.001);
+    gas_fee_strategy.set_global_fee_strategy(150_000, 150_000, 500_000, 500_000, 0.001, 0.001);
 
-    // 创建 PumpSwapParams（需要从 RPC 获取真实的池信息）
-    // 这里使用模拟参数，实际测试时需要替换为真实值
-    let pump_swap_params = PumpSwapParams::new(
-        pool,
-        mint,
-        sol_trade_sdk::constants::USDC_TOKEN_ACCOUNT,
-        Pubkey::default(),
-        Pubkey::default(),
-        1_000_000_000,
-        1_000_000_000,
-        Pubkey::default(),
-        Pubkey::default(),
-        sol_trade_sdk::constants::TOKEN_PROGRAM,
-        sol_trade_sdk::constants::TOKEN_PROGRAM,
-        Pubkey::default(),
+    print!("{:?}\n", pump_swap_params);
+    assert_eq!(
+        pump_swap_params.base_mint,
+        Pubkey::from_str_const("pumpCmXqMfrsAkQ5r49WcJnRayYRqmXz6ae8H7H9Dfn")
     );
 
     // 买入参数
     let buy_params = sol_trade_sdk::TradeBuyParams {
         dex_type: sol_trade_sdk::DexType::PumpSwap,
-        input_token_type: sol_trade_sdk::TradeTokenType::WSOL,
-        mint,
+        input_token_type: sol_trade_sdk::TradeTokenType::SOL,
+        mint: pump_swap_params.base_mint,
         input_token_amount: 10_000_000, // 0.01 SOL
         slippage_basis_points: Some(500),
-        recent_blockhash: None,
+        recent_blockhash: Some(recent_blockhash),
         extension_params: DexParamEnum::PumpSwap(pump_swap_params),
         address_lookup_table_account: None,
         wait_transaction_confirmed: true,

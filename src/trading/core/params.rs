@@ -221,7 +221,7 @@ impl PumpFunParams {
 /// **Performance Note**: If these parameters are not provided, the system will attempt to
 /// retrieve the relevant information from RPC, which will increase transaction time.
 /// For optimal performance, it is recommended to provide all necessary parameters in advance.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct PumpSwapParams {
     /// Liquidity pool address
     pub pool: Pubkey,
