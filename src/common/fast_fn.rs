@@ -90,7 +90,7 @@ pub fn create_associated_token_account_idempotent_fast(
     _create_associated_token_account_idempotent_fast(payer, owner, mint, token_program, false)
 }
 
-pub fn _create_associated_token_account_idempotent_fast(
+fn _create_associated_token_account_idempotent_fast(
     payer: &Pubkey,
     owner: &Pubkey,
     mint: &Pubkey,
