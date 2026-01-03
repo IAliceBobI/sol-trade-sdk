@@ -92,7 +92,6 @@ async fn test_wsol_wrap_complete_flow() {
 /// 测试：连续多次包装 WSOL
 ///
 /// 验证 ATA 复用机制是否正常工作
-#[ignore]
 #[tokio::test]
 async fn test_wsol_multiple_wraps() {
     let client = create_test_client().await;
@@ -125,7 +124,6 @@ async fn test_wsol_multiple_wraps() {
 /// 测试：创建 WSOL ATA（幂等性）
 ///
 /// 验证重复创建 ATA 不会失败
-#[ignore]
 #[tokio::test]
 async fn test_wsol_ata_creation_idempotent() {
     let client = create_test_client().await;
