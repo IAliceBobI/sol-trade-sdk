@@ -325,4 +325,33 @@ mod tests {
         assert_ne!(wsol_ata, Pubkey::default());
         assert_ne!(wsol_ata, payer);
     }
+
+    /// 验证主网地址的 WSOL ATA 计算
+    /// 预期 ATA: F7hCHiC6gZLqufNag1ytn4a34S22nvjEbwgH7qbnjuvG
+    #[test]
+    fn test_wsol_ata_for_mainnet_address() {
+        // 主网地址: 2QfBNK2WDwSLoUQRb1zAnp3KM12N9hQ8q6ApwUMnWW2T
+        let payer = "2QfBNK2WDwSLoUQRb1zAnp3KM12N9hQ8q6ApwUMnWW2T"
+            .parse::<Pubkey>()
+            .expect("Invalid payer address");
+
+        // 计算 WSOL ATA
+        let wsol_ata = crate::common::fast_fn::get_associated_token_address_with_program_id_fast(
+            &payer,
+            &WSOL_TOKEN_ACCOUNT,
+            &TOKEN_PROGRAM,
+        );
+
+        // 预期 ATA 地址: F7hCHiC6gZLqufNag1ytn4a34S22nvjEbwgH7qbnjuvG
+        let expected_ata: Pubkey = "F7hCHiC6gZLqufNag1ytn4a34S22nvjEbwgH7qbnjuvG"
+            .parse()
+            .expect("Invalid expected ATA address");
+
+        println!("Payer: {}", payer);
+        println!("WSOL Mint: {}", WSOL_TOKEN_ACCOUNT);
+        println!("Expected ATA: {}", expected_ata);
+        println!("Calculated ATA: {}", wsol_ata);
+
+        assert_eq!(wsol_ata, expected_ata, "WSOL ATA 计算不匹配!");
+    }
 }

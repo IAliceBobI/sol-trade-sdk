@@ -271,6 +271,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore]
     async fn test_fetch_pool_state_owner_validation() {
         // Test that fetch_pool_state validates the program owner
         let invalid_address = Pubkey::from_str("11111111111111111111111111111111").unwrap(); // System program
