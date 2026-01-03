@@ -5,7 +5,7 @@
 //! 运行测试:
 //!     cargo test --test wsol_tests -- --nocapture
 //!
-//! 注意：需要确保 surfpool 正在运行，且测试账户有足够的 SOL
+//! 注意：需要确保 surfpool 正在运行
 
 use sol_trade_sdk::{
     common::{GasFeeStrategy, TradeConfig},
@@ -14,29 +14,42 @@ use sol_trade_sdk::{
     SolanaTrade,
 };
 use solana_commitment_config::CommitmentConfig;
-use solana_rpc_client::rpc_client::RpcClient;
-use solana_sdk::{pubkey::Pubkey, signature::Keypair, signer::Signer};
+use solana_rpc_client::nonblocking::rpc_client::RpcClient;
+use solana_sdk::{
+    native_token::LAMPORTS_PER_SOL, pubkey::Pubkey, signature::Keypair, signer::Signer,
+};
 use std::str::FromStr;
 use std::sync::Arc;
 
-/// 获取测试用的 RPC URL（surfpool）
-fn get_test_rpc_url() -> String {
-    std::env::var("TEST_RPC_URL")
-        .unwrap_or_else(|_| "http://127.0.0.1:8899".to_string())
-}
-
-/// 为测试账户空投 SOL（surfpool 支持通过 getTokenSupply 方式）
+/// 为测试账户自动空投 SOL
 async fn airdrop_to_payer(rpc_url: &str, payer: &Pubkey) -> Result<(), Box<dyn std::error::Error>> {
     let client = RpcClient::new(rpc_url.to_string());
 
     // 检查账户余额
-    let balance = client.get_balance(payer)?;
+    let balance = client.get_balance(payer).await?;
     println!("账户余额: {} lamports ({:.4} SOL)", balance, balance as f64 / 1e9);
 
-    // 如果余额小于 10 SOL，需要用户手动空投
-    if balance < 10_000_000_000 {
-        println!("⚠️ 账户余额不足 10 SOL，请确保测试账户有足够的 SOL 进行测试");
-        println!("   可以通过 surfpool 水龙头或从有 SOL 的账户转账");
+    // 如果余额小于 2 SOL，自动请求空投
+    if balance < 2 * LAMPORTS_PER_SOL {
+        println!("💧 请求 2 SOL 空投...");
+        let airdrop_signature = client.request_airdrop(payer, 2 * LAMPORTS_PER_SOL).await?;
+        println!("📤 空投交易签名: {}", airdrop_signature);
+
+        // 等待空投确认
+        loop {
+            let confirmed = client.confirm_transaction(&airdrop_signature).await?;
+            if confirmed {
+                break;
+            }
+        }
+
+        // 验证余额
+        let new_balance = client.get_balance(payer).await?;
+        println!(
+            "✅ 空投成功！新余额: {} lamports ({:.4} SOL)",
+            new_balance,
+            new_balance as f64 / 1e9
+        );
     } else {
         println!("✅ 账户余额充足");
     }
@@ -45,18 +58,12 @@ async fn airdrop_to_payer(rpc_url: &str, payer: &Pubkey) -> Result<(), Box<dyn s
 
 /// 创建测试用的 SolanaTrade 客户端
 async fn create_test_client() -> SolanaTrade {
-    let rpc_url = get_test_rpc_url();
+    let rpc_url = "http://127.0.0.1:8899".to_string();
 
-    // 使用测试账户（如果没有设置则创建新的）
-    let payer = if let Ok(secret_key) = std::env::var("TEST_SECRET_KEY_HEX") {
-        let key_bytes = hex::decode(secret_key).expect("Invalid hex");
-        let key_array: [u8; 32] = key_bytes[0..32].try_into().expect("Should be 32 bytes");
-        Keypair::new_from_array(key_array)
-    } else {
-        Keypair::new()
-    };
+    // 使用 Keypair::new() 生成随机测试账户
+    let payer = Keypair::new();
 
-    // 空投 SOL（仅在本地测试环境）
+    // 空投 SOL
     let payer_pubkey = payer.pubkey();
     let _ = airdrop_to_payer(&rpc_url, &payer_pubkey).await;
 
@@ -92,9 +99,6 @@ async fn test_wsol_wrap_complete_flow() {
         }
     }
 
-    // 等待确认
-    tokio::time::sleep(std::time::Duration::from_secs(2)).await;
-
     // Step 2: 部分解包装 (50%)
     let unwrap_amount = wrap_amount / 2;
     println!("\n解包装 {} lamports (0.05 SOL) 回 SOL...", unwrap_amount);
@@ -108,9 +112,6 @@ async fn test_wsol_wrap_complete_flow() {
             panic!("解包装失败: {}", e);
         }
     }
-
-    // 等待确认
-    tokio::time::sleep(std::time::Duration::from_secs(2)).await;
 
     // Step 3: 关闭 WSOL 账户
     println!("\n关闭 WSOL 账户...");
