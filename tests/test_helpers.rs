@@ -2,7 +2,13 @@
 //!
 //! 提供测试用的辅助函数，包括 SOL 空投和测试客户端创建
 
-use sol_trade_sdk::{common::TradeConfig, swqos::SwqosConfig, SolanaTrade};
+use sol_trade_sdk::{
+    common::fast_fn::get_associated_token_address_with_program_id_fast,
+    common::TradeConfig,
+    constants::{TOKEN_PROGRAM, WSOL_TOKEN_ACCOUNT},
+    swqos::SwqosConfig,
+    SolanaTrade,
+};
 use solana_commitment_config::CommitmentConfig;
 use solana_rpc_client::nonblocking::rpc_client::RpcClient;
 use solana_sdk::{
@@ -61,7 +67,79 @@ pub async fn create_test_client() -> SolanaTrade {
 
     let commitment = CommitmentConfig::confirmed();
     let swqos_configs: Vec<SwqosConfig> = vec![SwqosConfig::Default(rpc_url.clone())];
-    let trade_config = TradeConfig::new(rpc_url, swqos_configs, commitment);
-
+    let trade_config =
+        TradeConfig::new(rpc_url, swqos_configs, commitment).with_wsol_ata_config(true, false);
     SolanaTrade::new(Arc::new(payer), trade_config).await
+}
+
+/// 获取账户的 WSOL ATA 地址
+#[inline]
+pub fn get_wsol_ata_address(payer: &Pubkey) -> Pubkey {
+    get_associated_token_address_with_program_id_fast(payer, &WSOL_TOKEN_ACCOUNT, &TOKEN_PROGRAM)
+}
+
+/// 打印并返回账户的 SOL 和 WSOL 余额（同时使用 get_balance 和 get_token_account_balance）
+/// 如果 WSOL 账户不存在（已关闭），返回 (sol_balance, 0)
+pub async fn print_balances(
+    rpc_url: &str,
+    payer: &Pubkey,
+) -> Result<(u64, u64), Box<dyn std::error::Error>> {
+    let client = RpcClient::new(rpc_url.to_string());
+
+    // 获取 SOL 余额
+    let sol_balance = client.get_balance(payer).await?;
+
+    // 获取 WSOL ATA 地址
+    let wsol_ata = get_wsol_ata_address(payer);
+
+    // 方式1: 使用 get_balance 获取 WSOL 余额（账户不存在时返回 0）
+    let wsol_balance = match client.get_balance(&wsol_ata).await {
+        Ok(balance) => balance,
+        Err(e) => {
+            println!("⚠️  get_balance 查询 WSOL 账户失败: {}，视为余额 0", e);
+            0
+        }
+    };
+
+    // 方式2: 使用 get_token_account_balance 获取 WSOL 余额（账户不存在时返回 0）
+    let (wsol_amount, wsol_decimals, wsol_ui_amount_str) =
+        match client.get_token_account_balance(&wsol_ata).await {
+            Ok(token) => {
+                let amount: u64 = token.amount.parse().unwrap_or(0);
+                (amount, token.decimals, token.ui_amount_string)
+            }
+            Err(e) => {
+                println!(
+                    "⚠️  get_token_account_balance 查询 WSOL 账户失败: {}，视为余额 0",
+                    e
+                );
+                (0, 9, "0".to_string())
+            }
+        };
+
+    println!("\n========== 账户余额 ==========");
+    println!("账户地址: {}", payer);
+    println!("WSOL ATA: {}", wsol_ata);
+    println!("--------------------------------");
+    println!(
+        "💰 SOL 余额: {} lamports ({:.4} SOL)",
+        sol_balance,
+        sol_balance as f64 / LAMPORTS_PER_SOL as f64
+    );
+    println!(
+        "🪙 WSOL 余额 (get_balance): {} lamports ({:.4} SOL)",
+        wsol_balance,
+        wsol_balance as f64 / LAMPORTS_PER_SOL as f64
+    );
+    println!(
+        "🪙 WSOL 余额 (get_token_account_balance): {} lamports",
+        wsol_amount
+    );
+    println!(
+        "🪙 WSOL uiAmountString: {} (decimals: {})",
+        wsol_ui_amount_str, wsol_decimals
+    );
+    println!("================================\n");
+
+    Ok((sol_balance, wsol_amount))
 }

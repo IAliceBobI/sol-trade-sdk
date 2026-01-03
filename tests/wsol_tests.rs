@@ -11,11 +11,11 @@ use sol_trade_sdk::{
     common::GasFeeStrategy,
     trading::core::params::{DexParamEnum, PumpSwapParams},
 };
-use solana_sdk::{pubkey::Pubkey};
+use solana_sdk::{pubkey::Pubkey, signer::Signer};
 use std::str::FromStr;
 
 mod test_helpers;
-use test_helpers::create_test_client;
+use test_helpers::{create_test_client, print_balances};
 
 /// 测试：WSOL 包装完整流程
 ///
@@ -27,9 +27,14 @@ use test_helpers::create_test_client;
 async fn test_wsol_wrap_complete_flow() {
     let client = create_test_client().await;
     let wrap_amount = 100_000_000; // 0.1 SOL in lamports
+    let rpc_url = "http://127.0.0.1:8899".to_string();
+    let payer_pubkey = client.payer.try_pubkey().expect("Failed to get payer pubkey");
 
     println!("=== 测试 WSOL 完整流程 ===");
     println!("包装 {} lamports (0.1 SOL) 到 WSOL...", wrap_amount);
+
+    // 打印初始余额
+    let (sol_before, wsol_before) = print_balances(&rpc_url, &payer_pubkey).await.unwrap();
 
     // Step 1: 包装 SOL 到 WSOL
     match client.wrap_sol_to_wsol(wrap_amount).await {
@@ -42,11 +47,15 @@ async fn test_wsol_wrap_complete_flow() {
         }
     }
 
-    // Step 2: 部分解包装 (50%)
-    let unwrap_amount = wrap_amount / 2;
-    println!("\n解包装 {} lamports (0.05 SOL) 回 SOL...", unwrap_amount);
+    // 打印包装后余额
+    let (sol_after_wrap, wsol_after_wrap) = print_balances(&rpc_url, &payer_pubkey).await.unwrap();
+    assert!(wsol_after_wrap > wsol_before, "WSOL 余额应该增加");
+    assert!(sol_after_wrap < sol_before, "SOL 余额应该减少");
 
-    match client.wrap_wsol_to_sol(unwrap_amount).await {
+    // Step 2: 解包装
+    println!("\n解包装 {} lamports (0.1 SOL) 回 SOL...", wrap_amount);
+
+    match client.wrap_wsol_to_sol(wrap_amount).await {
         Ok(signature) => {
             println!("✅ WSOL -> SOL 成功: {}", signature);
         }
@@ -55,6 +64,11 @@ async fn test_wsol_wrap_complete_flow() {
             panic!("解包装失败: {}", e);
         }
     }
+
+    // 打印解包装后余额
+    let (sol_after_unwrap, wsol_after_unwrap) = print_balances(&rpc_url, &payer_pubkey).await.unwrap();
+    assert!(sol_after_unwrap > sol_after_wrap, "SOL 余额应该增加");
+    assert!(wsol_after_unwrap < wsol_after_wrap, "WSOL 余额应该减少");
 
     // Step 3: 关闭 WSOL 账户
     println!("\n关闭 WSOL 账户...");
@@ -67,6 +81,10 @@ async fn test_wsol_wrap_complete_flow() {
             panic!("关闭失败: {}", e);
         }
     }
+
+    // 打印关闭后余额
+    let (_, wsol_final) = print_balances(&rpc_url, &payer_pubkey).await.unwrap();
+    assert_eq!(wsol_final, 0, "WSOL 账户关闭后余额应该为 0");
 
     println!("=== WSOL 完整流程测试通过 ===");
 }
