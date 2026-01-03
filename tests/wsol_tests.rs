@@ -14,7 +14,8 @@ use sol_trade_sdk::{
     SolanaTrade,
 };
 use solana_commitment_config::CommitmentConfig;
-use solana_sdk::{pubkey::Pubkey, signature::Keypair};
+use solana_rpc_client::rpc_client::RpcClient;
+use solana_sdk::{pubkey::Pubkey, signature::Keypair, signer::Signer};
 use std::str::FromStr;
 use std::sync::Arc;
 
@@ -22,6 +23,24 @@ use std::sync::Arc;
 fn get_test_rpc_url() -> String {
     std::env::var("TEST_RPC_URL")
         .unwrap_or_else(|_| "http://127.0.0.1:8899".to_string())
+}
+
+/// 为测试账户空投 SOL（surfpool 支持通过 getTokenSupply 方式）
+async fn airdrop_to_payer(rpc_url: &str, payer: &Pubkey) -> Result<(), Box<dyn std::error::Error>> {
+    let client = RpcClient::new(rpc_url.to_string());
+
+    // 检查账户余额
+    let balance = client.get_balance(payer)?;
+    println!("账户余额: {} lamports ({:.4} SOL)", balance, balance as f64 / 1e9);
+
+    // 如果余额小于 10 SOL，需要用户手动空投
+    if balance < 10_000_000_000 {
+        println!("⚠️ 账户余额不足 10 SOL，请确保测试账户有足够的 SOL 进行测试");
+        println!("   可以通过 surfpool 水龙头或从有 SOL 的账户转账");
+    } else {
+        println!("✅ 账户余额充足");
+    }
+    Ok(())
 }
 
 /// 创建测试用的 SolanaTrade 客户端
@@ -37,6 +56,10 @@ async fn create_test_client() -> SolanaTrade {
         Keypair::new()
     };
 
+    // 空投 SOL（仅在本地测试环境）
+    let payer_pubkey = payer.pubkey();
+    let _ = airdrop_to_payer(&rpc_url, &payer_pubkey).await;
+
     let commitment = CommitmentConfig::confirmed();
     let swqos_configs: Vec<SwqosConfig> = vec![SwqosConfig::Default(rpc_url.clone())];
     let trade_config = TradeConfig::new(rpc_url, swqos_configs, commitment);
@@ -50,7 +73,6 @@ async fn create_test_client() -> SolanaTrade {
 /// 1. SOL -> WSOL 包装
 /// 2. WSOL -> SOL 部分解包装
 /// 3. WSOL 账户关闭
-#[ignore]
 #[tokio::test]
 async fn test_wsol_wrap_complete_flow() {
     let client = create_test_client().await;
