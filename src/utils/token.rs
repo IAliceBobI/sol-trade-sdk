@@ -13,42 +13,78 @@ use spl_token::state::Mint;
 // Increased cache sizes for better performance
 const MAX_TOKEN_METADATA_CACHE_SIZE: usize = 100_000;
 
-/// 全局 Token Decimal 缓存
-static DECIMALS_CACHE: Lazy<DashMap<Pubkey, u8>> =
+/// Mint 账户信息（包含所有元数据）
+#[derive(Clone, Debug)]
+pub struct MintInfo {
+    /// 代币精度
+    pub decimals: u8,
+    /// 代币符号
+    pub symbol: String,
+    /// 是否为 Token2022
+    pub is_token2022: bool,
+}
+
+/// 全局 MintInfo 缓存（包含 decimals、symbol、is_token2022）
+static MINT_INFO_CACHE: Lazy<DashMap<Pubkey, MintInfo>> =
     Lazy::new(|| DashMap::with_capacity(MAX_TOKEN_METADATA_CACHE_SIZE));
 
-/// 全局 Token Symbol 缓存
-static SYMBOL_CACHE: Lazy<DashMap<Pubkey, String>> =
-    Lazy::new(|| DashMap::with_capacity(MAX_TOKEN_METADATA_CACHE_SIZE));
+/// 获取缓存的 MintInfo，不存在则返回 None
+pub fn get_cached_mint_info(mint: &Pubkey) -> Option<MintInfo> {
+    MINT_INFO_CACHE.get(mint).map(|info| info.clone())
+}
 
-/// 获取代币精度（统一实现，支持 Token 和 Token2022）
+/// 获取 Mint 账户的完整信息（统一实现，支持 Token 和 Token2022）
 ///
 /// 使用全局缓存减少 RPC 调用
-pub async fn get_token_decimals(
+pub async fn get_mint_info(
     rpc: &crate::common::SolanaRpcClient,
     mint: &Pubkey,
-) -> Result<u8> {
-    // Fast path: 检查缓存
-    if let Some(cached) = DECIMALS_CACHE.get(mint) {
-        return Ok(*cached);
-    }
-
+) -> Result<MintInfo> {
     let account = rpc.get_account(mint).await?;
+    let is_token2022 = account.owner == spl_token_2022::ID;
 
     // 尝试解析为传统 Token 程序的 Mint
-    if let Ok(mint_account) = Mint::unpack(&account.data) {
-        let decimals = mint_account.decimals;
-        DECIMALS_CACHE.insert(*mint, decimals);
-        return Ok(decimals);
+    if !is_token2022 {
+        if let Ok(mint_account) = Mint::unpack(&account.data) {
+            let info = MintInfo {
+                decimals: mint_account.decimals,
+                symbol: get_known_token_symbol(mint),
+                is_token2022: false,
+            };
+            MINT_INFO_CACHE.insert(*mint, info.clone());
+            return Ok(info);
+        }
     }
 
     // 尝试解析为 Token2022 的 Mint
-    use spl_token_2022::extension::StateWithExtensions;
-    use spl_token_2022::state::Mint as Mint2022;
-    if let Ok(mint_account) = StateWithExtensions::<Mint2022>::unpack(&account.data) {
-        let decimals = mint_account.base.decimals;
-        DECIMALS_CACHE.insert(*mint, decimals);
-        return Ok(decimals);
+    if is_token2022 {
+        use spl_token_2022::extension::{BaseStateWithExtensions, StateWithExtensions};
+        use spl_token_2022::state::Mint as Mint2022;
+        if let Ok(mint_account) = StateWithExtensions::<Mint2022>::unpack(&account.data) {
+            let decimals = mint_account.base.decimals;
+
+            // 尝试获取 TokenMetadata 中的 symbol
+            let symbol = if let Ok(metadata) = mint_account
+                .get_variable_len_extension::<spl_token_metadata_interface::state::TokenMetadata>()
+            {
+                let s = metadata.symbol.to_string();
+                if s.is_empty() {
+                    get_known_token_symbol(mint)
+                } else {
+                    s
+                }
+            } else {
+                get_known_token_symbol(mint)
+            };
+
+            let info = MintInfo {
+                decimals,
+                symbol,
+                is_token2022: true,
+            };
+            MINT_INFO_CACHE.insert(*mint, info.clone());
+            return Ok(info);
+        }
     }
 
     Err(anyhow::anyhow!(
@@ -59,6 +95,23 @@ pub async fn get_token_decimals(
     ))
 }
 
+/// 获取代币精度（统一实现，支持 Token 和 Token2022）
+///
+/// 使用全局缓存减少 RPC 调用
+pub async fn get_token_decimals(
+    rpc: &crate::common::SolanaRpcClient,
+    mint: &Pubkey,
+) -> Result<u8> {
+    // Fast path: 检查缓存
+    if let Some(info) = get_cached_mint_info(mint) {
+        return Ok(info.decimals);
+    }
+
+    // 缓存未命中，获取完整 MintInfo
+    let info = get_mint_info(rpc, mint).await?;
+    Ok(info.decimals)
+}
+
 /// 获取代币 Symbol（支持 Token 和 Token2022 Metadata Extension）
 ///
 /// 使用全局缓存减少 RPC 调用
@@ -67,34 +120,13 @@ pub async fn get_token_symbol(
     mint: &Pubkey,
 ) -> Result<String> {
     // Fast path: 检查缓存
-    if let Some(cached) = SYMBOL_CACHE.get(mint) {
-        return Ok(cached.clone());
+    if let Some(info) = get_cached_mint_info(mint) {
+        return Ok(info.symbol);
     }
 
-    let account = rpc.get_account(mint).await?;
-
-    // 尝试解析为 Token2022 的 Mint（支持 Metadata Extension）
-    if account.owner == spl_token_2022::ID {
-        use spl_token_2022::extension::{BaseStateWithExtensions, StateWithExtensions};
-        use spl_token_2022::state::Mint as Mint2022;
-        if let Ok(mint_account) = StateWithExtensions::<Mint2022>::unpack(&account.data) {
-            if let Ok(metadata) = mint_account
-                .get_variable_len_extension::<spl_token_metadata_interface::state::TokenMetadata>()
-            {
-                let symbol = metadata.symbol.to_string();
-                if !symbol.is_empty() {
-                    SYMBOL_CACHE.insert(*mint, symbol.clone());
-                    return Ok(symbol);
-                }
-            }
-        }
-    }
-
-    // 传统 Token 程序不支持链上 metadata
-    // 使用硬编码兜底方案
-    let symbol = get_known_token_symbol(mint);
-    SYMBOL_CACHE.insert(*mint, symbol.clone());
-    Ok(symbol)
+    // 缓存未命中，获取完整 MintInfo
+    let info = get_mint_info(rpc, mint).await?;
+    Ok(info.symbol)
 }
 
 /// 计算 ATA 地址（自动识别 Token Program）
@@ -103,8 +135,21 @@ pub async fn calculate_ata(
     owner: &Pubkey,
     mint: &Pubkey,
 ) -> Result<Pubkey> {
-    let account = rpc.get_account(mint).await?;
-    let token_program = account.owner;
+    let token_program = if let Some(info) = get_cached_mint_info(mint) {
+        if info.is_token2022 {
+            spl_token_2022::ID
+        } else {
+            spl_token::ID
+        }
+    } else {
+        // 缓存未命中，获取 MintInfo
+        let info = get_mint_info(rpc, mint).await?;
+        if info.is_token2022 {
+            spl_token_2022::ID
+        } else {
+            spl_token::ID
+        }
+    };
 
     Ok(spl_associated_token_account::get_associated_token_address_with_program_id(
         owner,
@@ -187,7 +232,7 @@ mod tests {
         let wsol = Pubkey::from_str_const("So11111111111111111111111111111111111111112");
 
         // 清除缓存确保冷启动
-        DECIMALS_CACHE.remove(&wsol);
+        MINT_INFO_CACHE.remove(&wsol);
 
         let decimals = get_token_decimals(&rpc, &wsol).await.unwrap();
         assert_eq!(decimals, 9);
@@ -200,7 +245,7 @@ mod tests {
         let pump = Pubkey::from_str_const("pumpCmXqMfrsAkQ5r49WcJnRayYRqmXz6ae8H7H9Dfn");
 
         // 清除缓存确保冷启动
-        SYMBOL_CACHE.remove(&pump);
+        MINT_INFO_CACHE.remove(&pump);
 
         let symbol = get_token_symbol(&rpc, &pump).await.unwrap();
         assert!(!symbol.is_empty());
@@ -239,6 +284,50 @@ mod tests {
 
         assert!(!symbol1.is_empty());
         assert_eq!(symbol1, symbol2);
+    }
+
+    #[tokio::test]
+    async fn test_get_mint_info_usdc() {
+        use solana_client::nonblocking::rpc_client::RpcClient;
+        let rpc = RpcClient::new("https://api.mainnet-beta.solana.com".to_string());
+        let usdc = Pubkey::from_str_const("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v");
+
+        let info = get_mint_info(&rpc, &usdc).await.unwrap();
+        assert_eq!(info.decimals, 6);
+        assert!(!info.symbol.is_empty());
+        assert!(!info.is_token2022, "USDC on mainnet is not Token2022");
+    }
+
+    #[tokio::test]
+    async fn test_get_mint_info_pumpfun() {
+        use solana_client::nonblocking::rpc_client::RpcClient;
+        let rpc = RpcClient::new("https://api.mainnet-beta.solana.com".to_string());
+        let pump = Pubkey::from_str_const("pumpCmXqMfrsAkQ5r49WcJnRayYRqmXz6ae8H7H9Dfn");
+
+        let info = get_mint_info(&rpc, &pump).await.unwrap();
+        assert_eq!(info.decimals, 6);
+        assert!(!info.symbol.is_empty());
+        assert!(info.is_token2022, "Pump.fun tokens are Token2022");
+    }
+
+    #[tokio::test]
+    async fn test_cached_mint_info() {
+        use solana_client::nonblocking::rpc_client::RpcClient;
+        let rpc = RpcClient::new("https://api.mainnet-beta.solana.com".to_string());
+        let wsol = Pubkey::from_str_const("So11111111111111111111111111111111111111112");
+
+        // 清除缓存确保冷启动
+        MINT_INFO_CACHE.remove(&wsol);
+
+        // 先获取 MintInfo
+        let info1 = get_mint_info(&rpc, &wsol).await.unwrap();
+        assert_eq!(info1.decimals, 9);
+
+        // 使用 get_cached_mint_info 应该命中缓存
+        let info2 = get_cached_mint_info(&wsol).unwrap();
+        assert_eq!(info1.decimals, info2.decimals);
+        assert_eq!(info1.symbol, info2.symbol);
+        assert_eq!(info1.is_token2022, info2.is_token2022);
     }
 }
 
