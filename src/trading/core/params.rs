@@ -2,6 +2,7 @@ use crate::common::bonding_curve::BondingCurveAccount;
 use crate::common::nonce_cache::DurableNonceInfo;
 use crate::common::spl_associated_token_account::get_associated_token_address_with_program_id;
 use crate::common::{GasFeeStrategy, SolanaRpcClient};
+use crate::utils::token::calculate_ata;
 use crate::constants::TOKEN_PROGRAM;
 use crate::instruction::utils::pumpfun::global_constants::MAYHEM_FEE_RECIPIENT;
 use crate::instruction::utils::pumpswap::accounts::MAYHEM_FEE_RECIPIENT as MAYHEM_FEE_RECIPIENT_SWAP;
@@ -196,11 +197,11 @@ impl PumpFunParams {
             creator: account.0.creator,
             is_mayhem_mode: account.0.is_mayhem_mode,
         };
-        let associated_bonding_curve = get_associated_token_address_with_program_id(
+        let associated_bonding_curve = calculate_ata(
+            rpc,
             &bonding_curve.account,
             mint,
-            &mint_account.owner,
-        );
+        ).await?;
         let creator_vault =
             crate::instruction::utils::pumpfun::get_creator_vault_pda(&bonding_curve.creator);
         Ok(Self {
