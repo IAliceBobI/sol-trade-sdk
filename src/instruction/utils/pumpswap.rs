@@ -203,128 +203,176 @@ pub async fn fetch_pool(
     Ok(pool)
 }
 
+// ==================== 带缓存的查询方法（Step 3） ====================
+
+/// 带缓存的地址查询
+pub async fn get_pool_by_address(
+    rpc: &SolanaRpcClient,
+    pool_address: &Pubkey,
+) -> Result<Pool, anyhow::Error> {
+    // 1. 检查缓存
+    if let Some(pool) = pump_swap_cache::get_cached_pool_by_address(pool_address) {
+        return Ok(pool);
+    }
+    // 2. RPC 查询
+    let pool = fetch_pool(rpc, pool_address).await?;
+    // 3. 写入缓存
+    pump_swap_cache::cache_pool_by_address(pool_address, &pool);
+    Ok(pool)
+}
+
+/// 带缓存的 mint 查询（返回最优池）
+pub async fn get_pool_by_mint(
+    rpc: &SolanaRpcClient,
+    mint: &Pubkey,
+) -> Result<(Pubkey, Pool), anyhow::Error> {
+    // 1. 检查缓存
+    if let Some(pool_address) = pump_swap_cache::get_cached_pool_address_by_mint(mint) {
+        if let Some(pool) = pump_swap_cache::get_cached_pool_by_address(&pool_address) {
+            return Ok((pool_address, pool));
+        }
+    }
+    // 2. RPC 查询
+    let (pool_address, pool) = find_by_mint(rpc, mint).await?;
+    // 3. 写入缓存
+    pump_swap_cache::cache_pool_address_by_mint(mint, &pool_address);
+    pump_swap_cache::cache_pool_by_address(&pool_address, &pool);
+    Ok((pool_address, pool))
+}
+
+/// Force 刷新：强制重新查询指定 Pool
+pub async fn get_pool_by_address_force(
+    rpc: &SolanaRpcClient,
+    pool_address: &Pubkey,
+) -> Result<Pool, anyhow::Error> {
+    pump_swap_cache::POOL_DATA_CACHE.remove(pool_address);
+    get_pool_by_address(rpc, pool_address).await
+}
+
+/// Force 刷新：强制重新查询 mint 对应的 Pool
+pub async fn get_pool_by_mint_force(
+    rpc: &SolanaRpcClient,
+    mint: &Pubkey,
+) -> Result<(Pubkey, Pool), anyhow::Error> {
+    pump_swap_cache::MINT_TO_POOL_CACHE.remove(mint);
+    get_pool_by_mint(rpc, mint).await
+}
+
+/// 清除所有 Pool 缓存
+pub fn clear_pool_cache() {
+    pump_swap_cache::clear_all();
+}
+
+
+// PumpSwap Pool 缓存（Step 2）
+pub(crate) mod pump_swap_cache {
+    use super::*;
+    use dashmap::DashMap;
+    use once_cell::sync::Lazy;
+
+    const MAX_CACHE_SIZE: usize = 50_000;
+
+    /// mint → pool_address 缓存
+    pub(crate) static MINT_TO_POOL_CACHE: Lazy<DashMap<Pubkey, Pubkey>> =
+        Lazy::new(|| DashMap::with_capacity(MAX_CACHE_SIZE));
+
+    /// pool_address → Pool 数据缓存
+    pub(crate) static POOL_DATA_CACHE: Lazy<DashMap<Pubkey, Pool>> =
+        Lazy::new(|| DashMap::with_capacity(MAX_CACHE_SIZE));
+
+    pub(crate) fn get_cached_pool_by_address(pool_address: &Pubkey) -> Option<Pool> {
+        POOL_DATA_CACHE.get(pool_address).map(|p| p.clone())
+    }
+
+    pub(crate) fn cache_pool_by_address(pool_address: &Pubkey, pool: &Pool) {
+        POOL_DATA_CACHE.insert(*pool_address, pool.clone());
+    }
+
+    pub(crate) fn get_cached_pool_address_by_mint(mint: &Pubkey) -> Option<Pubkey> {
+        MINT_TO_POOL_CACHE.get(mint).map(|p| *p)
+    }
+
+    pub(crate) fn cache_pool_address_by_mint(mint: &Pubkey, pool_address: &Pubkey) {
+        MINT_TO_POOL_CACHE.insert(*mint, *pool_address);
+    }
+
+    pub(crate) fn clear_all() {
+        MINT_TO_POOL_CACHE.clear();
+        POOL_DATA_CACHE.clear();
+    }
+}
+
+// 常量偏移量
+const BASE_MINT_OFFSET: usize = 43;
+const QUOTE_MINT_OFFSET: usize = 75;
+
+/// 通用内部实现：通过 offset 查找单个最优 Pool
+async fn find_pool_by_mint_offset(
+    rpc: &SolanaRpcClient,
+    mint: &Pubkey,
+    offset: usize,
+) -> Result<(Pubkey, Pool), anyhow::Error> {
+    let pools = find_pools_by_mint_offset_collect(rpc, mint, offset).await?;
+    if pools.is_empty() {
+        return Err(anyhow!("No pool found for mint {} at offset {}", mint, offset));
+    }
+    let (address, pool) = pools[0].clone();
+    Ok((address, pool))
+}
+
+/// 通用内部实现：通过 offset 查找所有 Pool（返回 Vec）
+async fn find_pools_by_mint_offset_collect(
+    rpc: &SolanaRpcClient,
+    mint: &Pubkey,
+    offset: usize,
+) -> Result<Vec<(Pubkey, Pool)>, anyhow::Error> {
+    let filters = vec![solana_rpc_client_api::filter::RpcFilterType::Memcmp(
+        solana_client::rpc_filter::Memcmp::new_base58_encoded(offset, &mint.to_bytes()),
+    )];
+    let config = solana_rpc_client_api::config::RpcProgramAccountsConfig {
+        filters: Some(filters),
+        account_config: solana_rpc_client_api::config::RpcAccountInfoConfig {
+            encoding: Some(UiAccountEncoding::Base64),
+            data_slice: None,
+            commitment: None,
+            min_context_slot: None,
+        },
+        with_context: None,
+        sort_results: None,
+    };
+    let program_id = accounts::AMM_PROGRAM;
+    let accounts = rpc.get_program_ui_accounts_with_config(&program_id, config).await?;
+
+    let pools: Vec<(Pubkey, Pool)> = accounts
+        .into_iter()
+        .filter_map(|(addr, acc)| {
+            let data_bytes = match &acc.data {
+                UiAccountData::Binary(base64_str, _) => STANDARD.decode(base64_str).ok()?,
+                _ => return None,
+            };
+            if data_bytes.len() > 8 {
+                pool_decode(&data_bytes[8..]).map(|pool| (addr, pool))
+            } else {
+                None
+            }
+        })
+        .collect();
+
+    Ok(pools)
+}
 
 pub async fn find_by_base_mint(
     rpc: &SolanaRpcClient,
     base_mint: &Pubkey,
 ) -> Result<(Pubkey, Pool), anyhow::Error> {
-    // Use getProgramAccounts to find pools for the given mint
-    let filters = vec![
-        // solana_rpc_client_api::filter::RpcFilterType::DataSize(211), // Pool account size
-        solana_rpc_client_api::filter::RpcFilterType::Memcmp(
-            solana_client::rpc_filter::Memcmp::new_base58_encoded(43, &base_mint.to_bytes()),
-        ),
-    ];
-    let config = solana_rpc_client_api::config::RpcProgramAccountsConfig {
-        filters: Some(filters),
-        account_config: solana_rpc_client_api::config::RpcAccountInfoConfig {
-            encoding: Some(UiAccountEncoding::Base64),
-            data_slice: None,
-            commitment: None,
-            min_context_slot: None,
-        },
-        with_context: None,
-        sort_results: None,
-    };
-    let program_id = accounts::AMM_PROGRAM;
-    let accounts = rpc.get_program_ui_accounts_with_config(&program_id, config).await?;
-    if accounts.is_empty() {
-        return Err(anyhow!("No pool found for mint {}", base_mint));
-    }
-    let accounts_count = accounts.len(); // 🔧 保存长度，因为 into_iter() 会消耗 accounts
-    let mut pools: Vec<_> = accounts
-        .into_iter()
-        .filter_map(|(addr, acc)| {
-            // 🔧 修复：从 UiAccountData 提取并解码 Base64 数据
-            let data_bytes = match &acc.data {
-                UiAccountData::Binary(base64_str, _) => {
-                    STANDARD.decode(base64_str).ok()?
-                }
-                _ => return None,
-            };
-            // 🔧 修复：跳过8字节的discriminator
-            if data_bytes.len() > 8 {
-                pool_decode(&data_bytes[8..]).map(|pool| (addr, pool))
-            } else {
-                None
-            }
-        })
-        .collect();
-
-    // 🔧 修复：检查过滤后的 pools 是否为空（accounts 可能不为空但解码全部失败）
-    if pools.is_empty() {
-        return Err(anyhow!(
-            "No valid pool decoded for mint {} (found {} accounts but all decode failed)",
-            base_mint,
-            accounts_count
-        ));
-    }
-
-    pools.sort_by(|a, b| b.1.lp_supply.cmp(&a.1.lp_supply));
-    let (address, pool) = pools[0].clone();
-    Ok((address, pool))
+    find_pool_by_mint_offset(rpc, base_mint, BASE_MINT_OFFSET).await
 }
-
 
 pub async fn find_by_quote_mint(
     rpc: &SolanaRpcClient,
     quote_mint: &Pubkey,
 ) -> Result<(Pubkey, Pool), anyhow::Error> {
-    // Use getProgramAccounts to find pools for the given mint
-    let filters = vec![
-        // solana_rpc_client_api::filter::RpcFilterType::DataSize(211), // Pool account size
-        solana_rpc_client_api::filter::RpcFilterType::Memcmp(
-            solana_client::rpc_filter::Memcmp::new_base58_encoded(75, &quote_mint.to_bytes()),
-        ),
-    ];
-    let config = solana_rpc_client_api::config::RpcProgramAccountsConfig {
-        filters: Some(filters),
-        account_config: solana_rpc_client_api::config::RpcAccountInfoConfig {
-            encoding: Some(UiAccountEncoding::Base64),
-            data_slice: None,
-            commitment: None,
-            min_context_slot: None,
-        },
-        with_context: None,
-        sort_results: None,
-    };
-    let program_id = accounts::AMM_PROGRAM;
-    let accounts = rpc.get_program_ui_accounts_with_config(&program_id, config).await?;
-    if accounts.is_empty() {
-        return Err(anyhow!("No pool found for mint {}", quote_mint));
-    }
-    let accounts_count = accounts.len(); // 🔧 保存长度，因为 into_iter() 会消耗 accounts
-    let mut pools: Vec<_> = accounts
-        .into_iter()
-        .filter_map(|(addr, acc)| {
-            // 🔧 修复：从 UiAccountData 提取并解码 Base64 数据
-            let data_bytes = match &acc.data {
-                UiAccountData::Binary(base64_str, _) => {
-                    STANDARD.decode(base64_str).ok()?
-                }
-                _ => return None,
-            };
-            // 🔧 修复：跳过8字节的discriminator
-            if data_bytes.len() > 8 {
-                pool_decode(&data_bytes[8..]).map(|pool| (addr, pool))
-            } else {
-                None
-            }
-        })
-        .collect();
-
-    // 🔧 修复：检查过滤后的 pools 是否为空（accounts 可能不为空但解码全部失败）
-    if pools.is_empty() {
-        return Err(anyhow!(
-            "No valid pool decoded for quote_mint {} (found {} accounts but all decode failed)",
-            quote_mint,
-            accounts_count
-        ));
-    }
-
-    pools.sort_by(|a, b| b.1.lp_supply.cmp(&a.1.lp_supply));
-    let (address, pool) = pools[0].clone();
-    Ok((address, pool))
+    find_pool_by_mint_offset(rpc, quote_mint, QUOTE_MINT_OFFSET).await
 }
 
 
@@ -371,41 +419,48 @@ pub async fn find_by_mint(
         }
     }
 
-    // Priority 2: List all pools and prefer WSOL pairs (sorted by LP supply)
-    // This ensures we get the most liquid WSOL pair if available
-    if let Ok(pools) = list_by_mint(rpc, mint).await {
-        // First, try to find WSOL pairs, sorted by LP supply (highest first)
-        let mut wsol_pools: Vec<_> = pools
-            .iter()
-            .filter(|(_, pool)| {
-                pool.base_mint == WSOL_TOKEN_ACCOUNT || pool.quote_mint == WSOL_TOKEN_ACCOUNT
-            })
-            .collect();
-        
-        if !wsol_pools.is_empty() {
-            // Sort by LP supply (highest first) and return the first one
-            wsol_pools.sort_by(|a, b| b.1.lp_supply.cmp(&a.1.lp_supply));
-            let (address, pool) = wsol_pools[0];
-            return Ok((*address, pool.clone()));
+    // Priority 2: Try base_mint scan (1 getProgramAccounts call)
+    // Collect all base_mint pools first
+    let mut all_pools: Vec<(Pubkey, Pool)> = match find_pools_by_mint_offset_collect(rpc, mint, BASE_MINT_OFFSET).await {
+        Ok(pools) => pools,
+        Err(_) => Vec::new(),
+    };
+
+    // Priority 3: Try quote_mint scan (1 getProgramAccounts call) and merge
+    if let Ok(quote_pools) = find_pools_by_mint_offset_collect(rpc, mint, QUOTE_MINT_OFFSET).await {
+        // Merge and deduplicate
+        use std::collections::HashSet;
+        let mut seen: HashSet<Pubkey> = all_pools.iter().map(|(addr, _)| *addr).collect();
+        for (addr, pool) in quote_pools {
+            if seen.insert(addr) {
+                all_pools.push((addr, pool));
+            }
         }
-        
-        // If no WSOL pair found, return the pool with highest LP supply
-        let mut all_pools: Vec<_> = pools.iter().collect();
-        all_pools.sort_by(|a, b| b.1.lp_supply.cmp(&a.1.lp_supply));
-        let (address, pool) = all_pools[0];
+    }
+
+    if all_pools.is_empty() {
+        return Err(anyhow!("No pool found for mint {}", mint));
+    }
+
+    // Priority: Prefer WSOL pairs
+    let mut wsol_pools: Vec<_> = all_pools
+        .iter()
+        .filter(|(_, pool)| {
+            pool.base_mint == WSOL_TOKEN_ACCOUNT || pool.quote_mint == WSOL_TOKEN_ACCOUNT
+        })
+        .collect();
+
+    if !wsol_pools.is_empty() {
+        // Sort by LP supply (highest first) and return the first one
+        wsol_pools.sort_by(|a, b| b.1.lp_supply.cmp(&a.1.lp_supply));
+        let (address, pool) = wsol_pools[0];
         return Ok((*address, pool.clone()));
     }
 
-    // Fallback: Try individual find functions (for backward compatibility)
-    if let Ok((address, pool)) = find_by_base_mint(rpc, mint).await {
-        return Ok((address, pool));
-    }
-    
-    if let Ok((address, pool)) = find_by_quote_mint(rpc, mint).await {
-        return Ok((address, pool));
-    }
-
-    Err(anyhow!("No pool found for mint {}", mint))
+    // If no WSOL pair found, return the pool with highest LP supply
+    all_pools.sort_by(|a, b| b.1.lp_supply.cmp(&a.1.lp_supply));
+    let (address, pool) = all_pools[0].clone();
+    Ok((address, pool))
 }
 
 /// List all PumpSwap pools for a mint (as base or quote).
@@ -419,84 +474,22 @@ pub async fn list_by_mint(
     use std::collections::HashSet;
 
     let mut out: Vec<(Pubkey, Pool)> = Vec::new();
-    let mut seen: HashSet<String> = HashSet::new();
+    let mut seen: HashSet<Pubkey> = HashSet::new();
 
-    // Always scan for base_mint pools (unconditionally)
-    let filters_base = vec![solana_rpc_client_api::filter::RpcFilterType::Memcmp(
-        solana_client::rpc_filter::Memcmp::new_base58_encoded(43, &mint.to_bytes()),
-    )];
-    let config_base = solana_rpc_client_api::config::RpcProgramAccountsConfig {
-        filters: Some(filters_base),
-        account_config: solana_rpc_client_api::config::RpcAccountInfoConfig {
-            encoding: Some(UiAccountEncoding::Base64),
-            data_slice: None,
-            commitment: None,
-            min_context_slot: None,
-        },
-        with_context: None,
-        sort_results: None,
-    };
-    if let Ok(accounts) = rpc
-        .get_program_ui_accounts_with_config(&accounts::AMM_PROGRAM, config_base)
-        .await
-    {
-        for (addr, acc) in accounts {
-            let data_bytes = match &acc.data {
-                UiAccountData::Binary(base64_str, _) => {
-                    match STANDARD.decode(base64_str) {
-                        Ok(bytes) => bytes,
-                        Err(_) => continue,
-                    }
-                }
-                _ => continue,
-            };
-            if data_bytes.len() > 8 {
-                if let Some(pool) = pool_decode(&data_bytes[8..]) {
-                    let k = addr.to_string();
-                    if seen.insert(k) {
-                        out.push((addr, pool));
-                    }
-                }
+    // Scan base_mint pools
+    if let Ok(base_pools) = find_pools_by_mint_offset_collect(rpc, mint, BASE_MINT_OFFSET).await {
+        for (addr, pool) in base_pools {
+            if seen.insert(addr) {
+                out.push((addr, pool));
             }
         }
     }
 
-    // Always scan for quote_mint pools (unconditionally)
-    let filters_quote = vec![solana_rpc_client_api::filter::RpcFilterType::Memcmp(
-        solana_client::rpc_filter::Memcmp::new_base58_encoded(75, &mint.to_bytes()),
-    )];
-    let config_quote = solana_rpc_client_api::config::RpcProgramAccountsConfig {
-        filters: Some(filters_quote),
-        account_config: solana_rpc_client_api::config::RpcAccountInfoConfig {
-            encoding: Some(UiAccountEncoding::Base64),
-            data_slice: None,
-            commitment: None,
-            min_context_slot: None,
-        },
-        with_context: None,
-        sort_results: None,
-    };
-    if let Ok(accounts) = rpc
-        .get_program_ui_accounts_with_config(&accounts::AMM_PROGRAM, config_quote)
-        .await
-    {
-        for (addr, acc) in accounts {
-            let data_bytes = match &acc.data {
-                UiAccountData::Binary(base64_str, _) => {
-                    match STANDARD.decode(base64_str) {
-                        Ok(bytes) => bytes,
-                        Err(_) => continue,
-                    }
-                }
-                _ => continue,
-            };
-            if data_bytes.len() > 8 {
-                if let Some(pool) = pool_decode(&data_bytes[8..]) {
-                    let k = addr.to_string();
-                    if seen.insert(k) {
-                        out.push((addr, pool));
-                    }
-                }
+    // Scan quote_mint pools and merge
+    if let Ok(quote_pools) = find_pools_by_mint_offset_collect(rpc, mint, QUOTE_MINT_OFFSET).await {
+        for (addr, pool) in quote_pools {
+            if seen.insert(addr) {
+                out.push((addr, pool));
             }
         }
     }
