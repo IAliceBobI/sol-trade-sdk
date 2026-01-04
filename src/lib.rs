@@ -65,7 +65,7 @@ pub struct TradingClient {
     pub swqos_clients: Vec<Arc<SwqosClient>>,
     /// Optional middleware manager for custom transaction processing
     pub middleware_manager: Option<Arc<MiddlewareManager>>,
-    /// Whether to use seed optimization for all ATA operations (default: true)
+    /// Whether to use seed optimization for all ATA operations (default: false)
     /// Applies to all token account creations across buy and sell operations
     pub use_seed_optimize: bool,
     /// 回调执行模式（全局默认配置）

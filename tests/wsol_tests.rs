@@ -7,15 +7,13 @@
 //!
 //! 注意：需要确保 surfpool 正在运行
 
-use sol_trade_sdk::{
-    common::GasFeeStrategy,
-    trading::core::params::{DexParamEnum, PumpSwapParams},
-};
 use solana_sdk::{pubkey::Pubkey, signer::Signer};
 use std::str::FromStr;
 
 mod test_helpers;
-use test_helpers::{create_test_client, print_balances};
+use test_helpers::{buy_pump_with_sol, create_test_client, print_balances};
+
+use crate::test_helpers::create_test_client_with_seed_optimize;
 
 /// 测试：WSOL 包装完整流程
 ///
@@ -150,73 +148,20 @@ async fn test_wsol_ata_creation_idempotent() {
     let _ = client.close_wsol().await;
 }
 
-/// 测试：交易中使用 WSOL
-///
-/// 使用 PumpSwap 进行买入交易，验证 WSOL 自动处理
 #[tokio::test]
 async fn test_trade_with_wsol() {
     // cargo test --package sol-trade-sdk --test wsol_tests -- test_trade_with_wsol --exact --nocapture
-    let client = create_test_client().await;
+    let client = create_test_client_with_seed_optimize(false).await;
 
-    println!("=== 测试交易中使用 WSOL ===");
+    println!("=== 测试交易中使用 WSOL (工具函数版) ===");
 
     // 使用一个已知的 PumpSwap 池进行测试
     let pool = Pubkey::from_str("539m4mVWt6iduB6W8rDGPMarzNCMesuqY5eUTiiYHAgR")
         .expect("Invalid pool address");
+    let mint = Pubkey::from_str("pumpCmXqMfrsAkQ5r49WcJnRayYRqmXz6ae8H7H9Dfn")
+        .expect("Invalid mint address");
 
-    // 从 RPC 获取真实的池信息（参考 single_buy.rs）
-    let pump_swap_params = PumpSwapParams::from_pool_address_by_rpc(&client.rpc, &pool)
-        .await
-        .expect("Failed to fetch pool info from RPC");
-
-    // 从 RPC 获取最新的 blockhash
-    let recent_blockhash =
-        client.rpc.get_latest_blockhash().await.expect("Failed to get latest blockhash");
-
-    // 设置 Gas 策略
-    let gas_fee_strategy = GasFeeStrategy::new();
-    gas_fee_strategy.set_global_fee_strategy(150_000, 150_000, 500_000, 500_000, 0.001, 0.001);
-
-    print!("{:?}\n", pump_swap_params);
-    assert_eq!(
-        pump_swap_params.base_mint,
-        Pubkey::from_str_const("pumpCmXqMfrsAkQ5r49WcJnRayYRqmXz6ae8H7H9Dfn")
-    );
-
-    // 买入参数
-    let buy_params = sol_trade_sdk::TradeBuyParams {
-        dex_type: sol_trade_sdk::DexType::PumpSwap,
-        input_token_type: sol_trade_sdk::TradeTokenType::SOL,
-        mint: pump_swap_params.base_mint,
-        input_token_amount: 10_000_000, // 0.01 SOL
-        slippage_basis_points: Some(500),
-        recent_blockhash: Some(recent_blockhash),
-        extension_params: DexParamEnum::PumpSwap(pump_swap_params),
-        address_lookup_table_account: None,
-        wait_transaction_confirmed: true,
-        create_input_token_ata: true,
-        close_input_token_ata: false, // 推荐：复用 ATA
-        create_mint_ata: true,
-        durable_nonce: None,
-        fixed_output_token_amount: None,
-        gas_fee_strategy,
-        simulate: false,
-        on_transaction_signed: None,
-        callback_execution_mode: None,
-    };
-
-    match client.buy(buy_params).await {
-        Ok((success, signatures, error)) => {
-            if success {
-                println!("✅ 买入成功: {:?}", signatures);
-            } else {
-                println!("❌ 买入失败: {:?}", error);
-            }
-        }
-        Err(e) => {
-            println!("❌ 交易错误: {}", e);
-        }
-    }
-
+    // 使用工具函数购买 0.01 SOL 的 Pump 代币
+    let _ = buy_pump_with_sol(&client, pool, mint, 10_000_000, Some(500)).await;
     println!("=== 交易 WSOL 测试完成 ===");
 }

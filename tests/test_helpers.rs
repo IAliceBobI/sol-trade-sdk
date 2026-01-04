@@ -7,10 +7,11 @@ use sol_trade_sdk::{
         get_associated_token_address_with_program_id_fast,
         get_associated_token_address_with_program_id_fast_use_seed,
     },
-    common::TradeConfig,
+    common::{GasFeeStrategy, TradeConfig},
     constants::{TOKEN_PROGRAM, TOKEN_PROGRAM_2022, WSOL_TOKEN_ACCOUNT},
     swqos::SwqosConfig,
-    SolanaTrade,
+    trading::core::params::{DexParamEnum, PumpSwapParams},
+    SolanaTrade, TradeBuyParams, TradeTokenType,
 };
 use solana_commitment_config::CommitmentConfig;
 use solana_rpc_client::nonblocking::rpc_client::RpcClient;
@@ -241,4 +242,102 @@ pub async fn print_seed_optimize_balances(
     println!("============================================\n");
 
     Ok(())
+}
+
+/// 使用 SOL 购买 Pump 代币（空投用途）
+///
+/// 这是一个便捷工具函数，封装了 PumpSwap 买入交易的全流程。
+/// 用户只需传入购买的 SOL 数量和代币地址，内部自动处理：
+/// - 从 RPC 获取池信息
+/// - 设置 Gas 策略
+/// - 构建买入参数
+/// - 执行交易
+///
+/// # 参数
+/// * `client` - TradingClient 实例
+/// * `pool` - PumpSwap 池地址
+/// * `mint` - 要购买的 Pump 代币 mint 地址
+/// * `sol_amount` - 购买的 SOL 数量（lamports），例如 0.01 SOL = 10_000_000 lamports
+/// * `slippage_basis_points` - 滑点容忍度（可选，默认为 500，即 5%）
+///
+/// # 返回
+/// * `Ok((bool, Vec<Signature>, Option<TradeError>))` - 交易结果
+/// * `Err(anyhow::Error)` - 如果交易执行失败
+///
+/// # 示例
+/// ```ignore
+/// // 购买 0.01 SOL 的 Pump 代币
+/// let pool = Pubkey::from_str("池地址").unwrap();
+/// let mint = Pubkey::from_str("代币地址").unwrap();
+/// buy_pump_with_sol(&client, pool, mint, 10_000_000, None).await?;
+/// ```
+#[allow(dead_code)]
+pub async fn buy_pump_with_sol(
+    client: &SolanaTrade,
+    pool: Pubkey,
+    mint: Pubkey,
+    sol_amount: u64,
+    slippage_basis_points: Option<u64>,
+) -> Result<(bool, Vec<solana_sdk::signature::Signature>, Option<sol_trade_sdk::swqos::common::TradeError>), anyhow::Error> {
+    println!("\n🛒 开始购买 Pump 代币");
+    println!("  - Pool: {}", pool);
+    println!("  - Token Mint: {}", mint);
+    println!("  - 购买金额: {} lamports ({:.4} SOL)", sol_amount, sol_amount as f64 / 1e9);
+    if let Some(slippage) = slippage_basis_points {
+        println!("  - 滑点容忍: {} bps ({:.1}%)", slippage, slippage as f64 / 100.0);
+    }
+
+    // 1. 从 RPC 获取池信息
+    let pump_swap_params = PumpSwapParams::from_pool_address_by_rpc(&client.rpc, &pool)
+        .await
+        .expect("Failed to fetch pool info from RPC");
+    println!("  - 池信息获取成功");
+
+    // 2. 从 RPC 获取最新的 blockhash
+    let recent_blockhash = client.rpc.get_latest_blockhash().await?;
+
+    // 3. 设置 Gas 策略
+    let gas_fee_strategy = GasFeeStrategy::new();
+    gas_fee_strategy.set_global_fee_strategy(150_000, 150_000, 500_000, 500_000, 0.001, 0.001);
+
+    // 4. 构建买入参数
+    let buy_params = TradeBuyParams {
+        dex_type: sol_trade_sdk::DexType::PumpSwap,
+        input_token_type: TradeTokenType::SOL,
+        mint,
+        input_token_amount: sol_amount,
+        slippage_basis_points,
+        recent_blockhash: Some(recent_blockhash),
+        extension_params: DexParamEnum::PumpSwap(pump_swap_params),
+        address_lookup_table_account: None,
+        wait_transaction_confirmed: true,
+        create_input_token_ata: true,
+        close_input_token_ata: false, // 推荐：复用 ATA
+        create_mint_ata: true,
+        durable_nonce: None,
+        fixed_output_token_amount: None,
+        gas_fee_strategy,
+        simulate: false,
+        on_transaction_signed: None,
+        callback_execution_mode: None,
+    };
+
+    // 5. 执行买入交易
+    match client.buy(buy_params).await {
+        Ok((success, signatures, error)) => {
+            if success {
+                println!("✅ 买入成功！签名数量: {}", signatures.len());
+                for (i, sig) in signatures.iter().enumerate() {
+                    println!("  [{}] {}", i + 1, sig);
+                }
+            } else {
+                println!("❌ 买入失败: {:?}", error);
+            }
+            Ok((success, signatures, error))
+        }
+        Err(e) => {
+            println!("❌ 交易错误: {}", e);
+            Err(e)
+        }
+    }
 }

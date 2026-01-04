@@ -45,7 +45,7 @@ pub struct TradeConfig {
     /// Whether to create WSOL ATA on startup (default: true)
     /// If true, SDK will check WSOL ATA on initialization and create if not exists
     pub create_wsol_ata_on_startup: bool,
-    /// Whether to use seed optimization for all ATA operations (default: true)
+    /// Whether to use seed optimization for all ATA operations (default: false)
     pub use_seed_optimize: bool,
     /// 回调执行模式（默认：异步）
     ///
@@ -61,14 +61,14 @@ impl TradeConfig {
         commitment: CommitmentConfig,
     ) -> Self {
         println!("🔧 TradeConfig create_wsol_ata_on_startup default value: true");
-        println!("🔧 TradeConfig use_seed_optimize default value: true");
+        println!("🔧 TradeConfig use_seed_optimize default value: false");
         println!("🔧 TradeConfig callback_execution_mode default value: Async");
         Self {
             rpc_url,
             swqos_configs,
             commitment,
             create_wsol_ata_on_startup: true,  // 默认：启动时检查并创建
-            use_seed_optimize: true,           // 默认：使用seed优化
+            use_seed_optimize: false,          // 默认：禁用seed优化
             callback_execution_mode: CallbackExecutionMode::Async,  // 默认：异步模式
         }
     }
