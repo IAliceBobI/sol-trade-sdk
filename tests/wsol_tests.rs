@@ -11,7 +11,10 @@ use solana_sdk::{pubkey::Pubkey, signer::Signer};
 use std::str::FromStr;
 
 mod test_helpers;
-use test_helpers::{buy_pump_with_sol, create_test_client, print_balances};
+use test_helpers::{
+    buy_pump_with_fixed_output, buy_pump_with_sol, create_test_client, get_token_balance,
+    print_balances,
+};
 
 use crate::test_helpers::create_test_client_with_seed_optimize;
 
@@ -164,4 +167,94 @@ async fn test_trade_with_wsol() {
     // 使用工具函数购买 0.01 SOL 的 Pump 代币
     let _ = buy_pump_with_sol(&client, pool, mint, 10_000_000, Some(500)).await;
     println!("=== 交易 WSOL 测试完成 ===");
+}
+
+/// 测试：使用 fixed_output_token_amount 购买指定数量代币
+///
+/// 验证：
+/// 1. 使用 fixed_output_token_amount 参数指定精确的代币购买数量
+/// 2. 交易前后验证 Token 余额变化
+/// 3. 验证实际买入数量与预期一致
+#[tokio::test]
+async fn test_trade_with_fixed_output_token_amount() {
+    // cargo test --package sol-trade-sdk --test wsol_tests -- test_trade_with_fixed_output_token_amount --exact --nocapture
+    let client = create_test_client_with_seed_optimize(false).await;
+
+    println!("=== 测试 fixed_output_token_amount 参数 ===");
+
+    // 使用一个已知的 PumpSwap 池进行测试
+    let pool = Pubkey::from_str("539m4mVWt6iduB6W8rDGPMarzNCMesuqY5eUTiiYHAgR")
+        .expect("Invalid pool address");
+    let mint = Pubkey::from_str("pumpCmXqMfrsAkQ5r49WcJnRayYRqmXz6ae8H7H9Dfn")
+        .expect("Invalid mint address");
+    let rpc_url = "http://127.0.0.1:8899".to_string();
+    let payer_pubkey = client.payer.try_pubkey().expect("Failed to get payer pubkey");
+
+    // 要购买的代币数量
+    let target_token_amount = 10_000u64;
+
+    println!("  目标购买数量: {} 个代币", target_token_amount);
+    println!("  Pool: {}", pool);
+    println!("  Token Mint: {}", mint);
+
+    // 查询交易前的 Token 余额
+    let balance_before = get_token_balance(&rpc_url, &payer_pubkey, &mint)
+        .await
+        .expect("Failed to get token balance before trade");
+    println!("  交易前余额: {}", balance_before);
+
+    // 使用工具函数购买指定数量的代币
+    let result = buy_pump_with_fixed_output(&client, pool, mint, target_token_amount, Some(500))
+        .await;
+
+    // 验证交易结果
+    match result {
+        Ok((success, signatures, _error)) => {
+            assert!(success, "交易应该成功");
+            assert!(!signatures.is_empty(), "应该获得交易签名");
+
+            println!("  ✅ 交易成功！签名数量: {}", signatures.len());
+            for (i, sig) in signatures.iter().enumerate() {
+                println!("    [{}] {}", i + 1, sig);
+            }
+
+            // 等待一下让链上状态更新
+            tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+
+            // 查询交易后的 Token 余额
+            let balance_after = get_token_balance(&rpc_url, &payer_pubkey, &mint)
+                .await
+                .expect("Failed to get token balance after trade");
+            println!("  交易后余额: {}", balance_after);
+
+            // 计算实际买入数量
+            let actual_amount = balance_after.saturating_sub(balance_before);
+            println!("  实际买入数量: {}", actual_amount);
+
+            // 验证买入数量大于 0
+            assert!(
+                actual_amount > 0,
+                "实际买入数量应该大于 0，实际: {}",
+                actual_amount
+            );
+
+            // 验证买入数量接近目标（考虑滑点，允许 10% 误差）
+            let min_expected = target_token_amount * 90 / 100; // 90% 下限
+            let max_expected = target_token_amount * 110 / 100; // 110% 上限
+            assert!(
+                actual_amount >= min_expected && actual_amount <= max_expected,
+                "实际买入数量应该在 {} ~ {} 范围内，实际: {}",
+                min_expected,
+                max_expected,
+                actual_amount
+            );
+
+            println!("  ✅ 验证通过：实际买入 {} 个代币 (目标: {})", actual_amount, target_token_amount);
+        }
+        Err(e) => {
+            panic!("交易执行失败: {}", e);
+        }
+    }
+
+    println!("=== fixed_output_token_amount 测试通过 ===");
 }

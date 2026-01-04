@@ -11,7 +11,7 @@ use crate::{
             traits::InstructionBuilder,
         },
     },
-    utils::calc::pumpswap::{buy_quote_input_internal, sell_base_input_internal},
+    utils::calc::pumpswap::{buy_base_input_internal, buy_quote_input_internal, sell_base_input_internal},
 };
 use anyhow::{anyhow, Result};
 use solana_sdk::{
@@ -35,7 +35,10 @@ impl InstructionBuilder for PumpSwapInstructionBuilder {
             .downcast_ref::<PumpSwapParams>()
             .ok_or_else(|| anyhow!("Invalid protocol params for PumpSwap"))?;
 
-        if params.input_amount.unwrap_or(0) == 0 {
+        // 如果设置了 fixed_output_amount，则跳过 input_amount 为 0 的检查
+        // 并使用 fixed_output_amount 进行逆向计算
+        let has_fixed_output = params.fixed_output_amount.is_some();
+        if params.input_amount.unwrap_or(0) == 0 && !has_fixed_output {
             return Err(anyhow!("Amount cannot be zero"));
         }
 
@@ -75,7 +78,20 @@ impl InstructionBuilder for PumpSwapInstructionBuilder {
             creator = params_coin_creator_vault_authority;
         }
 
-        let (mut token_amount, sol_amount) = if quote_is_wsol_or_usdc {
+        // 如果设置了 fixed_output_amount，使用逆向计算
+        let (token_amount, sol_amount) = if let Some(fixed_output) = params.fixed_output_amount {
+            // 逆向计算：给定目标 base 数量，计算需要的 quote 数量
+            let result = buy_base_input_internal(
+                fixed_output,
+                params.slippage_basis_points.unwrap_or(DEFAULT_SLIPPAGE),
+                pool_base_token_reserves,
+                pool_quote_token_reserves,
+                &creator,
+            )
+            .unwrap();
+            // base_amount_out (fixed), max_quote_amount_in
+            (fixed_output, result.max_quote)
+        } else if quote_is_wsol_or_usdc {
             let result = buy_quote_input_internal(
                 params.input_amount.unwrap_or(0),
                 params.slippage_basis_points.unwrap_or(DEFAULT_SLIPPAGE),
@@ -98,10 +114,6 @@ impl InstructionBuilder for PumpSwapInstructionBuilder {
             // min_quote_amount_out, base_amount_in
             (result.min_quote, params.input_amount.unwrap_or(0))
         };
-
-        if params.fixed_output_amount.is_some() {
-            token_amount = params.fixed_output_amount.unwrap();
-        }
 
         let user_base_token_account =
             crate::common::fast_fn::get_associated_token_address_with_program_id_fast_use_seed(

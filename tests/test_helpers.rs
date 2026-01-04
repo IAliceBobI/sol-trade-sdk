@@ -157,6 +157,64 @@ pub async fn print_balances(
     Ok((sol_balance, wsol_amount))
 }
 
+/// 获取指定 mint 的 Token 余额
+///
+/// # 参数
+/// * `rpc_url` - RPC URL
+/// * `payer` - 钱包地址
+/// * `mint` - Token mint 地址
+///
+/// # 返回
+/// * `Ok(u64)` - Token 余额（原始数量）
+/// * `Err` - 查询失败
+#[allow(dead_code)]
+pub async fn get_token_balance(
+    rpc_url: &str,
+    payer: &Pubkey,
+    mint: &Pubkey,
+) -> Result<u64, Box<dyn std::error::Error>> {
+    let client = RpcClient::new(rpc_url.to_string());
+
+    // 尝试 TOKEN_PROGRAM 和 TOKEN_PROGRAM_2022
+    let ata = get_associated_token_address_with_program_id_fast(payer, mint, &TOKEN_PROGRAM);
+    if let Ok(token) = client.get_token_account_balance(&ata).await {
+        let amount: u64 = token.amount.parse().unwrap_or(0);
+        return Ok(amount);
+    }
+
+    // 尝试 TOKEN_PROGRAM_2022
+    let ata2022 = get_associated_token_address_with_program_id_fast(payer, mint, &TOKEN_PROGRAM_2022);
+    if let Ok(token) = client.get_token_account_balance(&ata2022).await {
+        let amount: u64 = token.amount.parse().unwrap_or(0);
+        return Ok(amount);
+    }
+
+    // 账户不存在，返回 0
+    Ok(0)
+}
+
+/// 打印指定 mint 的 Token 余额并返回
+///
+/// # 参数
+/// * `rpc_url` - RPC URL
+/// * `payer` - 钱包地址
+/// * `mint` - Token mint 地址
+/// * `token_name` - Token 名称（用于打印）
+///
+/// # 返回
+/// * `Ok(u64)` - Token 余额（原始数量）
+#[allow(dead_code)]
+pub async fn print_token_balance(
+    rpc_url: &str,
+    payer: &Pubkey,
+    mint: &Pubkey,
+    token_name: &str,
+) -> Result<u64, Box<dyn std::error::Error>> {
+    let balance = get_token_balance(rpc_url, payer, mint).await?;
+    println!("  🪙 {} 余额: {} (mint: {})", token_name, balance, mint);
+    Ok(balance)
+}
+
 /// 打印并查询 4 个 ATA 地址的余额
 ///
 /// 包含：
@@ -316,6 +374,92 @@ pub async fn buy_pump_with_sol(
         create_mint_ata: true,
         durable_nonce: None,
         fixed_output_token_amount: None,
+        gas_fee_strategy,
+        simulate: false,
+        on_transaction_signed: None,
+        callback_execution_mode: None,
+    };
+
+    // 5. 执行买入交易
+    match client.buy(buy_params).await {
+        Ok((success, signatures, error)) => {
+            if success {
+                println!("✅ 买入成功！签名数量: {}", signatures.len());
+                for (i, sig) in signatures.iter().enumerate() {
+                    println!("  [{}] {}", i + 1, sig);
+                }
+            } else {
+                println!("❌ 买入失败: {:?}", error);
+            }
+            Ok((success, signatures, error))
+        }
+        Err(e) => {
+            println!("❌ 交易错误: {}", e);
+            Err(e)
+        }
+    }
+}
+
+/// 使用固定输出数量购买 Pump 代币
+///
+/// 指定要购买的代币数量，系统自动计算需要支付的 SOL 金额。
+/// 适用于需要精确控制买入代币数量的场景（如空投）。
+///
+/// # 参数
+/// * `client` - TradingClient 实例
+/// * `pool` - PumpSwap 池地址
+/// * `mint` - 要购买的 Pump 代币 mint 地址
+/// * `token_amount` - 要购买的代币数量（整数），例如 10000 个代币
+/// * `slippage_basis_points` - 滑点容忍度（可选，默认为 500，即 5%）
+///
+/// # 返回
+/// * `Ok((bool, Vec<Signature>, Option<TradeError>))` - 交易结果
+/// * `Err(anyhow::Error)` - 如果交易执行失败
+#[allow(dead_code)]
+pub async fn buy_pump_with_fixed_output(
+    client: &SolanaTrade,
+    pool: Pubkey,
+    mint: Pubkey,
+    token_amount: u64,
+    slippage_basis_points: Option<u64>,
+) -> Result<(bool, Vec<solana_sdk::signature::Signature>, Option<sol_trade_sdk::swqos::common::TradeError>), anyhow::Error> {
+    println!("\n🛒 开始购买 Pump 代币（固定输出数量）");
+    println!("  - Pool: {}", pool);
+    println!("  - Token Mint: {}", mint);
+    println!("  - 目标代币数量: {}", token_amount);
+    if let Some(slippage) = slippage_basis_points {
+        println!("  - 滑点容忍: {} bps ({:.1}%)", slippage, slippage as f64 / 100.0);
+    }
+
+    // 1. 从 RPC 获取池信息
+    let pump_swap_params = PumpSwapParams::from_pool_address_by_rpc(&client.rpc, &pool)
+        .await
+        .expect("Failed to fetch pool info from RPC");
+    println!("  - 池信息获取成功");
+
+    // 2. 从 RPC 获取最新的 blockhash
+    let recent_blockhash = client.rpc.get_latest_blockhash().await?;
+
+    // 3. 设置 Gas 策略
+    let gas_fee_strategy = GasFeeStrategy::new();
+    gas_fee_strategy.set_global_fee_strategy(150_000, 150_000, 500_000, 500_000, 0.001, 0.001);
+
+    // 4. 构建买入参数（使用 fixed_output_token_amount）
+    let buy_params = TradeBuyParams {
+        dex_type: sol_trade_sdk::DexType::PumpSwap,
+        input_token_type: TradeTokenType::SOL,
+        mint,
+        input_token_amount: 0, // 使用 fixed_output_token_amount 时不需要
+        slippage_basis_points,
+        recent_blockhash: Some(recent_blockhash),
+        extension_params: DexParamEnum::PumpSwap(pump_swap_params),
+        address_lookup_table_account: None,
+        wait_transaction_confirmed: true,
+        create_input_token_ata: true,
+        close_input_token_ata: false,
+        create_mint_ata: true,
+        durable_nonce: None,
+        fixed_output_token_amount: Some(token_amount),
         gas_fee_strategy,
         simulate: false,
         on_transaction_signed: None,
