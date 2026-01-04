@@ -3,9 +3,12 @@
 //! 提供测试用的辅助函数，包括 SOL 空投和测试客户端创建
 
 use sol_trade_sdk::{
-    common::fast_fn::get_associated_token_address_with_program_id_fast,
+    common::fast_fn::{
+        get_associated_token_address_with_program_id_fast,
+        get_associated_token_address_with_program_id_fast_use_seed,
+    },
     common::TradeConfig,
-    constants::{TOKEN_PROGRAM, WSOL_TOKEN_ACCOUNT},
+    constants::{TOKEN_PROGRAM, TOKEN_PROGRAM_2022, WSOL_TOKEN_ACCOUNT},
     swqos::SwqosConfig,
     SolanaTrade,
 };
@@ -54,8 +57,15 @@ pub async fn airdrop_to_payer(
     Ok(())
 }
 
+
 /// 创建测试用的 SolanaTrade 客户端
+#[allow(dead_code)]
 pub async fn create_test_client() -> SolanaTrade {
+    create_test_client_with_seed_optimize(true).await
+}
+
+/// 创建测试用的 SolanaTrade 客户端（可选择是否启用 seed 优化）
+pub async fn create_test_client_with_seed_optimize(use_seed_optimize: bool) -> SolanaTrade {
     let rpc_url = "http://127.0.0.1:8899".to_string();
 
     // 使用 Keypair::new() 生成随机测试账户
@@ -68,18 +78,20 @@ pub async fn create_test_client() -> SolanaTrade {
     let commitment = CommitmentConfig::confirmed();
     let swqos_configs: Vec<SwqosConfig> = vec![SwqosConfig::Default(rpc_url.clone())];
     let trade_config =
-        TradeConfig::new(rpc_url, swqos_configs, commitment).with_wsol_ata_config(true, false);
+        TradeConfig::new(rpc_url, swqos_configs, commitment).with_wsol_ata_config(true, use_seed_optimize);
     SolanaTrade::new(Arc::new(payer), trade_config).await
 }
 
 /// 获取账户的 WSOL ATA 地址
 #[inline]
+#[allow(dead_code)]
 pub fn get_wsol_ata_address(payer: &Pubkey) -> Pubkey {
     get_associated_token_address_with_program_id_fast(payer, &WSOL_TOKEN_ACCOUNT, &TOKEN_PROGRAM)
 }
 
 /// 打印并返回账户的 SOL 和 WSOL 余额（同时使用 get_balance 和 get_token_account_balance）
 /// 如果 WSOL 账户不存在（已关闭），返回 (sol_balance, 0)
+#[allow(dead_code)]
 pub async fn print_balances(
     rpc_url: &str,
     payer: &Pubkey,
@@ -142,4 +154,91 @@ pub async fn print_balances(
     println!("================================\n");
 
     Ok((sol_balance, wsol_amount))
+}
+
+/// 打印并查询 4 个 ATA 地址的余额
+///
+/// 包含：
+/// 1. TOKEN_PROGRAM (标准)
+/// 2. TOKEN_PROGRAM_2022 (标准)
+/// 3. TOKEN_PROGRAM (seed 优化)
+/// 4. TOKEN_PROGRAM_2022 (seed 优化)
+#[allow(dead_code)]
+pub async fn print_seed_optimize_balances(
+    rpc_url: &str,
+    payer: &Pubkey,
+    mint: &Pubkey,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let client = RpcClient::new(rpc_url.to_string());
+
+    // 计算 4 个 ATA 地址
+    let ata_token_standard = get_associated_token_address_with_program_id_fast(
+        payer,
+        mint,
+        &TOKEN_PROGRAM,
+    );
+    let ata_token2022_standard = get_associated_token_address_with_program_id_fast(
+        payer,
+        mint,
+        &TOKEN_PROGRAM_2022,
+    );
+    let ata_token_seed = get_associated_token_address_with_program_id_fast_use_seed(
+        payer,
+        mint,
+        &TOKEN_PROGRAM,
+        true,
+    );
+    let ata_token2022_seed = get_associated_token_address_with_program_id_fast_use_seed(
+        payer,
+        mint,
+        &TOKEN_PROGRAM_2022,
+        true,
+    );
+
+    println!("\n========== Seed 优化 ATA 余额查询 ==========");
+    println!("钱包地址: {}", payer);
+    println!("Token Mint: {}", mint);
+    println!("------------------------------------------");
+
+    // 查询每个地址的余额
+    let addresses = [
+        ("TOKEN_PROGRAM (标准)", &ata_token_standard),
+        ("TOKEN_PROGRAM_2022 (标准)", &ata_token2022_standard),
+        ("TOKEN_PROGRAM (seed)", &ata_token_seed),
+        ("TOKEN_PROGRAM_2022 (seed)", &ata_token2022_seed),
+    ];
+
+    for (name, address) in addresses.iter() {
+        match client.get_token_account_balance(address).await {
+            Ok(token) => {
+                println!(
+                    "  {:<30} {} ({})",
+                    format!("{}:", name),
+                    token.ui_amount_string,
+                    address
+                );
+            }
+            Err(_) => {
+                // 尝试用 get_balance
+                match client.get_balance(address).await {
+                    Ok(lamports) => {
+                        let sol = lamports as f64 / LAMPORTS_PER_SOL as f64;
+                        println!(
+                            "  {:<30} {:.4} UNIT ({})",
+                            format!("{}:", name),
+                            sol,
+                            address
+                        );
+                    }
+                    Err(_) => {
+                        println!("  {:<30} N/A ({})", format!("{}:", name), address);
+                    }
+                }
+            }
+        }
+    }
+
+    println!("============================================\n");
+
+    Ok(())
 }
