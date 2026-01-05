@@ -59,18 +59,62 @@ pub mod accounts {
 pub const BUY_EXECT_IN_DISCRIMINATOR: [u8; 8] = [250, 234, 13, 123, 213, 156, 19, 236];
 pub const SELL_EXECT_IN_DISCRIMINATOR: [u8; 8] = [149, 39, 222, 155, 211, 124, 152, 26];
 
-pub async fn fetch_pool_state(
+// ==================== 缓存模块 ====================
+
+const MAX_CACHE_SIZE: usize = 50_000;
+
+pub(crate) mod bonk_cache {
+    use super::*;
+    use dashmap::DashMap;
+    use once_cell::sync::Lazy;
+
+    /// pool_address → PoolState 数据缓存
+    pub(crate) static POOL_DATA_CACHE: Lazy<DashMap<Pubkey, PoolState>> =
+        Lazy::new(|| DashMap::with_capacity(MAX_CACHE_SIZE));
+
+    pub(crate) fn get_cached_pool_by_address(pool_address: &Pubkey) -> Option<PoolState> {
+        POOL_DATA_CACHE.get(pool_address).map(|p| p.clone())
+    }
+
+    pub(crate) fn cache_pool_by_address(pool_address: &Pubkey, pool: &PoolState) {
+        POOL_DATA_CACHE.insert(*pool_address, pool.clone());
+    }
+
+    pub(crate) fn clear_all() {
+        POOL_DATA_CACHE.clear();
+    }
+}
+
+pub async fn get_pool_by_address(
     rpc: &SolanaRpcClient,
     pool_address: &Pubkey,
 ) -> Result<PoolState, anyhow::Error> {
+    // 1. 检查缓存
+    if let Some(pool) = bonk_cache::get_cached_pool_by_address(pool_address) {
+        return Ok(pool);
+    }
+    // 2. RPC 查询
     let account = rpc.get_account(pool_address).await?;
     if account.owner != accounts::BONK {
         return Err(anyhow!("Account is not owned by Bonk program"));
     }
-    // Skip the 8-byte discriminator
     let pool_state = pool_state_decode(&account.data[8..])
         .ok_or_else(|| anyhow!("Failed to decode pool state"))?;
+    // 3. 写入缓存
+    bonk_cache::cache_pool_by_address(pool_address, &pool_state);
     Ok(pool_state)
+}
+
+pub async fn get_pool_by_address_force(
+    rpc: &SolanaRpcClient,
+    pool_address: &Pubkey,
+) -> Result<PoolState, anyhow::Error> {
+    bonk_cache::POOL_DATA_CACHE.remove(pool_address);
+    get_pool_by_address(rpc, pool_address).await
+}
+
+pub fn clear_pool_cache() {
+    bonk_cache::clear_all();
 }
 
 pub fn get_amount_in_net(
@@ -235,13 +279,13 @@ mod tests {
     async fn test_fetch_pool_state() {
         // Test pool address provided by user
         let pool_address = Pubkey::from_str("5UUBHfBssdFDtqFrcuPYA8xvYftYwYWEawucDuAH45KX").unwrap();
-        
+
         // Use public Solana RPC endpoint
         let rpc_url = "https://api.mainnet-beta.solana.com";
         let rpc = RpcClient::new(rpc_url.to_string());
 
-        // Call fetch_pool_state
-        let result = fetch_pool_state(&rpc, &pool_address).await;
+        // Call get_pool_by_address
+        let result = get_pool_by_address(&rpc, &pool_address).await;
 
         // Verify the result
         assert!(result.is_ok(), "Failed to fetch pool state: {:?}", result.err());
@@ -273,13 +317,13 @@ mod tests {
     #[tokio::test]
     #[ignore]
     async fn test_fetch_pool_state_owner_validation() {
-        // Test that fetch_pool_state validates the program owner
+        // Test that get_pool_by_address validates the program owner
         let invalid_address = Pubkey::from_str("11111111111111111111111111111111").unwrap(); // System program
-        
+
         let rpc_url = "https://api.mainnet-beta.solana.com";
         let rpc = RpcClient::new(rpc_url.to_string());
 
-        let result = fetch_pool_state(&rpc, &invalid_address).await;
+        let result = get_pool_by_address(&rpc, &invalid_address).await;
 
         // Should fail because system program is not the BONK program
         assert!(result.is_err(), "Expected error for invalid program owner");

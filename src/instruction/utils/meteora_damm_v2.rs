@@ -36,16 +36,61 @@ pub mod accounts {
 
 pub const SWAP_DISCRIMINATOR: &[u8] = &[248, 198, 158, 145, 225, 117, 135, 200];
 
-pub async fn fetch_pool(
+// ==================== 缓存模块 ====================
+
+const MAX_CACHE_SIZE: usize = 50_000;
+
+pub(crate) mod meteora_cache {
+    use super::*;
+    use dashmap::DashMap;
+    use once_cell::sync::Lazy;
+
+    /// pool_address → Pool 数据缓存
+    pub(crate) static POOL_DATA_CACHE: Lazy<DashMap<Pubkey, Pool>> =
+        Lazy::new(|| DashMap::with_capacity(MAX_CACHE_SIZE));
+
+    pub(crate) fn get_cached_pool_by_address(pool_address: &Pubkey) -> Option<Pool> {
+        POOL_DATA_CACHE.get(pool_address).map(|p| p.clone())
+    }
+
+    pub(crate) fn cache_pool_by_address(pool_address: &Pubkey, pool: &Pool) {
+        POOL_DATA_CACHE.insert(*pool_address, pool.clone());
+    }
+
+    pub(crate) fn clear_all() {
+        POOL_DATA_CACHE.clear();
+    }
+}
+
+pub async fn get_pool_by_address(
     rpc: &SolanaRpcClient,
     pool_address: &Pubkey,
 ) -> Result<Pool, anyhow::Error> {
+    // 1. 检查缓存
+    if let Some(pool) = meteora_cache::get_cached_pool_by_address(pool_address) {
+        return Ok(pool);
+    }
+    // 2. RPC 查询
     let account = rpc.get_account(pool_address).await?;
     if account.owner != accounts::METEORA_DAMM_V2 {
         return Err(anyhow!("Account is not owned by Meteora Damm V2 program"));
     }
     let pool = pool_decode(&account.data[8..]).ok_or_else(|| anyhow!("Failed to decode pool"))?;
+    // 3. 写入缓存
+    meteora_cache::cache_pool_by_address(pool_address, &pool);
     Ok(pool)
+}
+
+pub async fn get_pool_by_address_force(
+    rpc: &SolanaRpcClient,
+    pool_address: &Pubkey,
+) -> Result<Pool, anyhow::Error> {
+    meteora_cache::POOL_DATA_CACHE.remove(pool_address);
+    get_pool_by_address(rpc, pool_address).await
+}
+
+pub fn clear_pool_cache() {
+    meteora_cache::clear_all();
 }
 
 #[inline]

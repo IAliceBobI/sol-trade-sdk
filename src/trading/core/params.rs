@@ -288,24 +288,15 @@ impl PumpSwapParams {
         rpc: &SolanaRpcClient,
         mint: &Pubkey,
     ) -> Result<Self, anyhow::Error> {
-        if let Ok((pool_address, _)) =
-            crate::instruction::utils::pumpswap::find_by_base_mint(rpc, mint).await
-        {
-            Self::from_pool_address_by_rpc(rpc, &pool_address).await
-        } else if let Ok((pool_address, _)) =
-            crate::instruction::utils::pumpswap::find_by_quote_mint(rpc, mint).await
-        {
-            Self::from_pool_address_by_rpc(rpc, &pool_address).await
-        } else {
-            Err(anyhow::anyhow!("No pool found for mint"))
-        }
+        let (pool_address, _) = crate::instruction::utils::pumpswap::get_pool_by_mint(rpc, mint).await?;
+        Self::from_pool_address_by_rpc(rpc, &pool_address).await
     }
 
     pub async fn from_pool_address_by_rpc(
         rpc: &SolanaRpcClient,
         pool_address: &Pubkey,
     ) -> Result<Self, anyhow::Error> {
-        let pool_data = crate::instruction::utils::pumpswap::fetch_pool(rpc, pool_address).await?;
+        let pool_data = crate::instruction::utils::pumpswap::get_pool_by_address(rpc, pool_address).await?;
         let (pool_base_token_reserves, pool_quote_token_reserves) =
             crate::instruction::utils::pumpswap::get_token_balances(&pool_data, rpc).await?;
         let creator = pool_data.coin_creator;
@@ -501,7 +492,7 @@ impl BonkParams {
         )
         .unwrap();
         let pool_data =
-            crate::instruction::utils::bonk::fetch_pool_state(rpc, &pool_address).await?;
+            crate::instruction::utils::bonk::get_pool_by_address(rpc, &pool_address).await?;
         let token_account = rpc.get_account(&pool_data.base_mint).await?;
         let platform_associated_account =
             crate::instruction::utils::bonk::get_platform_associated_account(
@@ -590,7 +581,7 @@ impl RaydiumCpmmParams {
         pool_address: &Pubkey,
     ) -> Result<Self, anyhow::Error> {
         let pool =
-            crate::instruction::utils::raydium_cpmm::fetch_pool_state(rpc, pool_address).await?;
+            crate::instruction::utils::raydium_cpmm::get_pool_by_address(rpc, pool_address).await?;
         let (token0_balance, token1_balance) =
             crate::instruction::utils::raydium_cpmm::get_pool_token_balances(
                 rpc,
@@ -727,8 +718,8 @@ impl RaydiumClmmParams {
         rpc: &SolanaRpcClient,
         pool_address: &Pubkey,
     ) -> Result<Self, anyhow::Error> {
-        let pool_state = crate::instruction::utils::raydium_clmm::fetch_pool_state(rpc, pool_address).await?;
-        
+        let pool_state = crate::instruction::utils::raydium_clmm::get_pool_by_address(rpc, pool_address).await?;
+
         // Determine token programs by querying mint accounts
         let token0_account = rpc.get_account(&pool_state.token_mint0).await?;
         let token0_program = if token0_account.owner == crate::constants::TOKEN_PROGRAM_2022 {
@@ -813,7 +804,7 @@ impl MeteoraDammV2Params {
         pool_address: &Pubkey,
     ) -> Result<Self, anyhow::Error> {
         let pool_data =
-            crate::instruction::utils::meteora_damm_v2::fetch_pool(rpc, pool_address).await?;
+            crate::instruction::utils::meteora_damm_v2::get_pool_by_address(rpc, pool_address).await?;
         Ok(Self {
             pool: pool_address.clone(),
             token_a_vault: pool_data.token_a_vault,

@@ -142,7 +142,7 @@ pub const SELL_DISCRIMINATOR: [u8; 8] = [51, 230, 133, 164, 1, 127, 131, 173];
 
 // Find a pool for a specific mint
 pub async fn find_pool(rpc: &SolanaRpcClient, mint: &Pubkey) -> Result<Pubkey, anyhow::Error> {
-    let (pool_address, _) = find_by_mint(rpc, mint).await?;
+    let (pool_address, _) = get_pool_by_mint(rpc, mint).await?;
     Ok(pool_address)
 }
 
@@ -191,21 +191,6 @@ pub fn get_global_volume_accumulator_pda() -> Option<Pubkey> {
     pda.map(|pubkey| pubkey.0)
 }
 
-pub async fn fetch_pool(
-    rpc: &SolanaRpcClient,
-    pool_address: &Pubkey,
-) -> Result<Pool, anyhow::Error> {
-    let account = rpc.get_account(pool_address).await?;
-    if account.owner != accounts::AMM_PROGRAM {
-        return Err(anyhow!("Account is not owned by PumpSwap program"));
-    }
-    let pool = pool_decode(&account.data[8..]).ok_or_else(|| anyhow!("Failed to decode pool"))?;
-    Ok(pool)
-}
-
-// ==================== 带缓存的查询方法（Step 3） ====================
-
-/// 带缓存的地址查询
 pub async fn get_pool_by_address(
     rpc: &SolanaRpcClient,
     pool_address: &Pubkey,
@@ -215,7 +200,11 @@ pub async fn get_pool_by_address(
         return Ok(pool);
     }
     // 2. RPC 查询
-    let pool = fetch_pool(rpc, pool_address).await?;
+    let account = rpc.get_account(pool_address).await?;
+    if account.owner != accounts::AMM_PROGRAM {
+        return Err(anyhow!("Account is not owned by PumpSwap program"));
+    }
+    let pool = pool_decode(&account.data[8..]).ok_or_else(|| anyhow!("Failed to decode pool"))?;
     // 3. 写入缓存
     pump_swap_cache::cache_pool_by_address(pool_address, &pool);
     Ok(pool)
@@ -233,7 +222,7 @@ pub async fn get_pool_by_mint(
         }
     }
     // 2. RPC 查询
-    let (pool_address, pool) = find_by_mint(rpc, mint).await?;
+    let (pool_address, pool) = find_pool_by_mint_impl(rpc, mint).await?;
     // 3. 写入缓存
     pump_swap_cache::cache_pool_address_by_mint(mint, &pool_address);
     pump_swap_cache::cache_pool_by_address(&pool_address, &pool);
@@ -306,20 +295,6 @@ pub(crate) mod pump_swap_cache {
 const BASE_MINT_OFFSET: usize = 43;
 const QUOTE_MINT_OFFSET: usize = 75;
 
-/// 通用内部实现：通过 offset 查找单个最优 Pool
-async fn find_pool_by_mint_offset(
-    rpc: &SolanaRpcClient,
-    mint: &Pubkey,
-    offset: usize,
-) -> Result<(Pubkey, Pool), anyhow::Error> {
-    let pools = find_pools_by_mint_offset_collect(rpc, mint, offset).await?;
-    if pools.is_empty() {
-        return Err(anyhow!("No pool found for mint {} at offset {}", mint, offset));
-    }
-    let (address, pool) = pools[0].clone();
-    Ok((address, pool))
-}
-
 /// 通用内部实现：通过 offset 查找所有 Pool（返回 Vec）
 async fn find_pools_by_mint_offset_collect(
     rpc: &SolanaRpcClient,
@@ -361,21 +336,6 @@ async fn find_pools_by_mint_offset_collect(
     Ok(pools)
 }
 
-pub async fn find_by_base_mint(
-    rpc: &SolanaRpcClient,
-    base_mint: &Pubkey,
-) -> Result<(Pubkey, Pool), anyhow::Error> {
-    find_pool_by_mint_offset(rpc, base_mint, BASE_MINT_OFFSET).await
-}
-
-pub async fn find_by_quote_mint(
-    rpc: &SolanaRpcClient,
-    quote_mint: &Pubkey,
-) -> Result<(Pubkey, Pool), anyhow::Error> {
-    find_pool_by_mint_offset(rpc, quote_mint, QUOTE_MINT_OFFSET).await
-}
-
-
 /// Calculate the canonical PumpSwap pool PDA for a mint that was migrated from PumpFun
 ///
 /// Canonical pools are created by the PumpFun migrate instruction and use:
@@ -401,7 +361,8 @@ pub fn calculate_canonical_pool_pda(mint: &Pubkey) -> Option<(Pubkey, Pubkey)> {
     Some((pool, pool_authority))
 }
 
-pub async fn find_by_mint(
+/// 内部实现：查找 mint 对应的最优池
+async fn find_pool_by_mint_impl(
     rpc: &SolanaRpcClient,
     mint: &Pubkey,
 ) -> Result<(Pubkey, Pool), anyhow::Error> {
@@ -410,7 +371,7 @@ pub async fn find_by_mint(
     // Priority 1: Try to find canonical pool (mint/WSOL pair) first
     // This is the most common case for PumpFun migrated tokens
     if let Some((pool_address, _)) = calculate_canonical_pool_pda(mint) {
-        if let Ok(pool) = fetch_pool(rpc, &pool_address).await {
+        if let Ok(pool) = get_pool_by_address(rpc, &pool_address).await {
             // Verify it's actually a mint/WSOL pool
             if (pool.base_mint == *mint && pool.quote_mint == WSOL_TOKEN_ACCOUNT) ||
                (pool.base_mint == WSOL_TOKEN_ACCOUNT && pool.quote_mint == *mint) {
@@ -467,7 +428,7 @@ pub async fn find_by_mint(
 ///
 /// This is a discovery helper for routing/selection layers. It does NOT pick a best pool.
 
-pub async fn list_by_mint(
+pub async fn list_pools_by_mint(
     rpc: &SolanaRpcClient,
     mint: &Pubkey,
 ) -> Result<Vec<(Pubkey, Pool)>, anyhow::Error> {
@@ -523,7 +484,7 @@ pub async fn quote_exact_in(
     amount_in: u64,
     is_base_in: bool,
 ) -> Result<crate::utils::quote::QuoteExactInResult, anyhow::Error> {
-    let pool = fetch_pool(rpc, pool_address).await?;
+    let pool = get_pool_by_address(rpc, pool_address).await?;
     let (base_reserve, quote_reserve) = get_token_balances(&pool, rpc).await?;
 
     if is_base_in {

@@ -1213,16 +1213,16 @@ async fn try_known_config_address(
 pub async fn find_cpswap_config(
     rpc: &SolanaRpcClient,
 ) -> Result<(Pubkey, Pubkey), anyhow::Error> {
-    use crate::instruction::utils::raydium_cpmm::find_pool_by_mint;
+    use crate::instruction::utils::raydium_cpmm::get_pool_by_mint;
     use crate::constants::WSOL_TOKEN_ACCOUNT;
-    
+
     // Method 1: Try known config addresses first (simplest and most reliable)
     if let Some((config, fee)) = try_known_config_address(rpc).await {
         return Ok((config, fee));
     }
-    
+
     // Method 2: Try to find an existing CPMM pool (using WSOL as a common token)
-    match find_pool_by_mint(rpc, &WSOL_TOKEN_ACCOUNT).await {
+    match get_pool_by_mint(rpc, &WSOL_TOKEN_ACCOUNT).await {
         Ok((_pool_address, pool_state)) => {
             let cpswap_config = pool_state.amm_config;
             

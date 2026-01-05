@@ -1,7 +1,7 @@
 use crate::{
     common::fast_fn::get_associated_token_address_with_program_id_fast_use_seed,
     constants::{accounts::TOKEN_PROGRAM, accounts::TOKEN_PROGRAM_2022, trade::trade::DEFAULT_SLIPPAGE},
-    instruction::utils::raydium_clmm::{accounts, fetch_pool_state, get_tick_array_pda},
+    instruction::utils::raydium_clmm::{accounts, get_pool_by_address, get_tick_array_pda},
     trading::core::{
         params::{RaydiumClmmParams, SwapParams},
         traits::InstructionBuilder,
@@ -53,7 +53,7 @@ impl InstructionBuilder for RaydiumClmmInstructionBuilder {
             .ok_or_else(|| anyhow!("Invalid protocol params for RaydiumClmm"))?;
 
         // Fetch pool state to get current price
-        let pool_state = fetch_pool_state(
+        let pool_state = get_pool_by_address(
             params.rpc.as_ref().ok_or_else(|| anyhow!("RPC client required"))?,
             &protocol_params.pool_state,
         )
@@ -332,7 +332,7 @@ impl InstructionBuilder for RaydiumClmmInstructionBuilder {
         }
 
         // Fetch pool state to get current price
-        let pool_state = fetch_pool_state(
+        let pool_state = get_pool_by_address(
             params.rpc.as_ref().ok_or_else(|| anyhow!("RPC client required"))?,
             &protocol_params.pool_state,
         )
