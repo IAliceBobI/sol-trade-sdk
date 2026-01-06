@@ -1,3 +1,27 @@
+//! Raydium AMM V4 (Raydium Liquidity Pool V4) 交易示例
+//!
+//! Raydium AMM V4 是 Raydium 的传统自动做市商（AMM）协议，使用恒定乘积公式（x * y = k）进行流动性提供和交易。
+//!
+//! ## 程序信息
+//! - **程序名称**: Raydium Liquidity Pool V4
+//! - **程序地址**: `675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8`
+//! - **特性**: 集成 Serum 订单簿，支持限价单和市价单
+//!
+//! ## 费用结构
+//! - **交易费**: 0.25% (25/10000)
+//! - **Swap 费**: 0.25% (25/10000)
+//! - **总费用**: 0.5%
+//!
+//! ## 已知 Pool
+//! - **WSOL-USDC Pool**: `58oQChx4yWmvKdwLLZzBi4ChoCc2fqCUWBkwMihLYQo2`
+//!   - Token0: WSOL (So11111111111111111111111111111111111111112)
+//!   - Token1: USDC (EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v)
+//!
+//! ## 功能
+//! - 订阅 Raydium AMM V4 的 Swap 事件
+//! - 自动执行跟单交易
+//! - 使用 MEV 保护服务
+
 use sol_trade_sdk::common::fast_fn::get_associated_token_address_with_program_id_fast_use_seed;
 use sol_trade_sdk::{
     common::AnyResult,

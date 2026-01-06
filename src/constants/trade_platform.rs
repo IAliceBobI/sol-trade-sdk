@@ -4,5 +4,5 @@ pub mod trade_platform {
     pub const BONK: &'static str = "bonk";
     pub const RAYDIUM_CPMM: &'static str = "raydium_cpmm";
     pub const RAYDIUM_CLMM: &'static str = "raydium_clmm";
-    pub const RAYDIUM_AMM_V4: &'static str = "raydium_amm_v4";
+    pub const RAYDIUM_AMM_V4: &'static str = "raydium_amm_v4"; // Raydium Liquidity Pool V4 (程序地址: 675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8)
 }

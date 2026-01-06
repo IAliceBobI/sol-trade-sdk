@@ -13,7 +13,10 @@ use solana_sdk::{
     signer::Signer,
 };
 
-/// Instruction builder for RaydiumCpmm protocol
+/// Instruction builder for Raydium AMM V4 (Raydium Liquidity Pool V4) protocol
+///
+/// Raydium AMM V4 使用恒定乘积公式（x * y = k）进行流动性提供和交易
+/// 程序地址: 675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8
 pub struct RaydiumAmmV4InstructionBuilder;
 
 #[async_trait::async_trait]

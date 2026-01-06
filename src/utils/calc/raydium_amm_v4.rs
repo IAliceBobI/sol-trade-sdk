@@ -1,3 +1,22 @@
+//! Raydium AMM V4 (Raydium Liquidity Pool V4) 交易计算工具
+//!
+//! Raydium AMM V4 使用恒定乘积公式（x * y = k）进行流动性提供和交易。
+//!
+//! ## 程序信息
+//! - **程序名称**: Raydium Liquidity Pool V4
+//! - **程序地址**: `675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8`
+//! - **特性**: 集成 Serum 订单簿，支持限价单和市价单
+//!
+//! ## 费用结构
+//! - **交易费**: 0.25% (25/10000)
+//! - **Swap 费**: 0.25% (25/10000)
+//! - **总费用**: 0.5%
+//!
+//! ## 交易计算
+//! - 使用恒定乘积公式计算输入/输出数量
+//! - 扣除交易费和 Swap 费
+//! - 支持滑点计算
+
 use crate::instruction::utils::raydium_amm_v4::accounts::{
     SWAP_FEE_DENOMINATOR, SWAP_FEE_NUMERATOR, TRADE_FEE_DENOMINATOR, TRADE_FEE_NUMERATOR,
 };
