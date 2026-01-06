@@ -380,23 +380,31 @@ async fn find_pool_by_mint_impl(
         }
     }
 
-    // Priority 2: Try base_mint scan (1 getProgramAccounts call)
-    // Collect all base_mint pools first
-    let mut all_pools: Vec<(Pubkey, Pool)> = match find_pools_by_mint_offset_collect(rpc, mint, BASE_MINT_OFFSET).await {
-        Ok(pools) => pools,
-        Err(_) => Vec::new(),
-    };
+    // Priority 2 & 3: 并行扫描 base_mint 和 quote_mint pools
+    let (base_result, quote_result) = tokio::join!(
+        find_pools_by_mint_offset_collect(rpc, mint, BASE_MINT_OFFSET),
+        find_pools_by_mint_offset_collect(rpc, mint, QUOTE_MINT_OFFSET)
+    );
 
-    // Priority 3: Try quote_mint scan (1 getProgramAccounts call) and merge
-    if let Ok(quote_pools) = find_pools_by_mint_offset_collect(rpc, mint, QUOTE_MINT_OFFSET).await {
-        // Merge and deduplicate
-        use std::collections::HashSet;
-        let mut seen: HashSet<Pubkey> = all_pools.iter().map(|(addr, _)| *addr).collect();
-        for (addr, pool) in quote_pools {
-            if seen.insert(addr) {
-                all_pools.push((addr, pool));
+    let mut all_pools: Vec<(Pubkey, Pool)> = Vec::new();
+
+    match base_result {
+        Ok(pools) => all_pools.extend(pools),
+        Err(_) => {}
+    }
+
+    match quote_result {
+        Ok(quote_pools) => {
+            // Merge and deduplicate
+            use std::collections::HashSet;
+            let mut seen: HashSet<Pubkey> = all_pools.iter().map(|(addr, _)| *addr).collect();
+            for (addr, pool) in quote_pools {
+                if seen.insert(addr) {
+                    all_pools.push((addr, pool));
+                }
             }
         }
+        Err(_) => {}
     }
 
     if all_pools.is_empty() {
