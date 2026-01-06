@@ -26,23 +26,6 @@ pub trait TransactionLifecycleCallback: Send + Sync {
     /// - 此回调在异步任务中执行，**不会阻塞**交易发送
     /// - 建议使用异步非阻塞方式处理（如发送到消息队列）
     /// - 如果回调耗时较长，建议使用 `tokio::spawn` 在后台处理
-    ///
-    /// # 示例
-    /// ```ignore
-    /// struct DatabaseCallback;
-    ///
-    /// impl TransactionLifecycleCallback for DatabaseCallback {
-    ///     async fn on_transaction_signed(&self, context: CallbackContext) -> Result<()> {
-    ///         // 异步入库
-    ///         tokio::spawn(async move {
-    ///             if let Err(e) = save_to_database(&context).await {
-    ///                 eprintln!("Failed to save transaction: {:?}", e);
-    ///             }
-    ///         });
-    ///         Ok(())
-    ///     }
-    /// }
-    /// ```
     fn on_transaction_signed(&self, context: CallbackContext) -> futures::future::BoxFuture<'static, Result<()>>;
 }
 

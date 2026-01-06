@@ -3,14 +3,6 @@
 //! 提供一键清除所有 DEX 协议 Pool 缓存的功能。
 
 /// 清除所有协议的 Pool 缓存
-///
-/// # 示例
-///
-/// ```ignore
-/// use crate::common::dex_pool_cache::clear_all_pool_caches;
-///
-/// // 清除所有缓存
-/// clear_all_pool_caches();
 /// ```
 pub fn clear_all_pool_caches() {
     // PumpSwap

@@ -48,18 +48,6 @@ impl PreallocatedTxBuilder {
     ///   - 兼容所有 RPC 节点
     ///   - 无需地址查找表支持
     ///   - 适用于简单交易
-    ///
-    /// # 示例
-    ///
-    /// ```rust,ignore
-    /// // 无查找表 -> Legacy 消息
-    /// let msg = builder.build_zero_alloc(&payer, &ixs, None, blockhash);
-    /// assert!(matches!(msg, VersionedMessage::Legacy(_)));
-    ///
-    /// // 有查找表 -> V0 消息
-    /// let msg = builder.build_zero_alloc(&payer, &ixs, Some(table_key), blockhash);
-    /// assert!(matches!(msg, VersionedMessage::V0(_)));
-    /// ```
     #[inline(always)]
     pub fn build_zero_alloc(
         &mut self,

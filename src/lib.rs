@@ -802,34 +802,6 @@ impl TradingClient {
     /// - Mint keypair generation fails
     /// - Transaction fails to execute or confirm
     /// - Network or RPC errors occur
-    ///
-    /// # Example
-    ///
-    /// ```ignore
-    /// use sol_trade_sdk::SolanaTrade;
-    /// use solana_sdk::signature::Keypair;
-    /// use std::sync::Arc;
-    ///
-    /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
-    /// let payer = Arc::new(Keypair::new());
-    /// let trade_config = /* ... */;
-    /// let solana_trade = SolanaTrade::new(payer, trade_config).await;
-    ///
-    /// // Create token with create_v2 (Token2022 + Mayhem support)
-    /// let (mint, signature) = solana_trade
-    ///     .create_pumpfun_token(
-    ///         "My Token".to_string(),
-    ///         "MTK".to_string(),
-    ///         "https://example.com/metadata.json".to_string(),
-    ///         true,  // use_v2
-    ///         false, // is_mayhem_mode
-    ///     )
-    ///     .await?;
-    ///
-    /// println!("Token created! Mint: {}, Signature: {}", mint, signature);
-    /// # Ok(())
-    /// # }
-    /// ```
     pub async fn create_pumpfun_token(
         &self,
         name: String,

@@ -189,26 +189,6 @@ pub struct MigrateNftInfo {
 
 /// PlatformConfig structure for Raydium LaunchLab
 /// Based on SDK layout.ts:
-/// ```ignore
-/// export const PlatformConfig = struct([
-///   u64(),  // discriminator
-///   u64("epoch"),
-///   publicKey("platformClaimFeeWallet"),
-///   publicKey("platformLockNftWallet"),
-///   u64("platformScale"),
-///   u64("creatorScale"),
-///   u64("burnScale"),
-///   u64("feeRate"),
-///   seq(u8(), 64, "name"),  // fixed 64 bytes
-///   seq(u8(), 256, "web"),  // fixed 256 bytes
-///   seq(u8(), 256, "img"),  // fixed 256 bytes
-///   publicKey("cpConfigId"),
-///   u64("creatorFeeRate"),
-///   publicKey("transferFeeExtensionAuth"),
-///   seq(u8(), 180),  // padding
-///   vec(PlatformCurveParam, "platformCurve"),
-/// ]);
-/// ```
 #[derive(Clone, Debug, Default)]
 pub struct PlatformConfig {
     pub epoch: u64,

@@ -88,12 +88,6 @@ impl TradeConfig {
     ///
     /// # 参数
     /// * `mode` - 回调执行模式（Async 或 Sync）
-    ///
-    /// # 示例
-    /// ```ignore
-    /// let trade_config = TradeConfig::new(rpc_url, swqos_configs, commitment)
-    ///     .with_callback_execution_mode(CallbackExecutionMode::Sync);
-    /// ```
     pub fn with_callback_execution_mode(mut self, mode: CallbackExecutionMode) -> Self {
         self.callback_execution_mode = mode;
         self
