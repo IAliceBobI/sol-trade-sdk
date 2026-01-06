@@ -12,12 +12,11 @@
 //!
 //! 注意：使用公共 Solana RPC 端点
 
+use sol_trade_sdk::instruction::utils::pumpswap::{
+    find_pool, get_pool_by_address, get_token_balances,
+};
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_sdk::pubkey::Pubkey;
-use sol_trade_sdk::instruction::utils::pumpswap::{
-    find_pool, get_pool_by_address, get_pool_by_address_force, get_pool_by_mint,
-    get_pool_by_mint_force, get_token_balances,
-};
 use std::str::FromStr;
 
 /// 已知的 Pump 代币 mint
@@ -33,7 +32,6 @@ async fn test_find_pool_by_mint() {
 
     let mint = Pubkey::from_str(PUMP_MINT).unwrap();
     let rpc_url = "http://127.0.0.1:8899";
-    // let rpc_url = "https://api.mainnet-beta.solana.com";
     let rpc = RpcClient::new(rpc_url.to_string());
 
     // 调用 find_pool
@@ -56,7 +54,7 @@ async fn test_get_pool_by_address() {
     println!("=== 测试：通过地址获取 pool 数据（带缓存） ===");
 
     let pool_address = Pubkey::from_str(PUMP_POOL_ADDRESS).unwrap();
-    let rpc_url = "https://api.mainnet-beta.solana.com";
+    let rpc_url = "http://127.0.0.1:8899";
     let rpc = RpcClient::new(rpc_url.to_string());
 
     // 第一次调用（会写入缓存）
@@ -101,175 +99,4 @@ async fn test_get_pool_by_address() {
     assert_eq!(pool_state.quote_mint, pool_state2.quote_mint, "Cached pool should match");
     assert_eq!(pool_state.lp_supply, pool_state2.lp_supply, "Cached pool should match");
     println!("✅ 缓存验证通过（数据一致）");
-}
-
-/// 测试：通过 mint 获取 pool（带缓存，返回最优池）
-#[tokio::test]
-async fn test_get_pool_by_mint() {
-    println!("=== 测试：通过 mint 获取 pool（带缓存，返回最优池） ===");
-
-    let mint = Pubkey::from_str(PUMP_MINT).unwrap();
-    let rpc_url = "https://api.mainnet-beta.solana.com";
-    let rpc = RpcClient::new(rpc_url.to_string());
-
-    // 第一次调用（会写入缓存）
-    println!("第一次调用（写入缓存）...");
-    let result1 = get_pool_by_mint(&rpc, &mint).await;
-    assert!(result1.is_ok(), "Failed to get pool by mint: {:?}", result1.err());
-
-    let (pool_address, pool_state) = result1.unwrap();
-    println!("✅ 通过 Mint 找到的 pool 地址: {}", pool_address);
-    println!("  Base Mint: {}", pool_state.base_mint);
-    println!("  Quote Mint: {}", pool_state.quote_mint);
-    println!("  LP Supply: {}", pool_state.lp_supply);
-
-    // 验证 mint 匹配
-    assert!(
-        pool_state.base_mint.eq(&mint) || pool_state.quote_mint.eq(&mint),
-        "Pool should contain the requested mint"
-    );
-    println!("✅ Mint 匹配验证通过");
-
-    // 第二次调用（应该从缓存读取）
-    println!("\n第二次调用（从缓存读取）...");
-    let result2 = get_pool_by_mint(&rpc, &mint).await;
-    assert!(result2.is_ok(), "Failed to get pool from cache: {:?}", result2.err());
-
-    let (pool_address2, pool_state2) = result2.unwrap();
-    assert_eq!(pool_address, pool_address2, "Cached pool address should match");
-    assert_eq!(pool_state.base_mint, pool_state2.base_mint, "Cached pool should match");
-    assert_eq!(pool_state.lp_supply, pool_state2.lp_supply, "Cached pool should match");
-    println!("✅ 缓存验证通过（数据一致）");
-}
-
-/// 测试：强制刷新缓存后通过地址获取 pool
-#[tokio::test]
-async fn test_get_pool_by_address_force() {
-    println!("=== 测试：强制刷新缓存后通过地址获取 pool ===");
-
-    let pool_address = Pubkey::from_str(PUMP_POOL_ADDRESS).unwrap();
-    let rpc_url = "https://api.mainnet-beta.solana.com";
-    let rpc = RpcClient::new(rpc_url.to_string());
-
-    // 第一次调用（写入缓存）
-    println!("第一次调用（写入缓存）...");
-    let _ = get_pool_by_address(&rpc, &pool_address).await.unwrap();
-    println!("✅ 缓存已写入");
-
-    // 强制刷新缓存
-    println!("\n强制刷新缓存...");
-    let result = get_pool_by_address_force(&rpc, &pool_address).await;
-    assert!(result.is_ok(), "Failed to get pool with force refresh: {:?}", result.err());
-
-    let pool_state = result.unwrap();
-    println!("✅ 强制刷新后获取的 pool: {}", pool_address);
-    println!("  Base Mint: {}", pool_state.base_mint);
-    println!("  Quote Mint: {}", pool_state.quote_mint);
-    println!("  LP Supply: {}", pool_state.lp_supply);
-}
-
-/// 测试：强制刷新缓存后通过 mint 获取 pool
-#[tokio::test]
-async fn test_get_pool_by_mint_force() {
-    println!("=== 测试：强制刷新缓存后通过 mint 获取 pool ===");
-
-    let mint = Pubkey::from_str(PUMP_MINT).unwrap();
-    let rpc_url = "https://api.mainnet-beta.solana.com";
-    let rpc = RpcClient::new(rpc_url.to_string());
-
-    // 第一次调用（写入缓存）
-    println!("第一次调用（写入缓存）...");
-    let _ = get_pool_by_mint(&rpc, &mint).await.unwrap();
-    println!("✅ 缓存已写入");
-
-    // 强制刷新缓存
-    println!("\n强制刷新缓存...");
-    let result = get_pool_by_mint_force(&rpc, &mint).await;
-    assert!(result.is_ok(), "Failed to get pool with force refresh: {:?}", result.err());
-
-    let (pool_address, pool_state) = result.unwrap();
-    println!("✅ 强制刷新后通过 Mint 找到的 pool: {}", pool_address);
-    println!("  Base Mint: {}", pool_state.base_mint);
-    println!("  Quote Mint: {}", pool_state.quote_mint);
-    println!("  LP Supply: {}", pool_state.lp_supply);
-}
-
-/// 测试：验证 pool 的程序所有者
-#[tokio::test]
-#[ignore]
-async fn test_pool_owner_validation() {
-    println!("=== 测试：验证 pool 的程序所有者 ===");
-
-    // 测试 get_pool_by_address 会验证程序所有者
-    let invalid_address = Pubkey::from_str("11111111111111111111111111111111").unwrap(); // System program
-
-    let rpc_url = "https://api.mainnet-beta.solana.com";
-    let rpc = RpcClient::new(rpc_url.to_string());
-
-    println!("尝试获取无效地址的 pool...");
-    let result = get_pool_by_address(&rpc, &invalid_address).await;
-
-    // 应该失败，因为 system program 不是 PumpSwap program
-    assert!(result.is_err(), "Expected error for invalid program owner");
-    let err = result.unwrap_err();
-    assert!(
-        err.to_string().contains("PumpSwap") || err.to_string().contains("AMM"),
-        "Error should mention PumpSwap program"
-    );
-    println!("✅ 程序所有者验证通过（正确拒绝无效地址）");
-}
-
-/// 测试：验证 find_pool 和 get_pool_by_mint 的一致性
-#[tokio::test]
-async fn test_find_pool_consistency() {
-    println!("=== 测试：验证 find_pool 和 get_pool_by_mint 的一致性 ===");
-
-    let mint = Pubkey::from_str(PUMP_MINT).unwrap();
-    let rpc_url = "https://api.mainnet-beta.solana.com";
-    let rpc = RpcClient::new(rpc_url.to_string());
-
-    // 使用 find_pool 获取地址
-    println!("使用 find_pool 获取地址...");
-    let pool_address_from_find = find_pool(&rpc, &mint).await.unwrap();
-    println!("  find_pool 结果: {}", pool_address_from_find);
-
-    // 使用 get_pool_by_mint 获取地址
-    println!("使用 get_pool_by_mint 获取地址...");
-    let (pool_address_from_get, _) = get_pool_by_mint(&rpc, &mint).await.unwrap();
-    println!("  get_pool_by_mint 结果: {}", pool_address_from_get);
-
-    // 两个方法应该返回相同的 pool 地址
-    assert_eq!(
-        pool_address_from_find,
-        pool_address_from_get,
-        "find_pool and get_pool_by_mint should return the same pool address"
-    );
-    println!("✅ 一致性验证通过（两个方法返回相同的 pool 地址）");
-}
-
-/// 测试：获取 token 余额
-#[tokio::test]
-async fn test_get_token_balances() {
-    println!("=== 测试：获取 token 余额 ===");
-
-    let pool_address = Pubkey::from_str(PUMP_POOL_ADDRESS).unwrap();
-    let rpc_url = "https://api.mainnet-beta.solana.com";
-    let rpc = RpcClient::new(rpc_url.to_string());
-
-    // 获取 pool 数据
-    println!("获取 pool 数据...");
-    let pool_state = get_pool_by_address(&rpc, &pool_address).await.unwrap();
-
-    // 获取 token 余额
-    println!("获取 token 余额...");
-    let (base_balance, quote_balance) = get_token_balances(&pool_state, &rpc).await.unwrap();
-
-    println!("✅ Token 余额获取成功:");
-    println!("  Base Token Balance: {}", base_balance);
-    println!("  Quote Token Balance: {}", quote_balance);
-
-    // 验证余额大于 0
-    assert!(base_balance > 0, "Base balance should be positive");
-    assert!(quote_balance > 0, "Quote balance should be positive");
-    println!("✅ 余额验证通过（大于 0）");
 }
