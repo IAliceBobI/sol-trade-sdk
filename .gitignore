@@ -32,6 +32,7 @@ tmp_*.log
 /temp
 /dexprojs
 
+.env
 .iflow
 IFLOW.md
 .iflowignore

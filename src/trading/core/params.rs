@@ -642,7 +642,7 @@ impl RaydiumAmmV4Params {
         rpc: &SolanaRpcClient,
         amm: Pubkey,
     ) -> Result<Self, anyhow::Error> {
-        let amm_info = crate::instruction::utils::raydium_amm_v4::fetch_amm_info(rpc, amm).await?;
+        let amm_info = crate::instruction::utils::raydium_amm_v4::get_pool_by_address(rpc, &amm).await?;
         let (coin_reserve, pc_reserve) =
             get_multi_token_balances(rpc, &amm_info.token_coin, &amm_info.token_pc).await?;
         Ok(Self {

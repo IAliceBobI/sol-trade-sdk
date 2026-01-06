@@ -18,7 +18,7 @@
 //!   - Token1: USDC (EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v)
 //!
 //! ## 测试方法
-//! - fetch_amm_info(rpc, amm) - 获取 AMM 信息
+//! - get_pool_by_address(rpc, amm) - 获取 AMM 信息（带缓存）
 //!
 //! 运行测试:
 //!     cargo test --test raydium_amm_v4_pool_tests -- --nocapture
@@ -26,7 +26,7 @@
 //! 注意：使用 surfpool (localhost:8899) 进行测试
 
 use sol_trade_sdk::instruction::utils::raydium_amm_v4::{
-    fetch_amm_info, get_pool_by_address, get_pool_by_address_force, clear_pool_cache,
+    get_pool_by_address, get_pool_by_address_force, clear_pool_cache,
 };
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_sdk::pubkey::Pubkey;
@@ -49,7 +49,7 @@ async fn test_fetch_amm_info() {
     let rpc = RpcClient::new(rpc_url.to_string());
 
     println!("获取 AMM 信息: {}", amm_address);
-    let result = fetch_amm_info(&rpc, amm_address).await;
+    let result = get_pool_by_address(&rpc, &amm_address).await;
 
     assert!(result.is_ok(), "Failed to fetch AMM info: {:?}", result.err());
 
