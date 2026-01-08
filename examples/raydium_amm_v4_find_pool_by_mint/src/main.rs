@@ -25,7 +25,7 @@ async fn main() -> Result<()> {
     println!("lp_amount: {}", amm_info.lp_amount);
 
     println!("\n=== Raydium AMM V4: list_pools_by_mint (WSOL) ===");
-    let all_pools = list_pools_by_mint(&rpc, &wsol_mint).await?;
+    let all_pools = list_pools_by_mint(&rpc, &wsol_mint, false).await?;
     println!("共找到 {} 个包含 WSOL 的池", all_pools.len());
     for (addr, amm) in all_pools.iter().take(5) {
         println!(
