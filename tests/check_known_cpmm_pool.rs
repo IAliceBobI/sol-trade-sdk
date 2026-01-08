@@ -12,12 +12,12 @@ const KNOWN_POOL_ADDRESS: &str = "DZ1Yr5V1hyU2ryJWchAhCQcKRHL5RxS7G9DHmbx1rcEz";
 #[tokio::test]
 async fn test_check_known_cpmm_pool() {
     println!("=== 测试：检查已知 CPMM 池子是否可通过 mint 查询找到 ===");
-    
+
     let metatron_mint = Pubkey::from_str(METATRON_MINT).expect("Invalid Metatron mint");
     let wsol_mint = Pubkey::from_str(WSOL_MINT).expect("Invalid WSOL mint");
     let known_pool_pubkey = Pubkey::from_str(KNOWN_POOL_ADDRESS).expect("Invalid pool address");
-    
-    let rpc_url = "http://127.0.0.1:8899";
+
+    let rpc_url = "https://api.mainnet-beta.solana.com";
     let rpc = RpcClient::new(rpc_url.to_string());
     
     // 方法1：直接通过 RPC 获取池状态（最可靠）
@@ -97,11 +97,11 @@ async fn test_check_known_cpmm_pool() {
 #[tokio::test]
 async fn test_list_pools_by_wsol_mint() {
     println!("=== 测试：通过 WSOL Mint 查询池子 ===");
-    
+
     let wsol_mint = Pubkey::from_str(WSOL_MINT).expect("Invalid WSOL mint");
     let known_pool_pubkey = Pubkey::from_str(KNOWN_POOL_ADDRESS).expect("Invalid pool address");
-    
-    let rpc_url = "http://127.0.0.1:8899";
+
+    let rpc_url = "https://api.mainnet-beta.solana.com";
     let rpc = RpcClient::new(rpc_url.to_string());
     
     println!("\n--- 通过 WSOL Mint 查询池子 ---");
@@ -135,11 +135,11 @@ async fn test_list_pools_by_wsol_mint() {
 #[tokio::test]
 async fn test_list_pools_by_metatron_mint() {
     println!("=== 测试：通过 Metatron Mint 查询池子 ===");
-    
+
     let metatron_mint = Pubkey::from_str(METATRON_MINT).expect("Invalid Metatron mint");
     let known_pool_pubkey = Pubkey::from_str(KNOWN_POOL_ADDRESS).expect("Invalid pool address");
-    
-    let rpc_url = "http://127.0.0.1:8899";
+
+    let rpc_url = "https://api.mainnet-beta.solana.com";
     let rpc = RpcClient::new(rpc_url.to_string());
     
     println!("\n--- 通过 Metatron Mint 查询池子 ---");
