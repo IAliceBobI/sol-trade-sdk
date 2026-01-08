@@ -139,19 +139,23 @@ pub async fn print_balances(
         sol_balance,
         sol_balance as f64 / LAMPORTS_PER_SOL as f64
     );
+    println!("   账户: {}", payer);
     println!(
         "🪙 WSOL 余额 (get_balance): {} lamports ({:.4} SOL)",
         wsol_balance,
         wsol_balance as f64 / LAMPORTS_PER_SOL as f64
     );
+    println!("   ATA: {}", wsol_ata);
     println!(
         "🪙 WSOL 余额 (get_token_account_balance): {} lamports",
         wsol_amount
     );
+    println!("   ATA: {}", wsol_ata);
     println!(
         "🪙 WSOL uiAmountString: {} (decimals: {})",
         wsol_ui_amount_str, wsol_decimals
     );
+    println!("   ATA: {}", wsol_ata);
     println!("================================\n");
 
     Ok((sol_balance, wsol_amount))
@@ -211,7 +215,10 @@ pub async fn print_token_balance(
     token_name: &str,
 ) -> Result<u64, Box<dyn std::error::Error>> {
     let balance = get_token_balance(rpc_url, payer, mint).await?;
-    println!("  🪙 {} 余额: {} (mint: {})", token_name, balance, mint);
+    let ata = get_associated_token_address_with_program_id_fast(payer, mint, &TOKEN_PROGRAM);
+    println!("  🪙 {} 余额: {}", token_name, balance);
+    println!("     Mint: {}", mint);
+    println!("     ATA: {}", ata);
     Ok(balance)
 }
 

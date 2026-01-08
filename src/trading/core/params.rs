@@ -608,7 +608,7 @@ impl RaydiumCpmmParams {
 
 /// RaydiumCpmm protocol specific parameters
 /// Configuration parameters specific to Raydium CPMM trading protocol
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct RaydiumAmmV4Params {
     /// AMM pool address
     pub amm: Pubkey,
