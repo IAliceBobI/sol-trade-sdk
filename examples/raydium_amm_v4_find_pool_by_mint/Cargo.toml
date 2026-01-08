@@ -1,0 +1,12 @@
+[package]
+name = "raydium_amm_v4_find_pool_by_mint"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+sol-trade-sdk = { path = "../../" }
+solana-client = "3.0.8"
+solana-sdk = "3.0.0"
+tokio = { version = "1", features = ["full"] }
+anyhow = "1"

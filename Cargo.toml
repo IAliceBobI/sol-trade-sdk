@@ -37,6 +37,7 @@ members = [
     "examples/meteora_damm_v2_direct_trading",
     "examples/transaction_callback",
     "examples/test_wsol_ata_config",
+    "examples/raydium_amm_v4_find_pool_by_mint",
 ]
 
 [lib]

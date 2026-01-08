@@ -14,6 +14,9 @@ pub fn clear_all_pool_caches() {
     // Raydium CLMM
     crate::instruction::utils::raydium_clmm::clear_pool_cache();
 
+    // Raydium AMM V4
+    crate::instruction::utils::raydium_amm_v4::clear_pool_cache();
+
     // Bonk
     crate::instruction::utils::bonk::clear_pool_cache();
 

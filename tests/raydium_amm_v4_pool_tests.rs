@@ -26,7 +26,12 @@
 //! 注意：使用 surfpool (localhost:8899) 进行测试
 
 use sol_trade_sdk::instruction::utils::raydium_amm_v4::{
-    get_pool_by_address, get_pool_by_address_force, clear_pool_cache,
+    get_pool_by_address,
+    get_pool_by_address_force,
+    get_pool_by_mint,
+    get_pool_by_mint_force,
+    list_pools_by_mint,
+    clear_pool_cache,
 };
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_sdk::pubkey::Pubkey;
@@ -254,4 +259,82 @@ async fn test_get_pool_by_address_cache() {
     println!("清除缓存验证通过");
 
     println!("\n=== 所有缓存功能测试通过 ===");
+}
+
+/// 测试：基于 mint 获取最优 Pool（WSOL-USDC 示例）
+#[tokio::test]
+async fn test_get_pool_by_mint_wsol() {
+    println!("=== 测试：get_pool_by_mint (WSOL) ===");
+
+    let wsol_mint = Pubkey::from_str("So11111111111111111111111111111111111111112")
+        .expect("Invalid WSOL mint");
+    let rpc_url = "http://127.0.0.1:8899";
+    let rpc = RpcClient::new(rpc_url.to_string());
+
+    // 清理缓存，确保从干净状态开始
+    clear_pool_cache();
+
+    // 第一次查询：应从链上扫描并选择最优池
+    let result1 = get_pool_by_mint(&rpc, &wsol_mint).await;
+    assert!(result1.is_ok(), "get_pool_by_mint failed: {:?}", result1.err());
+    let (pool_address_1, amm_info_1) = result1.unwrap();
+    println!("第一次查询到的 Pool: {}", pool_address_1);
+    println!("coin_mint: {}", amm_info_1.coin_mint);
+    println!("pc_mint: {}", amm_info_1.pc_mint);
+
+    // 验证返回的池确实包含 WSOL
+    assert!(
+        amm_info_1.coin_mint.to_string() == "So11111111111111111111111111111111111111112"
+            || amm_info_1.pc_mint.to_string() == "So11111111111111111111111111111111111111112",
+        "返回的 Pool 不包含 WSOL",
+    );
+
+    // 第二次查询：应命中缓存并返回相同结果
+    let result2 = get_pool_by_mint(&rpc, &wsol_mint).await.unwrap();
+    let (pool_address_2, amm_info_2) = result2;
+    assert_eq!(pool_address_1, pool_address_2, "缓存中的 pool_address 不一致");
+    assert_eq!(amm_info_1.lp_amount, amm_info_2.lp_amount, "缓存中的 AmmInfo 不一致");
+
+    // 强制刷新：删除缓存后重新查询
+    let result3 = get_pool_by_mint_force(&rpc, &wsol_mint).await.unwrap();
+    let (pool_address_3, amm_info_3) = result3;
+    println!("强制刷新后的 Pool: {}", pool_address_3);
+
+    // 即便强制刷新，主池一般仍然相同（除非链上发生结构性变化）
+    assert_eq!(pool_address_2, pool_address_3, "强制刷新后 pool_address 发生变化");
+    assert_eq!(amm_info_2.coin_mint, amm_info_3.coin_mint, "强制刷新后 coin_mint 不一致");
+    assert_eq!(amm_info_2.pc_mint, amm_info_3.pc_mint, "强制刷新后 pc_mint 不一致");
+}
+
+/// 测试：列出所有包含 WSOL 的 Raydium AMM V4 Pool
+#[tokio::test]
+async fn test_list_pools_by_mint_wsol() {
+    println!("=== 测试：list_pools_by_mint (WSOL) ===");
+
+    let wsol_mint = Pubkey::from_str("So11111111111111111111111111111111111111112")
+        .expect("Invalid WSOL mint");
+    let rpc_url = "http://127.0.0.1:8899";
+    let rpc = RpcClient::new(rpc_url.to_string());
+
+    let pools = list_pools_by_mint(&rpc, &wsol_mint).await;
+    assert!(pools.is_ok(), "list_pools_by_mint failed: {:?}", pools.err());
+    let pools = pools.unwrap();
+
+    assert!(!pools.is_empty(), "WSOL 相关的 Pool 列表不应为空");
+
+    // 所有池都应该包含 WSOL
+    for (addr, amm) in pools.iter() {
+        println!("WSOL Pool: {} (coin_mint={}, pc_mint={})", addr, amm.coin_mint, amm.pc_mint);
+        assert!(
+            amm.coin_mint.to_string() == "So11111111111111111111111111111111111111112"
+                || amm.pc_mint.to_string() == "So11111111111111111111111111111111111111112",
+            "Pool {} 不包含 WSOL",
+            addr,
+        );
+    }
+
+    // 确认已知的 WSOL-USDC AMM 池在列表中（若本地 RPC 同步了主网数据）
+    let target = Pubkey::from_str(SOL_USDC_AMM).expect("Invalid AMM address");
+    let found = pools.iter().any(|(addr, _)| *addr == target);
+    assert!(found, "WSOL-USDC 主池未出现在 list_pools_by_mint 结果中");
 }
