@@ -47,58 +47,6 @@ async fn test_check_known_cpmm_pool() {
         }
     }
     
-    // 方法2：通过 Metatron Mint 查询
-    println!("\n--- 方法2：通过 Metatron Mint 查询池子 ---");
-    match list_pools_by_mint(&rpc, &metatron_mint).await {
-        Ok(pools) => {
-            println!("Metatron Mint 相关池子数量: {}", pools.len());
-            
-            let mut found = false;
-            for (pool_addr, pool_state) in pools.iter() {
-                println!("  池子: {} (token0={}, token1={})", 
-                    pool_addr, pool_state.token0_mint, pool_state.token1_mint);
-                
-                if *pool_addr == known_pool_pubkey {
-                    println!("  ✅ 找到目标池子!");
-                    found = true;
-                }
-            }
-            
-            if !found {
-                println!("  ❌ 未通过 Metatron Mint 找到目标池子");
-            }
-        }
-        Err(e) => {
-            println!("❌ 通过 Metatron Mint 查询失败: {}", e);
-        }
-    }
-    
-    // 方法3：通过 WSOL Mint 查询
-    println!("\n--- 方法3：通过 WSOL Mint 查询池子 ---");
-    match list_pools_by_mint(&rpc, &wsol_mint).await {
-        Ok(pools) => {
-            println!("WSOL Mint 相关池子数量: {}", pools.len());
-            
-            let mut found = false;
-            for (pool_addr, pool_state) in pools.iter() {
-                println!("  池子: {} (token0={}, token1={})", 
-                    pool_addr, pool_state.token0_mint, pool_state.token1_mint);
-                
-                if *pool_addr == known_pool_pubkey {
-                    println!("  ✅ 找到目标池子!");
-                    found = true;
-                }
-            }
-            
-            if !found {
-                println!("  ❌ 未通过 WSOL Mint 找到目标池子");
-            }
-        }
-        Err(e) => {
-            println!("❌ 通过 WSOL Mint 查询失败: {}", e);
-        }
-    }
-    
     // 方法4：手动构建 PDA 并验证
     println!("\n--- 方法4：手动构建 PDA 并验证 ---");
     
@@ -140,6 +88,82 @@ async fn test_check_known_cpmm_pool() {
             Err(_) => {
                 println!("  无效的 AmmConfig: {}", config_str);
             }
+        }
+    }
+    
+    println!("\n=== 测试完成 ===");
+}
+
+#[tokio::test]
+async fn test_list_pools_by_wsol_mint() {
+    println!("=== 测试：通过 WSOL Mint 查询池子 ===");
+    
+    let wsol_mint = Pubkey::from_str(WSOL_MINT).expect("Invalid WSOL mint");
+    let known_pool_pubkey = Pubkey::from_str(KNOWN_POOL_ADDRESS).expect("Invalid pool address");
+    
+    let rpc_url = "http://127.0.0.1:8899";
+    let rpc = RpcClient::new(rpc_url.to_string());
+    
+    println!("\n--- 通过 WSOL Mint 查询池子 ---");
+    match list_pools_by_mint(&rpc, &wsol_mint).await {
+        Ok(pools) => {
+            println!("WSOL Mint 相关池子数量: {}", pools.len());
+            
+            let mut found = false;
+            for (pool_addr, pool_state) in pools.iter() {
+                println!("  池子: {} (token0={}, token1={})", 
+                    pool_addr, pool_state.token0_mint, pool_state.token1_mint);
+                
+                if *pool_addr == known_pool_pubkey {
+                    println!("  ✅ 找到目标池子!");
+                    found = true;
+                }
+            }
+            
+            if !found {
+                println!("  ❌ 未通过 WSOL Mint 找到目标池子");
+            }
+        }
+        Err(e) => {
+            println!("❌ 通过 WSOL Mint 查询失败: {}", e);
+        }
+    }
+    
+    println!("\n=== 测试完成 ===");
+}
+
+#[tokio::test]
+async fn test_list_pools_by_metatron_mint() {
+    println!("=== 测试：通过 Metatron Mint 查询池子 ===");
+    
+    let metatron_mint = Pubkey::from_str(METATRON_MINT).expect("Invalid Metatron mint");
+    let known_pool_pubkey = Pubkey::from_str(KNOWN_POOL_ADDRESS).expect("Invalid pool address");
+    
+    let rpc_url = "http://127.0.0.1:8899";
+    let rpc = RpcClient::new(rpc_url.to_string());
+    
+    println!("\n--- 通过 Metatron Mint 查询池子 ---");
+    match list_pools_by_mint(&rpc, &metatron_mint).await {
+        Ok(pools) => {
+            println!("Metatron Mint 相关池子数量: {}", pools.len());
+            
+            let mut found = false;
+            for (pool_addr, pool_state) in pools.iter() {
+                println!("  池子: {} (token0={}, token1={})", 
+                    pool_addr, pool_state.token0_mint, pool_state.token1_mint);
+                
+                if *pool_addr == known_pool_pubkey {
+                    println!("  ✅ 找到目标池子!");
+                    found = true;
+                }
+            }
+            
+            if !found {
+                println!("  ❌ 未通过 Metatron Mint 找到目标池子");
+            }
+        }
+        Err(e) => {
+            println!("❌ 通过 Metatron Mint 查询失败: {}", e);
         }
     }
     
