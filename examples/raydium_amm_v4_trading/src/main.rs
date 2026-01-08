@@ -30,7 +30,8 @@ use sol_trade_sdk::{
     SolanaTrade,
 };
 use sol_trade_sdk::{
-    common::TradeConfig, instruction::utils::raydium_amm_v4::fetch_amm_info,
+    common::TradeConfig,
+    instruction::utils::raydium_amm_v4::{get_pool_by_address, is_pool_tradeable, pool_status},
     trading::common::get_multi_token_balances, TradeTokenType,
 };
 use solana_commitment_config::CommitmentConfig;
@@ -145,7 +146,25 @@ async fn raydium_amm_v4_copy_trade_with_grpc(trade_info: RaydiumAmmV4SwapEvent) 
     let slippage_basis_points = Some(100);
     let recent_blockhash = client.rpc.get_latest_blockhash().await?;
 
-    let amm_info = fetch_amm_info(&client.rpc, trade_info.amm).await?;
+    // 使用带缓存和状态检查的函数获取 pool 信息
+    let amm_info = get_pool_by_address(&client.rpc, &trade_info.amm).await?;
+
+    // 检查 pool 是否适合交易
+    if !is_pool_tradeable(&amm_info) {
+        eprintln!("Pool is not tradeable. Status: {}", amm_info.status);
+        eprintln!("Pool status codes:");
+        eprintln!("  {} = Uninitialized", pool_status::UNINITIALIZED);
+        eprintln!("  {} = Initialized", pool_status::INITIALIZED);
+        eprintln!("  {} = Disabled", pool_status::DISABLED);
+        eprintln!("  {} = Withdraw Only", pool_status::WITHDRAW_ONLY);
+        eprintln!("  {} = Order Book Only", pool_status::ORDER_BOOK_ONLY);
+        eprintln!("  {} = Swap Only", pool_status::SWAP_ONLY);
+        eprintln!("  {} = Active (Tradeable)", pool_status::ACTIVE);
+        std::process::exit(0);
+    }
+
+    println!("Pool is tradeable! Status: {}", amm_info.status);
+
     let (coin_reserve, pc_reserve) =
         get_multi_token_balances(&client.rpc, &amm_info.token_coin, &amm_info.token_pc).await?;
     let mint_pubkey = if amm_info.pc_mint == sol_trade_sdk::constants::WSOL_TOKEN_ACCOUNT
