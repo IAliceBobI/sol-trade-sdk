@@ -271,14 +271,19 @@ async fn find_pool_by_mint_impl(
     rpc: &SolanaRpcClient,
     mint: &Pubkey,
 ) -> Result<(Pubkey, PoolState), anyhow::Error> {
-    // Try token0_mint offset
-    let mut all_pools: Vec<(Pubkey, PoolState)> = match find_pools_by_mint_offset_collect(rpc, mint, TOKEN0_MINT_OFFSET).await {
-        Ok(pools) => pools,
-        Err(_) => Vec::new(),
-    };
+    // 并行扫描 token0_mint 和 token1_mint 对应的池
+    let (token0_result, token1_result) = tokio::join!(
+        find_pools_by_mint_offset_collect(rpc, mint, TOKEN0_MINT_OFFSET),
+        find_pools_by_mint_offset_collect(rpc, mint, TOKEN1_MINT_OFFSET),
+    );
 
-    // Try token1_mint offset and merge
-    if let Ok(quote_pools) = find_pools_by_mint_offset_collect(rpc, mint, TOKEN1_MINT_OFFSET).await {
+    let mut all_pools: Vec<(Pubkey, PoolState)> = Vec::new();
+
+    if let Ok(pools) = token0_result {
+        all_pools.extend(pools);
+    }
+
+    if let Ok(quote_pools) = token1_result {
         use std::collections::HashSet;
         let mut seen: HashSet<Pubkey> = all_pools.iter().map(|(addr, _)| *addr).collect();
         for (addr, pool) in quote_pools {
