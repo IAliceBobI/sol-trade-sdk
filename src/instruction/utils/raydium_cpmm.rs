@@ -172,9 +172,15 @@ pub async fn get_pool_token_balances(
     token1_mint: &Pubkey,
 ) -> Result<(u64, u64), anyhow::Error> {
     let token0_vault = get_vault_pda(pool_state, token0_mint).unwrap();
-    let token0_balance = rpc.get_token_account_balance(&token0_vault).await?;
     let token1_vault = get_vault_pda(pool_state, token1_mint).unwrap();
-    let token1_balance = rpc.get_token_account_balance(&token1_vault).await?;
+
+    let (token0_balance_result, token1_balance_result) = tokio::join!(
+        rpc.get_token_account_balance(&token0_vault),
+        rpc.get_token_account_balance(&token1_vault),
+    );
+
+    let token0_balance = token0_balance_result?;
+    let token1_balance = token1_balance_result?;
 
     // Parse balance string to u64
     let token0_amount = token0_balance
