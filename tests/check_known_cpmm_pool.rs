@@ -1,9 +1,4 @@
 //! 测试：检查已知的 Raydium CPMM 池子是否能通过 mint 查询找到
-//!
-//! 已知池子信息：
-//! - Pool Address: DZ1Yr5V1hyU2ryJWchAhCQcKRHL5RxS7G9DHmbx1rcEz
-//! - Mint Metatron: DZ1Yr5V1hyU2ryJWchAhCQcKRHL5RxS7G9DHmbx1rcEz  
-//! - Mint WSOL: So11111111111111111111111111111111111111112
 
 use sol_trade_sdk::instruction::utils::raydium_cpmm::*;
 use solana_client::nonblocking::rpc_client::RpcClient;

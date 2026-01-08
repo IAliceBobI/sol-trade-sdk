@@ -1,6 +1,6 @@
 use crate::{
     common::SolanaRpcClient,
-    instruction::utils::raydium_cpmm_types::{PoolState, pool_state_decode, POOL_STATE_SIZE},
+    instruction::utils::raydium_cpmm_types::{PoolState, pool_state_decode},
     trading::core::params::RaydiumCpmmParams,
 };
 use anyhow::anyhow;
@@ -77,9 +77,11 @@ pub(crate) mod raydium_cpmm_cache {
     }
 }
 
-// 常量偏移量
-const TOKEN0_MINT_OFFSET: usize = 40;
-const TOKEN1_MINT_OFFSET: usize = 72;
+// 常量偏移量（包含 discriminator）
+// 根据实际数据解析结果，mintA 在 offset 160（不包含 discriminator），mintB 在 offset 192（不包含 discriminator）
+// RPC 查询时使用包含 discriminator 的偏移量，所以需要加 8
+const TOKEN0_MINT_OFFSET: usize = 168;  // mintA offset (160 + 8 discriminator)
+const TOKEN1_MINT_OFFSET: usize = 200;  // mintB offset (192 + 8 discriminator)
 
 pub async fn get_pool_by_address(
     rpc: &SolanaRpcClient,
@@ -236,8 +238,12 @@ async fn find_pools_by_mint_offset_collect(
     use solana_rpc_client_api::{config::RpcProgramAccountsConfig, filter::RpcFilterType};
     use solana_client::rpc_filter::Memcmp;
 
+    // 暂时移除 DataSize 过滤，只使用 Memcmp 过滤
+    // let filters = vec![
+    //     RpcFilterType::DataSize((POOL_STATE_SIZE + 8) as u64),
+    //     RpcFilterType::Memcmp(Memcmp::new_base58_encoded(offset, &mint.to_bytes())),
+    // ];
     let filters = vec![
-        RpcFilterType::DataSize(POOL_STATE_SIZE as u64),
         RpcFilterType::Memcmp(Memcmp::new_base58_encoded(offset, &mint.to_bytes())),
     ];
     let config = RpcProgramAccountsConfig {

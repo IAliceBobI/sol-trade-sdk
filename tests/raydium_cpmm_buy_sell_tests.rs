@@ -251,7 +251,8 @@ async fn test_raydium_cpmm_list_pools_by_mint_wsol() {
     println!("=== 测试：Raydium CPMM list_pools_by_mint (WSOL) ===");
 
     let wsol_mint = Pubkey::from_str(WSOL_MINT).expect("Invalid WSOL mint");
-    let rpc_url = "http://127.0.0.1:8899";
+    // let rpc_url = "http://127.0.0.1:8899";
+    let rpc_url = "https://api.mainnet-beta.solana.com".to_string();
     let rpc = RpcClient::new(rpc_url.to_string());
 
     let pools = list_pools_by_mint(&rpc, &wsol_mint).await.expect("list_pools_by_mint failed");
