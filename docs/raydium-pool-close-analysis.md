@@ -250,6 +250,8 @@ Migrate Pool 的条件：
 2. **使用测试网**：在测试网进行测试
 3. **标记已弃用 pool**：使用 `update_pool_status`
 4. **文档记录**：记录已弃用的 pool
+5. **过滤非活跃 pool**：在查询 pool 时过滤掉非活跃状态的 pool
+6. **检查 pool 状态**：在进行交易前检查 pool 的 status 字段
 
 ### 对于用户
 
@@ -262,6 +264,131 @@ Migrate Pool 的条件：
 1. **提供弃用机制**：允许标记 pool 为已弃用
 2. **提供迁移工具**：帮助用户迁移到新的 pool
 3. **文档说明**：清楚说明 pool 无法销毁
+
+---
+
+## Pool 状态管理
+
+### Pool 状态常量
+
+在 `src/instruction/utils/raydium_amm_v4.rs` 中定义了以下 pool 状态常量：
+
+```rust
+pub mod pool_status {
+    /// 未初始化
+    pub const UNINITIALIZED: u64 = 0;
+    /// 已初始化
+    pub const INITIALIZED: u64 = 1;
+    /// 已禁用
+    pub const DISABLED: u64 = 2;
+    /// 只能提现
+    pub const WITHDRAW_ONLY: u64 = 3;
+    /// 只能订单簿
+    pub const ORDER_BOOK_ONLY: u64 = 4;
+    /// 只能交易
+    pub const SWAP_ONLY: u64 = 5;
+    /// 活跃状态
+    pub const ACTIVE: u64 = 6;
+}
+```
+
+### Pool 状态检查函数
+
+提供了以下状态检查函数：
+
+```rust
+/// 检查 pool 是否处于活跃状态
+pub fn is_pool_active(amm_info: &AmmInfo) -> bool;
+
+/// 检查 pool 是否已禁用
+pub fn is_pool_disabled(amm_info: &AmmInfo) -> bool;
+
+/// 检查 pool 是否只能提现
+pub fn is_pool_withdraw_only(amm_info: &AmmInfo) -> bool;
+
+/// 检查 pool 是否适合交易
+pub fn is_pool_tradeable(amm_info: &AmmInfo) -> bool;
+```
+
+### 在查询中使用状态过滤
+
+#### get_pool_by_mint
+
+自动过滤非活跃状态的 pool，只返回适合交易的 pool：
+
+```rust
+let (pool_address, amm_info) = get_pool_by_mint(rpc, &mint).await?;
+// amm_info.status == 6 (ACTIVE)
+```
+
+#### list_pools_by_mint
+
+支持状态过滤参数：
+
+```rust
+// 返回所有 pool（包括非活跃的）
+let all_pools = list_pools_by_mint(rpc, &mint, false).await?;
+
+// 只返回活跃状态的 pool（适合交易的）
+let active_pools = list_pools_by_mint(rpc, &mint, true).await?;
+```
+
+### Deactivate Pool 的条件
+
+1. 需要管理员权限
+2. 使用 `setParams` 指令更新 pool 的 status 字段
+3. 或者通过其他方式将 pool 设置为非活跃状态
+
+### Migrate Pool 的条件
+
+1. 需要管理员权限
+2. 使用 `migrateToOpenBook` 指令
+3. 需要提供新的 OpenBook market 信息
+4. 需要确保旧的 Serum market 相关账户正确
+
+### 状态检查的最佳实践
+
+1. **查询时过滤**：使用 `list_pools_by_mint(rpc, &mint, true)` 只获取活跃 pool
+2. **交易前检查**：在进行交易前使用 `is_pool_tradeable()` 检查 pool 状态
+3. **错误处理**：当没有活跃 pool 时，返回明确的错误信息
+4. **日志记录**：记录被过滤掉的非活跃 pool，便于调试
+
+### 示例代码
+
+```rust
+use sol_trade_sdk::instruction::utils::raydium_amm_v4::{
+    get_pool_by_mint,
+    list_pools_by_mint,
+    is_pool_tradeable,
+    is_pool_disabled,
+    pool_status,
+};
+
+// 获取最优 pool（自动过滤非活跃状态）
+let (pool_address, amm_info) = get_pool_by_mint(rpc, &mint).await?;
+
+// 检查 pool 状态
+if is_pool_disabled(&amm_info) {
+    eprintln!("Pool is disabled, cannot trade");
+    return Err(anyhow!("Pool is disabled"));
+}
+
+// 列出所有活跃 pool
+let active_pools = list_pools_by_mint(rpc, &mint, true).await?;
+println!("Found {} active pools", active_pools.len());
+
+// 列出所有 pool（包括非活跃的）
+let all_pools = list_pools_by_mint(rpc, &mint, false).await?;
+println!("Found {} total pools", all_pools.len());
+
+// 检查 pool 状态
+match amm_info.status {
+    pool_status::ACTIVE => println!("Pool is active"),
+    pool_status::DISABLED => println!("Pool is disabled"),
+    pool_status::WITHDRAW_ONLY => println!("Pool is withdraw only"),
+    _ => println!("Pool status: {}", amm_info.status),
+}
+```
 
 ---
 

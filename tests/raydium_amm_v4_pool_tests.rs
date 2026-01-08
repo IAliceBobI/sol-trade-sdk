@@ -357,7 +357,7 @@ async fn test_list_pools_by_mint_wsol() {
     let rpc_url = "http://127.0.0.1:8899";
     let rpc = RpcClient::new(rpc_url.to_string());
 
-    let pools = list_pools_by_mint(&rpc, &wsol_mint).await;
+    let pools = list_pools_by_mint(&rpc, &wsol_mint, false).await;
     assert!(pools.is_ok(), "list_pools_by_mint failed: {:?}", pools.err());
     let pools = pools.unwrap();
 
@@ -365,7 +365,7 @@ async fn test_list_pools_by_mint_wsol() {
 
     // 所有池都应该包含 WSOL
     for (addr, amm) in pools.iter() {
-        println!("WSOL Pool: {} (coin_mint={}, pc_mint={})", addr, amm.coin_mint, amm.pc_mint);
+        println!("WSOL Pool: {} (coin_mint={}, pc_mint={}, status={})", addr, amm.coin_mint, amm.pc_mint, amm.status);
         assert!(
             amm.coin_mint.to_string() == "So11111111111111111111111111111111111111112"
                 || amm.pc_mint.to_string() == "So11111111111111111111111111111111111111112",
@@ -378,4 +378,33 @@ async fn test_list_pools_by_mint_wsol() {
     let target = Pubkey::from_str(SOL_USDC_AMM).expect("Invalid AMM address");
     let found = pools.iter().any(|(addr, _)| *addr == target);
     assert!(found, "WSOL-USDC 主池未出现在 list_pools_by_mint 结果中");
+}
+
+/// 测试：列出所有活跃的 WSOL Pool
+#[tokio::test]
+async fn test_list_active_pools_by_mint_wsol() {
+    println!("=== 测试：list_pools_by_mint (WSOL, active only) ===");
+
+    let wsol_mint = Pubkey::from_str("So11111111111111111111111111111111111111112")
+        .expect("Invalid WSOL mint");
+    let rpc_url = "http://127.0.0.1:8899";
+    let rpc = RpcClient::new(rpc_url.to_string());
+
+    let pools = list_pools_by_mint(&rpc, &wsol_mint, true).await;
+    assert!(pools.is_ok(), "list_pools_by_mint (active only) failed: {:?}", pools.err());
+    let pools = pools.unwrap();
+
+    assert!(!pools.is_empty(), "WSOL 相关的活跃 Pool 列表不应为空");
+
+    // 所有池都应该包含 WSOL 且是活跃状态
+    for (addr, amm) in pools.iter() {
+        println!("Active WSOL Pool: {} (coin_mint={}, pc_mint={}, status={})", addr, amm.coin_mint, amm.pc_mint, amm.status);
+        assert!(
+            amm.coin_mint.to_string() == "So11111111111111111111111111111111111111112"
+                || amm.pc_mint.to_string() == "So11111111111111111111111111111111111111112",
+            "Pool {} 不包含 WSOL",
+            addr,
+        );
+        assert_eq!(amm.status, 6, "Pool {} 不是活跃状态", addr); // 6 = ACTIVE
+    }
 }

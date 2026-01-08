@@ -124,6 +124,54 @@ pub fn clear_pool_cache() {
     clear_pool_cache_internal();
 }
 
+// ==================== Pool 状态检查函数 ====================
+
+/// Pool 状态常量
+pub mod pool_status {
+    /// 未初始化
+    pub const UNINITIALIZED: u64 = 0;
+    /// 已初始化
+    pub const INITIALIZED: u64 = 1;
+    /// 已禁用
+    pub const DISABLED: u64 = 2;
+    /// 只能提现
+    pub const WITHDRAW_ONLY: u64 = 3;
+    /// 只能订单簿
+    pub const ORDER_BOOK_ONLY: u64 = 4;
+    /// 只能交易
+    pub const SWAP_ONLY: u64 = 5;
+    /// 活跃状态
+    pub const ACTIVE: u64 = 6;
+}
+
+/// 检查 pool 是否处于活跃状态
+///
+/// 只有活跃状态的 pool 才适合进行交易。
+pub fn is_pool_active(amm_info: &AmmInfo) -> bool {
+    amm_info.status == pool_status::ACTIVE
+}
+
+/// 检查 pool 是否已禁用
+///
+/// 已禁用的 pool 不能进行交易。
+pub fn is_pool_disabled(amm_info: &AmmInfo) -> bool {
+    amm_info.status == pool_status::DISABLED
+}
+
+/// 检查 pool 是否只能提现
+///
+/// 只能提现的 pool 不能进行交易，只能提取流动性。
+pub fn is_pool_withdraw_only(amm_info: &AmmInfo) -> bool {
+    amm_info.status == pool_status::WITHDRAW_ONLY
+}
+
+/// 检查 pool 是否适合交易
+///
+/// 适合交易的 pool 必须是活跃状态。
+pub fn is_pool_tradeable(amm_info: &AmmInfo) -> bool {
+    is_pool_active(amm_info)
+}
+
 // ==================== Mint 查询相关常量与内部函数 ====================
 
 /// coin_mint 在 AmmInfo 结构中的偏移量
@@ -193,8 +241,9 @@ async fn find_pools_by_mint_offset_collect(
 /// 策略：
 /// 1. 并行查询 coin_mint 与 pc_mint 包含该 mint 的所有池
 /// 2. 合并并去重
-/// 3. 优先选择包含 WSOL (SOL_MINT) 的交易对
-/// 4. 若没有 WSOL 交易对，则按 lp_amount 从大到小排序，选择流动性最好的池
+/// 3. 过滤掉非活跃状态的 pool（只保留适合交易的 pool）
+/// 4. 优先选择包含 WSOL (SOL_MINT) 的交易对
+/// 5. 若没有 WSOL 交易对，则按 lp_amount 从大到小排序，选择流动性最好的池
 async fn find_pool_by_mint_impl(
     rpc: &SolanaRpcClient,
     mint: &Pubkey,
@@ -225,8 +274,21 @@ async fn find_pool_by_mint_impl(
         return Err(anyhow!("No Raydium AMM V4 pool found for mint {}", mint));
     }
 
+    // 过滤掉非活跃状态的 pool（只保留适合交易的 pool）
+    let active_pools: Vec<(Pubkey, AmmInfo)> = all_pools
+        .into_iter()
+        .filter(|(_, amm)| is_pool_tradeable(amm))
+        .collect();
+
+    if active_pools.is_empty() {
+        return Err(anyhow!(
+            "No active Raydium AMM V4 pool found for mint {} (all pools are disabled or not tradeable)",
+            mint
+        ));
+    }
+
     // 优先选择包含 WSOL 的交易对
-    let mut wsol_pools: Vec<&(Pubkey, AmmInfo)> = all_pools
+    let mut wsol_pools: Vec<&(Pubkey, AmmInfo)> = active_pools
         .iter()
         .filter(|(_, amm)| amm.coin_mint == SOL_MINT || amm.pc_mint == SOL_MINT)
         .collect();
@@ -239,8 +301,9 @@ async fn find_pool_by_mint_impl(
     }
 
     // 若没有 WSOL 交易对，则按 LP 供应量从大到小排序，选择流动性最好的池
-    all_pools.sort_by(|a, b| b.1.lp_amount.cmp(&a.1.lp_amount));
-    let (address, amm) = all_pools[0].clone();
+    let mut sorted_pools = active_pools;
+    sorted_pools.sort_by(|a, b| b.1.lp_amount.cmp(&a.1.lp_amount));
+    let (address, amm) = sorted_pools[0].clone();
     Ok((address, amm))
 }
 
@@ -283,12 +346,22 @@ pub async fn get_pool_by_mint_force(
     get_pool_by_mint(rpc, mint).await
 }
 
-/// 列出所有包含指定 mint 的 Raydium AMM V4 Pool（不做最优选择）
+/// 列出所有包含指定 mint 的 Raydium AMM V4 Pool
 ///
-/// 该接口主要用于上层路由与策略模块进行池路由与选择，不做任何排序或过滤。
+/// 该接口主要用于上层路由与策略模块进行池路由与选择。
+///
+/// # 参数
+/// - `rpc`: RPC 客户端
+/// - `mint`: 要查询的代币 mint 地址
+/// - `filter_active`: 是否只返回活跃状态的 pool（适合交易的 pool）
+///
+/// # 返回
+/// - 返回所有包含指定 mint 的 pool 列表
+/// - 如果 `filter_active` 为 true，则只返回活跃状态的 pool
 pub async fn list_pools_by_mint(
     rpc: &SolanaRpcClient,
     mint: &Pubkey,
+    filter_active: bool,
 ) -> Result<Vec<(Pubkey, AmmInfo)>, anyhow::Error> {
     use std::collections::HashSet;
 
@@ -315,6 +388,17 @@ pub async fn list_pools_by_mint(
 
     if out.is_empty() {
         return Err(anyhow!("No Raydium AMM V4 pool found for mint {}", mint));
+    }
+
+    // 如果需要过滤活跃状态的 pool
+    if filter_active {
+        out.retain(|(_, amm)| is_pool_tradeable(amm));
+        if out.is_empty() {
+            return Err(anyhow!(
+                "No active Raydium AMM V4 pool found for mint {} (all pools are disabled or not tradeable)",
+                mint
+            ));
+        }
     }
 
     Ok(out)
