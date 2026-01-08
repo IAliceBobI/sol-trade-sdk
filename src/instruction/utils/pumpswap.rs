@@ -473,8 +473,13 @@ pub async fn get_token_balances(
     pool: &Pool,
     rpc: &SolanaRpcClient,
 ) -> Result<(u64, u64), anyhow::Error> {
-    let base_balance = rpc.get_token_account_balance(&pool.pool_base_token_account).await?;
-    let quote_balance = rpc.get_token_account_balance(&pool.pool_quote_token_account).await?;
+    let (base_balance_result, quote_balance_result) = tokio::join!(
+        rpc.get_token_account_balance(&pool.pool_base_token_account),
+        rpc.get_token_account_balance(&pool.pool_quote_token_account),
+    );
+
+    let base_balance = base_balance_result?;
+    let quote_balance = quote_balance_result?;
 
     let base_amount = base_balance.amount.parse::<u64>().map_err(|e| anyhow!(e))?;
     let quote_amount = quote_balance.amount.parse::<u64>().map_err(|e| anyhow!(e))?;
