@@ -306,6 +306,47 @@ async fn test_get_pool_by_mint_wsol() {
     assert_eq!(amm_info_2.pc_mint, amm_info_3.pc_mint, "强制刷新后 pc_mint 不一致");
 }
 
+/// 测试：基于指定 mint (4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R) 获取 Pool
+#[tokio::test]
+#[ignore]
+async fn test_get_pool_by_mint_custom() {
+    // raydium 在 ammv4 上找不到。
+    println!("=== 测试：get_pool_by_mint (4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R) ===");
+
+    let target_mint = Pubkey::from_str("4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R")
+        .expect("Invalid target mint");
+    let rpc_url = "http://127.0.0.1:8899";
+    let rpc = RpcClient::new(rpc_url.to_string());
+
+    // 清理缓存，确保从干净状态开始
+    clear_pool_cache();
+
+    // 第一次查询：应从链上扫描并选择最优池
+    let result1 = get_pool_by_mint(&rpc, &target_mint).await;
+    assert!(result1.is_ok(), "get_pool_by_mint failed: {:?}", result1.err());
+    let (pool_address_1, amm_info_1) = result1.unwrap();
+    println!("第一次查询到的 Pool: {}", pool_address_1);
+    println!("coin_mint: {}", amm_info_1.coin_mint);
+    println!("pc_mint: {}", amm_info_1.pc_mint);
+    println!("lp_amount: {}", amm_info_1.lp_amount);
+
+    // 验证返回的池确实包含目标 mint
+    let target_mint_str = "4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R";
+    assert!(
+        amm_info_1.coin_mint.to_string() == target_mint_str
+            || amm_info_1.pc_mint.to_string() == target_mint_str,
+        "返回的 Pool 不包含目标 mint",
+    );
+
+    // 第二次查询：应命中缓存并返回相同结果
+    let result2 = get_pool_by_mint(&rpc, &target_mint).await.unwrap();
+    let (pool_address_2, amm_info_2) = result2;
+    assert_eq!(pool_address_1, pool_address_2, "缓存中的 pool_address 不一致");
+    assert_eq!(amm_info_1.lp_amount, amm_info_2.lp_amount, "缓存中的 AmmInfo 不一致");
+
+    println!("\n缓存验证通过，pool_address 一致: {}", pool_address_2);
+}
+
 /// 测试：列出所有包含 WSOL 的 Raydium AMM V4 Pool
 #[tokio::test]
 async fn test_list_pools_by_mint_wsol() {

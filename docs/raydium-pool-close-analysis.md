@@ -185,6 +185,17 @@ update_pool_status(pool, status)
 migrateToOpenBook(pool, openbook_market)
 ```
 
+Deactivate Pool 的条件：
+  1. 需要管理员权限
+  2. 使用 setParams 指令更新 pool 的 status 字段
+  3. 或者通过其他方式将 pool 设置为非活跃状态
+
+Migrate Pool 的条件：
+  1. 需要管理员权限
+  2. 使用 migrateToOpenBook 指令
+  3. 需要提供新的 OpenBook market 信息
+  4. 需要确保旧的 Serum market 相关账户正确
+
 ### 4. 停止使用
 
 - 不再向 pool 添加流动性
