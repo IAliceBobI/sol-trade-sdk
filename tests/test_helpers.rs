@@ -62,7 +62,7 @@ pub async fn airdrop_to_payer(
 /// 创建测试用的 SolanaTrade 客户端
 #[allow(dead_code)]
 pub async fn create_test_client() -> SolanaTrade {
-    create_test_client_with_seed_optimize(true).await
+    create_test_client_with_seed_optimize(false).await
 }
 
 /// 创建测试用的 SolanaTrade 客户端（可选择是否启用 seed 优化）
