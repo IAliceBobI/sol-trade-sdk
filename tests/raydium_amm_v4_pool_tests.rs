@@ -37,6 +37,9 @@ use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_sdk::pubkey::Pubkey;
 use std::str::FromStr;
 
+// 用于串行测试
+use serial_test::serial;
+
 /// 已知的 Raydium AMM V4 pool 地址
 /// WSOL-USDC pool on Raydium AMM V4
 /// - Pool Address: 58oQChx4yWmvKdwLLZzBi4ChoCc2fqCUWBkwMihLYQo2
@@ -261,8 +264,10 @@ async fn test_get_pool_by_address_cache() {
     println!("\n=== 所有缓存功能测试通过 ===");
 }
 
-/// 测试：基于 mint 获取最优 Pool（WSOL-USDC 示例）
+/// 测试：基于指定 mint (WSOL) 获取 Pool
+/// 注意：此测试会清除缓存，必须与其他测试串行运行
 #[tokio::test]
+#[serial]
 async fn test_get_pool_by_mint_wsol() {
     println!("=== 测试：get_pool_by_mint (WSOL) ===");
 
