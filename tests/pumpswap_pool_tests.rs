@@ -31,7 +31,7 @@ async fn test_find_pool_by_mint() {
     println!("=== 测试：通过 mint 查找 pool 地址 ===");
 
     let mint = Pubkey::from_str(PUMP_MINT).unwrap();
-    let rpc_url = "http://127.0.0.1:8899";
+    let rpc_url = "https://api.mainnet-beta.solana.com";
     let rpc = RpcClient::new(rpc_url.to_string());
 
     // 调用 find_pool

@@ -353,7 +353,9 @@ async fn test_get_pool_by_mint_custom() {
 }
 
 /// 测试：列出所有包含 WSOL 的 Raydium AMM V4 Pool
+/// 太久了。
 #[tokio::test]
+#[ignore]
 async fn test_list_pools_by_mint_wsol() {
     println!("=== 测试：list_pools_by_mint (WSOL) ===");
 

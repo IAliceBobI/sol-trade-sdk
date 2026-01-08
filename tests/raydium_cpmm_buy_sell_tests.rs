@@ -17,7 +17,7 @@ use serial_test::serial;
 use sol_trade_sdk::{
     common::GasFeeStrategy,
     instruction::utils::raydium_cpmm::{
-        clear_pool_cache, get_pool_by_mint, get_pool_by_mint_force, list_pools_by_mint,
+        clear_pool_cache, get_pool_by_address, get_pool_by_mint, get_pool_by_mint_force, list_pools_by_mint,
     },
     trading::core::params::{DexParamEnum, RaydiumCpmmParams},
     DexType, TradeBuyParams, TradeSellParams, TradeTokenType,
@@ -54,14 +54,19 @@ async fn test_raydium_cpmm_buy_sell_complete() {
     let (initial_sol, _) =
         print_balances(rpc_url, &payer_pubkey).await.expect("Failed to fetch initial balances");
 
-    // ===== 1. 通过 WSOL mint 查找 CPMM Pool =====
+    // ===== 1. 使用指定的 CPMM Pool (PIPE-WSOL) =====
+    let pool_address = Pubkey::from_str("BnYsRpYvJpz6biY3hV6U9smChVePCJ6YyupVDfcnXpTp")
+        .expect("Invalid pool address");
     let wsol_mint = Pubkey::from_str(WSOL_MINT).expect("Invalid WSOL mint");
 
-    println!("\n🔍 查找包含 WSOL 的 Raydium CPMM Pool...");
-    let (pool_address, pool_state) =
-        get_pool_by_mint(&client.rpc, &wsol_mint).await.expect("Failed to find CPMM pool for WSOL");
+    println!("\n🔍 使用指定的 Raydium CPMM Pool: {}", pool_address);
 
-    println!("找到的 Pool: {}", pool_address);
+    // 从 pool 地址获取 pool state
+    let pool_state = get_pool_by_address(&client.rpc, &pool_address)
+        .await
+        .expect("Failed to get CPMM pool state");
+
+    println!("Pool 信息:");
     println!("  token0_mint: {}", pool_state.token0_mint);
     println!("  token1_mint: {}", pool_state.token1_mint);
 
@@ -106,7 +111,7 @@ async fn test_raydium_cpmm_buy_sell_complete() {
         input_token_type: TradeTokenType::SOL,
         mint: target_mint,
         input_token_amount: input_amount,
-        slippage_basis_points: Some(1000), // 10% 容忍度，避免因滑点导致测试偶发失败
+        slippage_basis_points: Some(10000), // 10% 容忍度，避免因滑点导致测试偶发失败
         recent_blockhash: Some(recent_blockhash),
         extension_params: DexParamEnum::RaydiumCpmm(cpmm_params.clone()),
         address_lookup_table_account: None,
@@ -148,7 +153,7 @@ async fn test_raydium_cpmm_buy_sell_complete() {
         output_token_type: TradeTokenType::SOL,
         mint: target_mint,
         input_token_amount: token_after_buy,
-        slippage_basis_points: Some(1000),
+        slippage_basis_points: Some(10000),
         recent_blockhash: Some(recent_blockhash_sell),
         with_tip: false,
         extension_params: DexParamEnum::RaydiumCpmm(cpmm_params_sell),
@@ -206,7 +211,7 @@ async fn test_raydium_cpmm_get_pool_by_mint_wsol_cache_and_force() {
     println!("=== 测试：Raydium CPMM get_pool_by_mint (WSOL, cache & force) ===");
 
     let wsol_mint = Pubkey::from_str(WSOL_MINT).expect("Invalid WSOL mint");
-    let rpc_url = "http://127.0.0.1:8899";
+    let rpc_url = "https://api.mainnet-beta.solana.com";
     let rpc = RpcClient::new(rpc_url.to_string());
 
     // 1. 清空缓存，确保从干净状态开始

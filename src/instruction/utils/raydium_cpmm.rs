@@ -278,6 +278,49 @@ async fn find_pools_by_mint_offset_collect(
     Ok(pools)
 }
 
+/// Select the best pool from a list of pools based on multiple criteria:
+/// 1. Pool status (0 = uninitialized, prefer initialized pools)
+/// 2. LP supply (higher is better - more liquidity means less slippage)
+/// 3. Open time (earlier is better - more mature pools)
+fn select_best_pool(pools: &[(Pubkey, PoolState)]) -> (Pubkey, PoolState) {
+    if pools.is_empty() {
+        panic!("Cannot select best pool from empty list");
+    }
+
+    if pools.len() == 1 {
+        return pools[0].clone();
+    }
+
+    // Filter out uninitialized pools (status == 0 is typically uninitialized)
+    let active_pools: Vec<_> = pools.iter()
+        .filter(|(_, pool)| pool.status != 0)
+        .collect();
+
+    let candidates = if active_pools.is_empty() {
+        // If all pools are uninitialized, use all pools
+        pools
+    } else {
+        // Use only active pools
+        &active_pools.iter().map(|&p| p.clone()).collect::<Vec<_>>()[..]
+    };
+
+    // Find pool with highest liquidity (lp_supply)
+    let best = candidates.iter()
+        .max_by(|(_, pool_a), (_, pool_b)| {
+            // Primary criterion: LP supply (liquidity)
+            match pool_a.lp_supply.cmp(&pool_b.lp_supply) {
+                std::cmp::Ordering::Equal => {
+                    // Secondary criterion: earlier open time (more mature)
+                    pool_b.open_time.cmp(&pool_a.open_time)
+                }
+                other => other,
+            }
+        })
+        .expect("No pools to select from");
+
+    best.clone()
+}
+
 /// 内部实现：查找 mint 对应的最优池
 async fn find_pool_by_mint_impl(
     rpc: &SolanaRpcClient,
@@ -309,9 +352,9 @@ async fn find_pool_by_mint_impl(
         return Err(anyhow!("No CPMM pool found for mint {}", mint));
     }
 
-    // Return first pool (could be improved with liquidity sorting)
-    let (address, pool) = all_pools[0].clone();
-    Ok((address, pool))
+    // Select the best pool based on liquidity, status, and open time
+    let best_pool = select_best_pool(&all_pools);
+    Ok(best_pool)
 }
 
 /// List all CPMM pools that contain the given mint as token0 or token1.
