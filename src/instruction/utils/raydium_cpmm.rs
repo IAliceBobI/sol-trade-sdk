@@ -315,8 +315,13 @@ pub async fn list_pools_by_mint(
     let mut out: Vec<(Pubkey, PoolState)> = Vec::new();
     let mut seen: HashSet<Pubkey> = HashSet::new();
 
-    // Scan token0_mint pools
-    if let Ok(token0_pools) = find_pools_by_mint_offset_collect(rpc, mint, TOKEN0_MINT_OFFSET).await {
+    // 并行扫描 token0_mint 和 token1_mint 对应的池
+    let (token0_result, token1_result) = tokio::join!(
+        find_pools_by_mint_offset_collect(rpc, mint, TOKEN0_MINT_OFFSET),
+        find_pools_by_mint_offset_collect(rpc, mint, TOKEN1_MINT_OFFSET),
+    );
+
+    if let Ok(token0_pools) = token0_result {
         for (addr, pool) in token0_pools {
             if seen.insert(addr) {
                 out.push((addr, pool));
@@ -324,8 +329,7 @@ pub async fn list_pools_by_mint(
         }
     }
 
-    // Scan token1_mint pools and merge
-    if let Ok(token1_pools) = find_pools_by_mint_offset_collect(rpc, mint, TOKEN1_MINT_OFFSET).await {
+    if let Ok(token1_pools) = token1_result {
         for (addr, pool) in token1_pools {
             if seen.insert(addr) {
                 out.push((addr, pool));
