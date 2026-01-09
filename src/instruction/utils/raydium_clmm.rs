@@ -264,6 +264,49 @@ async fn find_pools_by_mint_offset_collect(
     Ok(pools)
 }
 
+/// Select the best pool from a list of pools based on multiple criteria:
+/// 1. Pool liquidity (higher is better - more liquidity means less slippage)
+/// 2. Tick spacing (smaller is better - finer granularity)
+/// For CLMM pools, we prioritize liquidity > 0 to ensure tradeable pools
+fn select_best_pool(pools: &[(Pubkey, PoolState)]) -> (Pubkey, PoolState) {
+    if pools.is_empty() {
+        panic!("Cannot select best pool from empty list");
+    }
+
+    if pools.len() == 1 {
+        return pools[0].clone();
+    }
+
+    // Filter pools with positive liquidity (tradeable pools)
+    let liquid_pools: Vec<_> = pools.iter()
+        .filter(|(_, pool)| pool.liquidity > 0)
+        .collect();
+
+    let candidates = if liquid_pools.is_empty() {
+        // If all pools have zero liquidity, use all pools as fallback
+        pools
+    } else {
+        // Use only pools with liquidity
+        &liquid_pools.iter().map(|&p| p.clone()).collect::<Vec<_>>()[..]
+    };
+
+    // Find pool with highest liquidity
+    let best = candidates.iter()
+        .max_by(|(_, pool_a), (_, pool_b)| {
+            // Primary criterion: liquidity (higher is better)
+            match pool_a.liquidity.cmp(&pool_b.liquidity) {
+                std::cmp::Ordering::Equal => {
+                    // Secondary criterion: tick spacing (smaller is better for tighter spreads)
+                    pool_b.tick_spacing.cmp(&pool_a.tick_spacing)
+                }
+                other => other,
+            }
+        })
+        .expect("No pools to select from");
+
+    best.clone()
+}
+
 /// 内部实现：查找 mint 对应的最优池
 async fn find_pool_by_mint_impl(
     rpc: &SolanaRpcClient,
@@ -292,9 +335,9 @@ async fn find_pool_by_mint_impl(
         return Err(anyhow!("No CLMM pool found for mint {}", mint));
     }
 
-    // Return first pool (could be improved with liquidity sorting)
-    let (address, pool) = all_pools[0].clone();
-    Ok((address, pool))
+    // Select the best pool based on liquidity and tick spacing
+    let best_pool = select_best_pool(&all_pools);
+    Ok(best_pool)
 }
 
 /// List all Raydium CLMM pools that contain the given mint as token0 or token1.

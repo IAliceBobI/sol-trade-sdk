@@ -300,7 +300,7 @@ async fn test_raydium_clmm_clear_cache() {
     println!("=== 测试：Raydium CLMM clear_pool_cache ===");
 
     let wsol_mint = Pubkey::from_str(WSOL_MINT).expect("Invalid WSOL mint");
-    let rpc_url = "http://127.0.0.1:8899";
+    let rpc_url = "https://api.mainnet-beta.solana.com";
     let rpc = RpcClient::new(rpc_url.to_string());
 
     // 清空缓存
@@ -348,7 +348,7 @@ async fn test_raydium_clmm_get_pool_by_non_wsol_mint() {
 
     // 先找到包含 WSOL 的池，然后获取其另一个 token 的 mint
     let wsol_mint = Pubkey::from_str(WSOL_MINT).expect("Invalid WSOL mint");
-    let rpc_url = "http://127.0.0.1:8899";
+    let rpc_url = "https://api.mainnet-beta.solana.com";
     let rpc = RpcClient::new(rpc_url.to_string());
 
     // 获取一个包含 WSOL 的池
