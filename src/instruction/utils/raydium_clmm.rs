@@ -1,6 +1,7 @@
 use crate::{
     common::SolanaRpcClient,
     instruction::utils::raydium_clmm_types::{PoolState, pool_state_decode},
+    constants::{SOL_MINT, USDC_MINT, USDT_MINT},
 };
 use anyhow::anyhow;
 use solana_sdk::pubkey::Pubkey;
@@ -77,6 +78,12 @@ pub fn get_tick_array_start_index(tick_current: i32, tick_spacing: u16) -> i32 {
 pub mod accounts {
     use solana_sdk::{pubkey, pubkey::Pubkey};
     pub const RAYDIUM_CLMM: Pubkey = pubkey!("CAMMCzo5YL8w4VFF8KVHrK22GGUsp5VTaW7grrKgrWqK");
+}
+
+/// 判断是否为 Hot Mint（主流桥接资产）
+/// 当前包含：WSOL、USDC、USDT
+fn is_hot_mint(mint: &Pubkey) -> bool {
+    *mint == SOL_MINT || *mint == USDC_MINT || *mint == USDT_MINT
 }
 
 /// Calculate tick array bitmap extension PDA
@@ -278,9 +285,10 @@ async fn find_pools_by_mint_offset_collect(
 }
 
 /// Select the best pool from a list of pools based on multiple criteria:
-/// 1. Pool liquidity (higher is better - more liquidity means less slippage)
-/// 2. Tick spacing (smaller is better - finer granularity)
-/// For CLMM pools, we prioritize liquidity > 0 to ensure tradeable pools
+/// 1. Pool status/liquidity（优先可交易池，liquidity > 0 且 status != 0）
+/// 2. Pool liquidity (higher is better - more liquidity means less slippage)
+/// 3. Open time (more recent pools first when liquidity is equal)
+/// 4. Tick spacing (smaller is better - finer granularity)
 fn select_best_pool(pools: &[(Pubkey, PoolState)]) -> (Pubkey, PoolState) {
     if pools.is_empty() {
         panic!("Cannot select best pool from empty list");
@@ -290,28 +298,47 @@ fn select_best_pool(pools: &[(Pubkey, PoolState)]) -> (Pubkey, PoolState) {
         return pools[0].clone();
     }
 
-    // Filter pools with positive liquidity (tradeable pools)
-    let liquid_pools: Vec<_> = pools.iter()
+    // 1. 优先选择「已激活且有流动性」的池
+    let tradeable_pools: Vec<_> = pools
+        .iter()
+        .filter(|(_, pool)| pool.status != 0 && pool.liquidity > 0)
+        .collect();
+
+    let fallback_liquid_pools: Vec<_> = pools
+        .iter()
         .filter(|(_, pool)| pool.liquidity > 0)
         .collect();
 
-    let candidates = if liquid_pools.is_empty() {
-        // If all pools have zero liquidity, use all pools as fallback
-        pools
+    let candidates = if !tradeable_pools.is_empty() {
+        &tradeable_pools
+            .iter()
+            .map(|&p| p.clone())
+            .collect::<Vec<_>>()[..]
+    } else if !fallback_liquid_pools.is_empty() {
+        // 所有池的 status 都为 0 时，至少保证有流动性
+        &fallback_liquid_pools
+            .iter()
+            .map(|&p| p.clone())
+            .collect::<Vec<_>>()[..]
     } else {
-        // Use only pools with liquidity
-        &liquid_pools.iter().map(|&p| p.clone()).collect::<Vec<_>>()[..]
+        // 极端情况：全部池流动性为 0，退化为任意池
+        pools
     };
 
-    // Find pool with highest liquidity
-    let best = candidates.iter()
+    // 2. 在候选集中按「流动性 -> open_time -> tick_spacing」排序
+    let best = candidates
+        .iter()
         .max_by(|(_, pool_a), (_, pool_b)| {
-            // Primary criterion: liquidity (higher is better)
+            use std::cmp::Ordering;
+
             match pool_a.liquidity.cmp(&pool_b.liquidity) {
-                std::cmp::Ordering::Equal => {
-                    // Secondary criterion: tick spacing (smaller is better for tighter spreads)
-                    pool_b.tick_spacing.cmp(&pool_a.tick_spacing)
-                }
+                Ordering::Equal => match pool_a.open_time.cmp(&pool_b.open_time) {
+                    Ordering::Equal => {
+                        // Tick spacing 越小，价格粒度越细，优先级越高
+                        pool_b.tick_spacing.cmp(&pool_a.tick_spacing)
+                    }
+                    other => other,
+                },
                 other => other,
             }
         })
@@ -348,8 +375,37 @@ async fn find_pool_by_mint_impl(
         return Err(anyhow!("No CLMM pool found for mint {}", mint));
     }
 
-    // Select the best pool based on liquidity and tick spacing
-    let best_pool = select_best_pool(&all_pools);
+    // 优先选择与 Hot Mint（如 WSOL/USDC/USDT）配对的池，参考 Pool 选择算法分析文档的 Hot/Cold 策略
+    let mut hot_pools: Vec<(Pubkey, PoolState)> = Vec::new();
+    let mut other_pools: Vec<(Pubkey, PoolState)> = Vec::new();
+
+    for (addr, pool) in all_pools.into_iter() {
+        // 找到与目标 mint 对应的另一侧 mint
+        let other_mint = if pool.token_mint0 == *mint {
+            pool.token_mint1
+        } else if pool.token_mint1 == *mint {
+            pool.token_mint0
+        } else {
+            // 理论上不会出现，但为了稳健性仍加入非 Hot 集合
+            other_pools.push((addr, pool));
+            continue;
+        };
+
+        if is_hot_mint(&other_mint) {
+            hot_pools.push((addr, pool));
+        } else {
+            other_pools.push((addr, pool));
+        }
+    }
+
+    let best_pool = if !hot_pools.is_empty() {
+        // Hot 对优先：通常是 mint/WSOL、mint/USDC、mint/USDT 等主路由
+        select_best_pool(&hot_pools)
+    } else {
+        // 没有 Hot 对时，在所有池中按通用评分规则选择
+        select_best_pool(&other_pools)
+    };
+
     Ok(best_pool)
 }
 
