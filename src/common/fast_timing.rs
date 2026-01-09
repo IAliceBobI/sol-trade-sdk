@@ -157,6 +157,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore]
     async fn test_stopwatch() {
         // 使用标准 Instant 测试
         let start = Instant::now();

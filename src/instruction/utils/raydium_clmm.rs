@@ -682,6 +682,12 @@ pub async fn list_pools_by_mint(
         find_pools_by_mint_offset_collect(rpc, mint, TOKEN_MINT1_OFFSET)
     );
 
+    // 检测是否都失败，如果都失败则返回第一个错误（通常包含 RPC 限制信息）
+    if result0.is_err() && result1.is_err() {
+        // 返回 result0 的错误，它包含我们的自定义错误消息
+        return Err(result0.unwrap_err());
+    }
+
     let mut out: Vec<(Pubkey, PoolState)> = Vec::new();
     let mut seen: HashSet<Pubkey> = HashSet::new();
 

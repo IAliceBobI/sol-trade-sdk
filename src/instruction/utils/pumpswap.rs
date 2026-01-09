@@ -407,6 +407,12 @@ async fn find_all_pools_by_mint_impl(
         find_pools_by_mint_offset_collect(rpc, mint, QUOTE_MINT_OFFSET)
     );
 
+    // 检测是否都失败，如果都失败则返回第一个错误（通常包含 RPC 限制信息）
+    if base_result.is_err() && quote_result.is_err() {
+        // 返回 base_result 的错误，它包含我们的自定义错误消息
+        return Err(base_result.unwrap_err());
+    }
+
     let mut all_pools: Vec<(Pubkey, Pool)> = Vec::new();
 
     if let Ok(pools) = base_result {
