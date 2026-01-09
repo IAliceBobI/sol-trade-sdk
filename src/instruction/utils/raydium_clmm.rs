@@ -1,6 +1,6 @@
 use crate::{
     common::SolanaRpcClient,
-    instruction::utils::raydium_clmm_types::{PoolState, pool_state_decode, POOL_STATE_SIZE},
+    instruction::utils::raydium_clmm_types::{PoolState, pool_state_decode},
 };
 use anyhow::anyhow;
 use solana_sdk::pubkey::Pubkey;
@@ -228,7 +228,8 @@ async fn find_pools_by_mint_offset_collect(
     use solana_client::rpc_filter::Memcmp;
 
     let filters = vec![
-        RpcFilterType::DataSize(POOL_STATE_SIZE as u64),
+        // CLMM 账户总大小 = 1536 (数据) + 8 (discriminator) = 1544
+        RpcFilterType::DataSize(1544),
         RpcFilterType::Memcmp(Memcmp::new_base58_encoded(offset, &mint.to_bytes())),
     ];
     let config = RpcProgramAccountsConfig {
