@@ -269,14 +269,16 @@ async fn find_pool_by_mint_impl(
     rpc: &SolanaRpcClient,
     mint: &Pubkey,
 ) -> Result<(Pubkey, PoolState), anyhow::Error> {
-    // Try token_mint0 offset
-    let mut all_pools: Vec<(Pubkey, PoolState)> = match find_pools_by_mint_offset_collect(rpc, mint, TOKEN_MINT0_OFFSET).await {
-        Ok(pools) => pools,
-        Err(_) => Vec::new(),
-    };
+    // Parallel search: try both token_mint0 and token_mint1 offsets simultaneously
+    let (result0, result1) = tokio::join!(
+        find_pools_by_mint_offset_collect(rpc, mint, TOKEN_MINT0_OFFSET),
+        find_pools_by_mint_offset_collect(rpc, mint, TOKEN_MINT1_OFFSET)
+    );
 
-    // Try token_mint1 offset and merge
-    if let Ok(quote_pools) = find_pools_by_mint_offset_collect(rpc, mint, TOKEN_MINT1_OFFSET).await {
+    let mut all_pools: Vec<(Pubkey, PoolState)> = result0.unwrap_or_default();
+
+    // Merge token_mint1 results
+    if let Ok(quote_pools) = result1 {
         use std::collections::HashSet;
         let mut seen: HashSet<Pubkey> = all_pools.iter().map(|(addr, _)| *addr).collect();
         for (addr, pool) in quote_pools {
@@ -305,11 +307,17 @@ pub async fn list_pools_by_mint(
 ) -> Result<Vec<(Pubkey, PoolState)>, anyhow::Error> {
     use std::collections::HashSet;
 
+    // Parallel search: scan both token_mint0 and token_mint1 simultaneously
+    let (result0, result1) = tokio::join!(
+        find_pools_by_mint_offset_collect(rpc, mint, TOKEN_MINT0_OFFSET),
+        find_pools_by_mint_offset_collect(rpc, mint, TOKEN_MINT1_OFFSET)
+    );
+
     let mut out: Vec<(Pubkey, PoolState)> = Vec::new();
     let mut seen: HashSet<Pubkey> = HashSet::new();
 
-    // Scan token_mint0 pools
-    if let Ok(token0_pools) = find_pools_by_mint_offset_collect(rpc, mint, TOKEN_MINT0_OFFSET).await {
+    // Merge token_mint0 results
+    if let Ok(token0_pools) = result0 {
         for (addr, pool) in token0_pools {
             if seen.insert(addr) {
                 out.push((addr, pool));
@@ -317,8 +325,8 @@ pub async fn list_pools_by_mint(
         }
     }
 
-    // Scan token_mint1 pools and merge
-    if let Ok(token1_pools) = find_pools_by_mint_offset_collect(rpc, mint, TOKEN_MINT1_OFFSET).await {
+    // Merge token_mint1 results
+    if let Ok(token1_pools) = result1 {
         for (addr, pool) in token1_pools {
             if seen.insert(addr) {
                 out.push((addr, pool));
