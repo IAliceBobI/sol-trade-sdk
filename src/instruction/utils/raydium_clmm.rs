@@ -199,6 +199,20 @@ pub async fn get_pool_by_mint(
     rpc: &SolanaRpcClient,
     mint: &Pubkey,
 ) -> Result<(Pubkey, PoolState), anyhow::Error> {
+    get_pool_by_mint_with_options(rpc, mint, false).await
+}
+
+/// 获取指定 mint 对应的最优 CLMM 池（带选项）
+/// 
+/// # Arguments
+/// * `use_vault_balance` - 是否使用金库余额选池策略（需要RPC调用，但更准确）
+///   - `true`: 并发读取候选池的USDC/USDT/WSOL金库余额，按余额从大到小选择（推荐用于生产环境）
+///   - `false`: 使用PoolState中的现有字段（liquidity等）选池，零网络开销（推荐用于测试/快速查询）
+pub async fn get_pool_by_mint_with_options(
+    rpc: &SolanaRpcClient,
+    mint: &Pubkey,
+    use_vault_balance: bool,
+) -> Result<(Pubkey, PoolState), anyhow::Error> {
     // 1. 检查缓存
     if let Some(pool_address) = raydium_clmm_cache::get_cached_pool_address_by_mint(mint) {
         if let Some(pool) = raydium_clmm_cache::get_cached_pool_by_address(&pool_address) {
@@ -206,7 +220,7 @@ pub async fn get_pool_by_mint(
         }
     }
     // 2. RPC 查询
-    let (pool_address, pool) = find_pool_by_mint_impl(rpc, mint).await?;
+    let (pool_address, pool) = find_pool_by_mint_impl(rpc, mint, use_vault_balance).await?;
     // 3. 写入缓存
     raydium_clmm_cache::cache_pool_address_by_mint(mint, &pool_address);
     raydium_clmm_cache::cache_pool_by_address(&pool_address, &pool);
@@ -227,6 +241,16 @@ pub async fn get_pool_by_mint_force(
 ) -> Result<(Pubkey, PoolState), anyhow::Error> {
     raydium_clmm_cache::MINT_TO_POOL_CACHE.remove(mint);
     get_pool_by_mint(rpc, mint).await
+}
+
+/// 强制刷新缓存并获取指定 mint 对应的最优 CLMM 池（带选项）
+pub async fn get_pool_by_mint_force_with_options(
+    rpc: &SolanaRpcClient,
+    mint: &Pubkey,
+    use_vault_balance: bool,
+) -> Result<(Pubkey, PoolState), anyhow::Error> {
+    raydium_clmm_cache::MINT_TO_POOL_CACHE.remove(mint);
+    get_pool_by_mint_with_options(rpc, mint, use_vault_balance).await
 }
 
 pub fn clear_pool_cache() {
@@ -280,11 +304,8 @@ async fn find_pools_by_mint_offset_collect(
     Ok(pools)
 }
 
-/// Select the best pool from a list of pools based on multiple criteria:
-/// 1. Pool status/liquidity（优先可交易池，liquidity > 0 且 status != 0）
-/// 2. Pool liquidity (higher is better - more liquidity means less slippage)
-/// 3. Open time (more recent pools first when liquidity is equal)
-/// 4. Tick spacing (smaller is better - finer granularity)
+/// 通用选池逻辑（降级使用）
+/// 基于 status、liquidity、open_time、tick_spacing 选择
 fn select_best_pool(pools: &[(Pubkey, PoolState)]) -> (Pubkey, PoolState) {
     if pools.is_empty() {
         panic!("Cannot select best pool from empty list");
@@ -331,6 +352,88 @@ fn select_best_pool(pools: &[(Pubkey, PoolState)]) -> (Pubkey, PoolState) {
         .expect("No pools to select from");
 
     best.clone()
+}
+
+/// 按累计交易量选择最佳池（零网络开销）
+/// 
+/// 策略：
+/// - 如果池子包含 WSOL/USDC/USDT，只计算这些稳定资产侧的累计交易量
+/// - 否则计算两侧的总交易量
+/// 交易量越大，说明池子被实际使用越多，深度越可靠
+fn select_best_pool_by_volume(pools: &[(Pubkey, PoolState)]) -> (Pubkey, PoolState) {
+    if pools.is_empty() {
+        panic!("Cannot select best pool from empty list");
+    }
+
+    if pools.len() == 1 {
+        return pools[0].clone();
+    }
+
+    // 过滤掉流动性为0的池
+    let mut valid_pools: Vec<_> = pools
+        .iter()
+        .filter(|(_, pool)| pool.liquidity > 0)
+        .map(|(addr, pool)| (*addr, pool.clone()))
+        .collect();
+
+    if valid_pools.is_empty() {
+        // 如果全部池流动性为0，降级为通用选池逻辑
+        return select_best_pool(pools);
+    }
+
+    // 按累计交易量排序
+    valid_pools.sort_by(|(_, pool_a), (_, pool_b)| {
+        // 计算有效交易量（优先只看WSOL/USDC/USDT侧）
+        let volume_a = calculate_effective_volume(pool_a);
+        let volume_b = calculate_effective_volume(pool_b);
+        
+        // 按交易量降序排序
+        match volume_b.cmp(&volume_a) {
+            std::cmp::Ordering::Equal => {
+                // 交易量相同时，按流动性排序
+                match pool_b.liquidity.cmp(&pool_a.liquidity) {
+                    std::cmp::Ordering::Equal => {
+                        // 流动性也相同时，按开池时间排序（更早的池更成熟）
+                        pool_b.open_time.cmp(&pool_a.open_time)
+                    }
+                    other => other,
+                }
+            }
+            other => other,
+        }
+    });
+
+    // 返回交易量最高的池
+    valid_pools.into_iter().next().unwrap()
+}
+
+/// 计算池子的有效交易量
+/// - 如果包含 WSOL/USDC/USDT，只计算这些资产侧的交易量
+/// - 否则计算两侧的总交易量
+fn calculate_effective_volume(pool: &PoolState) -> u128 {
+    // 检查 token0 是否为 WSOL/USDC/USDT
+    let token0_is_stable = pool.token_mint0 == SOL_MINT 
+        || pool.token_mint0 == USDC_MINT 
+        || pool.token_mint0 == USDT_MINT;
+    
+    // 检查 token1 是否为 WSOL/USDC/USDT
+    let token1_is_stable = pool.token_mint1 == SOL_MINT 
+        || pool.token_mint1 == USDC_MINT 
+        || pool.token_mint1 == USDT_MINT;
+    
+    if token0_is_stable && !token1_is_stable {
+        // 只计算 token0 侧（WSOL/USDC/USDT）的交易量
+        pool.swap_in_amount_token0.saturating_add(pool.swap_out_amount_token0)
+    } else if token1_is_stable && !token0_is_stable {
+        // 只计算 token1 侧（WSOL/USDC/USDT）的交易量
+        pool.swap_in_amount_token1.saturating_add(pool.swap_out_amount_token1)
+    } else {
+        // 两侧都是稳定资产或都不是，计算总交易量
+        pool.swap_in_amount_token0
+            .saturating_add(pool.swap_out_amount_token0)
+            .saturating_add(pool.swap_in_amount_token1)
+            .saturating_add(pool.swap_out_amount_token1)
+    }
 }
 
 /// 内部使用的候选结构：包含池地址、池状态、优先金库地址
@@ -499,6 +602,7 @@ async fn select_best_wsol_pool_by_vault_balance(
 async fn find_pool_by_mint_impl(
     rpc: &SolanaRpcClient,
     mint: &Pubkey,
+    use_vault_balance: bool,
 ) -> Result<(Pubkey, PoolState), anyhow::Error> {
     // Parallel search: try both token_mint0 and token_mint1 offsets simultaneously
     let (result0, result1) = tokio::join!(
@@ -548,18 +652,29 @@ async fn find_pool_by_mint_impl(
 
     let best_pool = if !hot_pools.is_empty() {
         // Hot 对优先：通常是 mint/WSOL、mint/USDC、mint/USDT 等主路由
-        // 对 Hot 对额外按金库余额（USDC/USDT/WSOL）择优（并发读取，控制并发数100）
-        select_best_hot_pool_by_vault_balance(rpc, &hot_pools).await
-    } else if *mint == SOL_MINT {
-        // 特殊情况：当 mint 本身是 WSOL 时，在所有包含 WSOL 的池中按 WSOL 金库余额择优
-        if let Some(best) = select_best_wsol_pool_by_vault_balance(rpc, &other_pools).await {
-            best
+        if use_vault_balance {
+            // 对 Hot 对额外按金库余额（USDC/USDT/WSOL）择优（并发读取，控制并发数1000）
+            select_best_hot_pool_by_vault_balance(rpc, &hot_pools).await
         } else {
-            select_best_pool(&other_pools)
+            // 使用累计交易量选池（零网络开销，反映真实使用深度）
+            select_best_pool_by_volume(&hot_pools)
+        }
+    } else if *mint == SOL_MINT {
+        // 特殊情况：当 mint 本身是 WSOL 时
+        if use_vault_balance {
+            // 在所有包含 WSOL 的池中按 WSOL 金库余额择优
+            if let Some(best) = select_best_wsol_pool_by_vault_balance(rpc, &other_pools).await {
+                best
+            } else {
+                select_best_pool_by_volume(&other_pools)
+            }
+        } else {
+            // 使用累计交易量选池（零网络开销）
+            select_best_pool_by_volume(&other_pools)
         }
     } else {
-        // 没有 Hot 对时，在所有池中按通用评分规则选择
-        select_best_pool(&other_pools)
+        // 没有 Hot 对时，使用累计交易量选池
+        select_best_pool_by_volume(&other_pools)
     };
 
     Ok(best_pool)

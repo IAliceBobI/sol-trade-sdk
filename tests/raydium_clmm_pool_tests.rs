@@ -14,12 +14,8 @@
 
 use serial_test::serial;
 use sol_trade_sdk::instruction::utils::raydium_clmm::{
-    get_pool_by_address,
-    get_pool_by_mint,
-    get_pool_by_address_force,
-    get_pool_by_mint_force,
-    list_pools_by_mint,
-    clear_pool_cache,
+    clear_pool_cache, get_pool_by_address, get_pool_by_address_force, get_pool_by_mint,
+    get_pool_by_mint_force, list_pools_by_mint,
 };
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_sdk::pubkey::Pubkey;
@@ -53,12 +49,10 @@ async fn test_raydium_clmm_get_pool_by_mint_wsol_cache_and_force() {
     println!("✅ 缓存已清空");
 
     // 2. 第一次 list_pools_by_mint：应从链上扫描
-    let pools_1 = list_pools_by_mint(&rpc, &wsol_mint)
-        .await
-        .expect("list_pools_by_mint failed");
+    let pools_1 = list_pools_by_mint(&rpc, &wsol_mint).await.expect("list_pools_by_mint failed");
     println!("第一次 list_pools_by_mint 查询到 {} 个 Pool", pools_1.len());
     assert!(!pools_1.is_empty(), "WSOL 相关的 CLMM Pool 列表不应为空");
-    
+
     for (addr, pool) in &pools_1 {
         assert!(
             pool.token_mint0 == wsol_mint || pool.token_mint1 == wsol_mint,
@@ -69,16 +63,15 @@ async fn test_raydium_clmm_get_pool_by_mint_wsol_cache_and_force() {
     println!("✅ 第一次 list_pools 验证通过");
 
     // 3. 第二次 list_pools_by_mint：应返回相同结果（来自缓存或链上）
-    let pools_2 = list_pools_by_mint(&rpc, &wsol_mint)
-        .await
-        .expect("list_pools_by_mint (2nd) failed");
+    let pools_2 =
+        list_pools_by_mint(&rpc, &wsol_mint).await.expect("list_pools_by_mint (2nd) failed");
     assert_eq!(pools_1.len(), pools_2.len(), "第二次 list_pools 数量不一致");
     println!("✅ 第二次 list_pools 验证通过（数量一致）");
 
     // 4. 清除缓存后再次查询
     clear_pool_cache();
     println!("✅ 缓存已再次清空");
-    
+
     let pools_3 = list_pools_by_mint(&rpc, &wsol_mint)
         .await
         .expect("list_pools_by_mint (after clear) failed");
@@ -86,9 +79,8 @@ async fn test_raydium_clmm_get_pool_by_mint_wsol_cache_and_force() {
     println!("✅ 清除缓存后 list_pools 验证通过");
 
     // 5. 使用 get_pool_by_mint 查找最优 Pool
-    let (pool_addr_1, pool_state_1) = get_pool_by_mint(&rpc, &wsol_mint)
-        .await
-        .expect("get_pool_by_mint failed");
+    let (pool_addr_1, pool_state_1) =
+        get_pool_by_mint(&rpc, &wsol_mint).await.expect("get_pool_by_mint failed");
     println!("\nget_pool_by_mint 查询到的最优 Pool: {}", pool_addr_1);
     println!("  token0_mint: {}", pool_state_1.token_mint0);
     println!("  token1_mint: {}", pool_state_1.token_mint1);
@@ -111,18 +103,16 @@ async fn test_raydium_clmm_get_pool_by_mint_wsol_cache_and_force() {
     println!("✅ 基本字段验证通过");
 
     // 第二次查询：应命中缓存，返回相同的池地址
-    let (pool_addr_2, pool_state_2) = get_pool_by_mint(&rpc, &wsol_mint)
-        .await
-        .expect("get_pool_by_mint (cached) failed");
+    let (pool_addr_2, pool_state_2) =
+        get_pool_by_mint(&rpc, &wsol_mint).await.expect("get_pool_by_mint (cached) failed");
     assert_eq!(pool_addr_1, pool_addr_2, "缓存中的 pool_address 不一致");
     assert_eq!(pool_state_1.amm_config, pool_state_2.amm_config, "缓存中的 amm_config 不一致");
     assert_eq!(pool_state_1.liquidity, pool_state_2.liquidity, "缓存中的 liquidity 不一致");
     println!("✅ get_pool_by_mint 缓存验证通过（数据一致）");
 
     // 6. 强制刷新：删除缓存后重新查询
-    let (pool_addr_3, pool_state_3) = get_pool_by_mint_force(&rpc, &wsol_mint)
-        .await
-        .expect("get_pool_by_mint_force failed");
+    let (pool_addr_3, pool_state_3) =
+        get_pool_by_mint_force(&rpc, &wsol_mint).await.expect("get_pool_by_mint_force failed");
     println!("\n强制刷新后的 Pool: {}", pool_addr_3);
 
     // 通常情况下，强制刷新前后返回的主池应相同
@@ -216,9 +206,8 @@ async fn test_raydium_clmm_get_pool_by_address_force() {
     clear_pool_cache();
 
     // 先获取 pool 地址
-    let (pool_address, _) = get_pool_by_mint(&rpc, &wsol_mint)
-        .await
-        .expect("get_pool_by_mint failed");
+    let (pool_address, _) =
+        get_pool_by_mint(&rpc, &wsol_mint).await.expect("get_pool_by_mint failed");
     println!("Pool 地址: {}", pool_address);
 
     // 第一次调用（写入缓存）
@@ -263,16 +252,14 @@ async fn test_raydium_clmm_clear_cache() {
 
     // 写入缓存
     println!("\n写入缓存...");
-    let (pool_address, pool_state) = get_pool_by_mint(&rpc, &wsol_mint)
-        .await
-        .expect("get_pool_by_mint failed");
+    let (pool_address, pool_state) =
+        get_pool_by_mint(&rpc, &wsol_mint).await.expect("get_pool_by_mint failed");
     println!("  Pool Address: {}", pool_address);
     println!("  Liquidity: {}", pool_state.liquidity);
 
     // 再次查询确认缓存已写入
-    let (_, pool_state_cached) = get_pool_by_mint(&rpc, &wsol_mint)
-        .await
-        .expect("get_pool_by_mint (cached) failed");
+    let (_, pool_state_cached) =
+        get_pool_by_mint(&rpc, &wsol_mint).await.expect("get_pool_by_mint (cached) failed");
     assert_eq!(pool_state.liquidity, pool_state_cached.liquidity);
     println!("  缓存验证成功");
 
@@ -306,9 +293,8 @@ async fn test_raydium_clmm_get_pool_by_non_wsol_mint() {
     let rpc = RpcClient::new(rpc_url.to_string());
 
     // 获取一个包含 WSOL 的池
-    let (_, pool_state) = get_pool_by_mint(&rpc, &wsol_mint)
-        .await
-        .expect("get_pool_by_mint failed");
+    let (_, pool_state) =
+        get_pool_by_mint(&rpc, &wsol_mint).await.expect("get_pool_by_mint failed");
 
     // 确定另一个 token 的 mint
     let target_mint = if pool_state.token_mint0 == wsol_mint {
