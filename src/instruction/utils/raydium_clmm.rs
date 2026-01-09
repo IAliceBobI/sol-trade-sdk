@@ -333,38 +333,66 @@ fn select_best_pool(pools: &[(Pubkey, PoolState)]) -> (Pubkey, PoolState) {
     best.clone()
 }
 
-/// 在一组候选池中，按流动性从大到小选择最佳池（零网络开销）
-fn pick_best_by_liquidity(
-    candidates: Vec<(Pubkey, PoolState)>,
+/// 内部使用的候选结构：包含池地址、池状态、优先金库地址
+struct PoolCandidate {
+    addr: Pubkey,
+    pool: PoolState,
+    priority_vault: Pubkey,
+}
+
+/// 在一组候选池中，按金库余额并发读取并选择最佳池
+/// 
+/// 策略：并发读取所有候选池的金库余额（控制并发数为100），按余额从大到小选择
+async fn pick_best_by_vault_balance_concurrent(
+    rpc: &SolanaRpcClient,
+    candidates: Vec<PoolCandidate>,
 ) -> Option<(Pubkey, PoolState)> {
     if candidates.is_empty() {
         return None;
     }
 
-    // 过滤掉流动性为0的池，然后按流动性降序排序
-    let mut valid_pools: Vec<_> = candidates
+    use futures::stream::{self, StreamExt};
+
+    // 并发读取所有金库余额，控制并发数为100
+    let results: Vec<_> = stream::iter(candidates)
+        .map(|cand| async move {
+            let balance_res = rpc.get_token_account_balance(&cand.priority_vault).await;
+            let amount: u64 = match balance_res {
+                Ok(bal) => bal.amount.parse::<u64>().unwrap_or(0),
+                Err(_) => 0,
+            };
+            (cand.addr, cand.pool, amount)
+        })
+        .buffer_unordered(1000) // 控制并发数为100
+        .collect()
+        .await;
+
+    // 过滤掉余额为0的池，并按余额从大到小排序
+    let mut valid_pools: Vec<_> = results
         .into_iter()
-        .filter(|(_, pool)| pool.liquidity > 0)
+        .filter(|(_, _, amount)| *amount > 0)
         .collect();
 
     if valid_pools.is_empty() {
         return None;
     }
 
-    // 按流动性从大到小排序
-    valid_pools.sort_by(|(_, pool_a), (_, pool_b)| pool_b.liquidity.cmp(&pool_a.liquidity));
+    // 按余额降序排序
+    valid_pools.sort_by(|(_, _, amount_a), (_, _, amount_b)| amount_b.cmp(amount_a));
 
-    // 返回流动性最高的池
-    valid_pools.into_iter().next()
+    // 返回余额最高的池
+    valid_pools.into_iter().next().map(|(addr, pool, _)| (addr, pool))
 }
 
-/// 对 Hot Mint 对（WSOL/USDC/USDT 相关）进一步按流动性择优（零网络开销）
+/// 对 Hot Mint 对（WSOL/USDC/USDT 相关）进一步按金库余额择优（并发读取）
 ///
 /// 策略：
-/// - 如果存在稳定币对（USDC/USDT），优先在这些池中按流动性从大到小选择
-/// - 否则如果存在 WSOL 对，在这些池中按流动性从大到小选择
+/// - 如果存在稳定币对（USDC/USDT），优先在这些池中按稳定币金库余额从大到小选择
+/// - 否则如果存在 WSOL 对，在这些池中按 WSOL 金库余额从大到小选择
 /// - 如果都无法区分，则退化为 select_best_pool 的通用逻辑
-fn select_best_hot_pool_by_liquidity(
+/// - 并发读取余额，控制并发数为100
+async fn select_best_hot_pool_by_vault_balance(
+    rpc: &SolanaRpcClient,
     pools: &[(Pubkey, PoolState)],
 ) -> (Pubkey, PoolState) {
     if pools.is_empty() {
@@ -375,41 +403,57 @@ fn select_best_hot_pool_by_liquidity(
         return pools[0].clone();
     }
 
-    let mut stable_candidates: Vec<(Pubkey, PoolState)> = Vec::new();
-    let mut wsol_candidates: Vec<(Pubkey, PoolState)> = Vec::new();
+    let mut stable_candidates: Vec<PoolCandidate> = Vec::new();
+    let mut wsol_candidates: Vec<PoolCandidate> = Vec::new();
 
     for (addr, pool) in pools.iter() {
         // 先找稳定币侧
         if pool.token_mint0 == USDC_MINT || pool.token_mint0 == USDT_MINT {
-            stable_candidates.push((*addr, pool.clone()));
+            stable_candidates.push(PoolCandidate {
+                addr: *addr,
+                pool: pool.clone(),
+                priority_vault: pool.token_vault0,
+            });
             continue;
         }
         if pool.token_mint1 == USDC_MINT || pool.token_mint1 == USDT_MINT {
-            stable_candidates.push((*addr, pool.clone()));
+            stable_candidates.push(PoolCandidate {
+                addr: *addr,
+                pool: pool.clone(),
+                priority_vault: pool.token_vault1,
+            });
             continue;
         }
 
         // 其次考虑 WSOL 侧
         if pool.token_mint0 == SOL_MINT {
-            wsol_candidates.push((*addr, pool.clone()));
+            wsol_candidates.push(PoolCandidate {
+                addr: *addr,
+                pool: pool.clone(),
+                priority_vault: pool.token_vault0,
+            });
             continue;
         }
         if pool.token_mint1 == SOL_MINT {
-            wsol_candidates.push((*addr, pool.clone()));
+            wsol_candidates.push(PoolCandidate {
+                addr: *addr,
+                pool: pool.clone(),
+                priority_vault: pool.token_vault1,
+            });
             continue;
         }
     }
 
-    // 1. 优先在稳定币相关池中按流动性择优
+    // 1. 优先在稳定币相关池中按金库余额择优（并发读取）
     if !stable_candidates.is_empty() {
-        if let Some(best) = pick_best_by_liquidity(stable_candidates) {
+        if let Some(best) = pick_best_by_vault_balance_concurrent(rpc, stable_candidates).await {
             return best;
         }
     }
 
-    // 2. 否则在 WSOL 相关池中按流动性择优
+    // 2. 否则在 WSOL 相关池中按 WSOL 金库余额择优（并发读取）
     if !wsol_candidates.is_empty() {
-        if let Some(best) = pick_best_by_liquidity(wsol_candidates) {
+        if let Some(best) = pick_best_by_vault_balance_concurrent(rpc, wsol_candidates).await {
             return best;
         }
     }
@@ -418,21 +462,37 @@ fn select_best_hot_pool_by_liquidity(
     select_best_pool(pools)
 }
 
-/// 在所有包含 WSOL 的池中，按流动性择优（零网络开销）
-fn select_best_wsol_pool_by_liquidity(
+/// 在所有包含 WSOL 的池中，按 WSOL 金库余额择优（并发读取）
+async fn select_best_wsol_pool_by_vault_balance(
+    rpc: &SolanaRpcClient,
     pools: &[(Pubkey, PoolState)],
 ) -> Option<(Pubkey, PoolState)> {
-    let wsol_candidates: Vec<(Pubkey, PoolState)> = pools
+    let wsol_candidates: Vec<PoolCandidate> = pools
         .iter()
-        .filter(|(_, pool)| pool.token_mint0 == SOL_MINT || pool.token_mint1 == SOL_MINT)
-        .map(|(addr, pool)| (*addr, pool.clone()))
+        .filter_map(|(addr, pool)| {
+            if pool.token_mint0 == SOL_MINT {
+                Some(PoolCandidate {
+                    addr: *addr,
+                    pool: pool.clone(),
+                    priority_vault: pool.token_vault0,
+                })
+            } else if pool.token_mint1 == SOL_MINT {
+                Some(PoolCandidate {
+                    addr: *addr,
+                    pool: pool.clone(),
+                    priority_vault: pool.token_vault1,
+                })
+            } else {
+                None
+            }
+        })
         .collect();
 
     if wsol_candidates.is_empty() {
         return None;
     }
 
-    pick_best_by_liquidity(wsol_candidates)
+    pick_best_by_vault_balance_concurrent(rpc, wsol_candidates).await
 }
 
 /// 内部实现：查找 mint 对应的最优池
@@ -488,11 +548,11 @@ async fn find_pool_by_mint_impl(
 
     let best_pool = if !hot_pools.is_empty() {
         // Hot 对优先：通常是 mint/WSOL、mint/USDC、mint/USDT 等主路由
-        // 对 Hot 对额外按流动性择优（零网络开销）
-        select_best_hot_pool_by_liquidity(&hot_pools)
+        // 对 Hot 对额外按金库余额（USDC/USDT/WSOL）择优（并发读取，控制并发数100）
+        select_best_hot_pool_by_vault_balance(rpc, &hot_pools).await
     } else if *mint == SOL_MINT {
-        // 特殊情况：当 mint 本身是 WSOL 时，在所有包含 WSOL 的池中按流动性择优
-        if let Some(best) = select_best_wsol_pool_by_liquidity(&other_pools) {
+        // 特殊情况：当 mint 本身是 WSOL 时，在所有包含 WSOL 的池中按 WSOL 金库余额择优
+        if let Some(best) = select_best_wsol_pool_by_vault_balance(rpc, &other_pools).await {
             best
         } else {
             select_best_pool(&other_pools)
