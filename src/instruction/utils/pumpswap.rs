@@ -2,7 +2,7 @@ use crate::{
     common::{
         SolanaRpcClient, spl_associated_token_account::get_associated_token_address_with_program_id,
     },
-    constants::TOKEN_PROGRAM,
+    constants::{TOKEN_PROGRAM, WSOL_TOKEN_ACCOUNT, USDC_MINT, USDT_MINT},
     instruction::utils::pumpswap_types::{Pool, pool_decode},
 };
 use anyhow::anyhow;
@@ -140,7 +140,37 @@ pub mod accounts {
 pub const BUY_DISCRIMINATOR: [u8; 8] = [102, 6, 61, 18, 1, 218, 235, 234];
 pub const SELL_DISCRIMINATOR: [u8; 8] = [51, 230, 133, 164, 1, 127, 131, 173];
 
-// Find a pool for a specific mint
+/// 判断是否为 Hot Mint（主流桥接资产）
+/// 当前包含：WSOL、USDC、USDT
+fn is_hot_mint(mint: &Pubkey) -> bool {
+    *mint == WSOL_TOKEN_ACCOUNT || *mint == USDC_MINT || *mint == USDT_MINT
+}
+
+/// 按 LP 供应量选择最佳池（PumpSwap 池没有交易量字段，使用 lp_supply 作为流动性指标）
+/// 
+/// 策略：
+/// - LP 供应量越大，说明流动性越好
+fn select_best_pool_by_liquidity(pools: &[(Pubkey, Pool)]) -> (Pubkey, Pool) {
+    if pools.is_empty() {
+        panic!("Cannot select best pool from empty list");
+    }
+
+    if pools.len() == 1 {
+        return pools[0].clone();
+    }
+
+    // 按 LP 供应量排序
+    let mut sorted_pools = pools.to_vec();
+    sorted_pools.sort_by(|(_, pool_a), (_, pool_b)| {
+        // 按 LP 供应量降序排序
+        pool_b.lp_supply.cmp(&pool_a.lp_supply)
+    });
+
+    // 返回 LP 供应量最高的池
+    sorted_pools.into_iter().next().unwrap()
+}
+
+/// Find a pool for a specific mint
 pub async fn find_pool(rpc: &SolanaRpcClient, mint: &Pubkey) -> Result<Pubkey, anyhow::Error> {
     let (pool_address, _) = get_pool_by_mint(rpc, mint).await?;
     Ok(pool_address)
@@ -361,13 +391,49 @@ pub fn calculate_canonical_pool_pda(mint: &Pubkey) -> Option<(Pubkey, Pubkey)> {
     Some((pool, pool_authority))
 }
 
+/// 内部实现：查找指定 mint 的所有 PumpSwap Pool
+///
+/// 策略：
+/// 1. 并行查询 base_mint 与 quote_mint 包含该 mint 的所有池
+/// 2. 合并并去重
+async fn find_all_pools_by_mint_impl(
+    rpc: &SolanaRpcClient,
+    mint: &Pubkey,
+) -> Result<Vec<(Pubkey, Pool)>, anyhow::Error> {
+    use std::collections::HashSet;
+
+    let (base_result, quote_result) = tokio::join!(
+        find_pools_by_mint_offset_collect(rpc, mint, BASE_MINT_OFFSET),
+        find_pools_by_mint_offset_collect(rpc, mint, QUOTE_MINT_OFFSET)
+    );
+
+    let mut all_pools: Vec<(Pubkey, Pool)> = Vec::new();
+
+    if let Ok(pools) = base_result {
+        all_pools.extend(pools);
+    }
+
+    if let Ok(quote_pools) = quote_result {
+        let mut seen: HashSet<Pubkey> = all_pools.iter().map(|(addr, _)| *addr).collect();
+        for (addr, pool) in quote_pools {
+            if seen.insert(addr) {
+                all_pools.push((addr, pool));
+            }
+        }
+    }
+
+    if all_pools.is_empty() {
+        return Err(anyhow!("No pool found for mint {}", mint));
+    }
+
+    Ok(all_pools)
+}
+
 /// 内部实现：查找 mint 对应的最优池
 async fn find_pool_by_mint_impl(
     rpc: &SolanaRpcClient,
     mint: &Pubkey,
 ) -> Result<(Pubkey, Pool), anyhow::Error> {
-    use crate::constants::WSOL_TOKEN_ACCOUNT;
-
     // Priority 1: Try to find canonical pool (mint/WSOL pair) first
     // This is the most common case for PumpFun migrated tokens
     if let Some((pool_address, _)) = calculate_canonical_pool_pda(mint) {
@@ -380,56 +446,46 @@ async fn find_pool_by_mint_impl(
         }
     }
 
-    // Priority 2 & 3: 并行扫描 base_mint 和 quote_mint pools
-    let (base_result, quote_result) = tokio::join!(
-        find_pools_by_mint_offset_collect(rpc, mint, BASE_MINT_OFFSET),
-        find_pools_by_mint_offset_collect(rpc, mint, QUOTE_MINT_OFFSET)
-    );
+    // Priority 2 & 3: 获取所有池子
+    let all_pools = find_all_pools_by_mint_impl(rpc, mint).await?;
 
-    let mut all_pools: Vec<(Pubkey, Pool)> = Vec::new();
+    // 分类：Hot 对（包含 WSOL/USDC/USDT）vs 其他对
+    let mut hot_pools: Vec<(Pubkey, Pool)> = Vec::new();
+    let mut other_pools: Vec<(Pubkey, Pool)> = Vec::new();
 
-    match base_result {
-        Ok(pools) => all_pools.extend(pools),
-        Err(_) => {}
-    }
+    for (addr, pool) in all_pools.into_iter() {
+        // 找到与目标 mint 对应的另一侧 mint
+        let other_mint = if pool.base_mint == *mint {
+            pool.quote_mint
+        } else if pool.quote_mint == *mint {
+            pool.base_mint
+        } else {
+            // 理论上不会出现，但为了稳健性仍加入非 Hot 集合
+            other_pools.push((addr, pool));
+            continue;
+        };
 
-    match quote_result {
-        Ok(quote_pools) => {
-            // Merge and deduplicate
-            use std::collections::HashSet;
-            let mut seen: HashSet<Pubkey> = all_pools.iter().map(|(addr, _)| *addr).collect();
-            for (addr, pool) in quote_pools {
-                if seen.insert(addr) {
-                    all_pools.push((addr, pool));
-                }
-            }
+        if is_hot_mint(&other_mint) {
+            hot_pools.push((addr, pool));
+        } else {
+            other_pools.push((addr, pool));
         }
-        Err(_) => {}
     }
 
-    if all_pools.is_empty() {
-        return Err(anyhow!("No pool found for mint {}", mint));
-    }
+    let best_pool = if !hot_pools.is_empty() {
+        // Hot 对优先：通常是 mint/WSOL、mint/USDC、mint/USDT 等主路由
+        // 使用 LP 供应量选池
+        select_best_pool_by_liquidity(&hot_pools)
+    } else if *mint == WSOL_TOKEN_ACCOUNT {
+        // 特殊情况：当 mint 本身是 WSOL 时
+        // 在所有池中按 LP 供应量选择
+        select_best_pool_by_liquidity(&other_pools)
+    } else {
+        // 没有 Hot 对时，使用 LP 供应量选池
+        select_best_pool_by_liquidity(&other_pools)
+    };
 
-    // Priority: Prefer WSOL pairs
-    let mut wsol_pools: Vec<_> = all_pools
-        .iter()
-        .filter(|(_, pool)| {
-            pool.base_mint == WSOL_TOKEN_ACCOUNT || pool.quote_mint == WSOL_TOKEN_ACCOUNT
-        })
-        .collect();
-
-    if !wsol_pools.is_empty() {
-        // Sort by LP supply (highest first) and return the first one
-        wsol_pools.sort_by(|a, b| b.1.lp_supply.cmp(&a.1.lp_supply));
-        let (address, pool) = wsol_pools[0];
-        return Ok((*address, pool.clone()));
-    }
-
-    // If no WSOL pair found, return the pool with highest LP supply
-    all_pools.sort_by(|a, b| b.1.lp_supply.cmp(&a.1.lp_supply));
-    let (address, pool) = all_pools[0].clone();
-    Ok((address, pool))
+    Ok(best_pool)
 }
 
 /// List all PumpSwap pools for a mint (as base or quote).
@@ -440,33 +496,8 @@ pub async fn list_pools_by_mint(
     rpc: &SolanaRpcClient,
     mint: &Pubkey,
 ) -> Result<Vec<(Pubkey, Pool)>, anyhow::Error> {
-    use std::collections::HashSet;
-
-    let mut out: Vec<(Pubkey, Pool)> = Vec::new();
-    let mut seen: HashSet<Pubkey> = HashSet::new();
-
-    // Scan base_mint pools
-    if let Ok(base_pools) = find_pools_by_mint_offset_collect(rpc, mint, BASE_MINT_OFFSET).await {
-        for (addr, pool) in base_pools {
-            if seen.insert(addr) {
-                out.push((addr, pool));
-            }
-        }
-    }
-
-    // Scan quote_mint pools and merge
-    if let Ok(quote_pools) = find_pools_by_mint_offset_collect(rpc, mint, QUOTE_MINT_OFFSET).await {
-        for (addr, pool) in quote_pools {
-            if seen.insert(addr) {
-                out.push((addr, pool));
-            }
-        }
-    }
-
-    if out.is_empty() {
-        return Err(anyhow!("No pool found for mint {}", mint));
-    }
-    Ok(out)
+    // 通过共用函数查询所有池子
+    find_all_pools_by_mint_impl(rpc, mint).await
 }
 
 pub async fn get_token_balances(

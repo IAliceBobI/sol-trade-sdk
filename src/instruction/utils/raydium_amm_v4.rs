@@ -1,7 +1,7 @@
 use crate::{
     common::SolanaRpcClient,
     instruction::utils::raydium_amm_v4_types::{amm_info_decode, AmmInfo, AMM_INFO_SIZE},
-    constants::SOL_MINT,
+    constants::{SOL_MINT, USDC_MINT, USDT_MINT},
 };
 use anyhow::anyhow;
 use base64::engine::general_purpose::STANDARD;
@@ -139,6 +139,89 @@ pub fn clear_pool_cache() {
     clear_pool_cache_internal();
 }
 
+/// 判断是否为 Hot Mint（主流桥接资产）
+/// 当前包含：WSOL、USDC、USDT
+fn is_hot_mint(mint: &Pubkey) -> bool {
+    *mint == SOL_MINT || *mint == USDC_MINT || *mint == USDT_MINT
+}
+
+/// 计算池子的有效交易量（基于 swap 数据）
+/// - 如果包含 WSOL/USDC/USDT，只计算这些资产侧的交易量
+/// - 否则计算两侧的总交易量
+fn calculate_effective_volume(amm: &AmmInfo) -> u128 {
+    // 检查 coin_mint 是否为 WSOL/USDC/USDT
+    let coin_is_stable = amm.coin_mint == SOL_MINT 
+        || amm.coin_mint == USDC_MINT 
+        || amm.coin_mint == USDT_MINT;
+    
+    // 检查 pc_mint 是否为 WSOL/USDC/USDT
+    let pc_is_stable = amm.pc_mint == SOL_MINT 
+        || amm.pc_mint == USDC_MINT 
+        || amm.pc_mint == USDT_MINT;
+    
+    if coin_is_stable && !pc_is_stable {
+        // 只计算 coin 侧（WSOL/USDC/USDT）的交易量
+        amm.out_put.swap_coin_in_amount.saturating_add(amm.out_put.swap_pc_out_amount)
+    } else if pc_is_stable && !coin_is_stable {
+        // 只计算 pc 侧（WSOL/USDC/USDT）的交易量
+        amm.out_put.swap_pc_in_amount.saturating_add(amm.out_put.swap_coin_out_amount)
+    } else {
+        // 两侧都是稳定资产或都不是，计算总交易量
+        amm.out_put.swap_coin_in_amount
+            .saturating_add(amm.out_put.swap_pc_out_amount)
+            .saturating_add(amm.out_put.swap_pc_in_amount)
+            .saturating_add(amm.out_put.swap_coin_out_amount)
+    }
+}
+
+/// 按累计交易量选择最佳池（零网络开销）
+/// 
+/// 策略：
+/// - 优先选择活跃状态的池
+/// - 如果池子包含 WSOL/USDC/USDT，只计算这些稳定资产侧的累计交易量
+/// - 否则计算两侧的总交易量
+/// - 交易量越大，说明池子被实际使用越多，深度越可靠
+fn select_best_pool_by_volume(pools: &[(Pubkey, AmmInfo)]) -> (Pubkey, AmmInfo) {
+    if pools.is_empty() {
+        panic!("Cannot select best pool from empty list");
+    }
+
+    if pools.len() == 1 {
+        return pools[0].clone();
+    }
+
+    // 优先选择活跃状态的池
+    let mut active_pools: Vec<_> = pools
+        .iter()
+        .filter(|(_, amm)| is_pool_tradeable(amm))
+        .map(|(addr, amm)| (*addr, amm.clone()))
+        .collect();
+
+    if active_pools.is_empty() {
+        // 如果全部池都不活跃，使用所有池
+        active_pools = pools.to_vec();
+    }
+
+    // 按累计交易量排序
+    active_pools.sort_by(|(_, amm_a), (_, amm_b)| {
+        // 计算有效交易量（优先只看WSOL/USDC/USDT侧）
+        let volume_a = calculate_effective_volume(amm_a);
+        let volume_b = calculate_effective_volume(amm_b);
+        
+        // 按交易量降序排序
+        match volume_b.cmp(&volume_a) {
+            std::cmp::Ordering::Equal => {
+                // 交易量相同时，按流动性排序
+                amm_b.lp_amount.cmp(&amm_a.lp_amount)
+            }
+            other => other,
+        }
+    });
+
+    // 返回交易量最高的池
+    active_pools.into_iter().next().unwrap()
+}
+
 // ==================== Pool 状态检查函数 ====================
 
 /// Pool 状态常量
@@ -251,18 +334,17 @@ async fn find_pools_by_mint_offset_collect(
     Ok(pools)
 }
 
-/// 内部实现：查找指定 mint 对应的最优 Raydium AMM V4 Pool
+/// 内部实现：查找指定 mint 的所有 Raydium AMM V4 Pool
 ///
 /// 策略：
 /// 1. 并行查询 coin_mint 与 pc_mint 包含该 mint 的所有池
 /// 2. 合并并去重
-/// 3. 过滤掉非活跃状态的 pool（只保留适合交易的 pool）
-/// 4. 优先选择包含 WSOL (SOL_MINT) 的交易对
-/// 5. 若没有 WSOL 交易对，则按 lp_amount 从大到小排序，选择流动性最好的池
-async fn find_pool_by_mint_impl(
+/// 3. 可选：过滤掉非活跃状态的 pool（只保留适合交易的 pool）
+async fn find_all_pools_by_mint_impl(
     rpc: &SolanaRpcClient,
     mint: &Pubkey,
-) -> Result<(Pubkey, AmmInfo), anyhow::Error> {
+    filter_active: bool,
+) -> Result<Vec<(Pubkey, AmmInfo)>, anyhow::Error> {
     use std::collections::HashSet;
 
     let (coin_result, pc_result) = tokio::join!(
@@ -289,37 +371,70 @@ async fn find_pool_by_mint_impl(
         return Err(anyhow!("No Raydium AMM V4 pool found for mint {}", mint));
     }
 
-    // 过滤掉非活跃状态的 pool（只保留适合交易的 pool）
-    let active_pools: Vec<(Pubkey, AmmInfo)> = all_pools
-        .into_iter()
-        .filter(|(_, amm)| is_pool_tradeable(amm))
-        .collect();
-
-    if active_pools.is_empty() {
-        return Err(anyhow!(
-            "No active Raydium AMM V4 pool found for mint {} (all pools are disabled or not tradeable)",
-            mint
-        ));
+    // 如果需要过滤活跃状态的 pool
+    if filter_active {
+        all_pools.retain(|(_, amm)| is_pool_tradeable(amm));
+        if all_pools.is_empty() {
+            return Err(anyhow!(
+                "No active Raydium AMM V4 pool found for mint {} (all pools are disabled or not tradeable)",
+                mint
+            ));
+        }
     }
 
-    // 优先选择包含 WSOL 的交易对
-    let mut wsol_pools: Vec<&(Pubkey, AmmInfo)> = active_pools
-        .iter()
-        .filter(|(_, amm)| amm.coin_mint == SOL_MINT || amm.pc_mint == SOL_MINT)
-        .collect();
+    Ok(all_pools)
+}
 
-    if !wsol_pools.is_empty() {
-        // 按 LP 供应量从大到小排序
-        wsol_pools.sort_by(|a, b| b.1.lp_amount.cmp(&a.1.lp_amount));
-        let (address, amm) = wsol_pools[0];
-        return Ok((*address, amm.clone()));
+/// 内部实现：查找指定 mint 对应的最优 Raydium AMM V4 Pool
+///
+/// 策略：
+/// 1. 获取所有活跃的池子
+/// 2. 优先选择包含 Hot Mint (WSOL/USDC/USDT) 的交易对
+/// 3. 在优先级相同的池子中，按累计交易量从大到小排序，选择流动性最好的池
+async fn find_pool_by_mint_impl(
+    rpc: &SolanaRpcClient,
+    mint: &Pubkey,
+) -> Result<(Pubkey, AmmInfo), anyhow::Error> {
+    // 获取所有活跃的池子
+    let active_pools = find_all_pools_by_mint_impl(rpc, mint, true).await?;
+
+    // 分类：Hot 对（包含 WSOL/USDC/USDT）vs 其他对
+    let mut hot_pools: Vec<(Pubkey, AmmInfo)> = Vec::new();
+    let mut other_pools: Vec<(Pubkey, AmmInfo)> = Vec::new();
+
+    for (addr, amm) in active_pools.into_iter() {
+        // 找到与目标 mint 对应的另一侧 mint
+        let other_mint = if amm.coin_mint == *mint {
+            amm.pc_mint
+        } else if amm.pc_mint == *mint {
+            amm.coin_mint
+        } else {
+            // 理论上不会出现，但为了稳健性仍加入非 Hot 集合
+            other_pools.push((addr, amm));
+            continue;
+        };
+
+        if is_hot_mint(&other_mint) {
+            hot_pools.push((addr, amm));
+        } else {
+            other_pools.push((addr, amm));
+        }
     }
 
-    // 若没有 WSOL 交易对，则按 LP 供应量从大到小排序，选择流动性最好的池
-    let mut sorted_pools = active_pools;
-    sorted_pools.sort_by(|a, b| b.1.lp_amount.cmp(&a.1.lp_amount));
-    let (address, amm) = sorted_pools[0].clone();
-    Ok((address, amm))
+    let best_pool = if !hot_pools.is_empty() {
+        // Hot 对优先：通常是 mint/WSOL、mint/USDC、mint/USDT 等主路由
+        // 使用累计交易量选池（零网络开销，反映真实使用深度）
+        select_best_pool_by_volume(&hot_pools)
+    } else if *mint == SOL_MINT {
+        // 特殊情况：当 mint 本身是 WSOL 时
+        // 在所有池中按交易量选择
+        select_best_pool_by_volume(&other_pools)
+    } else {
+        // 没有 Hot 对时，使用累计交易量选池
+        select_best_pool_by_volume(&other_pools)
+    };
+
+    Ok(best_pool)
 }
 
 // ==================== 基于 Mint 的公共查询 API ====================
@@ -379,8 +494,6 @@ pub async fn list_pools_by_mint(
     mint: &Pubkey,
     filter_active: bool,
 ) -> Result<Vec<(Pubkey, AmmInfo)>, anyhow::Error> {
-    use std::collections::HashSet;
-
     // 1. 检查缓存（注意：缓存的是未过滤的完整列表）
     if let Some(cached_pools) = get_cached_pools_list_by_mint(mint) {
         // 如果需要过滤活跃状态，在返回前过滤
@@ -400,44 +513,26 @@ pub async fn list_pools_by_mint(
         return Ok(cached_pools);
     }
 
-    let mut out: Vec<(Pubkey, AmmInfo)> = Vec::new();
-    let mut seen: HashSet<Pubkey> = HashSet::new();
-
-    // 2. 扫描 coin_mint = mint 的池
-    if let Ok(coin_pools) = find_pools_by_mint_offset_collect(rpc, mint, COIN_MINT_OFFSET).await {
-        for (addr, amm) in coin_pools {
-            if seen.insert(addr) {
-                out.push((addr, amm));
-            }
-        }
-    }
-
-    // 扫描 pc_mint = mint 的池并合并
-    if let Ok(pc_pools) = find_pools_by_mint_offset_collect(rpc, mint, PC_MINT_OFFSET).await {
-        for (addr, amm) in pc_pools {
-            if seen.insert(addr) {
-                out.push((addr, amm));
-            }
-        }
-    }
-
-    if out.is_empty() {
-        return Err(anyhow!("No Raydium AMM V4 pool found for mint {}", mint));
-    }
+    // 2. 通过共用函数查询所有池子（不过滤）
+    let pools = find_all_pools_by_mint_impl(rpc, mint, false).await?;
 
     // 3. 写入缓存（缓存未过滤的完整列表）
-    cache_pools_list_by_mint(mint, &out);
+    cache_pools_list_by_mint(mint, &pools);
 
     // 如果需要过滤活跃状态的 pool
     if filter_active {
-        out.retain(|(_, amm)| is_pool_tradeable(amm));
-        if out.is_empty() {
+        let filtered: Vec<_> = pools
+            .into_iter()
+            .filter(|(_, amm)| is_pool_tradeable(amm))
+            .collect();
+        if filtered.is_empty() {
             return Err(anyhow!(
                 "No active Raydium AMM V4 pool found for mint {} (all pools are disabled or not tradeable)",
                 mint
             ));
         }
+        return Ok(filtered);
     }
 
-    Ok(out)
+    Ok(pools)
 }

@@ -2,6 +2,7 @@ use crate::{
     common::SolanaRpcClient,
     instruction::utils::raydium_cpmm_types::{PoolState, pool_state_decode},
     trading::core::params::RaydiumCpmmParams,
+    constants::{WSOL_TOKEN_ACCOUNT, USDC_MINT, USDT_MINT},
 };
 use anyhow::anyhow;
 use solana_sdk::pubkey::Pubkey;
@@ -95,6 +96,12 @@ pub(crate) mod raydium_cpmm_cache {
 // RPC 查询时使用包含 discriminator 的偏移量，所以需要加 8
 const TOKEN0_MINT_OFFSET: usize = 168;  // mintA offset (160 + 8 discriminator)
 const TOKEN1_MINT_OFFSET: usize = 200;  // mintB offset (192 + 8 discriminator)
+
+/// 判断是否为 Hot Mint（主流桥接资产）
+/// 当前包含：WSOL、USDC、USDT
+fn is_hot_mint(mint: &Pubkey) -> bool {
+    *mint == WSOL_TOKEN_ACCOUNT || *mint == USDC_MINT || *mint == USDT_MINT
+}
 
 pub async fn get_pool_by_address(
     rpc: &SolanaRpcClient,
@@ -291,11 +298,12 @@ async fn find_pools_by_mint_offset_collect(
     Ok(pools)
 }
 
-/// Select the best pool from a list of pools based on multiple criteria:
-/// 1. Pool status (0 = uninitialized, prefer initialized pools)
-/// 2. LP supply (higher is better - more liquidity means less slippage)
-/// 3. Open time (earlier is better - more mature pools)
-fn select_best_pool(pools: &[(Pubkey, PoolState)]) -> (Pubkey, PoolState) {
+/// 按 LP 供应量选择最佳池（CPMM 池没有交易量字段，使用 lp_supply 作为流动性指标）
+/// 
+/// 策略：
+/// - 优先选择已激活且有流动性的池
+/// - LP 供应量越大，说明流动性越好
+fn select_best_pool_by_liquidity(pools: &[(Pubkey, PoolState)]) -> (Pubkey, PoolState) {
     if pools.is_empty() {
         panic!("Cannot select best pool from empty list");
     }
@@ -304,42 +312,45 @@ fn select_best_pool(pools: &[(Pubkey, PoolState)]) -> (Pubkey, PoolState) {
         return pools[0].clone();
     }
 
-    // Filter out uninitialized pools (status == 0 is typically uninitialized)
-    let active_pools: Vec<_> = pools.iter()
-        .filter(|(_, pool)| pool.status != 0)
+    // 优先选择已激活且有流动性的池
+    let mut active_pools: Vec<_> = pools
+        .iter()
+        .filter(|(_, pool)| pool.status != 0 && pool.lp_supply > 0)
+        .map(|(addr, pool)| (*addr, pool.clone()))
         .collect();
 
-    let candidates = if active_pools.is_empty() {
-        // If all pools are uninitialized, use all pools
-        pools
-    } else {
-        // Use only active pools
-        &active_pools.iter().map(|&p| p.clone()).collect::<Vec<_>>()[..]
-    };
+    if active_pools.is_empty() {
+        // 如果全部池都不活跃，使用所有池
+        active_pools = pools.to_vec();
+    }
 
-    // Find pool with highest liquidity (lp_supply)
-    let best = candidates.iter()
-        .max_by(|(_, pool_a), (_, pool_b)| {
-            // Primary criterion: LP supply (liquidity)
-            match pool_a.lp_supply.cmp(&pool_b.lp_supply) {
-                std::cmp::Ordering::Equal => {
-                    // Secondary criterion: earlier open time (more mature)
-                    pool_b.open_time.cmp(&pool_a.open_time)
-                }
-                other => other,
+    // 按 LP 供应量排序
+    active_pools.sort_by(|(_, pool_a), (_, pool_b)| {
+        // 按 LP 供应量降序排序
+        match pool_b.lp_supply.cmp(&pool_a.lp_supply) {
+            std::cmp::Ordering::Equal => {
+                // LP 供应量相同时，按开池时间排序（更早的池更成熟）
+                pool_b.open_time.cmp(&pool_a.open_time)
             }
-        })
-        .expect("No pools to select from");
+            other => other,
+        }
+    });
 
-    best.clone()
+    // 返回 LP 供应量最高的池
+    active_pools.into_iter().next().unwrap()
 }
 
-/// 内部实现：查找 mint 对应的最优池
-async fn find_pool_by_mint_impl(
+/// 内部实现：查找指定 mint 的所有 Raydium CPMM Pool
+///
+/// 策略：
+/// 1. 并行查询 token0_mint 与 token1_mint 包含该 mint 的所有池
+/// 2. 合并并去重
+async fn find_all_pools_by_mint_impl(
     rpc: &SolanaRpcClient,
     mint: &Pubkey,
-) -> Result<(Pubkey, PoolState), anyhow::Error> {
-    // 并行扫描 token0_mint 和 token1_mint 对应的池
+) -> Result<Vec<(Pubkey, PoolState)>, anyhow::Error> {
+    use std::collections::HashSet;
+
     let (token0_result, token1_result) = tokio::join!(
         find_pools_by_mint_offset_collect(rpc, mint, TOKEN0_MINT_OFFSET),
         find_pools_by_mint_offset_collect(rpc, mint, TOKEN1_MINT_OFFSET),
@@ -352,7 +363,6 @@ async fn find_pool_by_mint_impl(
     }
 
     if let Ok(quote_pools) = token1_result {
-        use std::collections::HashSet;
         let mut seen: HashSet<Pubkey> = all_pools.iter().map(|(addr, _)| *addr).collect();
         for (addr, pool) in quote_pools {
             if seen.insert(addr) {
@@ -365,8 +375,53 @@ async fn find_pool_by_mint_impl(
         return Err(anyhow!("No CPMM pool found for mint {}", mint));
     }
 
-    // Select the best pool based on liquidity, status, and open time
-    let best_pool = select_best_pool(&all_pools);
+    Ok(all_pools)
+}
+
+/// 内部实现：查找 mint 对应的最优池
+async fn find_pool_by_mint_impl(
+    rpc: &SolanaRpcClient,
+    mint: &Pubkey,
+) -> Result<(Pubkey, PoolState), anyhow::Error> {
+    // 获取所有池子
+    let all_pools = find_all_pools_by_mint_impl(rpc, mint).await?;
+
+    // 分类：Hot 对（包含 WSOL/USDC/USDT）vs 其他对
+    let mut hot_pools: Vec<(Pubkey, PoolState)> = Vec::new();
+    let mut other_pools: Vec<(Pubkey, PoolState)> = Vec::new();
+
+    for (addr, pool) in all_pools.into_iter() {
+        // 找到与目标 mint 对应的另一侧 mint
+        let other_mint = if pool.token0_mint == *mint {
+            pool.token1_mint
+        } else if pool.token1_mint == *mint {
+            pool.token0_mint
+        } else {
+            // 理论上不会出现，但为了稳健性仍加入非 Hot 集合
+            other_pools.push((addr, pool));
+            continue;
+        };
+
+        if is_hot_mint(&other_mint) {
+            hot_pools.push((addr, pool));
+        } else {
+            other_pools.push((addr, pool));
+        }
+    }
+
+    let best_pool = if !hot_pools.is_empty() {
+        // Hot 对优先：通常是 mint/WSOL、mint/USDC、mint/USDT 等主路由
+        // 使用 LP 供应量选池
+        select_best_pool_by_liquidity(&hot_pools)
+    } else if *mint == WSOL_TOKEN_ACCOUNT {
+        // 特殊情况：当 mint 本身是 WSOL 时
+        // 在所有池中按 LP 供应量选择
+        select_best_pool_by_liquidity(&other_pools)
+    } else {
+        // 没有 Hot 对时，使用 LP 供应量选池
+        select_best_pool_by_liquidity(&other_pools)
+    };
+
     Ok(best_pool)
 }
 
@@ -379,46 +434,18 @@ pub async fn list_pools_by_mint(
     rpc: &SolanaRpcClient,
     mint: &Pubkey,
 ) -> Result<Vec<(Pubkey, PoolState)>, anyhow::Error> {
-    use std::collections::HashSet;
-
     // 1. 检查缓存
     if let Some(cached_pools) = raydium_cpmm_cache::get_cached_pools_list_by_mint(mint) {
         return Ok(cached_pools);
     }
 
-    let mut out: Vec<(Pubkey, PoolState)> = Vec::new();
-    let mut seen: HashSet<Pubkey> = HashSet::new();
-
-    // 2. 并行扫描 token0_mint 和 token1_mint 对应的池
-    let (token0_result, token1_result) = tokio::join!(
-        find_pools_by_mint_offset_collect(rpc, mint, TOKEN0_MINT_OFFSET),
-        find_pools_by_mint_offset_collect(rpc, mint, TOKEN1_MINT_OFFSET),
-    );
-
-    if let Ok(token0_pools) = token0_result {
-        for (addr, pool) in token0_pools {
-            if seen.insert(addr) {
-                out.push((addr, pool));
-            }
-        }
-    }
-
-    if let Ok(token1_pools) = token1_result {
-        for (addr, pool) in token1_pools {
-            if seen.insert(addr) {
-                out.push((addr, pool));
-            }
-        }
-    }
-
-    if out.is_empty() {
-        return Err(anyhow!("No CPMM pool found for mint {}", mint));
-    }
+    // 2. 通过共用函数查询所有池子
+    let pools = find_all_pools_by_mint_impl(rpc, mint).await?;
 
     // 3. 写入缓存
-    raydium_cpmm_cache::cache_pools_list_by_mint(mint, &out);
+    raydium_cpmm_cache::cache_pools_list_by_mint(mint, &pools);
 
-    Ok(out)
+    Ok(pools)
 }
 
 /// Helper function to get token vault account address
