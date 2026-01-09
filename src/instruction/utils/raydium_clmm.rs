@@ -466,6 +466,36 @@ async fn select_best_hot_pool_by_vault_balance(
     select_best_pool(pools)
 }
 
+/// 在所有包含 WSOL 的池中，按 WSOL 金库余额择优
+async fn select_best_wsol_pool_by_vault_balance(
+    rpc: &SolanaRpcClient,
+    pools: &[(Pubkey, PoolState)],
+) -> Option<(Pubkey, PoolState)> {
+    let mut wsol_candidates: Vec<HotPoolCandidate> = Vec::new();
+
+    for (addr, pool) in pools.iter() {
+        if pool.token_mint0 == SOL_MINT {
+            wsol_candidates.push(HotPoolCandidate {
+                addr: *addr,
+                pool: pool.clone(),
+                priority_vault: pool.token_vault0,
+            });
+        } else if pool.token_mint1 == SOL_MINT {
+            wsol_candidates.push(HotPoolCandidate {
+                addr: *addr,
+                pool: pool.clone(),
+                priority_vault: pool.token_vault1,
+            });
+        }
+    }
+
+    if wsol_candidates.is_empty() {
+        return None;
+    }
+
+    pick_best_by_vault_balance(rpc, wsol_candidates).await
+}
+
 /// 内部实现：查找 mint 对应的最优池
 async fn find_pool_by_mint_impl(
     rpc: &SolanaRpcClient,
@@ -478,6 +508,8 @@ async fn find_pool_by_mint_impl(
     );
 
     let mut all_pools: Vec<(Pubkey, PoolState)> = result0.unwrap_or_default();
+
+    println!("!!! {:?}", all_pools);
 
     // Merge token_mint1 results
     if let Ok(quote_pools) = result1 {
@@ -521,6 +553,13 @@ async fn find_pool_by_mint_impl(
         // Hot 对优先：通常是 mint/WSOL、mint/USDC、mint/USDT 等主路由
         // 对 Hot 对额外按金库余额（USDC/USDT/WSOL）择优
         select_best_hot_pool_by_vault_balance(rpc, &hot_pools).await
+    } else if *mint == SOL_MINT {
+        // 特殊情况：当 mint 本身是 WSOL 时，在所有包含 WSOL 的池中按 WSOL 金库余额择优
+        if let Some(best) = select_best_wsol_pool_by_vault_balance(rpc, &other_pools).await {
+            best
+        } else {
+            select_best_pool(&other_pools)
+        }
     } else {
         // 没有 Hot 对时，在所有池中按通用评分规则选择
         select_best_pool(&other_pools)
