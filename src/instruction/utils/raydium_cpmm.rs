@@ -55,6 +55,10 @@ pub(crate) mod raydium_cpmm_cache {
     pub(crate) static POOL_DATA_CACHE: Lazy<DashMap<Pubkey, PoolState>> =
         Lazy::new(|| DashMap::with_capacity(MAX_CACHE_SIZE));
 
+    /// mint → Vec<(pool_address, PoolState)> 列表缓存（用于 list_pools_by_mint）
+    pub(crate) static MINT_TO_POOLS_LIST_CACHE: Lazy<DashMap<Pubkey, Vec<(Pubkey, PoolState)>>> =
+        Lazy::new(|| DashMap::with_capacity(MAX_CACHE_SIZE));
+
     pub(crate) fn get_cached_pool_by_address(pool_address: &Pubkey) -> Option<PoolState> {
         POOL_DATA_CACHE.get(pool_address).map(|p| p.clone())
     }
@@ -71,9 +75,18 @@ pub(crate) mod raydium_cpmm_cache {
         MINT_TO_POOL_CACHE.insert(*mint, *pool_address);
     }
 
+    pub(crate) fn get_cached_pools_list_by_mint(mint: &Pubkey) -> Option<Vec<(Pubkey, PoolState)>> {
+        MINT_TO_POOLS_LIST_CACHE.get(mint).map(|p| p.clone())
+    }
+
+    pub(crate) fn cache_pools_list_by_mint(mint: &Pubkey, pools: &[(Pubkey, PoolState)]) {
+        MINT_TO_POOLS_LIST_CACHE.insert(*mint, pools.to_vec());
+    }
+
     pub(crate) fn clear_all() {
         MINT_TO_POOL_CACHE.clear();
         POOL_DATA_CACHE.clear();
+        MINT_TO_POOLS_LIST_CACHE.clear();
     }
 }
 
@@ -360,6 +373,7 @@ async fn find_pool_by_mint_impl(
 /// List all CPMM pools that contain the given mint as token0 or token1.
 ///
 /// This is a discovery helper for routing/selection layers. It does NOT pick a best pool.
+/// Results are cached to improve performance on repeated queries.
 
 pub async fn list_pools_by_mint(
     rpc: &SolanaRpcClient,
@@ -367,10 +381,15 @@ pub async fn list_pools_by_mint(
 ) -> Result<Vec<(Pubkey, PoolState)>, anyhow::Error> {
     use std::collections::HashSet;
 
+    // 1. 检查缓存
+    if let Some(cached_pools) = raydium_cpmm_cache::get_cached_pools_list_by_mint(mint) {
+        return Ok(cached_pools);
+    }
+
     let mut out: Vec<(Pubkey, PoolState)> = Vec::new();
     let mut seen: HashSet<Pubkey> = HashSet::new();
 
-    // 并行扫描 token0_mint 和 token1_mint 对应的池
+    // 2. 并行扫描 token0_mint 和 token1_mint 对应的池
     let (token0_result, token1_result) = tokio::join!(
         find_pools_by_mint_offset_collect(rpc, mint, TOKEN0_MINT_OFFSET),
         find_pools_by_mint_offset_collect(rpc, mint, TOKEN1_MINT_OFFSET),
@@ -395,6 +414,10 @@ pub async fn list_pools_by_mint(
     if out.is_empty() {
         return Err(anyhow!("No CPMM pool found for mint {}", mint));
     }
+
+    // 3. 写入缓存
+    raydium_cpmm_cache::cache_pools_list_by_mint(mint, &out);
+
     Ok(out)
 }
 

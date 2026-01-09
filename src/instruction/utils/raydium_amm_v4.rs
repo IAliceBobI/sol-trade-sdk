@@ -51,6 +51,10 @@ static POOL_DATA_CACHE: Lazy<DashMap<Pubkey, AmmInfo>> =
 static MINT_TO_POOL_CACHE: Lazy<DashMap<Pubkey, Pubkey>> =
     Lazy::new(|| DashMap::with_capacity(MAX_CACHE_SIZE));
 
+/// mint → Vec<(pool_address, AmmInfo)> 列表缓存（用于 list_pools_by_mint）
+static MINT_TO_POOLS_LIST_CACHE: Lazy<DashMap<Pubkey, Vec<(Pubkey, AmmInfo)>>> =
+    Lazy::new(|| DashMap::with_capacity(MAX_CACHE_SIZE));
+
 /// 从缓存中获取 Pool 信息
 pub(crate) fn get_cached_pool_by_address(pool_address: &Pubkey) -> Option<AmmInfo> {
     POOL_DATA_CACHE.get(pool_address).map(|p| p.clone())
@@ -71,10 +75,21 @@ pub(crate) fn cache_pool_address_by_mint(mint: &Pubkey, pool_address: &Pubkey) {
     MINT_TO_POOL_CACHE.insert(*mint, *pool_address);
 }
 
+/// 从缓存中获取 mint 对应的池子列表
+pub(crate) fn get_cached_pools_list_by_mint(mint: &Pubkey) -> Option<Vec<(Pubkey, AmmInfo)>> {
+    MINT_TO_POOLS_LIST_CACHE.get(mint).map(|p| p.clone())
+}
+
+/// 将 mint → Vec<(pool_address, AmmInfo)> 列表写入缓存
+pub(crate) fn cache_pools_list_by_mint(mint: &Pubkey, pools: &[(Pubkey, AmmInfo)]) {
+    MINT_TO_POOLS_LIST_CACHE.insert(*mint, pools.to_vec());
+}
+
 /// 清除所有缓存
 pub(crate) fn clear_pool_cache_internal() {
     POOL_DATA_CACHE.clear();
     MINT_TO_POOL_CACHE.clear();
+    MINT_TO_POOLS_LIST_CACHE.clear();
 }
 
 // ==================== 公共函数 ====================
@@ -349,6 +364,7 @@ pub async fn get_pool_by_mint_force(
 /// 列出所有包含指定 mint 的 Raydium AMM V4 Pool
 ///
 /// 该接口主要用于上层路由与策略模块进行池路由与选择。
+/// Results are cached to improve performance on repeated queries.
 ///
 /// # 参数
 /// - `rpc`: RPC 客户端
@@ -365,10 +381,29 @@ pub async fn list_pools_by_mint(
 ) -> Result<Vec<(Pubkey, AmmInfo)>, anyhow::Error> {
     use std::collections::HashSet;
 
+    // 1. 检查缓存（注意：缓存的是未过滤的完整列表）
+    if let Some(cached_pools) = get_cached_pools_list_by_mint(mint) {
+        // 如果需要过滤活跃状态，在返回前过滤
+        if filter_active {
+            let filtered: Vec<_> = cached_pools
+                .into_iter()
+                .filter(|(_, amm)| is_pool_tradeable(amm))
+                .collect();
+            if filtered.is_empty() {
+                return Err(anyhow!(
+                    "No active Raydium AMM V4 pool found for mint {} (all pools are disabled or not tradeable)",
+                    mint
+                ));
+            }
+            return Ok(filtered);
+        }
+        return Ok(cached_pools);
+    }
+
     let mut out: Vec<(Pubkey, AmmInfo)> = Vec::new();
     let mut seen: HashSet<Pubkey> = HashSet::new();
 
-    // 扫描 coin_mint = mint 的池
+    // 2. 扫描 coin_mint = mint 的池
     if let Ok(coin_pools) = find_pools_by_mint_offset_collect(rpc, mint, COIN_MINT_OFFSET).await {
         for (addr, amm) in coin_pools {
             if seen.insert(addr) {
@@ -389,6 +424,9 @@ pub async fn list_pools_by_mint(
     if out.is_empty() {
         return Err(anyhow!("No Raydium AMM V4 pool found for mint {}", mint));
     }
+
+    // 3. 写入缓存（缓存未过滤的完整列表）
+    cache_pools_list_by_mint(mint, &out);
 
     // 如果需要过滤活跃状态的 pool
     if filter_active {

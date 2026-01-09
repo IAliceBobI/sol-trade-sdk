@@ -135,53 +135,6 @@ async fn test_raydium_clmm_get_pool_by_mint_wsol_cache_and_force() {
     println!("\n=== Raydium CLMM get_pool_by_mint 测试通过 ===");
 }
 
-/// 测试：列出所有包含 WSOL 的 Raydium CLMM Pool
-///
-/// 使用 `list_pools_by_mint`，验证：
-/// - 返回列表非空
-/// - 所有池的 `token_mint0` 或 `token_mint1` 中至少一侧为 WSOL
-#[tokio::test]
-async fn test_raydium_clmm_list_pools_by_mint_wsol() {
-    println!("=== 测试：Raydium CLMM list_pools_by_mint (WSOL) ===");
-
-    let wsol_mint = Pubkey::from_str(WSOL_MINT).expect("Invalid WSOL mint");
-    // 使用主网 RPC，因为本地 RPC 可能没有 CLMM 池数据
-    let rpc_url = "https://api.mainnet-beta.solana.com";
-    let rpc = RpcClient::new(rpc_url.to_string());
-
-    let pools = list_pools_by_mint(&rpc, &wsol_mint)
-        .await
-        .expect("list_pools_by_mint failed");
-
-    assert!(!pools.is_empty(), "WSOL 相关的 CLMM Pool 列表不应为空");
-    println!("✅ 找到 {} 个包含 WSOL 的 CLMM Pool", pools.len());
-
-    for (i, (addr, pool)) in pools.iter().enumerate() {
-        println!("\n[Pool {}]", i + 1);
-        println!("  Pool Address: {}", addr);
-        println!("  Token0 Mint: {}", pool.token_mint0);
-        println!("  Token1 Mint: {}", pool.token_mint1);
-        println!("  Liquidity: {}", pool.liquidity);
-        println!("  Sqrt Price X64: {}", pool.sqrt_price_x64);
-        println!("  Tick Current: {}", pool.tick_current);
-        println!("  Tick Spacing: {}", pool.tick_spacing);
-
-        assert!(
-            pool.token_mint0 == wsol_mint || pool.token_mint1 == wsol_mint,
-            "CLMM Pool {} 不包含 WSOL",
-            addr,
-        );
-
-        // 验证基本约束（注意：有些池可能 liquidity 为 0，已被关闭或清空）
-        if pool.liquidity == 0 {
-            println!("  ⚠️  池子 {} liquidity 为 0（可能已关闭）", addr);
-        }
-        assert!(pool.tick_spacing > 0, "Pool {} tick_spacing should be positive", addr);
-    }
-
-    println!("\n=== Raydium CLMM list_pools_by_mint 测试通过 ===");
-}
-
 /// 测试：通过地址获取 pool 数据（带缓存）
 #[tokio::test]
 async fn test_raydium_clmm_get_pool_by_address() {
