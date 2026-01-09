@@ -316,7 +316,19 @@ async fn find_pools_by_mint_offset_collect(
 
     let accounts = rpc
         .get_program_ui_accounts_with_config(&accounts::RAYDIUM_AMM_V4, config)
-        .await?;
+        .await
+        .map_err(|e| {
+            // 检测公共 RPC 限制错误
+            if e.to_string().contains("excluded from account secondary indexes") {
+                anyhow!(
+                    "Public RPC does not support getProgramAccounts for Raydium AMM V4. \
+                    Please use: (1) paid RPC service (Helius, QuickNode, Triton), \
+                    (2) local full node, or (3) known pool addresses directly."
+                )
+            } else {
+                anyhow!("RPC error: {}", e)
+            }
+        })?;
 
     let pools: Vec<(Pubkey, AmmInfo)> = accounts
         .into_iter()
@@ -351,6 +363,12 @@ async fn find_all_pools_by_mint_impl(
         find_pools_by_mint_offset_collect(rpc, mint, COIN_MINT_OFFSET),
         find_pools_by_mint_offset_collect(rpc, mint, PC_MINT_OFFSET),
     );
+
+    // 检测是否都失败，如果都失败则返回第一个错误（通常包含 RPC 限制信息）
+    if coin_result.is_err() && pc_result.is_err() {
+        // 返回 coin_result 的错误，它包含我们的自定义错误消息
+        return Err(coin_result.unwrap_err());
+    }
 
     let mut all_pools: Vec<(Pubkey, AmmInfo)> = Vec::new();
 

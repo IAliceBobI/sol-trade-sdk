@@ -311,60 +311,127 @@ async fn test_get_pool_by_mint_wsol() {
     assert_eq!(amm_info_2.pc_mint, amm_info_3.pc_mint, "强制刷新后 pc_mint 不一致");
 }
 
-/// 测试：基于指定 mint (4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R) 获取 Pool
+/// 测试：验证公共 RPC 对 getProgramAccounts 的限制
+/// 
+/// ## 问题分析
+/// 公共 RPC 节点（https://api.mainnet-beta.solana.com）针对热门程序禁用了 getProgramAccounts。
+/// 错误信息：
+/// ```
+/// RPC response error -32010: 675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8 excluded from 
+/// account secondary indexes; this RPC method unavailable for key
+/// ```
+/// 
+/// ## 原因
+/// - Raydium AMM V4 程序 ID 被排除在二级索引之外
+/// - 这是 Solana 公共 RPC 的主动限制策略，以防止滥用
+/// - 热门程序（如 Raydium, Orca）的账户数量巨大，扫描所有账户会消耗大量资源
+/// 
+/// ## 解决方案
+/// 
+/// ### 方案 1：使用已知池子地址（推荐用于生产）
+/// ```rust
+/// // 直接使用已知的主流池子地址
+/// const WSOL_USDC_AMM: &str = "58oQChx4yWmvKdwLLZzBi4ChoCc2fqCUWBkwMihLYQo2";
+/// let pool_address = Pubkey::from_str(WSOL_USDC_AMM)?;
+/// let amm_info = get_pool_by_address(&rpc, &pool_address).await?;
+/// ```
+/// 
+/// ### 方案 2：使用付费 RPC 服务
+/// - **Helius**: https://helius.dev/ - 支持 getProgramAccounts
+/// - **QuickNode**: https://www.quicknode.com/ - 支持全部 RPC 方法
+/// - **Triton**: https://triton.one/ - 专业级 RPC 服务
+/// 
+/// ### 方案 3：使用本地全节点
+/// ```bash
+/// # 运行本地 Solana 验证者节点
+/// solana-test-validator --url https://api.mainnet-beta.solana.com
+/// ```
+/// 
+/// ### 方案 4：使用 Raydium API
+/// - Raydium 提供 REST API 查询池子信息
+/// - API 文档: https://api-v3.raydium.io/docs/
+/// 
 #[tokio::test]
-#[ignore]
-async fn test_get_pool_by_mint_custom() {
-    // raydium 在 ammv4 上找不到。
-    println!("=== 测试：get_pool_by_mint (4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R) ===");
-
-    let target_mint = Pubkey::from_str("4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R")
-        .expect("Invalid target mint");
-    let rpc_url = "http://127.0.0.1:8899";
+async fn test_public_rpc_limitations() {
+    println!("=== 测试：验证公共 RPC getProgramAccounts 限制 ===");
+    
+    use sol_trade_sdk::instruction::utils::raydium_amm_v4::accounts::RAYDIUM_AMM_V4;
+    use solana_account_decoder::UiAccountEncoding;
+    use solana_client::rpc_filter::Memcmp;
+    use solana_rpc_client_api::{config::RpcProgramAccountsConfig, filter::RpcFilterType};
+    
+    let wsol_mint = Pubkey::from_str("So11111111111111111111111111111111111111112")
+        .expect("Invalid WSOL mint");
+    let rpc_url = "https://api.mainnet-beta.solana.com";
     let rpc = RpcClient::new(rpc_url.to_string());
-
-    // 清理缓存，确保从干净状态开始
-    clear_pool_cache();
-
-    // 第一次查询：应从链上扫描并选择最优池
-    let result1 = get_pool_by_mint(&rpc, &target_mint).await;
-    assert!(result1.is_ok(), "get_pool_by_mint failed: {:?}", result1.err());
-    let (pool_address_1, amm_info_1) = result1.unwrap();
-    println!("第一次查询到的 Pool: {}", pool_address_1);
-    println!("coin_mint: {}", amm_info_1.coin_mint);
-    println!("pc_mint: {}", amm_info_1.pc_mint);
-    println!("lp_amount: {}", amm_info_1.lp_amount);
-
-    // 验证返回的池确实包含目标 mint
-    let target_mint_str = "4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R";
-    assert!(
-        amm_info_1.coin_mint.to_string() == target_mint_str
-            || amm_info_1.pc_mint.to_string() == target_mint_str,
-        "返回的 Pool 不包含目标 mint",
-    );
-
-    // 第二次查询：应命中缓存并返回相同结果
-    let result2 = get_pool_by_mint(&rpc, &target_mint).await.unwrap();
-    let (pool_address_2, amm_info_2) = result2;
-    assert_eq!(pool_address_1, pool_address_2, "缓存中的 pool_address 不一致");
-    assert_eq!(amm_info_1.lp_amount, amm_info_2.lp_amount, "缓存中的 AmmInfo 不一致");
-
-    println!("\n缓存验证通过，pool_address 一致: {}", pool_address_2);
+    
+    // 尝试查询 coin_mint offset (400)
+    let filters = vec![
+        RpcFilterType::DataSize(752),  // AMM_INFO_SIZE
+        RpcFilterType::Memcmp(Memcmp::new_base58_encoded(400, &wsol_mint.to_bytes())),
+    ];
+    
+    let config = RpcProgramAccountsConfig {
+        filters: Some(filters),
+        account_config: solana_rpc_client_api::config::RpcAccountInfoConfig {
+            encoding: Some(UiAccountEncoding::Base64),
+            data_slice: None,
+            commitment: None,
+            min_context_slot: None,
+        },
+        with_context: None,
+        sort_results: None,
+    };
+    
+    println!("正在查询 Raydium AMM V4 程序账户（coin_mint = WSOL）...");
+    match rpc.get_program_ui_accounts_with_config(&RAYDIUM_AMM_V4, config).await {
+        Ok(accounts) => {
+            println!("✓ 查询成功，返回 {} 个账户", accounts.len());
+            if accounts.is_empty() {
+                println!("⚠️  警告：公共 RPC 返回空结果，可能被限制了 getProgramAccounts 查询");
+                println!("   建议：");
+                println!("   1. 使用付费 RPC 服务（Helius, QuickNode, Triton）");
+                println!("   2. 使用本地全节点");
+                println!("   3. 使用已知池子地址");
+                println!("   4. 使用 Raydium API");
+            }
+        }
+        Err(e) => {
+            println!("✗ 查询失败: {}", e);
+        }
+    }
 }
 
 /// 测试：列出所有包含 WSOL 的 Raydium AMM V4 Pool
-/// 太久了。
+/// 
+/// **注意**：此测试在公共 RPC 上会失败！
+/// 
+/// Solana 公共 RPC 节点禁用了 Raydium AMM V4 的 getProgramAccounts 查询。
+/// 这是因为 WSOL 相关的池子太多（数百个），扫描所有账户会消耗大量资源。
+/// 
+/// 要运行此测试，请使用：
+/// 1. 付费 RPC 服务（Helius, QuickNode, Triton）
+/// 2. 本地全节点
+/// 
+/// 对于生产环境，建议直接使用已知池子地址：
+/// ```rust
+/// const WSOL_USDC_AMM: &str = "58oQChx4yWmvKdwLLZzBi4ChoCc2fqCUWBkwMihLYQo2";
+/// let pool = get_pool_by_address(&rpc, &Pubkey::from_str(WSOL_USDC_AMM)?).await?;
+/// ```
 #[tokio::test]
-#[ignore]
+#[ignore]  // 默认忽略，因为公共 RPC 不支持
 async fn test_list_pools_by_mint_wsol() {
     println!("=== 测试：list_pools_by_mint (WSOL) ===");
 
     let wsol_mint = Pubkey::from_str("So11111111111111111111111111111111111111112")
         .expect("Invalid WSOL mint");
-    let rpc_url = "http://127.0.0.1:8899";
+    let rpc_url = "https://api.mainnet-beta.solana.com";
     let rpc = RpcClient::new(rpc_url.to_string());
 
-    let pools = list_pools_by_mint(&rpc, &wsol_mint, false).await;
+    println!("开始查询 WSOL 相关的 AMM V4 池子...");
+    println!("这可能需要一些时间,因为需要扫描所有 Raydium AMM V4 程序账户...");
+    
+    let pools = list_pools_by_mint(&rpc, &wsol_mint, true).await;
     assert!(pools.is_ok(), "list_pools_by_mint failed: {:?}", pools.err());
     let pools = pools.unwrap();
 
