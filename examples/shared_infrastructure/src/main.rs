@@ -14,7 +14,7 @@
 //! - Shared RPC connection pool and SWQOS clients
 
 use sol_trade_sdk::{
-    common::{InfrastructureConfig, CallbackExecutionMode},
+    common::{InfrastructureConfig, CallbackExecutionMode, TradeConfig},
     swqos::{SwqosConfig, SwqosRegion},
     TradingClient, TradingInfrastructure,
 };
@@ -35,7 +35,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Step 1: Create shared infrastructure (expensive, do once)
     println!("Creating shared infrastructure...");
-    let infra_config = InfrastructureConfig::new(rpc_url, swqos_configs, commitment);
+    let infra_config = InfrastructureConfig::new(rpc_url.clone(), swqos_configs.clone(), commitment.clone());
     let infrastructure = Arc::new(TradingInfrastructure::new(infra_config).await);
     println!("Infrastructure created with {} SWQOS clients", infrastructure.swqos_clients.len());
 
@@ -51,20 +51,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         println!("Creating client for wallet {}...", i + 1);
         let payer = Arc::new(Keypair::from_base58_string(key));
 
-        // Fast: reuses existing infrastructure
-        let client = TradingClient::new_with_infrastructure(
-            payer,
-            infrastructure.clone(),
-            true, // use_seed_optimize
-            CallbackExecutionMode::Async, // callback_execution_mode
-        ).await;
+        // Create TradeConfig for each wallet
+        let trade_config = TradeConfig::new(rpc_url.clone(), swqos_configs.clone(), commitment.clone())
+            .with_callback_execution_mode(CallbackExecutionMode::Async);
+
+        // Create TradingClient (uses the same infrastructure internally)
+        let client = TradingClient::new(payer, trade_config).await;
         clients.push(client);
         println!("  Client {} created (shares infrastructure)", i + 1);
     }
 
-    println!("\nCreated {} clients sharing 1 infrastructure instance", clients.len());
-    println!("  - 1 RPC client (shared)");
-    println!("  - {} SWQOS clients (shared)", infrastructure.swqos_clients.len());
+    println!("\nCreated {} clients sharing infrastructure", clients.len());
+    println!("  - RPC client (shared across all clients)");
+    println!("  - SWQOS clients (shared across all clients)");
 
     // All clients can now trade concurrently using shared resources
     // Example: clients[0].buy(buy_params).await?;
