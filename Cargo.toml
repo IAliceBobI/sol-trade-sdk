@@ -18,6 +18,7 @@ readme = "README.md"
 members = [
     "examples/pumpfun_buy_test",
     "examples/trading_client",
+    "examples/shared_infrastructure",
     "examples/middleware_system",
     "examples/pumpfun_copy_trading",
     "examples/pumpfun_sniper_trading",

@@ -7,6 +7,7 @@ pub mod trading;
 pub mod utils;
 use crate::common::GasFeeStrategy;
 use crate::common::TradeConfig;
+use crate::common::InfrastructureConfig;
 use crate::common::CallbackExecutionMode;
 use crate::common::nonce_cache::DurableNonceInfo;
 use crate::constants::SOL_TOKEN_ACCOUNT;
@@ -51,6 +52,74 @@ pub enum TradeTokenType {
     USDC,
 }
 
+/// Shared infrastructure components that can be reused across multiple wallets
+///
+/// This struct holds the expensive-to-initialize components (RPC client, SWQOS clients)
+/// that are wallet-independent and can be shared when only the trading wallet changes.
+pub struct TradingInfrastructure {
+    /// Shared RPC client for blockchain interactions
+    pub rpc: Arc<SolanaRpcClient>,
+    /// Shared SWQOS clients for transaction priority and routing
+    pub swqos_clients: Vec<Arc<SwqosClient>>,
+    /// Configuration used to create this infrastructure
+    pub config: InfrastructureConfig,
+}
+
+impl TradingInfrastructure {
+    /// Create new shared infrastructure from configuration
+    ///
+    /// This performs the expensive initialization:
+    /// - Creates RPC client with connection pool
+    /// - Creates SWQOS clients (each with their own HTTP client)
+    /// - Initializes rent cache and starts background updater
+    pub async fn new(config: InfrastructureConfig) -> Self {
+        // Install crypto provider (idempotent)
+        if CryptoProvider::get_default().is_none() {
+            let _ = default_provider()
+                .install_default()
+                .map_err(|e| anyhow::anyhow!("Failed to install crypto provider: {:?}", e));
+        }
+
+        // Create RPC client
+        let rpc = Arc::new(SolanaRpcClient::new_with_commitment(
+            config.rpc_url.clone(),
+            config.commitment.clone(),
+        ));
+
+        // Initialize rent cache and start background updater
+        common::seed::update_rents(&rpc).await.unwrap();
+        common::seed::start_rent_updater(rpc.clone());
+
+        // Create SWQOS clients with blacklist checking
+        let mut swqos_clients: Vec<Arc<SwqosClient>> = vec![];
+        for swqos in &config.swqos_configs {
+            // Check blacklist, skip disabled providers
+            if swqos.is_blacklisted() {
+                eprintln!("\u{26a0}\u{fe0f} SWQOS {:?} is blacklisted, skipping", swqos.swqos_type());
+                continue;
+            }
+            match SwqosConfig::get_swqos_client(
+                config.rpc_url.clone(),
+                config.commitment.clone(),
+                swqos.clone(),
+            ).await {
+                Ok(swqos_client) => swqos_clients.push(swqos_client),
+                Err(err) => eprintln!(
+                    "failed to create {:?} swqos client: {err}. Excluding from swqos list",
+                    swqos.swqos_type()
+                ),
+            }
+        }
+
+        Self {
+            rpc,
+            swqos_clients,
+            config,
+        }
+    }
+}
+
+
 /// Main trading client for Solana DeFi protocols
 ///
 /// `SolTradingSDK` provides a unified interface for trading across multiple Solana DEXs
@@ -58,6 +127,9 @@ pub enum TradeTokenType {
 /// It manages RPC connections, transaction signing, and SWQOS (Solana Web Quality of Service) settings.
 pub struct TradingClient {
     /// The keypair used for signing all transactions
+    /// Shared infrastructure (RPC client, SWQOS clients)
+    /// Can be shared across multiple TradingClient instances with different wallets
+    pub infrastructure: Option<Arc<TradingInfrastructure>>,
     pub payer: Arc<Keypair>,
     /// RPC client for blockchain interactions
     pub rpc: Arc<SolanaRpcClient>,
@@ -86,6 +158,7 @@ impl Clone for TradingClient {
             middleware_manager: self.middleware_manager.clone(),
             use_seed_optimize: self.use_seed_optimize,
             callback_execution_mode: self.callback_execution_mode,
+            infrastructure: self.infrastructure.clone(),
         }
     }
 }
@@ -306,6 +379,7 @@ impl TradingClient {
             middleware_manager: None,
             use_seed_optimize: trade_config.use_seed_optimize,
             callback_execution_mode: trade_config.callback_execution_mode,
+            infrastructure: None,
         };
 
         let mut current = INSTANCE.lock();
