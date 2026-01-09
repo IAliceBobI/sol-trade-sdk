@@ -1,13 +1,13 @@
 use crate::{
     common::SolanaRpcClient,
-    instruction::utils::raydium_clmm_types::{PoolState, pool_state_decode},
     constants::{SOL_MINT, USDC_MINT, USDT_MINT},
+    instruction::utils::raydium_clmm_types::{pool_state_decode, PoolState},
 };
 use anyhow::anyhow;
-use solana_sdk::pubkey::Pubkey;
-use solana_account_decoder::UiAccountData;
-use base64::Engine;
 use base64::engine::general_purpose::STANDARD;
+use base64::Engine;
+use solana_account_decoder::UiAccountData;
+use solana_sdk::pubkey::Pubkey;
 
 /// Seeds for PDA derivation
 pub mod seeds {
@@ -25,14 +25,13 @@ pub mod seeds {
 /// (tick_array_pda, bump)
 ///
 /// Note: Reference implementation uses to_be_bytes() for tick index
-pub fn get_tick_array_pda(pool_id: &Pubkey, start_tick_index: i32) -> Result<(Pubkey, u8), anyhow::Error> {
+pub fn get_tick_array_pda(
+    pool_id: &Pubkey,
+    start_tick_index: i32,
+) -> Result<(Pubkey, u8), anyhow::Error> {
     let tick_index_bytes = start_tick_index.to_be_bytes(); // Use big-endian like reference implementation
     Pubkey::try_find_program_address(
-        &[
-            seeds::TICK_ARRAY_SEED,
-            pool_id.as_ref(),
-            &tick_index_bytes,
-        ],
+        &[seeds::TICK_ARRAY_SEED, pool_id.as_ref(), &tick_index_bytes],
         &accounts::RAYDIUM_CLMM,
     )
     .ok_or_else(|| anyhow::anyhow!("Failed to find tick array PDA"))
@@ -95,10 +94,7 @@ fn is_hot_mint(mint: &Pubkey) -> bool {
 /// (tick_array_bitmap_extension_pda, bump)
 pub fn get_tick_array_bitmap_extension_pda(pool_id: &Pubkey) -> (Pubkey, u8) {
     Pubkey::find_program_address(
-        &[
-            seeds::POOL_TICK_ARRAY_BITMAP_SEED,
-            pool_id.as_ref(),
-        ],
+        &[seeds::POOL_TICK_ARRAY_BITMAP_SEED, pool_id.as_ref()],
         &accounts::RAYDIUM_CLMM,
     )
 }
@@ -244,8 +240,8 @@ async fn find_pools_by_mint_offset_collect(
     offset: usize,
 ) -> Result<Vec<(Pubkey, PoolState)>, anyhow::Error> {
     use solana_account_decoder::UiAccountEncoding;
-    use solana_rpc_client_api::{config::RpcProgramAccountsConfig, filter::RpcFilterType};
     use solana_client::rpc_filter::Memcmp;
+    use solana_rpc_client_api::{config::RpcProgramAccountsConfig, filter::RpcFilterType};
 
     let filters = vec![
         // CLMM 账户总大小 = 1536 (数据) + 8 (discriminator) = 1544
@@ -299,27 +295,17 @@ fn select_best_pool(pools: &[(Pubkey, PoolState)]) -> (Pubkey, PoolState) {
     }
 
     // 1. 优先选择「已激活且有流动性」的池
-    let tradeable_pools: Vec<_> = pools
-        .iter()
-        .filter(|(_, pool)| pool.status != 0 && pool.liquidity > 0)
-        .collect();
+    let tradeable_pools: Vec<_> =
+        pools.iter().filter(|(_, pool)| pool.status != 0 && pool.liquidity > 0).collect();
 
-    let fallback_liquid_pools: Vec<_> = pools
-        .iter()
-        .filter(|(_, pool)| pool.liquidity > 0)
-        .collect();
+    let fallback_liquid_pools: Vec<_> =
+        pools.iter().filter(|(_, pool)| pool.liquidity > 0).collect();
 
     let candidates = if !tradeable_pools.is_empty() {
-        &tradeable_pools
-            .iter()
-            .map(|&p| p.clone())
-            .collect::<Vec<_>>()[..]
+        &tradeable_pools.iter().map(|&p| p.clone()).collect::<Vec<_>>()[..]
     } else if !fallback_liquid_pools.is_empty() {
         // 所有池的 status 都为 0 时，至少保证有流动性
-        &fallback_liquid_pools
-            .iter()
-            .map(|&p| p.clone())
-            .collect::<Vec<_>>()[..]
+        &fallback_liquid_pools.iter().map(|&p| p.clone()).collect::<Vec<_>>()[..]
     } else {
         // 极端情况：全部池流动性为 0，退化为任意池
         pools
@@ -347,56 +333,38 @@ fn select_best_pool(pools: &[(Pubkey, PoolState)]) -> (Pubkey, PoolState) {
     best.clone()
 }
 
-/// 内部使用的候选结构：Hot Mint 对按金库余额评分
-struct HotPoolCandidate {
-    addr: Pubkey,
-    pool: PoolState,
-    priority_vault: Pubkey,
-}
-
-/// 在一组候选池中，按指定金库余额从大到小选择最佳池
-async fn pick_best_by_vault_balance(
-    rpc: &SolanaRpcClient,
-    candidates: Vec<HotPoolCandidate>,
+/// 在一组候选池中，按流动性从大到小选择最佳池（零网络开销）
+fn pick_best_by_liquidity(
+    candidates: Vec<(Pubkey, PoolState)>,
 ) -> Option<(Pubkey, PoolState)> {
-    let mut best: Option<(Pubkey, PoolState, u64)> = None;
-
-    for cand in candidates.into_iter() {
-        let balance_res = rpc.get_token_account_balance(&cand.priority_vault).await;
-        let amount: u64 = match balance_res {
-            Ok(bal) => bal.amount.parse::<u64>().unwrap_or(0),
-            Err(_) => 0,
-        };
-
-        if amount == 0 {
-            continue;
-        }
-
-        match &mut best {
-            None => {
-                best = Some((cand.addr, cand.pool, amount));
-            }
-            Some((_, _, best_amt)) => {
-                if amount > *best_amt {
-                    *best_amt = amount;
-                    best.as_mut().unwrap().0 = cand.addr;
-                    best.as_mut().unwrap().1 = cand.pool;
-                }
-            }
-        }
+    if candidates.is_empty() {
+        return None;
     }
 
-    best.map(|(addr, pool, _)| (addr, pool))
+    // 过滤掉流动性为0的池，然后按流动性降序排序
+    let mut valid_pools: Vec<_> = candidates
+        .into_iter()
+        .filter(|(_, pool)| pool.liquidity > 0)
+        .collect();
+
+    if valid_pools.is_empty() {
+        return None;
+    }
+
+    // 按流动性从大到小排序
+    valid_pools.sort_by(|(_, pool_a), (_, pool_b)| pool_b.liquidity.cmp(&pool_a.liquidity));
+
+    // 返回流动性最高的池
+    valid_pools.into_iter().next()
 }
 
-/// 对 Hot Mint 对（WSOL/USDC/USDT 相关）进一步按金库余额择优
+/// 对 Hot Mint 对（WSOL/USDC/USDT 相关）进一步按流动性择优（零网络开销）
 ///
 /// 策略：
-/// - 如果存在稳定币对（USDC/USDT），优先在这些池中按稳定币金库余额从大到小选择
-/// - 否则如果存在 WSOL 对，在这些池中按 WSOL 金库余额从大到小选择
+/// - 如果存在稳定币对（USDC/USDT），优先在这些池中按流动性从大到小选择
+/// - 否则如果存在 WSOL 对，在这些池中按流动性从大到小选择
 /// - 如果都无法区分，则退化为 select_best_pool 的通用逻辑
-async fn select_best_hot_pool_by_vault_balance(
-    rpc: &SolanaRpcClient,
+fn select_best_hot_pool_by_liquidity(
     pools: &[(Pubkey, PoolState)],
 ) -> (Pubkey, PoolState) {
     if pools.is_empty() {
@@ -407,57 +375,41 @@ async fn select_best_hot_pool_by_vault_balance(
         return pools[0].clone();
     }
 
-    let mut stable_candidates: Vec<HotPoolCandidate> = Vec::new();
-    let mut wsol_candidates: Vec<HotPoolCandidate> = Vec::new();
+    let mut stable_candidates: Vec<(Pubkey, PoolState)> = Vec::new();
+    let mut wsol_candidates: Vec<(Pubkey, PoolState)> = Vec::new();
 
     for (addr, pool) in pools.iter() {
         // 先找稳定币侧
         if pool.token_mint0 == USDC_MINT || pool.token_mint0 == USDT_MINT {
-            stable_candidates.push(HotPoolCandidate {
-                addr: *addr,
-                pool: pool.clone(),
-                priority_vault: pool.token_vault0,
-            });
+            stable_candidates.push((*addr, pool.clone()));
             continue;
         }
         if pool.token_mint1 == USDC_MINT || pool.token_mint1 == USDT_MINT {
-            stable_candidates.push(HotPoolCandidate {
-                addr: *addr,
-                pool: pool.clone(),
-                priority_vault: pool.token_vault1,
-            });
+            stable_candidates.push((*addr, pool.clone()));
             continue;
         }
 
         // 其次考虑 WSOL 侧
         if pool.token_mint0 == SOL_MINT {
-            wsol_candidates.push(HotPoolCandidate {
-                addr: *addr,
-                pool: pool.clone(),
-                priority_vault: pool.token_vault0,
-            });
+            wsol_candidates.push((*addr, pool.clone()));
             continue;
         }
         if pool.token_mint1 == SOL_MINT {
-            wsol_candidates.push(HotPoolCandidate {
-                addr: *addr,
-                pool: pool.clone(),
-                priority_vault: pool.token_vault1,
-            });
+            wsol_candidates.push((*addr, pool.clone()));
             continue;
         }
     }
 
-    // 1. 优先在稳定币相关池中按金库余额择优
+    // 1. 优先在稳定币相关池中按流动性择优
     if !stable_candidates.is_empty() {
-        if let Some(best) = pick_best_by_vault_balance(rpc, stable_candidates).await {
+        if let Some(best) = pick_best_by_liquidity(stable_candidates) {
             return best;
         }
     }
 
-    // 2. 否则在 WSOL 相关池中按 WSOL 金库余额择优
+    // 2. 否则在 WSOL 相关池中按流动性择优
     if !wsol_candidates.is_empty() {
-        if let Some(best) = pick_best_by_vault_balance(rpc, wsol_candidates).await {
+        if let Some(best) = pick_best_by_liquidity(wsol_candidates) {
             return best;
         }
     }
@@ -466,34 +418,21 @@ async fn select_best_hot_pool_by_vault_balance(
     select_best_pool(pools)
 }
 
-/// 在所有包含 WSOL 的池中，按 WSOL 金库余额择优
-async fn select_best_wsol_pool_by_vault_balance(
-    rpc: &SolanaRpcClient,
+/// 在所有包含 WSOL 的池中，按流动性择优（零网络开销）
+fn select_best_wsol_pool_by_liquidity(
     pools: &[(Pubkey, PoolState)],
 ) -> Option<(Pubkey, PoolState)> {
-    let mut wsol_candidates: Vec<HotPoolCandidate> = Vec::new();
-
-    for (addr, pool) in pools.iter() {
-        if pool.token_mint0 == SOL_MINT {
-            wsol_candidates.push(HotPoolCandidate {
-                addr: *addr,
-                pool: pool.clone(),
-                priority_vault: pool.token_vault0,
-            });
-        } else if pool.token_mint1 == SOL_MINT {
-            wsol_candidates.push(HotPoolCandidate {
-                addr: *addr,
-                pool: pool.clone(),
-                priority_vault: pool.token_vault1,
-            });
-        }
-    }
+    let wsol_candidates: Vec<(Pubkey, PoolState)> = pools
+        .iter()
+        .filter(|(_, pool)| pool.token_mint0 == SOL_MINT || pool.token_mint1 == SOL_MINT)
+        .map(|(addr, pool)| (*addr, pool.clone()))
+        .collect();
 
     if wsol_candidates.is_empty() {
         return None;
     }
 
-    pick_best_by_vault_balance(rpc, wsol_candidates).await
+    pick_best_by_liquidity(wsol_candidates)
 }
 
 /// 内部实现：查找 mint 对应的最优池
@@ -508,8 +447,6 @@ async fn find_pool_by_mint_impl(
     );
 
     let mut all_pools: Vec<(Pubkey, PoolState)> = result0.unwrap_or_default();
-
-    println!("!!! {:?}", all_pools);
 
     // Merge token_mint1 results
     if let Ok(quote_pools) = result1 {
@@ -551,11 +488,11 @@ async fn find_pool_by_mint_impl(
 
     let best_pool = if !hot_pools.is_empty() {
         // Hot 对优先：通常是 mint/WSOL、mint/USDC、mint/USDT 等主路由
-        // 对 Hot 对额外按金库余额（USDC/USDT/WSOL）择优
-        select_best_hot_pool_by_vault_balance(rpc, &hot_pools).await
+        // 对 Hot 对额外按流动性择优（零网络开销）
+        select_best_hot_pool_by_liquidity(&hot_pools)
     } else if *mint == SOL_MINT {
-        // 特殊情况：当 mint 本身是 WSOL 时，在所有包含 WSOL 的池中按 WSOL 金库余额择优
-        if let Some(best) = select_best_wsol_pool_by_vault_balance(rpc, &other_pools).await {
+        // 特殊情况：当 mint 本身是 WSOL 时，在所有包含 WSOL 的池中按流动性择优
+        if let Some(best) = select_best_wsol_pool_by_liquidity(&other_pools) {
             best
         } else {
             select_best_pool(&other_pools)
