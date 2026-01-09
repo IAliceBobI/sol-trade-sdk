@@ -27,6 +27,7 @@ const PUMP_POOL_ADDRESS: &str = "539m4mVWt6iduB6W8rDGPMarzNCMesuqY5eUTiiYHAgR";
 
 /// 测试：通过 mint 查找 pool 地址
 #[tokio::test]
+#[serial_test::serial]
 async fn test_find_pool_by_mint() {
     println!("=== 测试：通过 mint 查找 pool 地址 ===");
 

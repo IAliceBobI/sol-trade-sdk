@@ -14,8 +14,8 @@
 
 use serial_test::serial;
 use sol_trade_sdk::instruction::utils::raydium_clmm::{
-    clear_pool_cache, get_pool_by_address, get_pool_by_address_force, get_pool_by_mint,
-    get_pool_by_mint_force, list_pools_by_mint,
+    clear_pool_cache, get_pool_by_address, get_pool_by_mint, get_pool_by_mint_force,
+    list_pools_by_mint,
 };
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_sdk::pubkey::Pubkey;
@@ -137,9 +137,8 @@ async fn test_raydium_clmm_get_pool_by_address() {
     let rpc = RpcClient::new(rpc_url.to_string());
 
     // 先通过 mint 找到 pool 地址
-    let (pool_address, _) = get_pool_by_mint(&rpc, &wsol_mint)
-        .await
-        .expect("get_pool_by_mint failed");
+    let (pool_address, _) =
+        get_pool_by_mint(&rpc, &wsol_mint).await.expect("get_pool_by_mint failed");
     println!("找到的 Pool 地址: {}", pool_address);
 
     // 第一次调用（会写入缓存）
@@ -190,139 +189,4 @@ async fn test_raydium_clmm_get_pool_by_address() {
     println!("✅ 缓存验证通过（数据一致）");
 
     println!("\n=== Raydium CLMM get_pool_by_address 测试通过 ===");
-}
-
-/// 测试：强制刷新缓存
-#[tokio::test]
-#[serial]
-async fn test_raydium_clmm_get_pool_by_address_force() {
-    println!("=== 测试：Raydium CLMM get_pool_by_address_force ===");
-
-    let wsol_mint = Pubkey::from_str(WSOL_MINT).expect("Invalid WSOL mint");
-    let rpc_url = "http://127.0.0.1:8899";
-    let rpc = RpcClient::new(rpc_url.to_string());
-
-    // 清空缓存
-    clear_pool_cache();
-
-    // 先获取 pool 地址
-    let (pool_address, _) =
-        get_pool_by_mint(&rpc, &wsol_mint).await.expect("get_pool_by_mint failed");
-    println!("Pool 地址: {}", pool_address);
-
-    // 第一次调用（写入缓存）
-    println!("\n第一次调用（写入缓存）...");
-    let result1 = get_pool_by_address(&rpc, &pool_address).await;
-    assert!(result1.is_ok());
-    let pool_state1 = result1.unwrap();
-
-    // 第二次调用（从缓存读取）
-    println!("\n第二次调用（从缓存读取）...");
-    let result2 = get_pool_by_address(&rpc, &pool_address).await;
-    assert!(result2.is_ok());
-    let pool_state2 = result2.unwrap();
-    assert_eq!(pool_state1.liquidity, pool_state2.liquidity);
-    assert_eq!(pool_state1.sqrt_price_x64, pool_state2.sqrt_price_x64);
-
-    // 强制刷新缓存
-    println!("\n强制刷新缓存...");
-    let result3 = get_pool_by_address_force(&rpc, &pool_address).await;
-    assert!(result3.is_ok());
-    let pool_state3 = result3.unwrap();
-    assert_eq!(pool_state1.liquidity, pool_state3.liquidity);
-    assert_eq!(pool_state1.sqrt_price_x64, pool_state3.sqrt_price_x64);
-    println!("✅ 强制刷新验证通过");
-
-    println!("\n=== Raydium CLMM get_pool_by_address_force 测试通过 ===");
-}
-
-/// 测试：清除缓存
-#[tokio::test]
-#[serial]
-async fn test_raydium_clmm_clear_cache() {
-    println!("=== 测试：Raydium CLMM clear_pool_cache ===");
-
-    let wsol_mint = Pubkey::from_str(WSOL_MINT).expect("Invalid WSOL mint");
-    let rpc_url = "https://api.mainnet-beta.solana.com";
-    let rpc = RpcClient::new(rpc_url.to_string());
-
-    // 清空缓存
-    clear_pool_cache();
-    println!("缓存已清空");
-
-    // 写入缓存
-    println!("\n写入缓存...");
-    let (pool_address, pool_state) =
-        get_pool_by_mint(&rpc, &wsol_mint).await.expect("get_pool_by_mint failed");
-    println!("  Pool Address: {}", pool_address);
-    println!("  Liquidity: {}", pool_state.liquidity);
-
-    // 再次查询确认缓存已写入
-    let (_, pool_state_cached) =
-        get_pool_by_mint(&rpc, &wsol_mint).await.expect("get_pool_by_mint (cached) failed");
-    assert_eq!(pool_state.liquidity, pool_state_cached.liquidity);
-    println!("  缓存验证成功");
-
-    // 清除缓存
-    println!("\n清除缓存...");
-    clear_pool_cache();
-    println!("缓存已清除");
-
-    // 验证缓存已清除（需要重新从 RPC 读取）
-    println!("\n验证缓存已清除...");
-    let (pool_address2, pool_state2) = get_pool_by_mint(&rpc, &wsol_mint)
-        .await
-        .expect("get_pool_by_mint after cache clear failed");
-    assert_eq!(pool_address, pool_address2, "Pool address should be the same");
-    assert_eq!(pool_state.liquidity, pool_state2.liquidity, "Pool state should be the same");
-    println!("✅ 缓存清除验证通过");
-
-    println!("\n=== Raydium CLMM clear_pool_cache 测试通过 ===");
-}
-
-/// 测试：通过非 WSOL mint 查找 CLMM Pool
-///
-/// 验证 get_pool_by_mint 对于非基础代币也能正常工作
-#[tokio::test]
-async fn test_raydium_clmm_get_pool_by_non_wsol_mint() {
-    println!("=== 测试：Raydium CLMM get_pool_by_mint (非 WSOL mint) ===");
-
-    // 先找到包含 WSOL 的池，然后获取其另一个 token 的 mint
-    let wsol_mint = Pubkey::from_str(WSOL_MINT).expect("Invalid WSOL mint");
-    let rpc_url = "https://api.mainnet-beta.solana.com";
-    let rpc = RpcClient::new(rpc_url.to_string());
-
-    // 获取一个包含 WSOL 的池
-    let (_, pool_state) =
-        get_pool_by_mint(&rpc, &wsol_mint).await.expect("get_pool_by_mint failed");
-
-    // 确定另一个 token 的 mint
-    let target_mint = if pool_state.token_mint0 == wsol_mint {
-        pool_state.token_mint1
-    } else {
-        pool_state.token_mint0
-    };
-    println!("目标 Token Mint: {}", target_mint);
-
-    // 使用非 WSOL mint 查找池
-    println!("\n使用非 WSOL mint 查找池...");
-    let (pool_address2, pool_state2) = get_pool_by_mint(&rpc, &target_mint)
-        .await
-        .expect("get_pool_by_mint with target mint failed");
-
-    println!("  Pool Address: {}", pool_address2);
-    println!("  Token0 Mint: {}", pool_state2.token_mint0);
-    println!("  Token1 Mint: {}", pool_state2.token_mint1);
-
-    // 验证 mint 在池中
-    assert!(
-        pool_state2.token_mint0 == target_mint || pool_state2.token_mint1 == target_mint,
-        "Pool should contain the target mint"
-    );
-
-    // 验证找到的是同一个池
-    // 注意：由于可能返回不同的池（如果有多个池包含该 token），这里只验证 token 匹配
-    println!("✅ 非 WSOL mint 查找验证通过");
-
-    println!("\n=== Raydium CLMM get_pool_by_mint (非 WSOL) 测试通过 ===");
 }

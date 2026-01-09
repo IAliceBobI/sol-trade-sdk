@@ -604,28 +604,8 @@ async fn find_pool_by_mint_impl(
     mint: &Pubkey,
     use_vault_balance: bool,
 ) -> Result<(Pubkey, PoolState), anyhow::Error> {
-    // Parallel search: try both token_mint0 and token_mint1 offsets simultaneously
-    let (result0, result1) = tokio::join!(
-        find_pools_by_mint_offset_collect(rpc, mint, TOKEN_MINT0_OFFSET),
-        find_pools_by_mint_offset_collect(rpc, mint, TOKEN_MINT1_OFFSET)
-    );
-
-    let mut all_pools: Vec<(Pubkey, PoolState)> = result0.unwrap_or_default();
-
-    // Merge token_mint1 results
-    if let Ok(quote_pools) = result1 {
-        use std::collections::HashSet;
-        let mut seen: HashSet<Pubkey> = all_pools.iter().map(|(addr, _)| *addr).collect();
-        for (addr, pool) in quote_pools {
-            if seen.insert(addr) {
-                all_pools.push((addr, pool));
-            }
-        }
-    }
-
-    if all_pools.is_empty() {
-        return Err(anyhow!("No CLMM pool found for mint {}", mint));
-    }
+    // 复用 list_pools_by_mint 获取所有包含该 mint 的池（带缓存）
+    let all_pools = list_pools_by_mint(rpc, mint).await?;
 
     // 优先选择与 Hot Mint（如 WSOL/USDC/USDT）配对的池，参考 Pool 选择算法分析文档的 Hot/Cold 策略
     let mut hot_pools: Vec<(Pubkey, PoolState)> = Vec::new();
