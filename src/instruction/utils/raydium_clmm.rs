@@ -347,6 +347,125 @@ fn select_best_pool(pools: &[(Pubkey, PoolState)]) -> (Pubkey, PoolState) {
     best.clone()
 }
 
+/// 内部使用的候选结构：Hot Mint 对按金库余额评分
+struct HotPoolCandidate {
+    addr: Pubkey,
+    pool: PoolState,
+    priority_vault: Pubkey,
+}
+
+/// 在一组候选池中，按指定金库余额从大到小选择最佳池
+async fn pick_best_by_vault_balance(
+    rpc: &SolanaRpcClient,
+    candidates: Vec<HotPoolCandidate>,
+) -> Option<(Pubkey, PoolState)> {
+    let mut best: Option<(Pubkey, PoolState, u64)> = None;
+
+    for cand in candidates.into_iter() {
+        let balance_res = rpc.get_token_account_balance(&cand.priority_vault).await;
+        let amount: u64 = match balance_res {
+            Ok(bal) => bal.amount.parse::<u64>().unwrap_or(0),
+            Err(_) => 0,
+        };
+
+        if amount == 0 {
+            continue;
+        }
+
+        match &mut best {
+            None => {
+                best = Some((cand.addr, cand.pool, amount));
+            }
+            Some((_, _, best_amt)) => {
+                if amount > *best_amt {
+                    *best_amt = amount;
+                    best.as_mut().unwrap().0 = cand.addr;
+                    best.as_mut().unwrap().1 = cand.pool;
+                }
+            }
+        }
+    }
+
+    best.map(|(addr, pool, _)| (addr, pool))
+}
+
+/// 对 Hot Mint 对（WSOL/USDC/USDT 相关）进一步按金库余额择优
+///
+/// 策略：
+/// - 如果存在稳定币对（USDC/USDT），优先在这些池中按稳定币金库余额从大到小选择
+/// - 否则如果存在 WSOL 对，在这些池中按 WSOL 金库余额从大到小选择
+/// - 如果都无法区分，则退化为 select_best_pool 的通用逻辑
+async fn select_best_hot_pool_by_vault_balance(
+    rpc: &SolanaRpcClient,
+    pools: &[(Pubkey, PoolState)],
+) -> (Pubkey, PoolState) {
+    if pools.is_empty() {
+        panic!("Cannot select best hot pool from empty list");
+    }
+
+    if pools.len() == 1 {
+        return pools[0].clone();
+    }
+
+    let mut stable_candidates: Vec<HotPoolCandidate> = Vec::new();
+    let mut wsol_candidates: Vec<HotPoolCandidate> = Vec::new();
+
+    for (addr, pool) in pools.iter() {
+        // 先找稳定币侧
+        if pool.token_mint0 == USDC_MINT || pool.token_mint0 == USDT_MINT {
+            stable_candidates.push(HotPoolCandidate {
+                addr: *addr,
+                pool: pool.clone(),
+                priority_vault: pool.token_vault0,
+            });
+            continue;
+        }
+        if pool.token_mint1 == USDC_MINT || pool.token_mint1 == USDT_MINT {
+            stable_candidates.push(HotPoolCandidate {
+                addr: *addr,
+                pool: pool.clone(),
+                priority_vault: pool.token_vault1,
+            });
+            continue;
+        }
+
+        // 其次考虑 WSOL 侧
+        if pool.token_mint0 == SOL_MINT {
+            wsol_candidates.push(HotPoolCandidate {
+                addr: *addr,
+                pool: pool.clone(),
+                priority_vault: pool.token_vault0,
+            });
+            continue;
+        }
+        if pool.token_mint1 == SOL_MINT {
+            wsol_candidates.push(HotPoolCandidate {
+                addr: *addr,
+                pool: pool.clone(),
+                priority_vault: pool.token_vault1,
+            });
+            continue;
+        }
+    }
+
+    // 1. 优先在稳定币相关池中按金库余额择优
+    if !stable_candidates.is_empty() {
+        if let Some(best) = pick_best_by_vault_balance(rpc, stable_candidates).await {
+            return best;
+        }
+    }
+
+    // 2. 否则在 WSOL 相关池中按 WSOL 金库余额择优
+    if !wsol_candidates.is_empty() {
+        if let Some(best) = pick_best_by_vault_balance(rpc, wsol_candidates).await {
+            return best;
+        }
+    }
+
+    // 3. 都无法区分时退化为原有通用规则
+    select_best_pool(pools)
+}
+
 /// 内部实现：查找 mint 对应的最优池
 async fn find_pool_by_mint_impl(
     rpc: &SolanaRpcClient,
@@ -400,7 +519,8 @@ async fn find_pool_by_mint_impl(
 
     let best_pool = if !hot_pools.is_empty() {
         // Hot 对优先：通常是 mint/WSOL、mint/USDC、mint/USDT 等主路由
-        select_best_pool(&hot_pools)
+        // 对 Hot 对额外按金库余额（USDC/USDT/WSOL）择优
+        select_best_hot_pool_by_vault_balance(rpc, &hot_pools).await
     } else {
         // 没有 Hot 对时，在所有池中按通用评分规则选择
         select_best_pool(&other_pools)
