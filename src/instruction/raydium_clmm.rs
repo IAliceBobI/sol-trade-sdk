@@ -72,41 +72,74 @@ impl InstructionBuilder for RaydiumClmmInstructionBuilder {
         // ========================================
         // Trade calculation and account address preparation
         // ========================================
-        // For buy: params.input_mint should be WSOL/USDC, params.output_mint is the token we're buying
-        // Verify input_mint is WSOL or USDC
-        if params.input_mint != crate::constants::WSOL_TOKEN_ACCOUNT && params.input_mint != crate::constants::USDC_TOKEN_ACCOUNT {
-            return Err(anyhow!("Input mint must be WSOL or USDC for buy"));
-        }
-        
-        // Verify output_mint matches one of the pool tokens
-        if params.output_mint != protocol_params.token0_mint && params.output_mint != protocol_params.token1_mint {
-            return Err(anyhow!("Output mint {} does not match pool tokens", params.output_mint));
-        }
-        
-        let input_mint = params.input_mint;
+        // For buy: user input can be SOL/WSOL/USDC, params.output_mint is the token we're buying
+        let user_input_mint = params.input_mint;
         let output_mint = params.output_mint;
-        
+
+        // Verify output_mint matches one of the pool tokens
+        if output_mint != protocol_params.token0_mint && output_mint != protocol_params.token1_mint {
+            return Err(anyhow!("Output mint {} does not match pool tokens", output_mint));
+        }
+
+        // Verify input mint is one of SOL/WSOL/USDC
+        let is_supported_input = user_input_mint == crate::constants::SOL_TOKEN_ACCOUNT
+            || user_input_mint == crate::constants::WSOL_TOKEN_ACCOUNT
+            || user_input_mint == crate::constants::USDC_TOKEN_ACCOUNT;
+        if !is_supported_input {
+            return Err(anyhow!("Input mint must be SOL, WSOL or USDC for buy"));
+        }
+
+        // Determine the stable mint (WSOL or USDC) actually used by this pool
+        let wsol_mint = crate::constants::WSOL_TOKEN_ACCOUNT;
+        let usdc_mint = crate::constants::USDC_TOKEN_ACCOUNT;
+        let stable_mint_in_pool = if protocol_params.token0_mint == wsol_mint
+            || protocol_params.token0_mint == usdc_mint
+        {
+            protocol_params.token0_mint
+        } else if protocol_params.token1_mint == wsol_mint
+            || protocol_params.token1_mint == usdc_mint
+        {
+            protocol_params.token1_mint
+        } else {
+            return Err(anyhow!("Pool must contain WSOL or USDC"));
+        };
+
+        // Map SOL input to the actual stable mint used by the pool
+        let input_mint = if user_input_mint == crate::constants::SOL_TOKEN_ACCOUNT {
+            stable_mint_in_pool
+        } else {
+            user_input_mint
+        };
+
+        // Ensure the effective input mint matches the pool's stable mint
+        if input_mint != stable_mint_in_pool {
+            return Err(anyhow!(
+                "Input mint {} does not match pool stable mint {}",
+                input_mint, stable_mint_in_pool
+            ));
+        }
+
         // Determine which token is input (for is_base_input flag)
         let is_token0_in = protocol_params.token0_mint == input_mint;
-        
+
         // Get vaults and programs based on which token is input/output
         let (input_vault, input_token_program) = if is_token0_in {
             (protocol_params.token0_vault, protocol_params.token0_program)
         } else {
             (protocol_params.token1_vault, protocol_params.token1_program)
         };
-        
+
         let (output_vault, output_token_program) = if output_mint == protocol_params.token0_mint {
             (protocol_params.token0_vault, protocol_params.token0_program)
         } else {
             (protocol_params.token1_vault, protocol_params.token1_program)
         };
-        
+
         // Note: Raydium CLMM swap instruction requires both TOKEN_PROGRAM_ID and TOKEN_2022_PROGRAM_ID
         // The program will use the appropriate one based on the token accounts
 
         let amount_in: u64 = params.input_amount.unwrap_or(0);
-        
+
         // Calculate expected output amount using price
         // Note: This is a simplified calculation. In production, CLMM swap output
         // should be calculated by the on-chain program based on liquidity distribution.
@@ -115,13 +148,13 @@ impl InstructionBuilder for RaydiumClmmInstructionBuilder {
         } else {
             protocol_params.token1_decimals
         };
-        
+
         let output_decimals = if output_mint == protocol_params.token0_mint {
             protocol_params.token0_decimals
         } else {
             protocol_params.token1_decimals
         };
-        
+
         let price = if is_token0_in {
             price_token0_in_token1(
                 pool_state.sqrt_price_x64,
@@ -351,41 +384,77 @@ impl InstructionBuilder for RaydiumClmmInstructionBuilder {
         // ========================================
         // Trade calculation and account address preparation
         // ========================================
-        // For sell: input_mint is the token we're selling, output_mint should be WSOL/USDC
-        // Verify output_mint is WSOL or USDC
-        if params.output_mint != crate::constants::WSOL_TOKEN_ACCOUNT && params.output_mint != crate::constants::USDC_TOKEN_ACCOUNT {
-            return Err(anyhow!("Output mint must be WSOL or USDC for sell"));
-        }
-        
-        // Verify input_mint matches one of the pool tokens
-        if params.input_mint != protocol_params.token0_mint && params.input_mint != protocol_params.token1_mint {
-            return Err(anyhow!("Input mint {} does not match pool tokens", params.input_mint));
-        }
-        
+        // For sell: input_mint is the token we're selling, user output can be SOL/WSOL/USDC
         let input_mint = params.input_mint;
-        let output_mint = params.output_mint;
-        
+        let user_output_mint = params.output_mint;
+
+        // Verify input_mint matches one of the pool tokens
+        if input_mint != protocol_params.token0_mint && input_mint != protocol_params.token1_mint {
+            return Err(anyhow!("Input mint {} does not match pool tokens", input_mint));
+        }
+
+        // Verify output mint is one of SOL/WSOL/USDC
+        let is_supported_output = user_output_mint == crate::constants::SOL_TOKEN_ACCOUNT
+            || user_output_mint == crate::constants::WSOL_TOKEN_ACCOUNT
+            || user_output_mint == crate::constants::USDC_TOKEN_ACCOUNT;
+        if !is_supported_output {
+            return Err(anyhow!("Output mint must be SOL, WSOL or USDC for sell"));
+        }
+
+        // Determine the stable mint (WSOL or USDC) actually used by this pool
+        let wsol_mint = crate::constants::WSOL_TOKEN_ACCOUNT;
+        let usdc_mint = crate::constants::USDC_TOKEN_ACCOUNT;
+        let stable_mint_in_pool = if protocol_params.token0_mint == wsol_mint
+            || protocol_params.token0_mint == usdc_mint
+        {
+            protocol_params.token0_mint
+        } else if protocol_params.token1_mint == wsol_mint
+            || protocol_params.token1_mint == usdc_mint
+        {
+            protocol_params.token1_mint
+        } else {
+            return Err(anyhow!("Pool must contain WSOL or USDC"));
+        };
+
+        // Map SOL output to the actual stable mint used by the pool
+        let output_mint = if user_output_mint == crate::constants::SOL_TOKEN_ACCOUNT {
+            stable_mint_in_pool
+        } else {
+            user_output_mint
+        };
+
+        // Ensure the effective output mint matches the pool's stable mint
+        if output_mint != stable_mint_in_pool {
+            return Err(anyhow!(
+                "Output mint {} does not match pool stable mint {}",
+                output_mint, stable_mint_in_pool
+            ));
+        }
+
+        // ========================================
+        // Trade calculation and account address preparation
+        // ========================================
         // Determine which token is input (for is_base_input flag)
         let is_token0_in = protocol_params.token0_mint == input_mint;
-        
+
         // Get vaults and programs based on which token is input/output
         let (input_vault, input_token_program) = if is_token0_in {
             (protocol_params.token0_vault, protocol_params.token0_program)
         } else {
             (protocol_params.token1_vault, protocol_params.token1_program)
         };
-        
+
         let (output_vault, output_token_program) = if output_mint == protocol_params.token0_mint {
             (protocol_params.token0_vault, protocol_params.token0_program)
         } else {
             (protocol_params.token1_vault, protocol_params.token1_program)
         };
-        
+
         // Note: Raydium CLMM swap instruction requires both TOKEN_PROGRAM_ID and TOKEN_2022_PROGRAM_ID
         // The program will use the appropriate one based on the token accounts
 
         let amount_in: u64 = params.input_amount.unwrap_or(0);
-        
+
         // Calculate expected output amount using price
         let price = if is_token0_in {
             price_token0_in_token1(
