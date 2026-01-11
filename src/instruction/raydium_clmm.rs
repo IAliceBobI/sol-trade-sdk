@@ -1,6 +1,6 @@
 use crate::{
     common::fast_fn::get_associated_token_address_with_program_id_fast_use_seed,
-    constants::{accounts::TOKEN_PROGRAM, accounts::TOKEN_PROGRAM_2022, trade::trade::DEFAULT_SLIPPAGE},
+    constants::{accounts::TOKEN_PROGRAM,   trade::trade::DEFAULT_SLIPPAGE},
     instruction::utils::raydium_clmm::{accounts, get_pool_by_address, get_tick_array_pda},
     trading::core::{
         params::{RaydiumClmmParams, SwapParams},
@@ -11,27 +11,19 @@ use crate::{
 use anyhow::{Result, anyhow};
 use solana_sdk::{
     instruction::{AccountMeta, Instruction},
-    pubkey::Pubkey,
+  
     signer::Signer,
 };
 
-/// Instruction discriminator for CLMM swap_v2
+/// Instruction discriminator for CLMM swap
 /// 
-/// Based on event parser and SDK analysis:
-/// - swap (old): [248, 198, 158, 145, 225, 117, 135, 200] - uses SwapSingle (fewer accounts, only token_program)
-/// - swap_v2 (new): [43, 4, 237, 11, 26, 201, 30, 98] - uses SwapSingleV2 (more accounts)
+/// Based on Jupiter aggregator usage and production observations:
+/// - swap (standard): [248, 198, 158, 145, 225, 117, 135, 200] - SwapSingle, widely used
+/// - swap_v2 (extended): [43, 4, 237, 11, 26, 201, 30, 98] - SwapSingleV2, includes token_program_2022 & memo
 /// 
-/// We use swap_v2 which includes:
-/// - token_program_2022
-/// - memo_program  
-/// - input_vault_mint
-/// - output_vault_mint
-/// 
-/// Account order matches parse_swap_v2_instruction:
-/// 0: payer, 1: amm_config, 2: pool_state, 3: input_token_account, 4: output_token_account,
-/// 5: input_vault, 6: output_vault, 7: observation_state, 8: token_program, 9: token_program2022,
-/// 10: memo_program, 11: input_vault_mint, 12: output_vault_mint, 13+: tick arrays
-const SWAP_V2_DISCRIMINATOR: &[u8] = &[43, 4, 237, 11, 26, 201, 30, 98];
+/// We use the standard swap instruction for maximum compatibility
+const SWAP_DISCRIMINATOR: &[u8] = &[248, 198, 158, 145, 225, 117, 135, 200];
+const _SWAP_V2_DISCRIMINATOR: &[u8] = &[43, 4, 237, 11, 26, 201, 30, 98];
 
 /// Instruction builder for RaydiumClmm protocol
 pub struct RaydiumClmmInstructionBuilder;
@@ -173,6 +165,12 @@ impl InstructionBuilder for RaydiumClmmInstructionBuilder {
         let input_amount_f64 = amount_in as f64 / 10f64.powi(input_decimals as i32);
         let output_amount_f64 = input_amount_f64 * price;
         let expected_output = (output_amount_f64 * 10f64.powi(output_decimals as i32)) as u64;
+        
+        eprintln!("[CLMM Debug] Price calculation:");
+        eprintln!("  price: {}", price);
+        eprintln!("  input_amount: {} ({} in decimals)", amount_in, input_amount_f64);
+        eprintln!("  expected_output_f64: {}", output_amount_f64);
+        eprintln!("  expected_output: {}", expected_output);
 
         // Apply slippage
         let slippage = params.slippage_basis_points.unwrap_or(DEFAULT_SLIPPAGE);
@@ -182,6 +180,9 @@ impl InstructionBuilder for RaydiumClmmInstructionBuilder {
                 ((expected_output as f64) * (1.0 - (slippage as f64) / 10000.0)) as u64
             }
         };
+        
+        eprintln!("  slippage: {}bp", slippage);
+        eprintln!("  minimum_amount_out: {}", minimum_amount_out);
 
         let input_token_account = get_associated_token_address_with_program_id_fast_use_seed(
             &params.payer.pubkey(),
@@ -227,34 +228,63 @@ impl InstructionBuilder for RaydiumClmmInstructionBuilder {
         }
 
         if params.create_output_mint_ata {
+            // 不使用 seed 优化，使用标准 ATA 创建方式
             instructions.extend(
-                crate::common::fast_fn::create_associated_token_account_idempotent_fast_use_seed(
+                crate::common::fast_fn::create_associated_token_account_idempotent_fast(
                     &params.payer.pubkey(),
                     &params.payer.pubkey(),
                     &output_mint,
                     &output_token_program,
-                    params.open_seed_optimize,
                 ),
             );
         }
 
-        // Calculate tick array PDA
-        // Reference implementation uses get_first_initialized_tick_array to find the first initialized tick array
-        // For now, we use a simplified approach: find the first initialized tick array or fall back to current tick's array
+        // Calculate tick arrays - CLMM requires multiple tick arrays for swap
+        // 根据官方 client 实现，需要获取多个 tick arrays（最多 5 个）
         let zero_for_one = is_token0_in;
-        let tick_array_start_index = crate::instruction::utils::raydium_clmm::get_first_initialized_tick_array_start_index(
+        let mut tick_array_start_index = crate::instruction::utils::raydium_clmm::get_first_initialized_tick_array_start_index(
             &pool_state,
             zero_for_one,
         );
-        let (tick_array_pda, _) = get_tick_array_pda(&protocol_params.pool_state, tick_array_start_index)?;
         
-        // Get tick array bitmap extension PDA (may not exist)
+        let mut tick_array_pdas = Vec::new();
+        let (first_tick_array_pda, _) = get_tick_array_pda(&protocol_params.pool_state, tick_array_start_index)?;
+        tick_array_pdas.push(first_tick_array_pda);
+        
+        // 获取后续的 tick arrays（最多 5 个）
+        let tick_spacing = pool_state.tick_spacing as i32;
+        const TICK_ARRAY_SIZE: i32 = 60; // raydium_amm_v3::states::TICK_ARRAY_SIZE
+        let ticks_per_array = tick_spacing * TICK_ARRAY_SIZE;
+        
+        for _ in 0..4 {
+            tick_array_start_index = if zero_for_one {
+                tick_array_start_index - ticks_per_array
+            } else {
+                tick_array_start_index + ticks_per_array
+            };
+            
+            // 检查是否超出范围
+            const MIN_TICK: i32 = -443636;
+            const MAX_TICK: i32 = 443636;
+            if (zero_for_one && tick_array_start_index < MIN_TICK) || 
+               (!zero_for_one && tick_array_start_index > MAX_TICK) {
+                break;
+            }
+            
+            if let Ok((tick_array_pda, _)) = get_tick_array_pda(&protocol_params.pool_state, tick_array_start_index) {
+                tick_array_pdas.push(tick_array_pda);
+            }
+        }
+        
+        eprintln!("   [CLMM Debug] Generated {} tick array PDAs", tick_array_pdas.len());
+        
+        // Get tick array bitmap extension PDA
         let (tick_array_bitmap_extension_pda, _) = crate::instruction::utils::raydium_clmm::get_tick_array_bitmap_extension_pda(&protocol_params.pool_state);
 
         // Create swap instruction
-        // Account order matches Raydium SDK V2 swapInstruction:
+        // Account order for standard Swap instruction (not SwapV2):
         // 0. payer (signer)
-        // 1. ammConfigId (readonly)
+        // 1. ammConfig (readonly)
         // 2. poolId (writable)
         // 3. inputTokenAccount (writable)
         // 4. outputTokenAccount (writable)
@@ -262,17 +292,10 @@ impl InstructionBuilder for RaydiumClmmInstructionBuilder {
         // 6. outputVault (writable)
         // 7. observationId (writable)
         // 8. TOKEN_PROGRAM_ID (readonly)
-        // 9. TOKEN_2022_PROGRAM_ID (readonly)
-        // 10. MEMO_PROGRAM_ID (readonly)
-        // 11. inputMint (readonly)
-        // 12. outputMint (readonly)
-        // 13+. remainingAccounts (tick arrays + exTickArrayBitmap)
-        
-        // MEMO_PROGRAM_ID: MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr
-        const MEMO_PROGRAM_ID: Pubkey = solana_sdk::pubkey!("MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr");
+        // 9+. remainingAccounts (tick arrays)
         
         // Debug: Print account information
-        eprintln!("   [CLMM Debug] Building swap instruction with accounts:");
+        eprintln!("   [CLMM Debug] Building standard swap instruction with accounts:");
         eprintln!("     0. Payer: {}", params.payer.pubkey());
         eprintln!("     1. Amm Config: {}", protocol_params.amm_config);
         eprintln!("     2. Pool State: {}", protocol_params.pool_state);
@@ -282,12 +305,11 @@ impl InstructionBuilder for RaydiumClmmInstructionBuilder {
         eprintln!("     6. Output Vault: {}", output_vault);
         eprintln!("     7. Observation State: {}", protocol_params.observation_state);
         eprintln!("     8. Token Program: {}", TOKEN_PROGRAM);
-        eprintln!("     9. Token Program 2022: {}", TOKEN_PROGRAM_2022);
-        eprintln!("     10. Memo Program: {}", MEMO_PROGRAM_ID);
-        eprintln!("     11. Input Mint: {}", input_mint);
-        eprintln!("     12. Output Mint: {}", output_mint);
-        eprintln!("     13. Tick Array PDA: {}", tick_array_pda);
+        eprintln!("     9. First Tick Array PDA: {}", tick_array_pdas[0]);
         
+        // 根据 Raydium CLMM 官方源码，标准 Swap 指令需要 10 个账户：
+        // https://github.com/raydium-io/raydium-clmm/blob/master/programs/amm/src/instructions/swap.rs#L16-L53
+        // SwapSingle 结构体包含第一个 tick_array，额外的 tick_arrays 通过 remaining_accounts 添加
         let mut account_metas = vec![
             AccountMeta::new(params.payer.pubkey(), true), // 0. Payer (signer)
             AccountMeta::new_readonly(protocol_params.amm_config, false), // 1. Amm Config (readonly)
@@ -297,44 +319,42 @@ impl InstructionBuilder for RaydiumClmmInstructionBuilder {
             AccountMeta::new(input_vault, false), // 5. Input Vault (writable)
             AccountMeta::new(output_vault, false), // 6. Output Vault (writable)
             AccountMeta::new(protocol_params.observation_state, false), // 7. Observation State (writable)
-            AccountMeta::new_readonly(TOKEN_PROGRAM, false), // 8. Token Program (readonly)
-            AccountMeta::new_readonly(TOKEN_PROGRAM_2022, false), // 9. Token Program 2022 (readonly)
-            AccountMeta::new_readonly(MEMO_PROGRAM_ID, false), // 10. Memo Program (readonly)
-            AccountMeta::new_readonly(input_mint, false), // 11. Input Mint (readonly)
-            AccountMeta::new_readonly(output_mint, false), // 12. Output Mint (readonly)
+            AccountMeta::new_readonly(crate::constants::TOKEN_PROGRAM, false), // 8. Token Program (readonly)
+            AccountMeta::new(tick_array_pdas[0], false), // 9. 第一个 Tick Array (writable)
         ];
         
-        // Build remaining accounts: exTickArrayBitmap (if exists) + tick arrays
-        // Reference implementation: tickarray_bitmap_extension is readonly, only added if exists
-        // Note: SDK uses writable, but reference uses readonly - we'll use readonly to match reference
-        let mut remaining_accounts = Vec::new();
+        // 根据官方 client 实现（line 1812-1834）：
+        // remaining_accounts 第一个是 tickarray_bitmap_extension (readonly)
+        // 然后是额外的 tick_arrays
+        account_metas.push(AccountMeta::new_readonly(tick_array_bitmap_extension_pda, false)); // 10. TickArray Bitmap Extension (readonly)
         
-        // Check if tick array bitmap extension exists
-        // Reference implementation only adds it if account exists
-        // Note: We can't check account existence in build_instructions (async not allowed in sync context)
-        // So we'll always include it if rpc is available
-        // The program will handle non-existent accounts gracefully
-        if params.rpc.is_some() {
-            // Reference implementation uses readonly for tickarray_bitmap_extension
-            remaining_accounts.push(AccountMeta::new_readonly(tick_array_bitmap_extension_pda, false));
-            eprintln!("   [CLMM Debug] Adding TickArrayBitmapExtension to remaining accounts (readonly): {}", tick_array_bitmap_extension_pda);
+        // 添加额外的 tick arrays（从第 2 个开始）
+        for i in 1..tick_array_pdas.len() {
+            account_metas.push(AccountMeta::new(tick_array_pdas[i], false));
         }
         
-        // Add tick arrays (at least one is required)
-        // TODO: In production, calculate all required tick arrays based on swap path
-        // For now, we only include the first tick array
-        remaining_accounts.push(AccountMeta::new(tick_array_pda, false)); // Tick Array (writable)
-        
-        account_metas.extend(remaining_accounts);
+        eprintln!("   [CLMM Debug] Total accounts: {} (10 main + {} remaining)", account_metas.len(), account_metas.len() - 10);
+
+        // 如果 input 是 WSOL，在 swap 之前再次调用 SyncNative 以确保 token amount 正确同步
+        // 这对 mainnet-fork 环境尤其重要，因为 Token Program 可能缓存了旧数据
+        if input_mint == crate::constants::WSOL_TOKEN_ACCOUNT {
+            instructions.push(Instruction {
+                program_id: crate::constants::TOKEN_PROGRAM,
+                accounts: vec![AccountMeta::new(input_token_account, false)],
+                data: vec![17], // SyncNative discriminator
+            });
+            eprintln!("   [CLMM Debug] Added SyncNative instruction before swap for WSOL input");
+        }
 
         // Create instruction data: discriminator (8 bytes) + amount (u64) + other_amount_threshold (u64) + sqrt_price_limit_x64 (u128) + is_base_input (bool)
-        // Note: SDK uses bool for is_base_input, but we use u8 (1 or 0)
+        // 根据官方源码，标准 Swap 指令使用 SWAP_DISCRIMINATOR [248, 198, 158, 145, 225, 117, 135, 200]
+        // SwapV2 指令（支持 Token2022）使用 [43, 4, 237, 11, 26, 201, 30, 98]
         let mut data = vec![0u8; 41];
-        data[0..8].copy_from_slice(SWAP_V2_DISCRIMINATOR);
+        data[0..8].copy_from_slice(SWAP_DISCRIMINATOR);
         data[8..16].copy_from_slice(&amount_in.to_le_bytes());
         data[16..24].copy_from_slice(&minimum_amount_out.to_le_bytes());
         data[24..40].copy_from_slice(&sqrt_price_limit_x64.to_le_bytes());
-        data[40] = if is_token0_in { 1 } else { 0 }; // is_base_input (1 if token0 is input, 0 if token1 is input)
+        data[40] = if is_token0_in { 1 } else { 0 }; // is_base_input
 
         instructions.push(Instruction::new_with_bytes(
             accounts::RAYDIUM_CLMM,
@@ -559,31 +579,31 @@ impl InstructionBuilder for RaydiumClmmInstructionBuilder {
         );
         let (tick_array_pda, _) = get_tick_array_pda(&protocol_params.pool_state, tick_array_start_index)?;
         
+        // 验证 Tick Array 账户是否存在
+        if let Some(rpc) = &params.rpc {
+            match rpc.get_account(&tick_array_pda).await {
+                Ok(account) => {
+                    eprintln!("   [CLMM Debug] Tick Array account exists, owner: {}", account.owner);
+                    eprintln!("   [CLMM Debug] Tick Array data length: {}", account.data.len());
+                },
+                Err(e) => {
+                    eprintln!("   [CLMM Debug] WARNING: Tick Array account NOT FOUND: {:?}", e);
+                    eprintln!("   [CLMM Debug] This will cause 'AccountOwnedByWrongProgram' error");
+                    eprintln!("   [CLMM Debug] Try querying mainnet to verify the account exists");
+                }
+            }
+        }
+        
         // Get tick array bitmap extension PDA (may not exist)
-        let (tick_array_bitmap_extension_pda, _) = crate::instruction::utils::raydium_clmm::get_tick_array_bitmap_extension_pda(&protocol_params.pool_state);
+        let (_tick_array_bitmap_extension_pda, _) = crate::instruction::utils::raydium_clmm::get_tick_array_bitmap_extension_pda(&protocol_params.pool_state);
 
         // Create swap instruction
-        // Account order matches Raydium SDK V2 swapInstruction:
-        // 0. payer (signer)
-        // 1. ammConfigId (readonly)
-        // 2. poolId (writable)
-        // 3. inputTokenAccount (writable)
-        // 4. outputTokenAccount (writable)
-        // 5. inputVault (writable)
-        // 6. outputVault (writable)
-        // 7. observationId (writable)
-        // 8. TOKEN_PROGRAM_ID (readonly)
-        // 9. TOKEN_2022_PROGRAM_ID (readonly)
-        // 10. MEMO_PROGRAM_ID (readonly)
-        // 11. inputMint (readonly)
-        // 12. outputMint (readonly)
-        // 13+. remainingAccounts (tick arrays + exTickArrayBitmap)
-        
-        // MEMO_PROGRAM_ID: MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr
-        const MEMO_PROGRAM_ID: Pubkey = solana_sdk::pubkey!("MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr");
+        // 根据 Raydium CLMM 官方源码，标准 Swap 指令需要 10 个账户：
+        // https://github.com/raydium-io/raydium-clmm/blob/master/programs/amm/src/instructions/swap.rs#L16-L53
+        // SwapSingle 结构体包含第一个 tick_array，额外的 tick_arrays 通过 remaining_accounts 添加
         
         // Debug: Print account information
-        eprintln!("   [CLMM Debug] Building swap instruction with accounts:");
+        eprintln!("   [CLMM Debug] Building standard swap instruction with accounts:");
         eprintln!("     0. Payer: {}", params.payer.pubkey());
         eprintln!("     1. Amm Config: {}", protocol_params.amm_config);
         eprintln!("     2. Pool State: {}", protocol_params.pool_state);
@@ -593,13 +613,9 @@ impl InstructionBuilder for RaydiumClmmInstructionBuilder {
         eprintln!("     6. Output Vault: {}", output_vault);
         eprintln!("     7. Observation State: {}", protocol_params.observation_state);
         eprintln!("     8. Token Program: {}", TOKEN_PROGRAM);
-        eprintln!("     9. Token Program 2022: {}", TOKEN_PROGRAM_2022);
-        eprintln!("     10. Memo Program: {}", MEMO_PROGRAM_ID);
-        eprintln!("     11. Input Mint: {}", input_mint);
-        eprintln!("     12. Output Mint: {}", output_mint);
-        eprintln!("     13. Tick Array PDA: {}", tick_array_pda);
+        eprintln!("     9. Tick Array PDA: {}", tick_array_pda);
         
-        let mut account_metas = vec![
+        let account_metas = vec![
             AccountMeta::new(params.payer.pubkey(), true), // 0. Payer (signer)
             AccountMeta::new_readonly(protocol_params.amm_config, false), // 1. Amm Config (readonly)
             AccountMeta::new(protocol_params.pool_state, false), // 2. Pool State (writable)
@@ -608,33 +624,18 @@ impl InstructionBuilder for RaydiumClmmInstructionBuilder {
             AccountMeta::new(input_vault, false), // 5. Input Vault (writable)
             AccountMeta::new(output_vault, false), // 6. Output Vault (writable)
             AccountMeta::new(protocol_params.observation_state, false), // 7. Observation State (writable)
-            AccountMeta::new_readonly(TOKEN_PROGRAM, false), // 8. Token Program (readonly)
-            AccountMeta::new_readonly(TOKEN_PROGRAM_2022, false), // 9. Token Program 2022 (readonly)
-            AccountMeta::new_readonly(MEMO_PROGRAM_ID, false), // 10. Memo Program (readonly)
-            AccountMeta::new_readonly(input_mint, false), // 11. Input Mint (readonly)
-            AccountMeta::new_readonly(output_mint, false), // 12. Output Mint (readonly)
+            AccountMeta::new_readonly(crate::constants::TOKEN_PROGRAM, false), // 8. Token Program (readonly)
+            AccountMeta::new(tick_array_pda, false), // 9. Tick Array (writable) - 第一个 tick_array 在主账户中！
         ];
-        
-        // Build remaining accounts: exTickArrayBitmap (if exists) + tick arrays
-        let mut remaining_accounts = Vec::new();
-        
-        if params.rpc.is_some() {
-            remaining_accounts.push(AccountMeta::new_readonly(tick_array_bitmap_extension_pda, false));
-            eprintln!("   [CLMM Debug] Adding TickArrayBitmapExtension to remaining accounts (readonly): {}", tick_array_bitmap_extension_pda);
-        }
-        
-        // Add tick arrays (at least one is required)
-        remaining_accounts.push(AccountMeta::new(tick_array_pda, false)); // Tick Array (writable)
-        
-        account_metas.extend(remaining_accounts);
 
         // Create instruction data: discriminator (8 bytes) + amount (u64) + other_amount_threshold (u64) + sqrt_price_limit_x64 (u128) + is_base_input (bool)
+        // 根据官方源码，标准 Swap 指令使用 SWAP_DISCRIMINATOR [248, 198, 158, 145, 225, 117, 135, 200]
         let mut data = vec![0u8; 41];
-        data[0..8].copy_from_slice(SWAP_V2_DISCRIMINATOR);
+        data[0..8].copy_from_slice(SWAP_DISCRIMINATOR);
         data[8..16].copy_from_slice(&amount_in.to_le_bytes());
         data[16..24].copy_from_slice(&minimum_amount_out.to_le_bytes());
         data[24..40].copy_from_slice(&sqrt_price_limit_x64.to_le_bytes());
-        data[40] = if is_token0_in { 1 } else { 0 }; // is_base_input (1 if token0 is input, 0 if token1 is input)
+        data[40] = if is_token0_in { 1 } else { 0 }; // is_base_input
 
         instructions.push(Instruction::new_with_bytes(
             accounts::RAYDIUM_CLMM,

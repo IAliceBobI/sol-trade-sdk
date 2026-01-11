@@ -256,6 +256,16 @@ async fn simulate_transaction(
         .clone();
 
     if let Some(err) = simulate_result.value.err {
+        eprintln!("\n[Simulation Failed] error={:?} signature={:?}", err, signature);
+        if let Some(logs) = &simulate_result.value.logs {
+            eprintln!("Transaction logs:");
+            for log in logs {
+                eprintln!("  {}", log);
+            }
+        }
+        if let Some(units_consumed) = simulate_result.value.units_consumed {
+            eprintln!("Compute Units Consumed: {}", units_consumed);
+        }
         #[cfg(feature = "perf-trace")]
         {
             log::warn!("[Simulation Failed] error={:?} signature={:?}", err, signature);
