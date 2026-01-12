@@ -57,7 +57,7 @@ const api = new Api({
 
 ## 3. Pool 查询接口
 
-### 3.1 获取 Pool 列表
+### 3.1 获取 Pool 列表（已实现）
 
 **接口**：`/pools/info/list`
 
@@ -122,7 +122,7 @@ console.log(pools)
 
 ---
 
-### 3.2 根据 Mint 查询 Pool
+### 3.2 根据 Mint 查询 Pool（已实现）
 
 **接口**：`/pools/info/mint`
 
@@ -177,7 +177,7 @@ console.log(pools.data)
 
 ---
 
-### 3.3 根据 Pool ID 查询 Pool
+### 3.3 根据 Pool ID 查询 Pool（已实现）
 
 **接口**：`/pools/info/ids`
 
@@ -213,7 +213,7 @@ console.log(pools)
 
 ---
 
-### 3.4 获取 Pool Keys（用于构建交易）
+### 3.4 获取 Pool Keys（用于构建交易）（已实现）
 
 **接口**：`/pools/key/ids`
 
@@ -260,7 +260,7 @@ console.log(poolKeys)
 
 ---
 
-### 3.5 获取 CLMM Pool 流动性曲线
+### 3.5 获取 CLMM Pool 流动性曲线（已实现）
 
 **接口**：`/pools/line/liquidity`
 
@@ -288,7 +288,7 @@ console.log(liquidityLines)
 
 ## 4. CLMM Pool 选择（不同费率）
 
-### 4.1 CLMM Config 信息
+### 4.1 CLMM Config 信息（未实现）
 
 **接口**：`/main/clmm-config`
 
@@ -343,7 +343,7 @@ console.log(clmmConfigs)
 // ]
 ```
 
-### 4.2 CLMM Pool 选择策略
+### 4.2 CLMM Pool 选择策略（未实现）
 
 Raydium SDK **不提供自动选择最合适 CLMM Pool 的功能**，需要开发者自己实现选择逻辑。
 
@@ -418,7 +418,7 @@ console.log('Best pool:', bestPool)
 
 ## 5. Swap 交易接口
 
-### 5.1 AMM V4 Swap
+### 5.1 AMM V4 Swap（未实现）
 
 **示例代码**：
 ```typescript
@@ -500,7 +500,7 @@ console.log(`Swap successful: https://explorer.solana.com/tx/${txId}`)
 
 ---
 
-### 5.2 CPMM Swap
+### 5.2 CPMM Swap（未实现）
 
 **示例代码**：
 ```typescript
@@ -568,7 +568,7 @@ console.log(`Swap successful: https://explorer.solana.com/tx/${txId}`)
 
 ---
 
-### 5.3 CLMM Swap
+### 5.3 CLMM Swap（未实现）
 
 **示例代码**：
 ```typescript
@@ -647,7 +647,7 @@ console.log(`Swap successful: https://explorer.solana.com/tx/${txId}`)
 
 ## 6. 其他辅助接口
 
-### 6.1 获取代币列表
+### 6.1 获取代币列表（未实现）
 
 **接口**：`/mint/list`
 
@@ -676,7 +676,7 @@ console.log(mintList)
 
 ---
 
-### 6.2 获取代币信息
+### 6.2 获取代币信息（未实现）
 
 **接口**：`/mint/ids`
 
@@ -698,7 +698,7 @@ console.log(tokens)
 
 ---
 
-### 6.3 获取 RPC 节点列表
+### 6.3 获取 RPC 节点列表（未实现）
 
 **接口**：`/main/rpcs`
 
@@ -722,7 +722,7 @@ console.log(rpcs)
 
 ---
 
-### 6.4 获取链上时间偏移
+### 6.4 获取链上时间偏移（未实现）
 
 **接口**：`/main/chain-time`
 
@@ -741,7 +741,7 @@ console.log(`Chain time offset: ${offset} seconds`)
 
 除了使用 API，也可以直接从 RPC 查询 Pool 信息。
 
-### 7.1 获取所有 AMM V4 Pool
+### 7.1 获取所有 AMM V4 Pool（未实现）
 
 ```typescript
 import { Connection, PublicKey } from '@solana/web3.js'
@@ -771,7 +771,7 @@ console.log(`Found ${ammPools.length} AMM V4 pools`)
 
 ---
 
-### 7.2 获取所有 CLMM Pool
+### 7.2 获取所有 CLMM Pool（未实现）
 
 ```typescript
 import { PoolInfoLayout } from '@raydium-io/raydium-sdk-v2'
@@ -794,7 +794,7 @@ console.log(`Found ${clmmPools.length} CLMM pools`)
 
 ---
 
-### 7.3 获取所有 CPMM Pool
+### 7.3 获取所有 CPMM Pool（未实现）
 
 ```typescript
 import { CpmmPoolInfoLayout } from '@raydium-io/raydium-sdk-v2'
