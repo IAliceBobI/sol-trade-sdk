@@ -735,19 +735,7 @@ impl RaydiumClmmParams {
             TOKEN_PROGRAM
         };
         
-        // Check if observation_key account exists and verify its owner
-        let observation_state = pool_state.observation_key;
-        let raydium_clmm_program = crate::instruction::utils::raydium_clmm::accounts::RAYDIUM_CLMM;
-        if let Ok(obs_account) = rpc.get_account(&observation_state).await {
-            eprintln!("   [CLMM Debug] Observation state account {} exists, owner: {}", observation_state, obs_account.owner);
-            if obs_account.owner != raydium_clmm_program {
-                eprintln!("   [CLMM Warning] Observation state account owner mismatch! Expected: {}, Got: {}", 
-                    raydium_clmm_program, obs_account.owner);
-            }
-        } else {
-            eprintln!("   [CLMM Warning] Observation state account {} does not exist or cannot be fetched", observation_state);
-            eprintln!("   [CLMM Debug] Using observation_key directly: {}", observation_state);
-        }
+        // Observation state is stored in pool_state.observation_key
         
         Ok(Self {
             pool_state: pool_address.clone(),

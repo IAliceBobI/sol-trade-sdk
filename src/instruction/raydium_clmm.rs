@@ -1,6 +1,6 @@
 use crate::{
     common::fast_fn::get_associated_token_address_with_program_id_fast_use_seed,
-    constants::{accounts::TOKEN_PROGRAM,   trade::trade::DEFAULT_SLIPPAGE},
+    constants::{trade::trade::DEFAULT_SLIPPAGE},
     instruction::utils::raydium_clmm::{accounts, get_pool_by_address, get_tick_array_pda},
     trading::core::{
         params::{RaydiumClmmParams, SwapParams},
@@ -66,13 +66,8 @@ fn fallback_simple_calculation(
         fee_rate,
         zero_for_one,
     ) {
-        Ok(amount) => {
-            eprintln!("[CLMM Math] ✅ Using simple calculation: {}", amount);
-            amount
-        },
-        Err(e) => {
-            eprintln!("[CLMM Math] ⚠️  Simple calculation failed: {}, using price-based fallback", e);
-            
+        Ok(amount) => amount,
+        Err(_e) => {
             // 最后的降级：使用价格计算
             let price = if is_token0_in {
                 price_token0_in_token1(
@@ -227,14 +222,6 @@ impl InstructionBuilder for RaydiumClmmInstructionBuilder {
         
         let fee_rate = amm_config.trade_fee_rate;
         
-        eprintln!("[CLMM Debug] Pool info:");
-        eprintln!("  sqrt_price_x64: {}", pool_state.sqrt_price_x64);
-        eprintln!("  liquidity: {}", pool_state.liquidity);
-        eprintln!("  tick_current: {}", pool_state.tick_current);
-        eprintln!("  tick_spacing: {}", pool_state.tick_spacing);
-        eprintln!("  fee_rate: {} ({}%)", fee_rate, fee_rate as f64 / 10000.0);
-        eprintln!("  input_amount: {}", amount_in);
-        
         // 尝试使用完整的 tick-by-tick 算法
         let expected_output = if pool_state.liquidity > 0 {
             // 计算需要的 tick array start indices
@@ -267,12 +254,6 @@ impl InstructionBuilder for RaydiumClmmInstructionBuilder {
                 &tick_array_indices,
             ).await {
                 Ok(tick_arrays) if !tick_arrays.is_empty() => {
-                    eprintln!("[CLMM Debug] Retrieved {} tick arrays", tick_arrays.len());
-                    eprintln!("[CLMM Debug] Tick array details:");
-                    for (start_index, tick_array) in &tick_arrays {
-                        eprintln!("  - start_index: {}, initialized_ticks: {}", start_index, tick_array.initialized_tick_count);
-                    }
-                                
                     // 转换为算法需要的格式
                     let tick_data: Vec<(i32, Vec<(i32, i128, u128)>)> = tick_arrays
                         .iter()
@@ -298,12 +279,10 @@ impl InstructionBuilder for RaydiumClmmInstructionBuilder {
                         &tick_data,
                     ) {
                         Ok(amount) => {
-                            eprintln!("[CLMM Math] ✅ Calculated output using tick-by-tick algorithm: {}", amount);
                             // 现在使用官方的 uint 库实现，精度与链上完全一致
                             amount
                         },
-                        Err(e) => {
-                            eprintln!("[CLMM Math] ⚠️  Tick-by-tick calculation failed: {}", e);
+                        Err(_e) => {
                             // 降级到简化算法
                             fallback_simple_calculation(
                                 amount_in,
@@ -321,7 +300,6 @@ impl InstructionBuilder for RaydiumClmmInstructionBuilder {
                     }
                 },
                 _ => {
-                    eprintln!("[CLMM Math] ⚠️  Failed to retrieve tick arrays, using fallback");
                     // 降级到简化算法
                     fallback_simple_calculation(
                         amount_in,
@@ -338,7 +316,6 @@ impl InstructionBuilder for RaydiumClmmInstructionBuilder {
                 }
             }
         } else {
-            eprintln!("[CLMM Math] ⚠️  Pool liquidity is 0, using price-based fallback");
             // 降级到价格计算
             fallback_simple_calculation(
                 amount_in,
@@ -354,8 +331,6 @@ impl InstructionBuilder for RaydiumClmmInstructionBuilder {
             )
         };
         
-        eprintln!("  expected_output: {}", expected_output);
-
         // Apply slippage using official client logic
         // For buy (base_in=true): minimum_amount_out = expected_output * (1 - slippage)
         let slippage = params.slippage_basis_points.unwrap_or(DEFAULT_SLIPPAGE);
@@ -368,12 +343,6 @@ impl InstructionBuilder for RaydiumClmmInstructionBuilder {
             }
         };
         
-        eprintln!("  slippage: {}bp ({}%)", slippage, slippage as f64 / 100.0);
-        eprintln!("  minimum_amount_out: {} ({:.2}% of expected)", 
-            minimum_amount_out, 
-            (minimum_amount_out as f64 / expected_output as f64) * 100.0
-        );
-
         let input_token_account = get_associated_token_address_with_program_id_fast_use_seed(
             &params.payer.pubkey(),
             &input_mint,
@@ -466,8 +435,6 @@ impl InstructionBuilder for RaydiumClmmInstructionBuilder {
             }
         }
         
-        eprintln!("   [CLMM Debug] Generated {} tick array PDAs", tick_array_pdas.len());
-        
         // Get tick array bitmap extension PDA
         let (tick_array_bitmap_extension_pda, _) = crate::instruction::utils::raydium_clmm::get_tick_array_bitmap_extension_pda(&protocol_params.pool_state);
 
@@ -489,22 +456,6 @@ impl InstructionBuilder for RaydiumClmmInstructionBuilder {
         // remainingAccounts:
         // 13. exTickArrayBitmap (readonly for SwapV2)
         // 14+. tickArrays (writable)
-        
-        // Debug: Print account information
-        eprintln!("   [CLMM Debug] Building SwapV2 instruction with accounts:");
-        eprintln!("     0. Payer (readonly): {}", params.payer.pubkey());
-        eprintln!("     1. Amm Config: {}", protocol_params.amm_config);
-        eprintln!("     2. Pool State: {}", protocol_params.pool_state);
-        eprintln!("     3. Input Token Account: {}", input_token_account);
-        eprintln!("     4. Output Token Account: {}", output_token_account);
-        eprintln!("     5. Input Vault: {}", input_vault);
-        eprintln!("     6. Output Vault: {}", output_vault);
-        eprintln!("     7. Observation State: {}", protocol_params.observation_state);
-        eprintln!("     8. Token Program: {}", TOKEN_PROGRAM);
-        eprintln!("     9. Token 2022 Program: {}", crate::constants::TOKEN_2022_PROGRAM);
-        eprintln!("     10. Memo Program: {}", crate::constants::MEMO_PROGRAM);
-        eprintln!("     11. Input Mint: {}", input_mint);
-        eprintln!("     12. Output Mint: {}", output_mint);
         
         // SwapV2 指令的主账户列表（13 个账户）
         let mut account_metas = vec![
@@ -530,8 +481,6 @@ impl InstructionBuilder for RaydiumClmmInstructionBuilder {
         for i in 0..tick_array_pdas.len() {
             account_metas.push(AccountMeta::new(tick_array_pdas[i], false));
         }
-        
-        eprintln!("   [CLMM Debug] Total accounts: {} (13 main + {} remaining)", account_metas.len(), account_metas.len() - 13);
 
         if input_mint == crate::constants::WSOL_TOKEN_ACCOUNT && params.create_input_mint_ata {
             instructions.push(Instruction {
@@ -539,7 +488,6 @@ impl InstructionBuilder for RaydiumClmmInstructionBuilder {
                 accounts: vec![AccountMeta::new(input_token_account, false)],
                 data: vec![17], // SyncNative discriminator
             });
-            eprintln!("   [CLMM Debug] Added SyncNative instruction before swap for WSOL input");
         }
 
         // Create instruction data: discriminator (8 bytes) + amount (u64) + other_amount_threshold (u64) + sqrt_price_limit_x64 (u128) + is_base_input (bool)
@@ -779,39 +727,11 @@ impl InstructionBuilder for RaydiumClmmInstructionBuilder {
         );
         let (tick_array_pda, _) = get_tick_array_pda(&protocol_params.pool_state, tick_array_start_index)?;
         
-        // 验证 Tick Array 账户是否存在
-        if let Some(rpc) = &params.rpc {
-            match rpc.get_account(&tick_array_pda).await {
-                Ok(account) => {
-                    eprintln!("   [CLMM Debug] Tick Array account exists, owner: {}", account.owner);
-                    eprintln!("   [CLMM Debug] Tick Array data length: {}", account.data.len());
-                },
-                Err(e) => {
-                    eprintln!("   [CLMM Debug] WARNING: Tick Array account NOT FOUND: {:?}", e);
-                    eprintln!("   [CLMM Debug] This will cause 'AccountOwnedByWrongProgram' error");
-                    eprintln!("   [CLMM Debug] Try querying mainnet to verify the account exists");
-                }
-            }
-        }
-        
         // Get tick array bitmap extension PDA (may not exist)
         let (_tick_array_bitmap_extension_pda, _) = crate::instruction::utils::raydium_clmm::get_tick_array_bitmap_extension_pda(&protocol_params.pool_state);
 
         // Create swap instruction
         // SwapV2 指令账户顺序（与 buy 相同）
-        
-        // Debug: Print account information
-        eprintln!("   [CLMM Debug] Building SwapV2 instruction (sell) with accounts:");
-        eprintln!("     0. Payer (readonly): {}", params.payer.pubkey());
-        eprintln!("     1. Amm Config: {}", protocol_params.amm_config);
-        eprintln!("     2. Pool State: {}", protocol_params.pool_state);
-        eprintln!("     3. Input Token Account: {}", input_token_account);
-        eprintln!("     4. Output Token Account: {}", output_token_account);
-        eprintln!("     5. Input Vault: {}", input_vault);
-        eprintln!("     6. Output Vault: {}", output_vault);
-        eprintln!("     7. Observation State: {}", protocol_params.observation_state);
-        eprintln!("     8. Token Program: {}", TOKEN_PROGRAM);
-        eprintln!("     9. Tick Array PDA: {}", tick_array_pda);
         
         let mut account_metas = vec![
             AccountMeta::new_readonly(params.payer.pubkey(), true), // 0. Payer (signer, readonly)
