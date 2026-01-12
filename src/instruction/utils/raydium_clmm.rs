@@ -1,7 +1,10 @@
 use crate::{
     common::SolanaRpcClient,
     constants::{SOL_MINT, USDC_MINT, USDT_MINT},
-    instruction::utils::raydium_clmm_types::{pool_state_decode, PoolState},
+    instruction::utils::raydium_clmm_types::{
+        pool_state_decode, amm_config_decode, tick_array_state_decode,
+        PoolState, AmmConfig, TickArrayState,
+    },
 };
 use anyhow::anyhow;
 use base64::engine::general_purpose::STANDARD;
@@ -193,6 +196,52 @@ pub async fn get_pool_by_address(
     // 3. 写入缓存
     raydium_clmm_cache::cache_pool_by_address(pool_address, &pool_state);
     Ok(pool_state)
+}
+
+/// 获取 amm_config 配置
+pub async fn get_amm_config(
+    rpc: &SolanaRpcClient,
+    amm_config_address: &Pubkey,
+) -> Result<AmmConfig, anyhow::Error> {
+    let account = rpc.get_account(amm_config_address).await?;
+    if account.owner != accounts::RAYDIUM_CLMM {
+        return Err(anyhow!("Account is not owned by Raydium CLMM program"));
+    }
+    amm_config_decode(&account.data)
+        .ok_or_else(|| anyhow!("Failed to decode amm config"))
+}
+
+/// 获取多个 tick arrays
+pub async fn get_tick_arrays(
+    rpc: &SolanaRpcClient,
+    pool_id: &Pubkey,
+    start_indices: &[i32],
+) -> Result<Vec<(i32, TickArrayState)>, anyhow::Error> {
+    let mut addresses = Vec::new();
+    for &start_index in start_indices {
+        let (tick_array_pda, _) = get_tick_array_pda(pool_id, start_index)?;
+        addresses.push((start_index, tick_array_pda));
+    }
+
+    let mut result = Vec::new();
+    for (start_index, address) in addresses {
+        match rpc.get_account(&address).await {
+            Ok(account) => {
+                if account.owner != accounts::RAYDIUM_CLMM {
+                    continue;
+                }
+                if let Some(tick_array) = tick_array_state_decode(&account.data) {
+                    result.push((start_index, tick_array));
+                }
+            }
+            Err(_) => {
+                // Tick array 可能不存在，跳过
+                continue;
+            }
+        }
+    }
+
+    Ok(result)
 }
 
 pub async fn get_pool_by_mint(

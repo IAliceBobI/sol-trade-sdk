@@ -3,6 +3,57 @@ use serde::{Deserialize, Serialize};
 use solana_sdk::pubkey::Pubkey;
 
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, BorshDeserialize)]
+pub struct AmmConfig {
+    pub bump: u8,
+    pub index: u16,
+    pub owner: Pubkey,
+    pub protocol_fee_rate: u32,
+    pub trade_fee_rate: u32,
+    pub tick_spacing: u16,
+    pub fund_fee_rate: u32,
+    pub padding_u32: u32,
+    pub fund_owner: Pubkey,
+    pub padding: [u64; 3],
+}
+
+pub const AMM_CONFIG_SIZE: usize = 8 + 1 + 2 + 32 + 4 + 4 + 2 + 4 + 4 + 32 + 24;
+
+pub fn amm_config_decode(data: &[u8]) -> Option<AmmConfig> {
+    if data.len() < AMM_CONFIG_SIZE {
+        return None;
+    }
+    borsh::from_slice::<AmmConfig>(&data[8..]).ok()
+}
+
+#[derive(Clone, Debug, BorshDeserialize)]
+pub struct TickState {
+    pub tick: i32,
+    pub liquidity_net: i128,
+    pub liquidity_gross: u128,
+    pub fee_growth_outside_0_x64: u128,
+    pub fee_growth_outside_1_x64: u128,
+    pub reward_growths_outside_x64: [u128; 3],
+    pub padding: [u32; 13],
+}
+
+#[derive(Clone, Debug, BorshDeserialize)]
+pub struct TickArrayState {
+    pub pool_id: Pubkey,
+    pub start_tick_index: i32,
+    pub ticks: [TickState; 60],
+    pub initialized_tick_count: u8,
+    pub recent_epoch: u64,
+    pub padding: [u8; 107],
+}
+
+pub fn tick_array_state_decode(data: &[u8]) -> Option<TickArrayState> {
+    if data.len() < 8 {
+        return None;
+    }
+    borsh::from_slice::<TickArrayState>(&data[8..]).ok()
+}
+
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, BorshDeserialize)]
 pub struct RewardInfo {
     pub reward_state: u8,
     pub open_time: u64,
