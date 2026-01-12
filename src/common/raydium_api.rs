@@ -81,8 +81,8 @@ impl RaydiumApiClient {
             .await?
             .error_for_status()?;
 
-        let page = resp.json::<PoolListPage>().await?;
-        Ok(page)
+        let api_resp = resp.json::<ApiResponse<PoolListPage>>().await?;
+        Ok(api_resp.data)
     }
 
     // ===================== 3.2 根据 Mint 查询 Pool =====================
@@ -125,8 +125,8 @@ impl RaydiumApiClient {
             .await?
             .error_for_status()?;
 
-        let page = resp.json::<PoolListPage>().await?;
-        Ok(page)
+        let api_resp = resp.json::<ApiResponse<PoolListPage>>().await?;
+        Ok(api_resp.data)
     }
 
     // ===================== 3.3 根据 Pool ID 查询 Pool =====================
@@ -270,6 +270,15 @@ pub struct FetchPoolsByMintsRequest {
     pub page: Option<u32>,
 }
 
+
+/// 通用的 Raydium API 响应外层结构
+#[derive(Debug, Clone, Deserialize)]
+#[allow(dead_code)]
+struct ApiResponse<T> {
+    pub id: String,
+    pub success: bool,
+    pub data: T,
+}
 
 /// 通用的 Pool 列表响应
 #[derive(Debug, Clone, Deserialize)]
