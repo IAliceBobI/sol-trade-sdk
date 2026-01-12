@@ -123,6 +123,7 @@ tonic-prost = "0.14.2"
 quinn = {version = "0.11", default-features = false, features = ["rustls"]}
 
 # Raydium CLMM math dependencies (same as official)
+# Note: uint crate uses cfg(feature = "enable-power") internally, but we don't need that feature
 uint = { git = "https://github.com/raydium-io/parity-common", package = "uint" }
 
 # Performance optimization dependencies
