@@ -1,18 +1,3 @@
-//! Raydium CLMM Buy & Sell 集成测试
-//!
-//! 本测试文件基于 `tests/raydium_cpmm_buy_sell_tests.rs` 的结构，验证：
-//! - 基于 WSOL mint 查找 Raydium CLMM 池
-//! - 基于 PoolState 构建 `RaydiumClmmParams`
-//! - 通过 `SolanaTrade` 执行一条完整的 Raydium CLMM 买入 -> 卖出交易流程
-//!
-//! 测试假设：
-//! - 本地 RPC `http://127.0.0.1:8899` 已接入主网数据（例如使用 surfpool）
-//! - Raydium CLMM 协议已在该 RPC 上可用
-//! - 存在至少一个包含 WSOL 的 Raydium CLMM 池
-//!
-//! 运行测试:
-//!     cargo test --test raydium_clmm_buy_sell_tests -- --nocapture
-
 use sol_trade_sdk::{
     common::{GasFeeStrategy, TradeConfig},
     swqos::SwqosConfig,
@@ -32,8 +17,8 @@ const JUP_MINT: &str = "JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN";
 /// WSOL-JUP CLMM Pool
 const WSOL_JUP_POOL: &str = "EZVkeboWeXygtq8LMyENHyXdF5wpYrtExRNH9UwB1qYw";
 
-/// 测试：Raydium CLMM 卖出 JUP（使用官方配置账户）
 #[tokio::test]
+#[serial_test::serial]
 async fn test_raydium_clmm_sell_jup() {
     println!("\n=== 测试：Raydium CLMM 卖出 JUP (使用官方配置账户) ===");
 
@@ -166,11 +151,8 @@ async fn test_raydium_clmm_sell_jup() {
     println!("\n=== Raydium CLMM 卖出 JUP 测试通过 ===");
 }
 
-/// 修复方案（待实现）：
-/// 1. 实现完整的 tick array 遍历算法
-/// 2. 或者集成官方 raydium-amm-v3 库的计算逻辑
-/// 3. 参考：temp/raydium-clmm/client/src/instructions/utils.rs:get_out_put_amount_and_remaining_accounts
 #[tokio::test]
+#[serial_test::serial]
 async fn test_raydium_clmm_buy_jup() {
     println!("\n=== 测试：Raydium CLMM 买入 JUP (使用官方配置账户) ===");
 
