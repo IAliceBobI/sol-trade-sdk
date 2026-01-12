@@ -5,3 +5,6 @@ pub mod pumpswap;
 pub mod raydium_amm_v4;
 pub mod raydium_clmm;
 pub mod raydium_cpmm;
+
+// Raydium CLMM official math library
+pub mod clmm_math;

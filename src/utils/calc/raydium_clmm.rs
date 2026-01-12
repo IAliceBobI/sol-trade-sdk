@@ -1,27 +1,36 @@
 // Copyright (c) Raydium Foundation
-// Licensed under Apache 2.0
-// Source: https://github.com/raydium-io/raydium-clmm
-// Modified for sol-trade-sdk integration
+// Licensed under Apache 2.0  
+// Raydium CLMM swap calculations using official math libraries
 
-//! Raydium CLMM 精确价格计算
+//! Raydium CLMM calculation module
 //! 
-//! 本模块移植自官方 raydium-clmm 实现，用于精确计算 CLMM swap 的输入输出比例
-//! 核心算法：tick-by-tick 遍历，通过 swap_math::compute_swap_step 计算每个 tick 区间的交易结果
+//! Uses official Raydium CLMM math libraries (clmm_math) for all calculations.
+//! Dependencies: uint = { git = "https://github.com/raydium-io/parity-common", package = "uint" }
 
-/// tick 的最小值
-pub const MIN_TICK: i32 = -443636;
-/// tick 的最大值
-pub const MAX_TICK: i32 = -MIN_TICK;
+// Re-export official libraries for convenience
+pub use super::clmm_math::{
+    tick_math,
+    liquidity_math,
+    sqrt_price_math,
+    fixed_point_64,
+    full_math::MulDiv,
+    U128, U256,
+};
 
-/// 最小 sqrt_price_x64 值
-pub const MIN_SQRT_PRICE_X64: u128 = 4295048016;
-/// 最大 sqrt_price_x64 值
-pub const MAX_SQRT_PRICE_X64: u128 = 79226673521066979257578248091;
-
-/// Q64 定点数（2^64）
-pub const Q64: u128 = 18446744073709551616; // (u64::MAX as u128) + 1
-/// 定点数精度位数
-pub const RESOLUTION: u8 = 64;
+// Export constants from official libraries  
+pub use super::clmm_math::tick_math::{
+    MIN_TICK, MAX_TICK, MIN_SQRT_PRICE_X64, MAX_SQRT_PRICE_X64,
+    get_sqrt_price_at_tick, get_tick_at_sqrt_price,
+};
+pub use super::clmm_math::fixed_point_64::{Q64, RESOLUTION};
+pub use super::clmm_math::liquidity_math::{
+    add_delta, get_delta_amount_0_unsigned, get_delta_amount_1_unsigned,
+};
+pub use super::clmm_math::sqrt_price_math::{
+    get_next_sqrt_price_from_input, get_next_sqrt_price_from_output,
+    get_next_sqrt_price_from_amount_0_rounding_up,
+    get_next_sqrt_price_from_amount_1_rounding_down,
+};
 
 /// 费率分母（100%）
 pub const FEE_RATE_DENOMINATOR_VALUE: u32 = 1_000_000;
@@ -81,237 +90,9 @@ impl TickState {
 }
 
 // ============================================================================
-// Tick Math - tick 和 price 转换
+// Swap Algorithm - 使用官方数学库的 tick-by-tick 算法
 // ============================================================================
 
-/// 计算 1.0001^(tick/2) 得到 sqrt_price_x64
-pub fn get_sqrt_price_at_tick(tick: i32) -> Result<u128, &'static str> {
-    let abs_tick = tick.abs() as u32;
-    if abs_tick > MAX_TICK as u32 {
-        return Err("Tick out of range");
-    }
-
-    // 使用魔数计算（官方实现的精简版）
-    // 这里为了简化，我们使用近似公式
-    // 完整实现需要所有魔数，暂时使用简化版本
-    let sqrt_price = if tick >= 0 {
-        // 正 tick：价格上涨
-        let factor = 1.0001f64.powf(tick as f64 / 2.0);
-        (factor * Q64 as f64) as u128
-    } else {
-        // 负 tick：价格下跌
-        let factor = 1.0001f64.powf(tick as f64 / 2.0);
-        (factor * Q64 as f64) as u128
-    };
-
-    Ok(sqrt_price.clamp(MIN_SQRT_PRICE_X64, MAX_SQRT_PRICE_X64))
-}
-
-/// 根据 sqrt_price_x64 计算 tick（向下取整）
-pub fn get_tick_at_sqrt_price(sqrt_price_x64: u128) -> Result<i32, &'static str> {
-    if sqrt_price_x64 < MIN_SQRT_PRICE_X64 || sqrt_price_x64 >= MAX_SQRT_PRICE_X64 {
-        return Err("sqrt_price out of range");
-    }
-
-    // 简化实现：反向计算 tick
-    // log_1.0001(price) = log(price) / log(1.0001)
-    let price_ratio = (sqrt_price_x64 as f64) / (Q64 as f64);
-    let tick = (price_ratio.ln() / 1.0001f64.ln() * 2.0) as i32;
-
-    Ok(tick.clamp(MIN_TICK, MAX_TICK))
-}
-
-// ============================================================================
-// Liquidity Math - 流动性计算
-// ============================================================================
-
-/// 添加流动性增量（带符号）
-pub fn add_delta(x: u128, y: i128) -> Result<u128, &'static str> {
-    if y < 0 {
-        let neg_y = (-y) as u128;
-        if x < neg_y {
-            return Err("Liquidity underflow");
-        }
-        Ok(x - neg_y)
-    } else {
-        Ok(x + (y as u128))
-    }
-}
-
-/// 计算指定价格范围内的 token_0 数量变化
-pub fn get_delta_amount_0_unsigned(
-    sqrt_ratio_a_x64: u128,
-    sqrt_ratio_b_x64: u128,
-    liquidity: u128,
-    round_up: bool,
-) -> Result<u64, &'static str> {
-    let (lower, upper) = if sqrt_ratio_a_x64 < sqrt_ratio_b_x64 {
-        (sqrt_ratio_a_x64, sqrt_ratio_b_x64)
-    } else {
-        (sqrt_ratio_b_x64, sqrt_ratio_a_x64)
-    };
-
-    if lower == 0 {
-        return Err("sqrt_ratio cannot be zero");
-    }
-
-    // Δx = L * (√P_upper - √P_lower) / (√P_upper * √P_lower)
-    let numerator = liquidity.saturating_mul(upper - lower);
-    let denominator = upper.saturating_mul(lower / Q64);
-
-    if denominator == 0 {
-        return Err("Division by zero");
-    }
-
-    let mut result = numerator / denominator;
-    if round_up && (numerator % denominator != 0) {
-        result += 1;
-    }
-
-    if result > u64::MAX as u128 {
-        return Err("Amount overflow");
-    }
-
-    Ok(result as u64)
-}
-
-/// 计算指定价格范围内的 token_1 数量变化
-pub fn get_delta_amount_1_unsigned(
-    sqrt_ratio_a_x64: u128,
-    sqrt_ratio_b_x64: u128,
-    liquidity: u128,
-    round_up: bool,
-) -> Result<u64, &'static str> {
-    let (lower, upper) = if sqrt_ratio_a_x64 < sqrt_ratio_b_x64 {
-        (sqrt_ratio_a_x64, sqrt_ratio_b_x64)
-    } else {
-        (sqrt_ratio_b_x64, sqrt_ratio_a_x64)
-    };
-
-    // Δy = L * (√P_upper - √P_lower) / 2^64
-    let delta = upper - lower;
-    let mut result = liquidity.saturating_mul(delta) / Q64;
-
-    if round_up && (liquidity.saturating_mul(delta) % Q64 != 0) {
-        result += 1;
-    }
-
-    if result > u64::MAX as u128 {
-        return Err("Amount overflow");
-    }
-
-    Ok(result as u64)
-}
-
-// ============================================================================
-// Sqrt Price Math - 价格更新计算
-// ============================================================================
-
-/// 根据输入的 token_0 计算下一个价格（向上取整）
-pub fn get_next_sqrt_price_from_amount_0_rounding_up(
-    sqrt_price_x64: u128,
-    liquidity: u128,
-    amount: u64,
-    add: bool,
-) -> u128 {
-    if amount == 0 {
-        return sqrt_price_x64;
-    }
-
-    let numerator = liquidity * Q64;
-
-    if add {
-        // 添加 token_0，价格下降
-        let product = (amount as u128) * sqrt_price_x64;
-        let denominator = numerator + product;
-        if denominator >= numerator {
-            return mul_div_ceil(numerator, sqrt_price_x64, denominator);
-        }
-        // Overflow 情况使用备用公式
-        div_rounding_up(numerator, numerator / sqrt_price_x64 + (amount as u128))
-    } else {
-        // 移除 token_0，价格上升
-        let product = (amount as u128) * sqrt_price_x64;
-        let denominator = numerator - product;
-        mul_div_ceil(numerator, sqrt_price_x64, denominator)
-    }
-}
-
-/// 根据输入的 token_1 计算下一个价格（向下取整）
-pub fn get_next_sqrt_price_from_amount_1_rounding_down(
-    sqrt_price_x64: u128,
-    liquidity: u128,
-    amount: u64,
-    add: bool,
-) -> u128 {
-    if add {
-        // 添加 token_1，价格上升
-        let quotient = ((amount as u128) * Q64) / liquidity;
-        sqrt_price_x64 + quotient
-    } else {
-        // 移除 token_1，价格下降
-        let quotient = div_rounding_up((amount as u128) * Q64, liquidity);
-        sqrt_price_x64 - quotient
-    }
-}
-
-/// 根据输入计算下一个价格
-pub fn get_next_sqrt_price_from_input(
-    sqrt_price_x64: u128,
-    liquidity: u128,
-    amount_in: u64,
-    zero_for_one: bool,
-) -> u128 {
-    if zero_for_one {
-        get_next_sqrt_price_from_amount_0_rounding_up(sqrt_price_x64, liquidity, amount_in, true)
-    } else {
-        get_next_sqrt_price_from_amount_1_rounding_down(sqrt_price_x64, liquidity, amount_in, true)
-    }
-}
-
-/// 根据输出计算下一个价格
-pub fn get_next_sqrt_price_from_output(
-    sqrt_price_x64: u128,
-    liquidity: u128,
-    amount_out: u64,
-    zero_for_one: bool,
-) -> u128 {
-    if zero_for_one {
-        get_next_sqrt_price_from_amount_1_rounding_down(
-            sqrt_price_x64,
-            liquidity,
-            amount_out,
-            false,
-        )
-    } else {
-        get_next_sqrt_price_from_amount_0_rounding_up(sqrt_price_x64, liquidity, amount_out, false)
-    }
-}
-
-// ============================================================================
-// 辅助数学函数
-// ============================================================================
-
-fn mul_div_ceil(a: u128, b: u128, denominator: u128) -> u128 {
-    let result = a.saturating_mul(b) / denominator;
-    if (a.saturating_mul(b) % denominator) != 0 {
-        result + 1
-    } else {
-        result
-    }
-}
-
-fn div_rounding_up(numerator: u128, denominator: u128) -> u128 {
-    let result = numerator / denominator;
-    if numerator % denominator != 0 {
-        result + 1
-    } else {
-        result
-    }
-}
-
-// ============================================================================
-// Swap Math - 核心交易计算
 // ============================================================================
 
 /// 计算单步 swap 结果（核心算法）
@@ -429,12 +210,13 @@ pub fn compute_swap_step(
         // 未达到目标价格，剩余部分作为手续费
         amount_remaining.saturating_sub(swap_step.amount_in)
     } else {
-        // 按比例计算手续费
-        mul_div_ceil(
-            swap_step.amount_in as u128,
-            fee_rate as u128,
-            (FEE_RATE_DENOMINATOR_VALUE - fee_rate) as u128,
-        ) as u64
+        // 按比例计算手续费：amount_in * fee_rate / (1 - fee_rate)
+        (swap_step.amount_in as u64)
+            .mul_div_ceil(
+                fee_rate.into(),
+                (FEE_RATE_DENOMINATOR_VALUE - fee_rate).into(),
+            )
+            .unwrap_or(0)
     };
 
     Ok(swap_step)

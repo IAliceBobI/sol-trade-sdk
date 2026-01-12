@@ -122,6 +122,9 @@ sha2 = "0.10"
 tonic-prost = "0.14.2"
 quinn = {version = "0.11", default-features = false, features = ["rustls"]}
 
+# Raydium CLMM math dependencies (same as official)
+uint = { git = "https://github.com/raydium-io/parity-common", package = "uint" }
+
 # Performance optimization dependencies
 crossbeam-queue = "0.3"
 crossbeam-utils = "0.8"

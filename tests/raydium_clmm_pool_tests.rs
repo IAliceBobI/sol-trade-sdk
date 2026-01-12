@@ -132,8 +132,8 @@ async fn test_raydium_clmm_get_pool_by_address() {
 
     // 使用之前测试中找到的 pool 地址
     let wsol_mint = Pubkey::from_str(WSOL_MINT).expect("Invalid WSOL mint");
-    let rpc_url = "https://api.mainnet-beta.solana.com";
-    // let rpc_url = "http://127.0.0.1:8899";
+    // let rpc_url = "https://api.mainnet-beta.solana.com";
+    let rpc_url = "http://127.0.0.1:8899";
     let rpc = RpcClient::new(rpc_url.to_string());
 
     // 先通过 mint 找到 pool 地址

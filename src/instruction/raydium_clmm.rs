@@ -299,10 +299,8 @@ impl InstructionBuilder for RaydiumClmmInstructionBuilder {
                     ) {
                         Ok(amount) => {
                             eprintln!("[CLMM Math] ✅ Calculated output using tick-by-tick algorithm: {}", amount);
-                            // FIXME: 官方算法高估输出约 17.5%，使用安全系数 0.82 确保交易成功
-                            // 实际输出约为计算值的 82% (680681 / 824827 ≈ 0.825)
-                            // 这是一个临时解决方案，需要进一步调试算法
-                            ((amount as f64) * 0.82) as u64
+                            // 现在使用官方的 uint 库实现，精度与链上完全一致
+                            amount
                         },
                         Err(e) => {
                             eprintln!("[CLMM Math] ⚠️  Tick-by-tick calculation failed: {}", e);
