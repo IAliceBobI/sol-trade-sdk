@@ -24,6 +24,9 @@ pub const TOKEN_PROGRAM_2022_META: solana_sdk::instruction::AccountMeta =
         is_writable: false,
     };
 
+/// Alias for TOKEN_PROGRAM_2022 to match usage in code
+pub const TOKEN_2022_PROGRAM: Pubkey = TOKEN_PROGRAM_2022;
+
 pub const SOL_TOKEN_ACCOUNT: Pubkey = pubkey!("So11111111111111111111111111111111111111111");
 
 pub const WSOL_TOKEN_ACCOUNT: Pubkey = pubkey!("So11111111111111111111111111111111111111112");
