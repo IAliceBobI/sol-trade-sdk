@@ -131,6 +131,7 @@ libc = "0.2"
 
 [dev-dependencies]
 serial_test = "3.2.0"
+dotenvy = "0.15"
 
 # 🚀 编译器优化配置 - 平衡性能与编译速度
 [profile.release]

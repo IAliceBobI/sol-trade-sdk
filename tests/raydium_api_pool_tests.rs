@@ -16,13 +16,35 @@ use sol_trade_sdk::common::raydium_api::{
     SortOrder,
 };
 use solana_sdk::pubkey::Pubkey;
-use std::str::FromStr;
+use std::{env, str::FromStr};
+use dotenvy::dotenv;
 
 const SOL_MINT: &str = "So11111111111111111111111111111111111111112";
 const USDC_MINT: &str = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
 
+fn init_env_and_print_proxy() {
+    // 加载 .env，如果存在的话
+    let _ = dotenv();
+
+    let https_proxy = env::var("HTTPS_PROXY").or_else(|_| env::var("https_proxy")).ok();
+    let http_proxy = env::var("HTTP_PROXY").or_else(|_| env::var("http_proxy")).ok();
+
+    match (https_proxy, http_proxy) {
+        (Some(hs), _) => {
+            println!("[raydium_api_pool_tests] 使用 HTTPS_PROXY = {}", hs);
+        }
+        (None, Some(hp)) => {
+            println!("[raydium_api_pool_tests] 使用 HTTP_PROXY = {}", hp);
+        }
+        (None, None) => {
+            println!("[raydium_api_pool_tests] 未检测到 HTTP_PROXY/HTTPS_PROXY，直接访问外网");
+        }
+    }
+}
+
 #[tokio::test]
 async fn test_raydium_api_get_pool_list_standard() {
+    init_env_and_print_proxy();
     println!("=== Raydium API：获取标准池列表（/pools/info/list） ===");
 
     let client = RaydiumApiClient::mainnet_default().expect("failed to create RaydiumApiClient");
@@ -52,6 +74,7 @@ async fn test_raydium_api_get_pool_list_standard() {
 
 #[tokio::test]
 async fn test_raydium_api_fetch_pools_by_mints_sol_usdc() {
+    init_env_and_print_proxy();
     println!("=== Raydium API：按 SOL-USDC mint 查询池（/pools/info/mint） ===");
 
     let client = RaydiumApiClient::mainnet_default().expect("failed to create RaydiumApiClient");
@@ -87,6 +110,7 @@ async fn test_raydium_api_fetch_pools_by_mints_sol_usdc() {
 
 #[tokio::test]
 async fn test_raydium_api_fetch_by_ids_and_clmm_liquidity_lines() {
+    init_env_and_print_proxy();
     println!("=== Raydium API：按 ID 查询池 & CLMM 流动性曲线 ===");
 
     let client = RaydiumApiClient::mainnet_default().expect("failed to create RaydiumApiClient");
