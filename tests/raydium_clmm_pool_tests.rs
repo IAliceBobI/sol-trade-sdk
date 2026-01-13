@@ -127,6 +127,7 @@ async fn test_raydium_clmm_get_pool_by_mint_wsol_cache_and_force() {
 
 /// 测试：通过地址获取 pool 数据（带缓存）
 #[tokio::test]
+#[serial]
 async fn test_raydium_clmm_get_pool_by_address() {
     println!("=== 测试：Raydium CLMM get_pool_by_address (带缓存) ===");
 
