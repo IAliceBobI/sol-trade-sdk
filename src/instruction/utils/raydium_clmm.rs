@@ -986,18 +986,62 @@ pub async fn get_token_price_in_usd(
     // 2. 为了价格实时性，对选中的池地址强制刷新一次 PoolState
     let pool_state = get_pool_by_address_force(rpc, &pool_address).await.unwrap_or(pool_state_best);
 
-    // 3. 只处理 X-WSOL 对（X 是任意 token，另一侧必须是 SOL_MINT）
-    let is_token0_x = pool_state.token_mint0 == *token_mint && pool_state.token_mint1 == SOL_MINT;
-    let is_token1_x = pool_state.token_mint1 == *token_mint && pool_state.token_mint0 == SOL_MINT;
+    // 3. 判断池子配对类型
+    let is_token0_x = pool_state.token_mint0 == *token_mint;
+    let is_token1_x = pool_state.token_mint1 == *token_mint;
 
-    if !is_token0_x && !is_token1_x {
+    let other_mint = if is_token0_x {
+        pool_state.token_mint1
+    } else if is_token1_x {
+        pool_state.token_mint0
+    } else {
         return Err(anyhow!(
-            "Best CLMM pool for mint {} is not paired with WSOL; USD pricing via WSOL is not supported yet",
+            "Pool {} does not contain the target mint {}",
+            pool_address,
             token_mint
+        ));
+    };
+
+    // 支持三种池子类型：
+    // 1. X-WSOL：需要通过 WSOL-USD 锚定池计算
+    // 2. X-USDC/USDT：直接认为稳定币价格 = 1 USD
+    // 3. 其他：暂不支持（需要多跳路由）
+    if other_mint == USDC_MINT || other_mint == USDT_MINT {
+        // X-稳定币池：直接计算 X 相对稳定币的价格
+        let price_x_in_stable = if is_token0_x {
+            price_token0_in_token1(
+                pool_state.sqrt_price_x64,
+                pool_state.mint_decimals0,
+                pool_state.mint_decimals1,
+            )
+        } else {
+            price_token1_in_token0(
+                pool_state.sqrt_price_x64,
+                pool_state.mint_decimals0,
+                pool_state.mint_decimals1,
+            )
+        };
+
+        if price_x_in_stable <= 0.0 {
+            return Err(anyhow!(
+                "Invalid price from X-Stable pool (<= 0): mint={}, pool={}",
+                token_mint,
+                pool_address
+            ));
+        }
+
+        return Ok(price_x_in_stable); // 稳定币 = 1 USD
+    }
+
+    if other_mint != SOL_MINT {
+        return Err(anyhow!(
+            "Best CLMM pool for mint {} is paired with {} (not WSOL/USDC/USDT); multi-hop USD pricing is not supported yet",
+            token_mint,
+            other_mint
         ));
     }
 
-    // 4. 计算 X 相对 WSOL 的价格
+    // 4. X-WSOL 池：计算 X 相对 WSOL 的价格
     let price_x_in_wsol = if is_token0_x {
         // token0 = X, token1 = WSOL
         price_token0_in_token1(
@@ -1056,19 +1100,62 @@ pub async fn get_token_price_in_usd_with_pool(
     // 1. 直接强制刷新指定的 X-WSOL 池（跳过查找步骤）
     let pool_state = get_pool_by_address_force(rpc, x_wsol_pool_address).await?;
 
-    // 2. 验证池是否为 X-WSOL 对
-    let is_token0_x = pool_state.token_mint0 == *token_mint && pool_state.token_mint1 == SOL_MINT;
-    let is_token1_x = pool_state.token_mint1 == *token_mint && pool_state.token_mint0 == SOL_MINT;
+    // 2. 判断池子配对类型
+    let is_token0_x = pool_state.token_mint0 == *token_mint;
+    let is_token1_x = pool_state.token_mint1 == *token_mint;
 
-    if !is_token0_x && !is_token1_x {
+    let other_mint = if is_token0_x {
+        pool_state.token_mint1
+    } else if is_token1_x {
+        pool_state.token_mint0
+    } else {
         return Err(anyhow!(
-            "Provided pool {} is not a valid X-WSOL pair for mint {}",
+            "Provided pool {} does not contain the target mint {}",
             x_wsol_pool_address,
             token_mint
         ));
+    };
+
+    // 支持三种池子类型：
+    // 1. X-WSOL：需要通过 WSOL-USD 锚定池计算
+    // 2. X-USDC/USDT：直接认为稳定币价格 = 1 USD
+    // 3. 其他：不支持
+    if other_mint == USDC_MINT || other_mint == USDT_MINT {
+        // X-稳定币池：直接计算 X 相对稳定币的价格
+        let price_x_in_stable = if is_token0_x {
+            price_token0_in_token1(
+                pool_state.sqrt_price_x64,
+                pool_state.mint_decimals0,
+                pool_state.mint_decimals1,
+            )
+        } else {
+            price_token1_in_token0(
+                pool_state.sqrt_price_x64,
+                pool_state.mint_decimals0,
+                pool_state.mint_decimals1,
+            )
+        };
+
+        if price_x_in_stable <= 0.0 {
+            return Err(anyhow!(
+                "Invalid price from X-Stable pool (<= 0): mint={}, pool={}",
+                token_mint,
+                x_wsol_pool_address
+            ));
+        }
+
+        return Ok(price_x_in_stable); // 稳定币 = 1 USD
     }
 
-    // 3. 计算 X 相对 WSOL 的价格
+    if other_mint != SOL_MINT {
+        return Err(anyhow!(
+            "Provided pool {} is paired with {} (not WSOL/USDC/USDT); multi-hop USD pricing is not supported yet",
+            x_wsol_pool_address,
+            other_mint
+        ));
+    }
+
+    // 3. X-WSOL 池：计算 X 相对 WSOL 的价格
     let price_x_in_wsol = if is_token0_x {
         // token0 = X, token1 = WSOL
         price_token0_in_token1(

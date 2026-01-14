@@ -227,7 +227,6 @@ async fn test_raydium_clmm_get_wsol_price_in_usd() {
 
 /// 测试：通过 Raydium CLMM 获取 JUP 的 USD 价格（X-WSOL 池 + WSOL-USD 锚定池，主网）
 #[tokio::test]
-#[ignore]
 #[serial]
 async fn test_raydium_clmm_get_jup_price_in_usd() {
     println!("=== 测试：Raydium CLMM get_token_price_in_usd (JUP) ===");
