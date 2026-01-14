@@ -10,7 +10,11 @@ use anyhow::anyhow;
 use base64::engine::general_purpose::STANDARD;
 use base64::Engine;
 use solana_account_decoder::UiAccountData;
-use solana_sdk::pubkey::Pubkey;
+use solana_sdk::{pubkey, pubkey::Pubkey};
+
+/// Raydium CLMM WSOL-USDT 锚定池（用于 USD 价格计算）
+/// 如果不传入锚定池参数，默认使用此池
+pub const DEFAULT_WSOL_USDT_CLMM_POOL: Pubkey = pubkey!("ExcBWu8fGPdJiaF1b1z3iEef38sjQJks8xvj6M85pPY6");
 
 /// Seeds for PDA derivation
 pub mod seeds {
@@ -966,8 +970,9 @@ pub async fn get_wsol_price_in_usd(
 pub async fn get_token_price_in_usd(
     rpc: &SolanaRpcClient,
     token_mint: &Pubkey,
-    wsol_usd_pool_address: &Pubkey,
+    wsol_usd_pool_address: Option<&Pubkey>,
 ) -> Result<f64, anyhow::Error> {
+    let wsol_usd_pool = wsol_usd_pool_address.unwrap_or(&DEFAULT_WSOL_USDT_CLMM_POOL);
     use crate::utils::price::raydium_clmm::{price_token0_in_token1, price_token1_in_token0};
 
     // 稳定币自身的价格直接认为是 1 USD
@@ -977,7 +982,7 @@ pub async fn get_token_price_in_usd(
 
     // WSOL/SOL 的价格直接来自锚定池
     if *token_mint == SOL_MINT {
-        return get_wsol_price_in_usd(rpc, wsol_usd_pool_address).await;
+        return get_wsol_price_in_usd(rpc, wsol_usd_pool).await;
     }
 
     // 1. 先在 CLMM 中找到 Token X 的最优池（优先 X-WSOL/USDC/USDT 对）
@@ -1063,7 +1068,7 @@ pub async fn get_token_price_in_usd(
     }
 
     // 5. 计算 WSOL 的 USD 价格
-    let price_wsol_in_usd = get_wsol_price_in_usd(rpc, wsol_usd_pool_address).await?;
+    let price_wsol_in_usd = get_wsol_price_in_usd(rpc, wsol_usd_pool).await?;
 
     Ok(price_x_in_wsol * price_wsol_in_usd)
 }
@@ -1083,8 +1088,9 @@ pub async fn get_token_price_in_usd_with_pool(
     rpc: &SolanaRpcClient,
     token_mint: &Pubkey,
     x_wsol_pool_address: &Pubkey,
-    wsol_usd_pool_address: &Pubkey,
+    wsol_usd_pool_address: Option<&Pubkey>,
 ) -> Result<f64, anyhow::Error> {
+    let wsol_usd_pool = wsol_usd_pool_address.unwrap_or(&DEFAULT_WSOL_USDT_CLMM_POOL);
     use crate::utils::price::raydium_clmm::{price_token0_in_token1, price_token1_in_token0};
 
     // 稳定币自身的价格直接认为是 1 USD
@@ -1094,7 +1100,7 @@ pub async fn get_token_price_in_usd_with_pool(
 
     // WSOL/SOL 的价格直接来自锚定池
     if *token_mint == SOL_MINT {
-        return get_wsol_price_in_usd(rpc, wsol_usd_pool_address).await;
+        return get_wsol_price_in_usd(rpc, wsol_usd_pool).await;
     }
 
     // 1. 直接强制刷新指定的 X-WSOL 池（跳过查找步骤）
@@ -1177,7 +1183,7 @@ pub async fn get_token_price_in_usd_with_pool(
     }
 
     // 4. 计算 WSOL 的 USD 价格
-    let price_wsol_in_usd = get_wsol_price_in_usd(rpc, wsol_usd_pool_address).await?;
+    let price_wsol_in_usd = get_wsol_price_in_usd(rpc, wsol_usd_pool).await?;
 
     Ok(price_x_in_wsol * price_wsol_in_usd)
 }

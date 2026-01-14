@@ -235,9 +235,8 @@ async fn test_raydium_clmm_get_jup_price_in_usd() {
     let rpc = RpcClient::new(rpc_url.to_string());
 
     let jup_mint = Pubkey::from_str(JUP_MINT).expect("Invalid JUP mint");
-    let anchor_pool = Pubkey::from_str(WSOL_USDT_CLMM_POOL).expect("Invalid WSOL-USDT pool");
 
-    let price = get_token_price_in_usd(&rpc, &jup_mint, &anchor_pool)
+    let price = get_token_price_in_usd(&rpc, &jup_mint, None)
         .await
         .expect("Failed to get JUP price in USD");
 
@@ -260,7 +259,6 @@ async fn test_raydium_clmm_get_jup_price_in_usd_with_pool() {
     let rpc = RpcClient::new(rpc_url.to_string());
 
     let jup_mint = Pubkey::from_str(JUP_MINT).expect("Invalid JUP mint");
-    let anchor_pool = Pubkey::from_str(WSOL_USDT_CLMM_POOL).expect("Invalid WSOL-USDT pool");
 
     // 1. 先用标准接口找到 JUP-WSOL 池地址（模拟：你已经缓存了这个池地址）
     let (jup_wsol_pool, _) = get_pool_by_mint(&rpc, &jup_mint)
@@ -269,7 +267,7 @@ async fn test_raydium_clmm_get_jup_price_in_usd_with_pool() {
     println!("找到的 JUP-WSOL 池地址: {}", jup_wsol_pool);
 
     // 2. 使用 get_token_price_in_usd_with_pool 直接传入池地址，避免重复查找
-    let price = get_token_price_in_usd_with_pool(&rpc, &jup_mint, &jup_wsol_pool, &anchor_pool)
+    let price = get_token_price_in_usd_with_pool(&rpc, &jup_mint, &jup_wsol_pool, None)
         .await
         .expect("Failed to get JUP price in USD with pool");
 
