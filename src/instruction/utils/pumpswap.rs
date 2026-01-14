@@ -300,6 +300,10 @@ pub(crate) mod pump_swap_cache {
     pub(crate) static POOL_DATA_CACHE: Lazy<DashMap<Pubkey, Pool>> =
         Lazy::new(|| DashMap::with_capacity(MAX_CACHE_SIZE));
 
+    /// mint → Vec<(pool_address, Pool)> 列表缓存（用于 list_pools_by_mint）
+    pub(crate) static MINT_TO_POOLS_LIST_CACHE: Lazy<DashMap<Pubkey, Vec<(Pubkey, Pool)>>> =
+        Lazy::new(|| DashMap::with_capacity(MAX_CACHE_SIZE));
+
     pub(crate) fn get_cached_pool_by_address(pool_address: &Pubkey) -> Option<Pool> {
         POOL_DATA_CACHE.get(pool_address).map(|p| p.clone())
     }
@@ -316,9 +320,18 @@ pub(crate) mod pump_swap_cache {
         MINT_TO_POOL_CACHE.insert(*mint, *pool_address);
     }
 
+    pub(crate) fn get_cached_pools_list_by_mint(mint: &Pubkey) -> Option<Vec<(Pubkey, Pool)>> {
+        MINT_TO_POOLS_LIST_CACHE.get(mint).map(|p| p.clone())
+    }
+
+    pub(crate) fn cache_pools_list_by_mint(mint: &Pubkey, pools: &[(Pubkey, Pool)]) {
+        MINT_TO_POOLS_LIST_CACHE.insert(*mint, pools.to_vec());
+    }
+
     pub(crate) fn clear_all() {
         MINT_TO_POOL_CACHE.clear();
         POOL_DATA_CACHE.clear();
+        MINT_TO_POOLS_LIST_CACHE.clear();
     }
 }
 
@@ -511,14 +524,66 @@ async fn find_pool_by_mint_impl(
 
 /// List all PumpSwap pools for a mint (as base or quote).
 ///
-/// This is a discovery helper for routing/selection layers. It does NOT pick a best pool.
-
+/// 返回按 Hot Token 优先策略排序后的池子列表：
+/// 1. 稳定币对（USDC/USDT）优先
+/// 2. WSOL 对次之
+/// 3. 其他对最后
+/// 4. 同类池子按 LP 供应量从大到小排序
+///
+/// Results are cached to improve performance on repeated queries.
 pub async fn list_pools_by_mint(
     rpc: &SolanaRpcClient,
     mint: &Pubkey,
 ) -> Result<Vec<(Pubkey, Pool)>, anyhow::Error> {
-    // 通过共用函数查询所有池子
-    find_all_pools_by_mint_impl(rpc, mint).await
+    // 1. 检查缓存
+    if let Some(cached_pools) = pump_swap_cache::get_cached_pools_list_by_mint(mint) {
+        return Ok(cached_pools);
+    }
+
+    // 2. 获取所有池子并分类排序
+    let all_pools = find_all_pools_by_mint_impl(rpc, mint).await?;
+
+    // 分类：稳定币对 > WSOL 对 > 其他对
+    let mut stable_pools: Vec<(Pubkey, Pool)> = Vec::new();
+    let mut wsol_pools: Vec<(Pubkey, Pool)> = Vec::new();
+    let mut other_pools: Vec<(Pubkey, Pool)> = Vec::new();
+
+    for (addr, pool) in all_pools.into_iter() {
+        // 找到与目标 mint 对应的另一侧 mint
+        let other_mint = if pool.base_mint == *mint {
+            pool.quote_mint
+        } else if pool.quote_mint == *mint {
+            pool.base_mint
+        } else {
+            other_pools.push((addr, pool));
+            continue;
+        };
+
+        // 按 Hot Token 优先级分类
+        if other_mint == USDC_MINT || other_mint == USDT_MINT {
+            stable_pools.push((addr, pool));
+        } else if other_mint == WSOL_TOKEN_ACCOUNT {
+            wsol_pools.push((addr, pool));
+        } else {
+            other_pools.push((addr, pool));
+        }
+    }
+
+    // 在各分类内按 LP 供应量排序
+    stable_pools.sort_by(|(_, a), (_, b)| b.lp_supply.cmp(&a.lp_supply));
+    wsol_pools.sort_by(|(_, a), (_, b)| b.lp_supply.cmp(&a.lp_supply));
+    other_pools.sort_by(|(_, a), (_, b)| b.lp_supply.cmp(&a.lp_supply));
+
+    // 合并：稳定币对 > WSOL 对 > 其他对
+    let mut sorted_pools = Vec::new();
+    sorted_pools.extend(stable_pools);
+    sorted_pools.extend(wsol_pools);
+    sorted_pools.extend(other_pools);
+
+    // 3. 写入缓存
+    pump_swap_cache::cache_pools_list_by_mint(mint, &sorted_pools);
+
+    Ok(sorted_pools)
 }
 
 pub async fn get_token_balances(

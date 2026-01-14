@@ -506,7 +506,12 @@ pub async fn get_pool_by_mint_force(
 
 /// 列出所有包含指定 mint 的 Raydium AMM V4 Pool
 ///
-/// 该接口主要用于上层路由与策略模块进行池路由与选择。
+/// 返回按 Hot Token 优先策略排序后的池子列表：
+/// 1. 稳定币对（USDC/USDT）优先
+/// 2. WSOL 对次之
+/// 3. 其他对最后
+/// 4. 同类池子按累计交易量从大到小排序
+///
 /// Results are cached to improve performance on repeated queries.
 ///
 /// # 参数
@@ -515,14 +520,14 @@ pub async fn get_pool_by_mint_force(
 /// - `filter_active`: 是否只返回活跃状态的 pool（适合交易的 pool）
 ///
 /// # 返回
-/// - 返回所有包含指定 mint 的 pool 列表
+/// - 返回排序后的包含指定 mint 的 pool 列表
 /// - 如果 `filter_active` 为 true，则只返回活跃状态的 pool
 pub async fn list_pools_by_mint(
     rpc: &SolanaRpcClient,
     mint: &Pubkey,
     filter_active: bool,
 ) -> Result<Vec<(Pubkey, AmmInfo)>, anyhow::Error> {
-    // 1. 检查缓存（注意：缓存的是未过滤的完整列表）
+    // 1. 检查缓存（注意：缓存的是排序后的完整列表）
     if let Some(cached_pools) = get_cached_pools_list_by_mint(mint) {
         // 如果需要过滤活跃状态，在返回前过滤
         if filter_active {
@@ -542,14 +547,63 @@ pub async fn list_pools_by_mint(
     }
 
     // 2. 通过共用函数查询所有池子（不过滤）
-    let pools = find_all_pools_by_mint_impl(rpc, mint, false).await?;
+    let all_pools = find_all_pools_by_mint_impl(rpc, mint, false).await?;
 
-    // 3. 写入缓存（缓存未过滤的完整列表）
-    cache_pools_list_by_mint(mint, &pools);
+    // 分类：稳定币对 > WSOL 对 > 其他对
+    let mut stable_pools: Vec<(Pubkey, AmmInfo)> = Vec::new();
+    let mut wsol_pools: Vec<(Pubkey, AmmInfo)> = Vec::new();
+    let mut other_pools: Vec<(Pubkey, AmmInfo)> = Vec::new();
+
+    for (addr, amm) in all_pools.into_iter() {
+        // 找到与目标 mint 对应的另一侧 mint
+        let other_mint = if amm.coin_mint == *mint {
+            amm.pc_mint
+        } else if amm.pc_mint == *mint {
+            amm.coin_mint
+        } else {
+            other_pools.push((addr, amm));
+            continue;
+        };
+
+        // 按 Hot Token 优先级分类
+        if other_mint == USDC_MINT || other_mint == USDT_MINT {
+            stable_pools.push((addr, amm));
+        } else if other_mint == SOL_MINT {
+            wsol_pools.push((addr, amm));
+        } else {
+            other_pools.push((addr, amm));
+        }
+    }
+
+    // 在各分类内按累计交易量排序
+    stable_pools.sort_by(|(_, a), (_, b)| {
+        let volume_a = calculate_effective_volume(a);
+        let volume_b = calculate_effective_volume(b);
+        volume_b.cmp(&volume_a)
+    });
+    wsol_pools.sort_by(|(_, a), (_, b)| {
+        let volume_a = calculate_effective_volume(a);
+        let volume_b = calculate_effective_volume(b);
+        volume_b.cmp(&volume_a)
+    });
+    other_pools.sort_by(|(_, a), (_, b)| {
+        let volume_a = calculate_effective_volume(a);
+        let volume_b = calculate_effective_volume(b);
+        volume_b.cmp(&volume_a)
+    });
+
+    // 合并：稳定币对 > WSOL 对 > 其他对
+    let mut sorted_pools = Vec::new();
+    sorted_pools.extend(stable_pools);
+    sorted_pools.extend(wsol_pools);
+    sorted_pools.extend(other_pools);
+
+    // 3. 写入缓存（缓存排序后的完整列表）
+    cache_pools_list_by_mint(mint, &sorted_pools);
 
     // 如果需要过滤活跃状态的 pool
     if filter_active {
-        let filtered: Vec<_> = pools
+        let filtered: Vec<_> = sorted_pools
             .into_iter()
             .filter(|(_, amm)| is_pool_tradeable(amm))
             .collect();
@@ -562,5 +616,5 @@ pub async fn list_pools_by_mint(
         return Ok(filtered);
     }
 
-    Ok(pools)
+    Ok(sorted_pools)
 }

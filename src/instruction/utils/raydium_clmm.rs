@@ -711,9 +711,13 @@ async fn find_pool_by_mint_impl(
 
 /// List all Raydium CLMM pools that contain the given mint as token0 or token1.
 ///
-/// This is a discovery helper for routing/selection layers. It does NOT pick a best pool.
+/// 返回按 Hot Token 优先策略排序后的池子列表：
+/// 1. 稳定币对（USDC/USDT）优先
+/// 2. WSOL 对次之
+/// 3. 其他对最后
+/// 4. 同类池子按累计交易量从大到小排序
+///
 /// Results are cached to improve performance on repeated queries.
-
 pub async fn list_pools_by_mint(
     rpc: &SolanaRpcClient,
     mint: &Pubkey,
@@ -737,14 +741,14 @@ pub async fn list_pools_by_mint(
         return Err(result0.unwrap_err());
     }
 
-    let mut out: Vec<(Pubkey, PoolState)> = Vec::new();
+    let mut all_pools: Vec<(Pubkey, PoolState)> = Vec::new();
     let mut seen: HashSet<Pubkey> = HashSet::new();
 
     // Merge token_mint0 results
     if let Ok(token0_pools) = result0 {
         for (addr, pool) in token0_pools {
             if seen.insert(addr) {
-                out.push((addr, pool));
+                all_pools.push((addr, pool));
             }
         }
     }
@@ -753,19 +757,68 @@ pub async fn list_pools_by_mint(
     if let Ok(token1_pools) = result1 {
         for (addr, pool) in token1_pools {
             if seen.insert(addr) {
-                out.push((addr, pool));
+                all_pools.push((addr, pool));
             }
         }
     }
 
-    if out.is_empty() {
+    if all_pools.is_empty() {
         return Err(anyhow!("No CLMM pool found for mint {}", mint));
     }
 
-    // 3. 写入缓存
-    raydium_clmm_cache::cache_pools_list_by_mint(mint, &out);
+    // 分类：稳定币对 > WSOL 对 > 其他对
+    let mut stable_pools: Vec<(Pubkey, PoolState)> = Vec::new();
+    let mut wsol_pools: Vec<(Pubkey, PoolState)> = Vec::new();
+    let mut other_pools: Vec<(Pubkey, PoolState)> = Vec::new();
 
-    Ok(out)
+    for (addr, pool) in all_pools.into_iter() {
+        // 找到与目标 mint 对应的另一侧 mint
+        let other_mint = if pool.token_mint0 == *mint {
+            pool.token_mint1
+        } else if pool.token_mint1 == *mint {
+            pool.token_mint0
+        } else {
+            other_pools.push((addr, pool));
+            continue;
+        };
+
+        // 按 Hot Token 优先级分类
+        if other_mint == USDC_MINT || other_mint == USDT_MINT {
+            stable_pools.push((addr, pool));
+        } else if other_mint == SOL_MINT {
+            wsol_pools.push((addr, pool));
+        } else {
+            other_pools.push((addr, pool));
+        }
+    }
+
+    // 在各分类内按累计交易量排序
+    stable_pools.sort_by(|(_, a), (_, b)| {
+        let volume_a = calculate_effective_volume(a);
+        let volume_b = calculate_effective_volume(b);
+        volume_b.cmp(&volume_a)
+    });
+    wsol_pools.sort_by(|(_, a), (_, b)| {
+        let volume_a = calculate_effective_volume(a);
+        let volume_b = calculate_effective_volume(b);
+        volume_b.cmp(&volume_a)
+    });
+    other_pools.sort_by(|(_, a), (_, b)| {
+        let volume_a = calculate_effective_volume(a);
+        let volume_b = calculate_effective_volume(b);
+        volume_b.cmp(&volume_a)
+    });
+
+    // 合并：稳定币对 > WSOL 对 > 其他对
+    let mut sorted_pools = Vec::new();
+    sorted_pools.extend(stable_pools);
+    sorted_pools.extend(wsol_pools);
+    sorted_pools.extend(other_pools);
+
+    // 3. 写入缓存
+    raydium_clmm_cache::cache_pools_list_by_mint(mint, &sorted_pools);
+
+    Ok(sorted_pools)
 }
 
 /// Quote an exact-in swap against a Raydium CLMM pool.

@@ -447,9 +447,13 @@ async fn find_pool_by_mint_impl(
 
 /// List all CPMM pools that contain the given mint as token0 or token1.
 ///
-/// This is a discovery helper for routing/selection layers. It does NOT pick a best pool.
+/// 返回按 Hot Token 优先策略排序后的池子列表：
+/// 1. 稳定币对（USDC/USDT）优先
+/// 2. WSOL 对次之
+/// 3. 其他对最后
+/// 4. 同类池子按 LP 供应量从大到小排序
+///
 /// Results are cached to improve performance on repeated queries.
-
 pub async fn list_pools_by_mint(
     rpc: &SolanaRpcClient,
     mint: &Pubkey,
@@ -460,12 +464,49 @@ pub async fn list_pools_by_mint(
     }
 
     // 2. 通过共用函数查询所有池子
-    let pools = find_all_pools_by_mint_impl(rpc, mint).await?;
+    let all_pools = find_all_pools_by_mint_impl(rpc, mint).await?;
+
+    // 分类：稳定币对 > WSOL 对 > 其他对
+    let mut stable_pools: Vec<(Pubkey, PoolState)> = Vec::new();
+    let mut wsol_pools: Vec<(Pubkey, PoolState)> = Vec::new();
+    let mut other_pools: Vec<(Pubkey, PoolState)> = Vec::new();
+
+    for (addr, pool) in all_pools.into_iter() {
+        // 找到与目标 mint 对应的另一侧 mint
+        let other_mint = if pool.token0_mint == *mint {
+            pool.token1_mint
+        } else if pool.token1_mint == *mint {
+            pool.token0_mint
+        } else {
+            other_pools.push((addr, pool));
+            continue;
+        };
+
+        // 按 Hot Token 优先级分类
+        if other_mint == USDC_MINT || other_mint == USDT_MINT {
+            stable_pools.push((addr, pool));
+        } else if other_mint == WSOL_TOKEN_ACCOUNT {
+            wsol_pools.push((addr, pool));
+        } else {
+            other_pools.push((addr, pool));
+        }
+    }
+
+    // 在各分类内按 LP 供应量排序
+    stable_pools.sort_by(|(_, a), (_, b)| b.lp_supply.cmp(&a.lp_supply));
+    wsol_pools.sort_by(|(_, a), (_, b)| b.lp_supply.cmp(&a.lp_supply));
+    other_pools.sort_by(|(_, a), (_, b)| b.lp_supply.cmp(&a.lp_supply));
+
+    // 合并：稳定币对 > WSOL 对 > 其他对
+    let mut sorted_pools = Vec::new();
+    sorted_pools.extend(stable_pools);
+    sorted_pools.extend(wsol_pools);
+    sorted_pools.extend(other_pools);
 
     // 3. 写入缓存
-    raydium_cpmm_cache::cache_pools_list_by_mint(mint, &pools);
+    raydium_cpmm_cache::cache_pools_list_by_mint(mint, &sorted_pools);
 
-    Ok(pools)
+    Ok(sorted_pools)
 }
 
 /// Helper function to get token vault account address
