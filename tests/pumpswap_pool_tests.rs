@@ -13,7 +13,7 @@
 //! 注意：使用公共 Solana RPC 端点
 
 use sol_trade_sdk::instruction::utils::pumpswap::{
-    find_pool, get_pool_by_address, get_token_balances,
+    find_pool, get_pool_by_address, get_token_balances, get_token_price_in_usd_with_pool,
 };
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_sdk::pubkey::Pubkey;
@@ -24,6 +24,9 @@ const PUMP_MINT: &str = "pumpCmXqMfrsAkQ5r49WcJnRayYRqmXz6ae8H7H9Dfn";
 
 /// 已知的 PumpSwap pool 地址
 const PUMP_POOL_ADDRESS: &str = "539m4mVWt6iduB6W8rDGPMarzNCMesuqY5eUTiiYHAgR";
+
+/// Raydium CLMM WSOL-USDT 锚定池（用于 USD 价格计算）
+const WSOL_USDT_CLMM_POOL: &str = "ExcBWu8fGPdJiaF1b1z3iEef38sjQJks8xvj6M85pPY6";
 
 /// 测试：通过 mint 查找 pool 地址
 #[tokio::test]
@@ -100,4 +103,34 @@ async fn test_get_pool_by_address() {
     assert_eq!(pool_state.quote_mint, pool_state2.quote_mint, "Cached pool should match");
     assert_eq!(pool_state.lp_supply, pool_state2.lp_supply, "Cached pool should match");
     println!("✅ 缓存验证通过（数据一致）");
+}
+
+/// 测试：获取 PumpSwap token 的 USD 价格
+#[tokio::test]
+async fn test_get_pumpswap_token_price_in_usd() {
+    println!("=== 测试：获取 PumpSwap token 的 USD 价格 ===");
+
+    let token_mint = Pubkey::from_str(PUMP_MINT).unwrap();
+    let pool_address = Pubkey::from_str(PUMP_POOL_ADDRESS).unwrap();
+    let wsol_usdt_pool = Pubkey::from_str(WSOL_USDT_CLMM_POOL).unwrap();
+    let rpc_url = "https://api.mainnet-beta.solana.com";
+    let rpc = RpcClient::new(rpc_url.to_string());
+
+    println!("Token Mint: {}", token_mint);
+    println!("Pool 地址: {}", pool_address);
+    println!("WSOL-USDT 锚定池: {}", wsol_usdt_pool);
+
+    // 调用价格计算函数
+    let result = get_token_price_in_usd_with_pool(&rpc, &token_mint, &pool_address, &wsol_usdt_pool).await;
+
+    // 验证结果
+    assert!(result.is_ok(), "Failed to get token price in USD: {:?}", result.err());
+
+    let price_usd = result.unwrap();
+    println!("✅ Token USD 价格: ${:.8}", price_usd);
+
+    // 验证价格在合理范围内（应该大于 0 且小于 1000 USD）
+    assert!(price_usd > 0.0, "Price should be positive");
+    assert!(price_usd < 1000.0, "Price should be reasonable (< $1000)");
+    println!("✅ 价格范围验证通过");
 }
