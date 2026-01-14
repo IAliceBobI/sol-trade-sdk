@@ -405,10 +405,11 @@ async fn find_all_pools_by_mint_impl(
 
 /// 内部实现：查找指定 mint 对应的最优 Raydium AMM V4 Pool
 ///
-/// 策略：
+/// 策略（参考 CLMM 的 Hot Token 优先策略）：
 /// 1. 获取所有活跃的池子
 /// 2. 优先选择包含 Hot Mint (WSOL/USDC/USDT) 的交易对
-/// 3. 在优先级相同的池子中，按累计交易量从大到小排序，选择流动性最好的池
+/// 3. 在 Hot 对中优先选择稳定币对（USDC/USDT），再考虑 WSOL 对
+/// 4. 在同类池子中，按累计交易量从大到小排序，选择流动性最好的池
 async fn find_pool_by_mint_impl(
     rpc: &SolanaRpcClient,
     mint: &Pubkey,
@@ -416,8 +417,9 @@ async fn find_pool_by_mint_impl(
     // 获取所有活跃的池子
     let active_pools = find_all_pools_by_mint_impl(rpc, mint, true).await?;
 
-    // 分类：Hot 对（包含 WSOL/USDC/USDT）vs 其他对
-    let mut hot_pools: Vec<(Pubkey, AmmInfo)> = Vec::new();
+    // 分类：稳定币对 > WSOL 对 > 其他对
+    let mut stable_pools: Vec<(Pubkey, AmmInfo)> = Vec::new();
+    let mut wsol_pools: Vec<(Pubkey, AmmInfo)> = Vec::new();
     let mut other_pools: Vec<(Pubkey, AmmInfo)> = Vec::new();
 
     for (addr, amm) in active_pools.into_iter() {
@@ -432,23 +434,31 @@ async fn find_pool_by_mint_impl(
             continue;
         };
 
-        if is_hot_mint(&other_mint) {
-            hot_pools.push((addr, amm));
+        // 按 Hot Token 优先级分类
+        if other_mint == USDC_MINT || other_mint == USDT_MINT {
+            // 最优：稳定币对
+            stable_pools.push((addr, amm));
+        } else if other_mint == SOL_MINT {
+            // 次优：WSOL 对
+            wsol_pools.push((addr, amm));
         } else {
             other_pools.push((addr, amm));
         }
     }
 
-    let best_pool = if !hot_pools.is_empty() {
-        // Hot 对优先：通常是 mint/WSOL、mint/USDC、mint/USDT 等主路由
-        // 使用累计交易量选池（零网络开销，反映真实使用深度）
-        select_best_pool_by_volume(&hot_pools)
+    // 按优先级选择最佳池
+    let best_pool = if !stable_pools.is_empty() {
+        // 优先级 1: 稳定币对（USDC/USDT）
+        select_best_pool_by_volume(&stable_pools)
+    } else if !wsol_pools.is_empty() {
+        // 优先级 2: WSOL 对
+        select_best_pool_by_volume(&wsol_pools)
     } else if *mint == SOL_MINT {
         // 特殊情况：当 mint 本身是 WSOL 时
         // 在所有池中按交易量选择
         select_best_pool_by_volume(&other_pools)
     } else {
-        // 没有 Hot 对时，使用累计交易量选池
+        // 优先级 3: 其他对
         select_best_pool_by_volume(&other_pools)
     };
 

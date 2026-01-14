@@ -437,6 +437,11 @@ async fn find_all_pools_by_mint_impl(
 }
 
 /// 内部实现：查找 mint 对应的最优池
+/// 
+/// 策略（参考 CLMM 的 Hot Token 优先策略）：
+/// 1. 优先尝试 canonical pool (PumpFun 迁移的 mint/WSOL 对)
+/// 2. 在所有池中优先选择稳定币对（USDC/USDT），再考虑 WSOL 对
+/// 3. 在同类池子中，按 LP 供应量从大到小排序
 async fn find_pool_by_mint_impl(
     rpc: &SolanaRpcClient,
     mint: &Pubkey,
@@ -456,8 +461,9 @@ async fn find_pool_by_mint_impl(
     // Priority 2 & 3: 获取所有池子
     let all_pools = find_all_pools_by_mint_impl(rpc, mint).await?;
 
-    // 分类：Hot 对（包含 WSOL/USDC/USDT）vs 其他对
-    let mut hot_pools: Vec<(Pubkey, Pool)> = Vec::new();
+    // 分类：稳定币对 > WSOL 对 > 其他对
+    let mut stable_pools: Vec<(Pubkey, Pool)> = Vec::new();
+    let mut wsol_pools: Vec<(Pubkey, Pool)> = Vec::new();
     let mut other_pools: Vec<(Pubkey, Pool)> = Vec::new();
 
     for (addr, pool) in all_pools.into_iter() {
@@ -472,23 +478,31 @@ async fn find_pool_by_mint_impl(
             continue;
         };
 
-        if is_hot_mint(&other_mint) {
-            hot_pools.push((addr, pool));
+        // 按 Hot Token 优先级分类
+        if other_mint == USDC_MINT || other_mint == USDT_MINT {
+            // 最优：稳定币对
+            stable_pools.push((addr, pool));
+        } else if other_mint == WSOL_TOKEN_ACCOUNT {
+            // 次优：WSOL 对
+            wsol_pools.push((addr, pool));
         } else {
             other_pools.push((addr, pool));
         }
     }
 
-    let best_pool = if !hot_pools.is_empty() {
-        // Hot 对优先：通常是 mint/WSOL、mint/USDC、mint/USDT 等主路由
-        // 使用 LP 供应量选池
-        select_best_pool_by_liquidity(&hot_pools)
+    // 按优先级选择最佳池
+    let best_pool = if !stable_pools.is_empty() {
+        // 优先级 1: 稳定币对（USDC/USDT）
+        select_best_pool_by_liquidity(&stable_pools)
+    } else if !wsol_pools.is_empty() {
+        // 优先级 2: WSOL 对
+        select_best_pool_by_liquidity(&wsol_pools)
     } else if *mint == WSOL_TOKEN_ACCOUNT {
         // 特殊情况：当 mint 本身是 WSOL 时
         // 在所有池中按 LP 供应量选择
         select_best_pool_by_liquidity(&other_pools)
     } else {
-        // 没有 Hot 对时，使用 LP 供应量选池
+        // 优先级 3: 其他对
         select_best_pool_by_liquidity(&other_pools)
     };
 
