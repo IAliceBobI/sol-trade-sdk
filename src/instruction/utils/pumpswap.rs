@@ -498,6 +498,9 @@ async fn find_pool_by_mint_impl(
         } else if other_mint == WSOL_TOKEN_ACCOUNT {
             // 次优：WSOL 对
             wsol_pools.push((addr, pool));
+        } else if is_hot_mint(&other_mint) {
+            // Hot mint 但不在上述分类中（理论上不会发生，但为了完整性）
+            wsol_pools.push((addr, pool));
         } else {
             other_pools.push((addr, pool));
         }
@@ -563,6 +566,9 @@ pub async fn list_pools_by_mint(
         if other_mint == USDC_MINT || other_mint == USDT_MINT {
             stable_pools.push((addr, pool));
         } else if other_mint == WSOL_TOKEN_ACCOUNT {
+            wsol_pools.push((addr, pool));
+        } else if is_hot_mint(&other_mint) {
+            // Hot mint 但不在上述分类中（理论上不会发生，但为了完整性）
             wsol_pools.push((addr, pool));
         } else {
             other_pools.push((addr, pool));
