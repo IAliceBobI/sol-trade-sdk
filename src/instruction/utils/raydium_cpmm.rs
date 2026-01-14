@@ -564,7 +564,7 @@ pub async fn get_token_price_in_usd(
     if *token_mint == SOL_MINT || *token_mint == WSOL_TOKEN_ACCOUNT {
         return crate::instruction::utils::raydium_clmm::get_wsol_price_in_usd(
             rpc,
-            wsol_usd_pool,
+            Some(wsol_usd_pool),
         )
         .await;
     }
@@ -678,7 +678,7 @@ pub async fn get_token_price_in_usd(
     // 4. 计算 WSOL 的 USD 价格
     let price_wsol_in_usd = crate::instruction::utils::raydium_clmm::get_wsol_price_in_usd(
         rpc,
-        wsol_usd_pool,
+        Some(wsol_usd_pool),
     )
     .await?;
 
@@ -715,7 +715,7 @@ pub async fn get_token_price_in_usd_with_pool(
     if *token_mint == SOL_MINT || *token_mint == WSOL_TOKEN_ACCOUNT {
         return crate::instruction::utils::raydium_clmm::get_wsol_price_in_usd(
             rpc,
-            wsol_usd_pool,
+            Some(wsol_usd_pool),
         )
         .await;
     }
@@ -826,7 +826,7 @@ pub async fn get_token_price_in_usd_with_pool(
     // 4. 计算 WSOL 的 USD 价格
     let price_wsol_in_usd = crate::instruction::utils::raydium_clmm::get_wsol_price_in_usd(
         rpc,
-        wsol_usd_pool,
+        Some(wsol_usd_pool),
     )
     .await?;
 

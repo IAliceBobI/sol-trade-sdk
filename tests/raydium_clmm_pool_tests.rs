@@ -212,7 +212,7 @@ async fn test_raydium_clmm_get_wsol_price_in_usd() {
 
     let anchor_pool = Pubkey::from_str(WSOL_USDT_CLMM_POOL).expect("Invalid WSOL-USDT pool");
 
-    let price = get_wsol_price_in_usd(&rpc, &anchor_pool)
+    let price = get_wsol_price_in_usd(&rpc, Some(&anchor_pool))
         .await
         .expect("Failed to get WSOL price in USD");
 

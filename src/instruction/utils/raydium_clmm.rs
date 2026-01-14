@@ -921,12 +921,14 @@ pub async fn quote_exact_in(
 /// * `wsol_usd_pool_address` - WSOL-USDT/USDC CLMM 池地址（例如你提供的 USDT-WSOL 池）
 pub async fn get_wsol_price_in_usd(
     rpc: &SolanaRpcClient,
-    wsol_usd_pool_address: &Pubkey,
+    wsol_usd_pool_address: Option<&Pubkey>,
 ) -> Result<f64, anyhow::Error> {
     use crate::utils::price::raydium_clmm::{price_token0_in_token1, price_token1_in_token0};
 
+    let wsol_usd_pool = wsol_usd_pool_address.unwrap_or(&DEFAULT_WSOL_USDT_CLMM_POOL);
+
     // 强制刷新：每次调用都重新从链上读取池状态，避免价格缓存
-    let pool_state = get_pool_by_address_force(rpc, wsol_usd_pool_address).await?;
+    let pool_state = get_pool_by_address_force(rpc, wsol_usd_pool).await?;
 
     // 只支持 WSOL <-> USDC/USDT 的稳定币池
     let is_token0_sol = pool_state.token_mint0 == SOL_MINT;
@@ -982,7 +984,7 @@ pub async fn get_token_price_in_usd(
 
     // WSOL/SOL 的价格直接来自锚定池
     if *token_mint == SOL_MINT {
-        return get_wsol_price_in_usd(rpc, wsol_usd_pool).await;
+        return get_wsol_price_in_usd(rpc, Some(wsol_usd_pool)).await;
     }
 
     // 1. 先在 CLMM 中找到 Token X 的最优池（优先 X-WSOL/USDC/USDT 对）
@@ -1068,7 +1070,7 @@ pub async fn get_token_price_in_usd(
     }
 
     // 5. 计算 WSOL 的 USD 价格
-    let price_wsol_in_usd = get_wsol_price_in_usd(rpc, wsol_usd_pool).await?;
+    let price_wsol_in_usd = get_wsol_price_in_usd(rpc, Some(wsol_usd_pool)).await?;
 
     Ok(price_x_in_wsol * price_wsol_in_usd)
 }
@@ -1100,7 +1102,7 @@ pub async fn get_token_price_in_usd_with_pool(
 
     // WSOL/SOL 的价格直接来自锚定池
     if *token_mint == SOL_MINT {
-        return get_wsol_price_in_usd(rpc, wsol_usd_pool).await;
+        return get_wsol_price_in_usd(rpc, Some(wsol_usd_pool)).await;
     }
 
     // 1. 直接强制刷新指定的 X-WSOL 池（跳过查找步骤）
@@ -1183,7 +1185,7 @@ pub async fn get_token_price_in_usd_with_pool(
     }
 
     // 4. 计算 WSOL 的 USD 价格
-    let price_wsol_in_usd = get_wsol_price_in_usd(rpc, wsol_usd_pool).await?;
+    let price_wsol_in_usd = get_wsol_price_in_usd(rpc, Some(wsol_usd_pool)).await?;
 
     Ok(price_x_in_wsol * price_wsol_in_usd)
 }
