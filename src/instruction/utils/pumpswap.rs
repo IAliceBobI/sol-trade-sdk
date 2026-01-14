@@ -735,6 +735,84 @@ pub async fn get_token_price_in_usd(
     Ok(price_x_in_wsol * price_wsol_in_usd)
 }
 
+/// 获取任意 Token 在 PumpSwap 上的 USD 价格（直接传入 X-WSOL 池地址，跳过池查找）
+///
+/// 与 `get_token_price_in_usd` 的区别：
+/// - 此函数要求调用者已知 X-WSOL 池地址，直接传入，避免 `get_pool_by_mint` 的查找开销
+/// - 适用于高频调用、已缓存池地址的场景
+///
+/// # Arguments
+/// * `rpc` - Solana RPC 客户端
+/// * `token_mint` - Token X 的 mint 地址
+/// * `x_wsol_pool_address` - Token X 与 WSOL 配对的 PumpSwap 池地址
+/// * `wsol_usd_clmm_pool_address` - Raydium CLMM 上的 WSOL-USDT/USDC 锚定池地址
+pub async fn get_token_price_in_usd_with_pool(
+    rpc: &SolanaRpcClient,
+    token_mint: &Pubkey,
+    x_wsol_pool_address: &Pubkey,
+    wsol_usd_clmm_pool_address: &Pubkey,
+) -> Result<f64, anyhow::Error> {
+    use crate::constants::{SOL_MINT, USDC_MINT, USDT_MINT, WSOL_TOKEN_ACCOUNT};
+    use crate::utils::price::pumpswap::{price_base_in_quote, price_quote_in_base};
+
+    // 稳定币自身的价格直接认为是 1 USD
+    if *token_mint == USDC_MINT || *token_mint == USDT_MINT {
+        return Ok(1.0);
+    }
+
+    // WSOL/SOL 的价格通过 Raydium CLMM 锚定池获取
+    if *token_mint == SOL_MINT || *token_mint == WSOL_TOKEN_ACCOUNT {
+        return crate::instruction::utils::raydium_clmm::get_wsol_price_in_usd(
+            rpc,
+            wsol_usd_clmm_pool_address,
+        )
+        .await;
+    }
+
+    // 1. 直接强制刷新指定的 X-WSOL 池（跳过查找步骤）
+    let pool = get_pool_by_address_force(rpc, x_wsol_pool_address).await?;
+
+    // 2. 只处理 X-WSOL 对（X 是任意 token，另一侧必须是 WSOL_TOKEN_ACCOUNT）
+    let is_base_x = pool.base_mint == *token_mint && pool.quote_mint == WSOL_TOKEN_ACCOUNT;
+    let is_quote_x = pool.quote_mint == *token_mint && pool.base_mint == WSOL_TOKEN_ACCOUNT;
+
+    if !is_base_x && !is_quote_x {
+        return Err(anyhow!(
+            "Provided PumpSwap pool {} is not paired with WSOL; USD pricing via WSOL is not supported yet",
+            x_wsol_pool_address
+        ));
+    }
+
+    // 3. 获取池子实时余额
+    let (base_reserve, quote_reserve) = get_token_balances(&pool, rpc).await?;
+
+    // 4. 获取两侧代币精度
+    let base_decimals = crate::utils::token::get_token_decimals(rpc, &pool.base_mint).await?;
+    let quote_decimals = crate::utils::token::get_token_decimals(rpc, &pool.quote_mint).await?;
+
+    // 5. 计算 X 相对 WSOL 的价格
+    let price_x_in_wsol = if is_base_x {
+        // base = X, quote = WSOL
+        price_base_in_quote(base_reserve, quote_reserve, base_decimals, quote_decimals)
+    } else {
+        // quote = X, base = WSOL
+        price_quote_in_base(base_reserve, quote_reserve, base_decimals, quote_decimals)
+    };
+
+    if price_x_in_wsol <= 0.0 {
+        return Err(anyhow!("Computed X/WSOL price on PumpSwap is invalid (<= 0)"));
+    }
+
+    // 6. 获取 WSOL 的 USD 价格（通过 Raydium CLMM 锚定池）
+    let price_wsol_in_usd = crate::instruction::utils::raydium_clmm::get_wsol_price_in_usd(
+        rpc,
+        wsol_usd_clmm_pool_address,
+    )
+    .await?;
+
+    Ok(price_x_in_wsol * price_wsol_in_usd)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

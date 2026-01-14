@@ -537,3 +537,292 @@ pub fn get_vault_account(
         get_vault_pda(pool_state, token_mint).unwrap()
     }
 }
+
+/// 获取任意 Token 在 Raydium CPMM 上的 USD 价格（通过 X-WSOL 池 + Raydium CLMM WSOL-USD 锚定池）
+///
+/// 价格计算路径：Token X -> WSOL -> USD
+/// - 要求：存在一个 X-WSOL 的 CPMM 池，以及一个 Raydium CLMM 上的 WSOL-USDT/USDC 锚定池
+pub async fn get_token_price_in_usd(
+    rpc: &SolanaRpcClient,
+    token_mint: &Pubkey,
+    wsol_usd_clmm_pool_address: &Pubkey,
+) -> Result<f64, anyhow::Error> {
+    use crate::constants::SOL_MINT;
+    use crate::utils::price::raydium_cpmm::{price_base_in_quote, price_quote_in_base};
+
+    // 稳定币自身的价格直接认为是 1 USD
+    if *token_mint == USDC_MINT || *token_mint == USDT_MINT {
+        return Ok(1.0);
+    }
+
+    // WSOL/SOL 的价格通过 Raydium CLMM 锚定池获取
+    if *token_mint == SOL_MINT || *token_mint == WSOL_TOKEN_ACCOUNT {
+        return crate::instruction::utils::raydium_clmm::get_wsol_price_in_usd(
+            rpc,
+            wsol_usd_clmm_pool_address,
+        )
+        .await;
+    }
+
+    // 1. 在 CPMM 中找到 Token X 的最优池（优先 X-WSOL/USDC/USDT 对）
+    let (pool_address, pool_best) = get_pool_by_mint(rpc, token_mint).await?;
+
+    // 2. 为了价格实时性，对选中的池地址强制刷新一次 PoolState
+    let pool = get_pool_by_address_force(rpc, &pool_address).await.unwrap_or(pool_best);
+
+    // 3. 判断池子配对类型
+    let is_token0_x = pool.token0_mint == *token_mint;
+    let is_token1_x = pool.token1_mint == *token_mint;
+
+    let other_mint = if is_token0_x {
+        pool.token1_mint
+    } else if is_token1_x {
+        pool.token0_mint
+    } else {
+        return Err(anyhow!(
+            "CPMM Pool {} does not contain the target mint {}",
+            pool_address,
+            token_mint
+        ));
+    };
+
+    // 支持三种池子类型：
+    // 1. X-WSOL：需要通过 WSOL-USD 锚定池计算
+    // 2. X-USDC/USDT：直接认为稳定币价格 = 1 USD
+    // 3. 其他：暂不支持（需要多跳路由）
+    if other_mint == USDC_MINT || other_mint == USDT_MINT {
+        // X-稳定币池：直接计算 X 相对稳定币的价格
+        // 获取实时余额
+        let (token0_balance, token1_balance) = get_pool_token_balances(
+            rpc,
+            &pool_address,
+            &pool.token0_mint,
+            &pool.token1_mint,
+        )
+        .await?;
+
+        let price_x_in_stable = if is_token0_x {
+            // token0 = X, token1 = USDC/USDT
+            price_base_in_quote(
+                token0_balance,
+                token1_balance,
+                pool.mint0_decimals,
+                pool.mint1_decimals,
+            )
+        } else {
+            // token1 = X, token0 = USDC/USDT
+            price_quote_in_base(
+                token0_balance,
+                token1_balance,
+                pool.mint0_decimals,
+                pool.mint1_decimals,
+            )
+        };
+
+        if price_x_in_stable <= 0.0 {
+            return Err(anyhow!(
+                "Invalid price from X-Stable CPMM pool (<= 0): mint={}, pool={}",
+                token_mint,
+                pool_address
+            ));
+        }
+
+        return Ok(price_x_in_stable); // 稳定币 = 1 USD
+    }
+
+    if other_mint != SOL_MINT && other_mint != WSOL_TOKEN_ACCOUNT {
+        return Err(anyhow!(
+            "Best CPMM pool for mint {} is paired with {} (not WSOL/USDC/USDT); multi-hop USD pricing is not supported yet",
+            token_mint,
+            other_mint
+        ));
+    }
+
+    // X-WSOL 池：计算 X 相对 WSOL 的价格
+    // 获取实时余额
+    let (token0_balance, token1_balance) = get_pool_token_balances(
+        rpc,
+        &pool_address,
+        &pool.token0_mint,
+        &pool.token1_mint,
+    )
+    .await?;
+
+    let price_x_in_wsol = if is_token0_x {
+        // token0 = X, token1 = WSOL
+        price_base_in_quote(
+            token0_balance,
+            token1_balance,
+            pool.mint0_decimals,
+            pool.mint1_decimals,
+        )
+    } else {
+        // token1 = X, token0 = WSOL
+        price_quote_in_base(
+            token0_balance,
+            token1_balance,
+            pool.mint0_decimals,
+            pool.mint1_decimals,
+        )
+    };
+
+    if price_x_in_wsol <= 0.0 {
+        return Err(anyhow!("Computed X/WSOL price on CPMM is invalid (<= 0)"));
+    }
+
+    // 4. 计算 WSOL 的 USD 价格
+    let price_wsol_in_usd = crate::instruction::utils::raydium_clmm::get_wsol_price_in_usd(
+        rpc,
+        wsol_usd_clmm_pool_address,
+    )
+    .await?;
+
+    Ok(price_x_in_wsol * price_wsol_in_usd)
+}
+
+/// 获取任意 Token 在 Raydium CPMM 上的 USD 价格（直接传入 X-WSOL 池地址，跳过池查找）
+///
+/// 与 `get_token_price_in_usd` 的区别：
+/// - 此函数要求调用者已知 X-WSOL 池地址，直接传入，避免 `get_pool_by_mint` 的查找开销
+/// - 适用于高频调用、已缓存池地址的场景
+///
+/// # Arguments
+/// * `rpc` - Solana RPC 客户端
+/// * `token_mint` - Token X 的 mint 地址
+/// * `x_wsol_pool_address` - Token X 与 WSOL 配对的 CPMM 池地址
+/// * `wsol_usd_clmm_pool_address` - Raydium CLMM 上的 WSOL-USDT/USDC 锚定池地址
+pub async fn get_token_price_in_usd_with_pool(
+    rpc: &SolanaRpcClient,
+    token_mint: &Pubkey,
+    x_wsol_pool_address: &Pubkey,
+    wsol_usd_clmm_pool_address: &Pubkey,
+) -> Result<f64, anyhow::Error> {
+    use crate::constants::SOL_MINT;
+    use crate::utils::price::raydium_cpmm::{price_base_in_quote, price_quote_in_base};
+
+    // 稳定币自身的价格直接认为是 1 USD
+    if *token_mint == USDC_MINT || *token_mint == USDT_MINT {
+        return Ok(1.0);
+    }
+
+    // WSOL/SOL 的价格通过 Raydium CLMM 锚定池获取
+    if *token_mint == SOL_MINT || *token_mint == WSOL_TOKEN_ACCOUNT {
+        return crate::instruction::utils::raydium_clmm::get_wsol_price_in_usd(
+            rpc,
+            wsol_usd_clmm_pool_address,
+        )
+        .await;
+    }
+
+    // 1. 直接强制刷新指定的 X-WSOL 池（跳过查找步骤）
+    let pool = get_pool_by_address_force(rpc, x_wsol_pool_address).await?;
+
+    // 2. 判断池子配对类型
+    let is_token0_x = pool.token0_mint == *token_mint;
+    let is_token1_x = pool.token1_mint == *token_mint;
+
+    let other_mint = if is_token0_x {
+        pool.token1_mint
+    } else if is_token1_x {
+        pool.token0_mint
+    } else {
+        return Err(anyhow!(
+            "Provided CPMM pool {} does not contain the target mint {}",
+            x_wsol_pool_address,
+            token_mint
+        ));
+    };
+
+    // 支持三种池子类型：
+    // 1. X-WSOL：需要通过 WSOL-USD 锚定池计算
+    // 2. X-USDC/USDT：直接认为稳定币价格 = 1 USD
+    // 3. 其他：暂不支持（需要多跳路由）
+    if other_mint == USDC_MINT || other_mint == USDT_MINT {
+        // X-稳定币池：直接计算 X 相对稳定币的价格
+        // 获取实时余额
+        let (token0_balance, token1_balance) = get_pool_token_balances(
+            rpc,
+            x_wsol_pool_address,
+            &pool.token0_mint,
+            &pool.token1_mint,
+        )
+        .await?;
+
+        let price_x_in_stable = if is_token0_x {
+            // token0 = X, token1 = USDC/USDT
+            price_base_in_quote(
+                token0_balance,
+                token1_balance,
+                pool.mint0_decimals,
+                pool.mint1_decimals,
+            )
+        } else {
+            // token1 = X, token0 = USDC/USDT
+            price_quote_in_base(
+                token0_balance,
+                token1_balance,
+                pool.mint0_decimals,
+                pool.mint1_decimals,
+            )
+        };
+
+        if price_x_in_stable <= 0.0 {
+            return Err(anyhow!(
+                "Invalid price from X-Stable CPMM pool (<= 0): mint={}, pool={}",
+                token_mint,
+                x_wsol_pool_address
+            ));
+        }
+
+        return Ok(price_x_in_stable); // 稳定币 = 1 USD
+    }
+
+    if other_mint != SOL_MINT && other_mint != WSOL_TOKEN_ACCOUNT {
+        return Err(anyhow!(
+            "Provided CPMM pool {} is paired with {} (not WSOL/USDC/USDT); multi-hop USD pricing is not supported yet",
+            x_wsol_pool_address,
+            other_mint
+        ));
+    }
+
+    // 3. X-WSOL 池：计算 X 相对 WSOL 的价格
+    // 获取实时余额
+    let (token0_balance, token1_balance) = get_pool_token_balances(
+        rpc,
+        x_wsol_pool_address,
+        &pool.token0_mint,
+        &pool.token1_mint,
+    )
+    .await?;
+
+    let price_x_in_wsol = if is_token0_x {
+        // token0 = X, token1 = WSOL
+        price_base_in_quote(
+            token0_balance,
+            token1_balance,
+            pool.mint0_decimals,
+            pool.mint1_decimals,
+        )
+    } else {
+        // token1 = X, token0 = WSOL
+        price_quote_in_base(
+            token0_balance,
+            token1_balance,
+            pool.mint0_decimals,
+            pool.mint1_decimals,
+        )
+    };
+
+    if price_x_in_wsol <= 0.0 {
+        return Err(anyhow!("Computed X/WSOL price on CPMM is invalid (<= 0)"));
+    }
+
+    // 4. 计算 WSOL 的 USD 价格
+    let price_wsol_in_usd = crate::instruction::utils::raydium_clmm::get_wsol_price_in_usd(
+        rpc,
+        wsol_usd_clmm_pool_address,
+    )
+    .await?;
+
+    Ok(price_x_in_wsol * price_wsol_in_usd)
+}

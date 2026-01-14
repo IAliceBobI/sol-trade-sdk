@@ -624,3 +624,282 @@ pub async fn list_pools_by_mint(
 
     Ok(sorted_pools)
 }
+
+/// 获取任意 Token 在 Raydium AMM V4 上的 USD 价格（通过 X-WSOL 池 + Raydium CLMM WSOL-USD 锚定池）
+///
+/// 价格计算路径：Token X -> WSOL -> USD
+/// - 要求：存在一个 X-WSOL 的 AMM V4 池，以及一个 Raydium CLMM 上的 WSOL-USDT/USDC 锚定池
+pub async fn get_token_price_in_usd(
+    rpc: &SolanaRpcClient,
+    token_mint: &Pubkey,
+    wsol_usd_clmm_pool_address: &Pubkey,
+) -> Result<f64, anyhow::Error> {
+    use crate::utils::price::raydium_amm_v4::{price_base_in_quote, price_quote_in_base};
+
+    // 稳定币自身的价格直接认为是 1 USD
+    if *token_mint == USDC_MINT || *token_mint == USDT_MINT {
+        return Ok(1.0);
+    }
+
+    // WSOL/SOL 的价格通过 Raydium CLMM 锚定池获取
+    if *token_mint == SOL_MINT {
+        return crate::instruction::utils::raydium_clmm::get_wsol_price_in_usd(
+            rpc,
+            wsol_usd_clmm_pool_address,
+        )
+        .await;
+    }
+
+    // 1. 在 AMM V4 中找到 Token X 的最优池（优先 X-WSOL/USDC/USDT 对）
+    let (pool_address, amm_best) = get_pool_by_mint(rpc, token_mint).await?;
+
+    // 2. 为了价格实时性，对选中的池地址强制刷新一次 AmmInfo
+    let amm = get_pool_by_address_force(rpc, &pool_address).await.unwrap_or(amm_best);
+
+    // 3. 判断池子配对类型
+    let is_coin_x = amm.coin_mint == *token_mint;
+    let is_pc_x = amm.pc_mint == *token_mint;
+
+    let other_mint = if is_coin_x {
+        amm.pc_mint
+    } else if is_pc_x {
+        amm.coin_mint
+    } else {
+        return Err(anyhow!(
+            "AMM V4 Pool {} does not contain the target mint {}",
+            pool_address,
+            token_mint
+        ));
+    };
+
+    // 支持三种池子类型：
+    // 1. X-WSOL：需要通过 WSOL-USD 锚定池计算
+    // 2. X-USDC/USDT：直接认为稳定币价格 = 1 USD
+    // 3. 其他：暂不支持（需要多跳路由）
+    if other_mint == USDC_MINT || other_mint == USDT_MINT {
+        // X-稳定币池：直接计算 X 相对稳定币的价格
+        let coin_decimals = crate::utils::token::get_token_decimals(rpc, &amm.coin_mint).await?;
+        let pc_decimals = crate::utils::token::get_token_decimals(rpc, &amm.pc_mint).await?;
+
+        // 获取实时余额
+        let coin_balance = rpc.get_token_account_balance(&amm.token_coin).await?.ui_amount.ok_or_else(|| anyhow!("Failed to get coin balance"))? as u64;
+        let pc_balance = rpc.get_token_account_balance(&amm.token_pc).await?.ui_amount.ok_or_else(|| anyhow!("Failed to get pc balance"))? as u64;
+
+        let price_x_in_stable = if is_coin_x {
+            // coin = X, pc = USDC/USDT
+            price_base_in_quote(
+                coin_balance,
+                pc_balance,
+                coin_decimals,
+                pc_decimals,
+            )
+        } else {
+            // pc = X, coin = USDC/USDT
+            price_quote_in_base(
+                coin_balance,
+                pc_balance,
+                coin_decimals,
+                pc_decimals,
+            )
+        };
+
+        if price_x_in_stable <= 0.0 {
+            return Err(anyhow!(
+                "Invalid price from X-Stable AMM V4 pool (<= 0): mint={}, pool={}",
+                token_mint,
+                pool_address
+            ));
+        }
+
+        return Ok(price_x_in_stable); // 稳定币 = 1 USD
+    }
+
+    if other_mint != SOL_MINT {
+        return Err(anyhow!(
+            "Best AMM V4 pool for mint {} is paired with {} (not WSOL/USDC/USDT); multi-hop USD pricing is not supported yet",
+            token_mint,
+            other_mint
+        ));
+    }
+
+    // X-WSOL 池：计算 X 相对 WSOL 的价格
+    let coin_decimals = crate::utils::token::get_token_decimals(rpc, &amm.coin_mint).await?;
+    let pc_decimals = crate::utils::token::get_token_decimals(rpc, &amm.pc_mint).await?;
+
+    // 获取实时余额
+    let coin_balance = rpc.get_token_account_balance(&amm.token_coin).await?.ui_amount.ok_or_else(|| anyhow!("Failed to get coin balance"))? as u64;
+    let pc_balance = rpc.get_token_account_balance(&amm.token_pc).await?.ui_amount.ok_or_else(|| anyhow!("Failed to get pc balance"))? as u64;
+
+    let price_x_in_wsol = if is_coin_x {
+        // coin = X, pc = WSOL
+        price_base_in_quote(
+            coin_balance,
+            pc_balance,
+            coin_decimals,
+            pc_decimals,
+        )
+    } else {
+        // pc = X, coin = WSOL
+        price_quote_in_base(
+            coin_balance,
+            pc_balance,
+            coin_decimals,
+            pc_decimals,
+        )
+    };
+
+    if price_x_in_wsol <= 0.0 {
+        return Err(anyhow!("Computed X/WSOL price on AMM V4 is invalid (<= 0)"));
+    }
+
+    // 4. 计算 WSOL 的 USD 价格
+    let price_wsol_in_usd = crate::instruction::utils::raydium_clmm::get_wsol_price_in_usd(
+        rpc,
+        wsol_usd_clmm_pool_address,
+    )
+    .await?;
+
+    Ok(price_x_in_wsol * price_wsol_in_usd)
+}
+
+/// 获取任意 Token 在 Raydium AMM V4 上的 USD 价格（直接传入 X-WSOL 池地址，跳过池查找）
+///
+/// 与 `get_token_price_in_usd` 的区别：
+/// - 此函数要求调用者已知 X-WSOL 池地址，直接传入，避免 `get_pool_by_mint` 的查找开销
+/// - 适用于高频调用、已缓存池地址的场景
+///
+/// # Arguments
+/// * `rpc` - Solana RPC 客户端
+/// * `token_mint` - Token X 的 mint 地址
+/// * `x_wsol_pool_address` - Token X 与 WSOL 配对的 AMM V4 池地址
+/// * `wsol_usd_clmm_pool_address` - Raydium CLMM 上的 WSOL-USDT/USDC 锚定池地址
+pub async fn get_token_price_in_usd_with_pool(
+    rpc: &SolanaRpcClient,
+    token_mint: &Pubkey,
+    x_wsol_pool_address: &Pubkey,
+    wsol_usd_clmm_pool_address: &Pubkey,
+) -> Result<f64, anyhow::Error> {
+    use crate::utils::price::raydium_amm_v4::{price_base_in_quote, price_quote_in_base};
+
+    // 稳定币自身的价格直接认为是 1 USD
+    if *token_mint == USDC_MINT || *token_mint == USDT_MINT {
+        return Ok(1.0);
+    }
+
+    // WSOL/SOL 的价格通过 Raydium CLMM 锚定池获取
+    if *token_mint == SOL_MINT {
+        return crate::instruction::utils::raydium_clmm::get_wsol_price_in_usd(
+            rpc,
+            wsol_usd_clmm_pool_address,
+        )
+        .await;
+    }
+
+    // 1. 直接强制刷新指定的 X-WSOL 池（跳过查找步骤）
+    let amm = get_pool_by_address_force(rpc, x_wsol_pool_address).await?;
+
+    // 2. 判断池子配对类型
+    let is_coin_x = amm.coin_mint == *token_mint;
+    let is_pc_x = amm.pc_mint == *token_mint;
+
+    let other_mint = if is_coin_x {
+        amm.pc_mint
+    } else if is_pc_x {
+        amm.coin_mint
+    } else {
+        return Err(anyhow!(
+            "Provided AMM V4 pool {} does not contain the target mint {}",
+            x_wsol_pool_address,
+            token_mint
+        ));
+    };
+
+    // 支持三种池子类型：
+    // 1. X-WSOL：需要通过 WSOL-USD 锚定池计算
+    // 2. X-USDC/USDT：直接认为稳定币价格 = 1 USD
+    // 3. 其他：暂不支持（需要多跳路由）
+    if other_mint == USDC_MINT || other_mint == USDT_MINT {
+        // X-稳定币池：直接计算 X 相对稳定币的价格
+        let coin_decimals = crate::utils::token::get_token_decimals(rpc, &amm.coin_mint).await?;
+        let pc_decimals = crate::utils::token::get_token_decimals(rpc, &amm.pc_mint).await?;
+
+        // 获取实时余额
+        let coin_balance = rpc.get_token_account_balance(&amm.token_coin).await?.ui_amount.ok_or_else(|| anyhow!("Failed to get coin balance"))? as u64;
+        let pc_balance = rpc.get_token_account_balance(&amm.token_pc).await?.ui_amount.ok_or_else(|| anyhow!("Failed to get pc balance"))? as u64;
+
+        let price_x_in_stable = if is_coin_x {
+            // coin = X, pc = USDC/USDT
+            price_base_in_quote(
+                coin_balance,
+                pc_balance,
+                coin_decimals,
+                pc_decimals,
+            )
+        } else {
+            // pc = X, coin = USDC/USDT
+            price_quote_in_base(
+                coin_balance,
+                pc_balance,
+                coin_decimals,
+                pc_decimals,
+            )
+        };
+
+        if price_x_in_stable <= 0.0 {
+            return Err(anyhow!(
+                "Invalid price from X-Stable AMM V4 pool (<= 0): mint={}, pool={}",
+                token_mint,
+                x_wsol_pool_address
+            ));
+        }
+
+        return Ok(price_x_in_stable); // 稳定币 = 1 USD
+    }
+
+    if other_mint != SOL_MINT {
+        return Err(anyhow!(
+            "Provided AMM V4 pool {} is paired with {} (not WSOL/USDC/USDT); multi-hop USD pricing is not supported yet",
+            x_wsol_pool_address,
+            other_mint
+        ));
+    }
+
+    // 3. X-WSOL 池：计算 X 相对 WSOL 的价格
+    let coin_decimals = crate::utils::token::get_token_decimals(rpc, &amm.coin_mint).await?;
+    let pc_decimals = crate::utils::token::get_token_decimals(rpc, &amm.pc_mint).await?;
+
+    // 获取实时余额
+    let coin_balance = rpc.get_token_account_balance(&amm.token_coin).await?.ui_amount.ok_or_else(|| anyhow!("Failed to get coin balance"))? as u64;
+    let pc_balance = rpc.get_token_account_balance(&amm.token_pc).await?.ui_amount.ok_or_else(|| anyhow!("Failed to get pc balance"))? as u64;
+
+    let price_x_in_wsol = if is_coin_x {
+        // coin = X, pc = WSOL
+        price_base_in_quote(
+            coin_balance,
+            pc_balance,
+            coin_decimals,
+            pc_decimals,
+        )
+    } else {
+        // pc = X, coin = WSOL
+        price_quote_in_base(
+            coin_balance,
+            pc_balance,
+            coin_decimals,
+            pc_decimals,
+        )
+    };
+
+    if price_x_in_wsol <= 0.0 {
+        return Err(anyhow!("Computed X/WSOL price on AMM V4 is invalid (<= 0)"));
+    }
+
+    // 4. 计算 WSOL 的 USD 价格
+    let price_wsol_in_usd = crate::instruction::utils::raydium_clmm::get_wsol_price_in_usd(
+        rpc,
+        wsol_usd_clmm_pool_address,
+    )
+    .await?;
+
+    Ok(price_x_in_wsol * price_wsol_in_usd)
+}
