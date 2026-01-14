@@ -909,3 +909,117 @@ pub async fn quote_exact_in(
         extra_accounts_read: 1,
     })
 }
+
+/// 获取 WSOL 的 USD 价格（通过指定的 Raydium CLMM WSOL-USD 池，实时读取，不缓存价格）
+///
+/// # Arguments
+/// * `rpc` - Solana RPC 客户端
+/// * `wsol_usd_pool_address` - WSOL-USDT/USDC CLMM 池地址（例如你提供的 USDT-WSOL 池）
+pub async fn get_wsol_price_in_usd(
+    rpc: &SolanaRpcClient,
+    wsol_usd_pool_address: &Pubkey,
+) -> Result<f64, anyhow::Error> {
+    use crate::utils::price::raydium_clmm::{price_token0_in_token1, price_token1_in_token0};
+
+    // 强制刷新：每次调用都重新从链上读取池状态，避免价格缓存
+    let pool_state = get_pool_by_address_force(rpc, wsol_usd_pool_address).await?;
+
+    // 只支持 WSOL <-> USDC/USDT 的稳定币池
+    let is_token0_sol = pool_state.token_mint0 == SOL_MINT;
+    let is_token1_sol = pool_state.token_mint1 == SOL_MINT;
+    let is_token0_stable = pool_state.token_mint0 == USDC_MINT || pool_state.token_mint0 == USDT_MINT;
+    let is_token1_stable = pool_state.token_mint1 == USDC_MINT || pool_state.token_mint1 == USDT_MINT;
+
+    let price_wsol_in_stable = if is_token0_sol && is_token1_stable {
+        // token0 = WSOL, token1 = USDC/USDT
+        price_token0_in_token1(
+            pool_state.sqrt_price_x64,
+            pool_state.mint_decimals0,
+            pool_state.mint_decimals1,
+        )
+    } else if is_token1_sol && is_token0_stable {
+        // token1 = WSOL, token0 = USDC/USDT
+        price_token1_in_token0(
+            pool_state.sqrt_price_x64,
+            pool_state.mint_decimals0,
+            pool_state.mint_decimals1,
+        )
+    } else {
+        return Err(anyhow!(
+            "WSOL-USD anchor pool must be a SOL<->USDC/USDT CLMM pool, got {:?} / {:?}",
+            pool_state.token_mint0, pool_state.token_mint1
+        ));
+    };
+
+    if price_wsol_in_stable <= 0.0 {
+        return Err(anyhow!("Invalid WSOL price from anchor pool (<= 0)"));
+    }
+
+    // 默认认为 USDC / USDT ~= 1 USD
+    Ok(price_wsol_in_stable)
+}
+
+/// 获取任意 Token 在 Raydium CLMM 上的 USD 价格（通过 X-WSOL 池 + WSOL-USD 锚定池）
+///
+/// 价格计算路径：Token X -> WSOL -> USD
+/// - 要求：存在一个 X-WSOL 的 CLMM 池（Hot 对），以及一个 WSOL-USDT/USDC 锚定池
+pub async fn get_token_price_in_usd(
+    rpc: &SolanaRpcClient,
+    token_mint: &Pubkey,
+    wsol_usd_pool_address: &Pubkey,
+) -> Result<f64, anyhow::Error> {
+    use crate::utils::price::raydium_clmm::{price_token0_in_token1, price_token1_in_token0};
+
+    // 稳定币自身的价格直接认为是 1 USD
+    if *token_mint == USDC_MINT || *token_mint == USDT_MINT {
+        return Ok(1.0);
+    }
+
+    // WSOL/SOL 的价格直接来自锚定池
+    if *token_mint == SOL_MINT {
+        return get_wsol_price_in_usd(rpc, wsol_usd_pool_address).await;
+    }
+
+    // 1. 先在 CLMM 中找到 Token X 的最优池（优先 X-WSOL/USDC/USDT 对）
+    let (pool_address, pool_state_best) = get_pool_by_mint_with_options(rpc, token_mint, true).await?;
+
+    // 2. 为了价格实时性，对选中的池地址强制刷新一次 PoolState
+    let pool_state = get_pool_by_address_force(rpc, &pool_address).await.unwrap_or(pool_state_best);
+
+    // 3. 只处理 X-WSOL 对（X 是任意 token，另一侧必须是 SOL_MINT）
+    let is_token0_x = pool_state.token_mint0 == *token_mint && pool_state.token_mint1 == SOL_MINT;
+    let is_token1_x = pool_state.token_mint1 == *token_mint && pool_state.token_mint0 == SOL_MINT;
+
+    if !is_token0_x && !is_token1_x {
+        return Err(anyhow!(
+            "Best CLMM pool for mint {} is not paired with WSOL; USD pricing via WSOL is not supported yet",
+            token_mint
+        ));
+    }
+
+    // 4. 计算 X 相对 WSOL 的价格
+    let price_x_in_wsol = if is_token0_x {
+        // token0 = X, token1 = WSOL
+        price_token0_in_token1(
+            pool_state.sqrt_price_x64,
+            pool_state.mint_decimals0,
+            pool_state.mint_decimals1,
+        )
+    } else {
+        // token1 = X, token0 = WSOL
+        price_token1_in_token0(
+            pool_state.sqrt_price_x64,
+            pool_state.mint_decimals0,
+            pool_state.mint_decimals1,
+        )
+    };
+
+    if price_x_in_wsol <= 0.0 {
+        return Err(anyhow!("Computed X/WSOL price is invalid (<= 0)"));
+    }
+
+    // 5. 计算 WSOL 的 USD 价格
+    let price_wsol_in_usd = get_wsol_price_in_usd(rpc, wsol_usd_pool_address).await?;
+
+    Ok(price_x_in_wsol * price_wsol_in_usd)
+}
