@@ -17,7 +17,8 @@
 use serial_test::serial;
 use sol_trade_sdk::instruction::utils::raydium_clmm::{
     clear_pool_cache, get_pool_by_address, get_pool_by_mint, get_pool_by_mint_force,
-    get_wsol_price_in_usd, list_pools_by_mint,
+    get_token_price_in_usd, get_token_price_in_usd_with_pool, get_wsol_price_in_usd,
+    list_pools_by_mint,
 };
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_sdk::pubkey::Pubkey;
@@ -30,6 +31,9 @@ const WSOL_MINT: &str = "So11111111111111111111111111111111111111112";
 
 /// 已知的 WSOL-USDT CLMM 锚定池（用于 USD 价格测试）
 const WSOL_USDT_CLMM_POOL: &str = "ExcBWu8fGPdJiaF1b1z3iEef38sjQJks8xvj6M85pPY6";
+
+/// 已知的 JUP mint（用于测试任意 token 的 USD 价格）
+const JUP_MINT: &str = "JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN";
 
 /// 测试：基于 WSOL mint 查找 CLMM Pool，并验证缓存与强制刷新
 ///
@@ -219,4 +223,62 @@ async fn test_raydium_clmm_get_wsol_price_in_usd() {
     assert!(price < 1000.0, "WSOL price in USD is unreasonably high");
 
     println!("✅ Raydium CLMM get_wsol_price_in_usd 测试通过");
+}
+
+/// 测试：通过 Raydium CLMM 获取 JUP 的 USD 价格（X-WSOL 池 + WSOL-USD 锚定池，主网）
+#[tokio::test]
+#[ignore]
+#[serial]
+async fn test_raydium_clmm_get_jup_price_in_usd() {
+    println!("=== 测试：Raydium CLMM get_token_price_in_usd (JUP) ===");
+
+    let rpc_url = "https://api.mainnet-beta.solana.com";
+    let rpc = RpcClient::new(rpc_url.to_string());
+
+    let jup_mint = Pubkey::from_str(JUP_MINT).expect("Invalid JUP mint");
+    let anchor_pool = Pubkey::from_str(WSOL_USDT_CLMM_POOL).expect("Invalid WSOL-USDT pool");
+
+    let price = get_token_price_in_usd(&rpc, &jup_mint, &anchor_pool)
+        .await
+        .expect("Failed to get JUP price in USD");
+
+    println!("JUP price in USD: {}", price);
+
+    // 宽松校验：价格应为正数，且在合理区间
+    assert!(price > 0.0, "JUP price in USD should be positive");
+    assert!(price < 100.0, "JUP price in USD is unreasonably high (likely an error)");
+
+    println!("✅ Raydium CLMM get_token_price_in_usd (JUP) 测试通过");
+}
+
+/// 测试：通过 Raydium CLMM 获取 JUP 的 USD 价格（直接传入池地址，跳过查找，主网）
+#[tokio::test]
+#[serial]
+async fn test_raydium_clmm_get_jup_price_in_usd_with_pool() {
+    println!("=== 测试：Raydium CLMM get_token_price_in_usd_with_pool (JUP, 跳过查找) ===");
+
+    let rpc_url = "https://api.mainnet-beta.solana.com";
+    let rpc = RpcClient::new(rpc_url.to_string());
+
+    let jup_mint = Pubkey::from_str(JUP_MINT).expect("Invalid JUP mint");
+    let anchor_pool = Pubkey::from_str(WSOL_USDT_CLMM_POOL).expect("Invalid WSOL-USDT pool");
+
+    // 1. 先用标准接口找到 JUP-WSOL 池地址（模拟：你已经缓存了这个池地址）
+    let (jup_wsol_pool, _) = get_pool_by_mint(&rpc, &jup_mint)
+        .await
+        .expect("Failed to find JUP-WSOL pool");
+    println!("找到的 JUP-WSOL 池地址: {}", jup_wsol_pool);
+
+    // 2. 使用 get_token_price_in_usd_with_pool 直接传入池地址，避免重复查找
+    let price = get_token_price_in_usd_with_pool(&rpc, &jup_mint, &jup_wsol_pool, &anchor_pool)
+        .await
+        .expect("Failed to get JUP price in USD with pool");
+
+    println!("JUP price in USD (with pool): {}", price);
+
+    // 宽松校验：价格应为正数，且在合理区间
+    assert!(price > 0.0, "JUP price in USD should be positive");
+    assert!(price < 100.0, "JUP price in USD is unreasonably high (likely an error)");
+
+    println!("✅ Raydium CLMM get_token_price_in_usd_with_pool (JUP) 测试通过");
 }

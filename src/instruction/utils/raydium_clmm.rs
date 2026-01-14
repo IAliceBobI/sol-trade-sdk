@@ -1023,3 +1023,74 @@ pub async fn get_token_price_in_usd(
 
     Ok(price_x_in_wsol * price_wsol_in_usd)
 }
+
+/// 获取任意 Token 在 Raydium CLMM 上的 USD 价格（直接传入 X-WSOL 池地址，跳过池查找）
+///
+/// 与 `get_token_price_in_usd` 的区别：
+/// - 此函数要求调用者已知 X-WSOL 池地址，直接传入，避免 `get_pool_by_mint` 的查找开销
+/// - 适用于高频调用、已缓存池地址的场景
+///
+/// # Arguments
+/// * `rpc` - Solana RPC 客户端
+/// * `token_mint` - Token X 的 mint 地址
+/// * `x_wsol_pool_address` - Token X 与 WSOL 配对的 CLMM 池地址
+/// * `wsol_usd_pool_address` - WSOL-USDT/USDC 锚定池地址
+pub async fn get_token_price_in_usd_with_pool(
+    rpc: &SolanaRpcClient,
+    token_mint: &Pubkey,
+    x_wsol_pool_address: &Pubkey,
+    wsol_usd_pool_address: &Pubkey,
+) -> Result<f64, anyhow::Error> {
+    use crate::utils::price::raydium_clmm::{price_token0_in_token1, price_token1_in_token0};
+
+    // 稳定币自身的价格直接认为是 1 USD
+    if *token_mint == USDC_MINT || *token_mint == USDT_MINT {
+        return Ok(1.0);
+    }
+
+    // WSOL/SOL 的价格直接来自锚定池
+    if *token_mint == SOL_MINT {
+        return get_wsol_price_in_usd(rpc, wsol_usd_pool_address).await;
+    }
+
+    // 1. 直接强制刷新指定的 X-WSOL 池（跳过查找步骤）
+    let pool_state = get_pool_by_address_force(rpc, x_wsol_pool_address).await?;
+
+    // 2. 验证池是否为 X-WSOL 对
+    let is_token0_x = pool_state.token_mint0 == *token_mint && pool_state.token_mint1 == SOL_MINT;
+    let is_token1_x = pool_state.token_mint1 == *token_mint && pool_state.token_mint0 == SOL_MINT;
+
+    if !is_token0_x && !is_token1_x {
+        return Err(anyhow!(
+            "Provided pool {} is not a valid X-WSOL pair for mint {}",
+            x_wsol_pool_address,
+            token_mint
+        ));
+    }
+
+    // 3. 计算 X 相对 WSOL 的价格
+    let price_x_in_wsol = if is_token0_x {
+        // token0 = X, token1 = WSOL
+        price_token0_in_token1(
+            pool_state.sqrt_price_x64,
+            pool_state.mint_decimals0,
+            pool_state.mint_decimals1,
+        )
+    } else {
+        // token1 = X, token0 = WSOL
+        price_token1_in_token0(
+            pool_state.sqrt_price_x64,
+            pool_state.mint_decimals0,
+            pool_state.mint_decimals1,
+        )
+    };
+
+    if price_x_in_wsol <= 0.0 {
+        return Err(anyhow!("Computed X/WSOL price is invalid (<= 0)"));
+    }
+
+    // 4. 计算 WSOL 的 USD 价格
+    let price_wsol_in_usd = get_wsol_price_in_usd(rpc, wsol_usd_pool_address).await?;
+
+    Ok(price_x_in_wsol * price_wsol_in_usd)
+}
