@@ -735,6 +735,31 @@ pub async fn get_token_price_in_usd(
     Ok(price_x_in_wsol * price_wsol_in_usd)
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// 测试：USDC/USDT 价格分支（不依赖真实 RPC，只要函数能返回 1.0 即可）
+    #[tokio::test]
+    async fn test_get_token_price_in_usd_stable_tokens() {
+        use solana_client::nonblocking::rpc_client::RpcClient;
+        use crate::constants::{USDC_MINT, USDT_MINT};
+
+        let rpc = RpcClient::new("http://127.0.0.1:8899".to_string());
+        let dummy_anchor_pool = Pubkey::new_unique();
+
+        let usdc_price = get_token_price_in_usd(&rpc, &USDC_MINT, &dummy_anchor_pool)
+            .await
+            .unwrap();
+        let usdt_price = get_token_price_in_usd(&rpc, &USDT_MINT, &dummy_anchor_pool)
+            .await
+            .unwrap();
+
+        assert_eq!(usdc_price, 1.0);
+        assert_eq!(usdt_price, 1.0);
+    }
+}
+
 #[inline]
 pub fn get_fee_config_pda() -> Option<Pubkey> {
     let seeds: &[&[u8]; 2] = &[seeds::FEE_CONFIG_SEED, accounts::AMM_PROGRAM.as_ref()];

@@ -6,6 +6,8 @@
 //! - get_pool_by_address_force(rpc, pool_address) - 强制刷新缓存后获取
 //! - get_pool_by_mint_force(rpc, mint) - 强制刷新缓存后通过 mint 获取
 //! - list_pools_by_mint(rpc, mint) - 列出所有包含该 mint 的 pool
+//! - get_wsol_price_in_usd(rpc, wsol_usd_pool) - 通过锚定池获取 WSOL 的 USD 价格（实时，不缓存）
+//! - get_token_price_in_usd(rpc, token_mint, wsol_usd_pool) - 通过 X-WSOL 池 + 锚定池获取任意 Token 的 USD 价格
 //!
 //! 运行测试:
 //!     cargo test --test raydium_clmm_pool_tests -- --nocapture
@@ -15,7 +17,7 @@
 use serial_test::serial;
 use sol_trade_sdk::instruction::utils::raydium_clmm::{
     clear_pool_cache, get_pool_by_address, get_pool_by_mint, get_pool_by_mint_force,
-    list_pools_by_mint,
+    get_wsol_price_in_usd, list_pools_by_mint,
 };
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_sdk::pubkey::Pubkey;
@@ -25,6 +27,9 @@ mod test_helpers;
 
 /// 已知的 SOL Token Mint (WSOL)
 const WSOL_MINT: &str = "So11111111111111111111111111111111111111112";
+
+/// 已知的 WSOL-USDT CLMM 锚定池（用于 USD 价格测试）
+const WSOL_USDT_CLMM_POOL: &str = "ExcBWu8fGPdJiaF1b1z3iEef38sjQJks8xvj6M85pPY6";
 
 /// 测试：基于 WSOL mint 查找 CLMM Pool，并验证缓存与强制刷新
 ///
@@ -190,4 +195,28 @@ async fn test_raydium_clmm_get_pool_by_address() {
     println!("✅ 缓存验证通过（数据一致）");
 
     println!("\n=== Raydium CLMM get_pool_by_address 测试通过 ===");
+}
+
+/// 测试：通过 WSOL-USDT 锚定池获取 WSOL 的 USD 价格（实时、主网）
+#[tokio::test]
+#[serial]
+async fn test_raydium_clmm_get_wsol_price_in_usd() {
+    println!("=== 测试：Raydium CLMM get_wsol_price_in_usd (WSOL-USDT anchor) ===");
+
+    let rpc_url = "https://api.mainnet-beta.solana.com";
+    let rpc = RpcClient::new(rpc_url.to_string());
+
+    let anchor_pool = Pubkey::from_str(WSOL_USDT_CLMM_POOL).expect("Invalid WSOL-USDT pool");
+
+    let price = get_wsol_price_in_usd(&rpc, &anchor_pool)
+        .await
+        .expect("Failed to get WSOL price in USD");
+
+    println!("WSOL price in USD: {}", price);
+
+    // 只做宽松校验：价格应为正数，且在合理区间（防止明显异常）
+    assert!(price > 0.0, "WSOL price in USD should be positive");
+    assert!(price < 1000.0, "WSOL price in USD is unreasonably high");
+
+    println!("✅ Raydium CLMM get_wsol_price_in_usd 测试通过");
 }
