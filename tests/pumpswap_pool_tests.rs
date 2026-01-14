@@ -25,9 +25,6 @@ const PUMP_MINT: &str = "pumpCmXqMfrsAkQ5r49WcJnRayYRqmXz6ae8H7H9Dfn";
 /// 已知的 PumpSwap pool 地址
 const PUMP_POOL_ADDRESS: &str = "539m4mVWt6iduB6W8rDGPMarzNCMesuqY5eUTiiYHAgR";
 
-/// Raydium CLMM WSOL-USDT 锚定池（用于 USD 价格计算）
-const WSOL_USDT_CLMM_POOL: &str = "ExcBWu8fGPdJiaF1b1z3iEef38sjQJks8xvj6M85pPY6";
-
 /// 测试：通过 mint 查找 pool 地址
 #[tokio::test]
 #[serial_test::serial]
@@ -112,16 +109,15 @@ async fn test_get_pumpswap_token_price_in_usd() {
 
     let token_mint = Pubkey::from_str(PUMP_MINT).unwrap();
     let pool_address = Pubkey::from_str(PUMP_POOL_ADDRESS).unwrap();
-    let wsol_usdt_pool = Pubkey::from_str(WSOL_USDT_CLMM_POOL).unwrap();
     let rpc_url = "https://api.mainnet-beta.solana.com";
     let rpc = RpcClient::new(rpc_url.to_string());
 
     println!("Token Mint: {}", token_mint);
     println!("Pool 地址: {}", pool_address);
-    println!("WSOL-USDT 锚定池: {}", wsol_usdt_pool);
+    println!("WSOL-USDT 锚定池: 使用默认锚定池");
 
     // 调用价格计算函数
-    let result = get_token_price_in_usd_with_pool(&rpc, &token_mint, &pool_address, &wsol_usdt_pool).await;
+    let result = get_token_price_in_usd_with_pool(&rpc, &token_mint, &pool_address, None).await;
 
     // 验证结果
     assert!(result.is_ok(), "Failed to get token price in USD: {:?}", result.err());

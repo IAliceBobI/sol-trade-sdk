@@ -32,6 +32,7 @@ use sol_trade_sdk::instruction::utils::raydium_amm_v4::{
     get_pool_by_mint_force,
     list_pools_by_mint,
     clear_pool_cache,
+    get_token_price_in_usd_with_pool,
 };
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_sdk::pubkey::Pubkey;
@@ -46,6 +47,12 @@ use serial_test::serial;
 /// - Token0: WSOL (So11111111111111111111111111111111111111112)
 /// - Token1: USDC (EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v)
 const SOL_USDC_AMM: &str = "58oQChx4yWmvKdwLLZzBi4ChoCc2fqCUWBkwMihLYQo2";
+
+/// OIIAOIIA Token AMM V4 Pool
+const OIIAOIIA_POOL: &str = "HZ6rzhC96cTVx3HQiKoDbSdoRd3LH5nELYuYXGu4f3EE";
+
+/// OIIAOIIA Token Mint
+const OIIAOIIA_MINT: &str = "VaxZxmFXV8tmsd72hUn22ex6GFzZ5uq9DVJ5wA5pump";
 
 /// 测试：获取 AMM 信息并验证字段
 #[tokio::test]
@@ -481,4 +488,33 @@ async fn test_list_active_pools_by_mint_wsol() {
         );
         assert_eq!(amm.status, 6, "Pool {} 不是活跃状态", addr); // 6 = ACTIVE
     }
+}
+
+/// 测试：获取 AMM V4 token 的 USD 价格
+#[tokio::test]
+async fn test_get_amm_v4_token_price_in_usd() {
+    println!("=== 测试：获取 AMM V4 token 的 USD 价格 ===");
+
+    let token_mint = Pubkey::from_str(OIIAOIIA_MINT).unwrap();
+    let pool_address = Pubkey::from_str(OIIAOIIA_POOL).unwrap();
+    let rpc_url = "https://api.mainnet-beta.solana.com";
+    let rpc = RpcClient::new(rpc_url.to_string());
+
+    println!("Token Mint: {}", token_mint);
+    println!("Pool 地址: {}", pool_address);
+
+    // 调用价格计算函数
+    println!("WSOL-USDT 锚定池: 使用默认锚定池");
+    let result = get_token_price_in_usd_with_pool(&rpc, &token_mint, &pool_address, None).await;
+
+    // 验证结果
+    assert!(result.is_ok(), "Failed to get token price in USD: {:?}", result.err());
+
+    let price_usd = result.unwrap();
+    println!("✅ Token USD 价格: ${:.8}", price_usd);
+
+    // 验证价格在合理范围内（应该大于 0 且小于 1000 USD）
+    assert!(price_usd > 0.0, "Price should be positive");
+    assert!(price_usd < 1000.0, "Price should be reasonable (< $1000)");
+    println!("✅ 价格范围验证通过");
 }

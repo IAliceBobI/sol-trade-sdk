@@ -7,9 +7,13 @@ use crate::{
 };
 use anyhow::anyhow;
 use solana_account_decoder::{UiAccountEncoding, UiAccountData};
-use solana_sdk::pubkey::Pubkey;
+use solana_sdk::{pubkey, pubkey::Pubkey};
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD;
+
+/// Raydium CLMM WSOL-USDT 锚定池（用于 USD 价格计算）
+/// 如果不传入锚定池参数，默认使用此池
+pub const DEFAULT_WSOL_USDT_CLMM_POOL: Pubkey = pubkey!("ExcBWu8fGPdJiaF1b1z3iEef38sjQJks8xvj6M85pPY6");
 
 /// Constants used as seeds for deriving PDAs (Program Derived Addresses)
 pub mod seeds {
@@ -669,8 +673,9 @@ pub async fn quote_exact_in(
 pub async fn get_token_price_in_usd(
     rpc: &SolanaRpcClient,
     token_mint: &Pubkey,
-    wsol_usd_clmm_pool_address: &Pubkey,
+    wsol_usd_clmm_pool_address: Option<&Pubkey>,
 ) -> Result<f64, anyhow::Error> {
+    let wsol_usd_pool = wsol_usd_clmm_pool_address.unwrap_or(&DEFAULT_WSOL_USDT_CLMM_POOL);
     use crate::constants::{SOL_MINT, USDC_MINT, USDT_MINT, WSOL_TOKEN_ACCOUNT};
     use crate::utils::price::pumpswap::{price_base_in_quote, price_quote_in_base};
 
@@ -683,7 +688,7 @@ pub async fn get_token_price_in_usd(
     if *token_mint == SOL_MINT || *token_mint == WSOL_TOKEN_ACCOUNT {
         return crate::instruction::utils::raydium_clmm::get_wsol_price_in_usd(
             rpc,
-            wsol_usd_clmm_pool_address,
+            wsol_usd_pool,
         )
         .await;
     }
@@ -728,7 +733,7 @@ pub async fn get_token_price_in_usd(
     // 7. 获取 WSOL 的 USD 价格（通过 Raydium CLMM 锚定池）
     let price_wsol_in_usd = crate::instruction::utils::raydium_clmm::get_wsol_price_in_usd(
         rpc,
-        wsol_usd_clmm_pool_address,
+        wsol_usd_pool,
     )
     .await?;
 
@@ -750,8 +755,9 @@ pub async fn get_token_price_in_usd_with_pool(
     rpc: &SolanaRpcClient,
     token_mint: &Pubkey,
     x_wsol_pool_address: &Pubkey,
-    wsol_usd_clmm_pool_address: &Pubkey,
+    wsol_usd_clmm_pool_address: Option<&Pubkey>,
 ) -> Result<f64, anyhow::Error> {
+    let wsol_usd_pool = wsol_usd_clmm_pool_address.unwrap_or(&DEFAULT_WSOL_USDT_CLMM_POOL);
     use crate::constants::{SOL_MINT, USDC_MINT, USDT_MINT, WSOL_TOKEN_ACCOUNT};
     use crate::utils::price::pumpswap::{price_base_in_quote, price_quote_in_base};
 
@@ -764,7 +770,7 @@ pub async fn get_token_price_in_usd_with_pool(
     if *token_mint == SOL_MINT || *token_mint == WSOL_TOKEN_ACCOUNT {
         return crate::instruction::utils::raydium_clmm::get_wsol_price_in_usd(
             rpc,
-            wsol_usd_clmm_pool_address,
+            wsol_usd_pool,
         )
         .await;
     }
@@ -806,7 +812,7 @@ pub async fn get_token_price_in_usd_with_pool(
     // 6. 获取 WSOL 的 USD 价格（通过 Raydium CLMM 锚定池）
     let price_wsol_in_usd = crate::instruction::utils::raydium_clmm::get_wsol_price_in_usd(
         rpc,
-        wsol_usd_clmm_pool_address,
+        wsol_usd_pool,
     )
     .await?;
 
@@ -826,10 +832,10 @@ mod tests {
         let rpc = RpcClient::new("http://127.0.0.1:8899".to_string());
         let dummy_anchor_pool = Pubkey::new_unique();
 
-        let usdc_price = get_token_price_in_usd(&rpc, &USDC_MINT, &dummy_anchor_pool)
+        let usdc_price = get_token_price_in_usd(&rpc, &USDC_MINT, Some(&dummy_anchor_pool))
             .await
             .unwrap();
-        let usdt_price = get_token_price_in_usd(&rpc, &USDT_MINT, &dummy_anchor_pool)
+        let usdt_price = get_token_price_in_usd(&rpc, &USDT_MINT, Some(&dummy_anchor_pool))
             .await
             .unwrap();
 
