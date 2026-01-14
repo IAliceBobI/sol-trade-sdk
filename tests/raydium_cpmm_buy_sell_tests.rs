@@ -18,6 +18,7 @@ use sol_trade_sdk::{
     common::GasFeeStrategy,
     instruction::utils::raydium_cpmm::{
         clear_pool_cache, get_pool_by_address, get_pool_by_mint, get_pool_by_mint_force, list_pools_by_mint,
+        get_token_price_in_usd_with_pool,
     },
     trading::core::params::{DexParamEnum, RaydiumCpmmParams},
     DexType, TradeBuyParams, TradeSellParams, TradeTokenType,
@@ -31,6 +32,12 @@ use test_helpers::{create_test_client, print_balances, print_token_balance};
 
 /// 已知的 WSOL mint
 const WSOL_MINT: &str = "So11111111111111111111111111111111111111112";
+
+/// PIPE Token Mint
+const PIPE_MINT: &str = "8ycz3kctoRb4LFrtoYG2r8tRyUYUeGf5Q16M2TEMp7A";
+
+/// PIPE Token CPMM Pool
+const PIPE_POOL: &str = "BnYsRpYvJpz6biY3hV6U9smChVePCJ6YyupVDfcnXpTp";
 
 /// 测试：Raydium CPMM 完整买入-卖出流程
 ///
@@ -275,4 +282,33 @@ async fn test_raydium_cpmm_list_pools_by_mint_wsol() {
             addr,
         );
     }
+}
+
+/// 测试：获取 CPMM token 的 USD 价格
+#[tokio::test]
+async fn test_get_cpmm_token_price_in_usd() {
+    println!("=== 测试：获取 CPMM token 的 USD 价格 ===");
+
+    let token_mint = Pubkey::from_str(PIPE_MINT).unwrap();
+    let pool_address = Pubkey::from_str(PIPE_POOL).unwrap();
+    let rpc_url = "https://api.mainnet-beta.solana.com";
+    let rpc = RpcClient::new(rpc_url.to_string());
+
+    println!("Token Mint: {}", token_mint);
+    println!("Pool 地址: {}", pool_address);
+    println!("WSOL-USDT 锚定池: 使用默认锚定池");
+
+    // 调用价格计算函数
+    let result = get_token_price_in_usd_with_pool(&rpc, &token_mint, &pool_address, None).await;
+
+    // 验证结果
+    assert!(result.is_ok(), "Failed to get token price in USD: {:?}", result.err());
+
+    let price_usd = result.unwrap();
+    println!("✅ Token USD 价格: ${:.8}", price_usd);
+
+    // 验证价格合理性
+    assert!(price_usd > 0.0, "Price should be positive");
+    assert!(price_usd < 1000.0, "Price should be reasonable (< $1000)");
+    println!("✅ 价格范围验证通过");
 }
