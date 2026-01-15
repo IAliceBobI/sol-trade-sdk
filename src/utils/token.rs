@@ -4,18 +4,14 @@
 
 use crate::constants::{SOL_MINT, USDC_MINT, USDT_MINT, RAY_MINT};
 use anyhow::Result;
-use clru::CLruCache;
 use dashmap::DashMap;
 use once_cell::sync::Lazy;
 use solana_sdk::pubkey::Pubkey;
 use spl_token::solana_program::program_pack::Pack;
 use spl_token::state::Mint;
-use std::num::NonZeroUsize;
-use std::sync::Mutex;
 
 // Increased cache sizes for better performance
 const MAX_TOKEN_METADATA_CACHE_SIZE: usize = 100_000;
-const MAX_ATA_CACHE_SIZE: usize = 100_000;
 
 /// Mint 账户信息（包含所有元数据）
 #[derive(Clone, Debug)]
@@ -35,18 +31,6 @@ static MINT_INFO_CACHE: Lazy<DashMap<Pubkey, MintInfo>> =
 /// 获取缓存的 MintInfo，不存在则返回 None
 pub fn get_cached_mint_info(mint: &Pubkey) -> Option<MintInfo> {
     MINT_INFO_CACHE.get(mint).map(|info| info.clone())
-}
-
-/// ATA 缓存键：(owner, mint)
-type AtaCacheKey = (Pubkey, Pubkey);
-
-/// 全局 ATA 地址缓存（使用 CLruCache + Mutex 实现线程安全的 LRU 淘汰）
-static ATA_CACHE: Lazy<Mutex<CLruCache<AtaCacheKey, Pubkey>>> =
-    Lazy::new(|| Mutex::new(CLruCache::new(NonZeroUsize::new(MAX_ATA_CACHE_SIZE).unwrap())));
-
-/// 获取缓存的 ATA 地址
-pub fn get_cached_ata(owner: &Pubkey, mint: &Pubkey) -> Option<Pubkey> {
-    ATA_CACHE.lock().unwrap().get(&(owner.clone(), mint.clone())).copied()
 }
 
 /// 获取 Mint 账户的完整信息（统一实现，支持 Token 和 Token2022）
@@ -147,41 +131,35 @@ pub async fn get_token_symbol(
 
 /// 计算 ATA 地址（自动识别 Token Program）
 ///
-/// 使用全局缓存减少重复计算，支持 MintInfo 缓存和 ATA 地址缓存
+/// 使用 fast_fn 的全局缓存（DashMap lock-free）减少重复计算，支持 MintInfo 缓存和 ATA 地址缓存
 pub async fn calculate_ata(
     rpc: &crate::common::SolanaRpcClient,
     owner: &Pubkey,
     mint: &Pubkey,
 ) -> Result<Pubkey> {
-    // Fast path: 检查 ATA 缓存
-    if let Some(ata) = get_cached_ata(owner, mint) {
-        return Ok(ata);
-    }
-
+    // 确定正确的 token_program
     let token_program = if let Some(info) = get_cached_mint_info(mint) {
         if info.is_token2022 {
-            spl_token_2022::ID
+            &crate::constants::TOKEN_PROGRAM_2022
         } else {
-            spl_token::ID
+            &crate::constants::TOKEN_PROGRAM
         }
     } else {
         // 缓存未命中，获取 MintInfo
         let info = get_mint_info(rpc, mint).await?;
         if info.is_token2022 {
-            spl_token_2022::ID
+            &crate::constants::TOKEN_PROGRAM_2022
         } else {
-            spl_token::ID
+            &crate::constants::TOKEN_PROGRAM
         }
     };
 
-    let ata = spl_associated_token_account::get_associated_token_address_with_program_id(
+    // 使用 fast_fn 计算 ATA（自动缓存，lock-free DashMap）
+    let ata = crate::common::fast_fn::get_associated_token_address_with_program_id_fast(
         owner,
         mint,
-        &token_program,
+        token_program,
     );
-
-    // 写入 ATA 缓存
-    ATA_CACHE.lock().unwrap().put((owner.clone(), mint.clone()), ata);
 
     Ok(ata)
 }
