@@ -3,6 +3,7 @@
 //! 主解析器，负责根据协议类型分发到对应的子解析器
 
 use std::sync::Arc;
+use std::collections::HashMap;
 use solana_rpc_client::rpc_client::RpcClient;
 use solana_rpc_client_api::config::RpcTransactionConfig;
 use solana_rpc_client_api::response::RpcConfirmedTransactionWithStatus;
@@ -16,11 +17,9 @@ use super::{
     transaction_adapter::TransactionAdapter,
     base_parser::{DexParserTrait, ParseError},
     types::{ParseResult, ParserConfig, DexProtocol},
+    pumpswap::PumpswapParser,
+    raydium::{RaydiumV4Parser, RaydiumClmmParser, RaydiumCpmmParser},
 };
-
-// TODO: 导入协议解析器（待实现）
-// use super::pumpswap::PumpswapParser;
-// use super::raydium::{RaydiumV4Parser, RaydiumClmmParser, RaydiumCpmmParser};
 
 /// DEX 解析器
 ///
@@ -29,7 +28,7 @@ use super::{
 pub struct DexParser {
     config: ParserConfig,
     rpc_client: Arc<RpcClient>,
-    // TODO: 添加解析器实例
+    parsers: HashMap<String, Arc<dyn DexParserTrait>>,
 }
 
 impl DexParser {
@@ -37,9 +36,31 @@ impl DexParser {
     pub fn new(config: ParserConfig) -> Self {
         let rpc_client = Arc::new(RpcClient::new(config.rpc_url.clone()));
 
+        let mut parsers: HashMap<String, Arc<dyn DexParserTrait>> = HashMap::new();
+
+        // 注册协议解析器
+        parsers.insert(
+            DexProtocol::PumpSwap.program_id().to_string(),
+            Arc::new(PumpswapParser) as Arc<dyn DexParserTrait>
+        );
+        parsers.insert(
+            DexProtocol::RaydiumV4.program_id().to_string(),
+            Arc::new(RaydiumV4Parser) as Arc<dyn DexParserTrait>
+        );
+        // CLMM 和 CPMM 解析器待实现
+        // parsers.insert(
+        //     DexProtocol::RaydiumClmm.program_id().to_string(),
+        //     Arc::new(RaydiumClmmParser) as Arc<dyn DexParserTrait>
+        // );
+        // parsers.insert(
+        //     DexProtocol::RaydiumCpmm.program_id().to_string(),
+        //     Arc::new(RaydiumCpmmParser) as Arc<dyn DexParserTrait>
+        // );
+
         Self {
             config,
             rpc_client,
+            parsers,
         }
     }
 
@@ -81,11 +102,17 @@ impl DexParser {
         };
 
         // 3. 识别协议并分发到对应的解析器
-        // TODO: 实现协议识别和解析
-        ParseResult {
-            success: false,
-            trades: vec![],
-            error: Some("解析器未实现".to_string()),
+        match self.parse_with_correct_parser(&adapter).await {
+            Ok(trades) => ParseResult {
+                success: !trades.is_empty(),
+                trades,
+                error: None,
+            },
+            Err(e) => ParseResult {
+                success: false,
+                trades: vec![],
+                error: Some(format!("解析失败: {}", e)),
+            },
         }
     }
 
@@ -97,7 +124,6 @@ impl DexParser {
         (RpcConfirmedTransactionWithStatus, u64, Option<i64>),
         Box<dyn std::error::Error + Send + Sync>,
     > {
-        // 使用 tokio 运行阻塞的 RPC 调用
         let rpc_client = self.rpc_client.clone();
         let signature = signature.to_string();
 
@@ -121,6 +147,26 @@ impl DexParser {
         .map_err(|e| format!("任务执行失败: {}", e))??;
 
         Ok((tx, slot, block_time))
+    }
+
+    /// 识别协议并分发到对应的解析器
+    async fn parse_with_correct_parser(
+        &self,
+        adapter: &TransactionAdapter,
+    ) -> Result<Vec<super::types::ParsedTradeInfo>, ParseError> {
+        // 尝试每个已注册的解析器
+        for (program_id, parser) in &self.parsers {
+            if parser.can_parse(adapter) {
+                if self.config.verbose {
+                    println!("识别到程序 {}，开始解析...", program_id);
+                }
+                return parser.parse(adapter).await;
+            }
+        }
+
+        Err(ParseError::UnsupportedProtocol(
+            "无法识别交易中的 DEX 协议".to_string(),
+        ))
     }
 }
 

@@ -170,8 +170,15 @@ impl TransactionAdapter {
     }
 
     /// 简化版本的指令解析
+    ///
+    /// TODO: 完整实现需要解析 EncodedConfirmedTransactionWithStatus 的 message
+    /// 当前返回空列表，等主解析器集成时再完善
     fn parse_instructions_simple() -> Result<(Vec<InstructionInfo>, Vec<InnerInstructionInfo>), AdapterError> {
-        // TODO: 完整实现需要解析交易消息
+        // 暂时返回空列表
+        // 完整实现需要：
+        // 1. 从 tx.transaction.message 中提取账户列表
+        // 2. 解析 message.instructions 中的指令
+        // 3. 解析 meta.innerInstructions 中的内部指令
         Ok((vec![], vec![]))
     }
 
