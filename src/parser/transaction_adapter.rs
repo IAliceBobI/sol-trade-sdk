@@ -115,23 +115,23 @@ impl TransactionAdapter {
         HashMap<Pubkey, Pubkey>,
         HashMap<Pubkey, u8>,
     ) {
-        let mut token_balance_changes = HashMap::new();
-        let mut spl_token_map = HashMap::new();
-        let mut spl_decimals_map = HashMap::new();
+        let mut token_balance_changes: HashMap<Pubkey, (Option<UiTokenAmount>, Option<UiTokenAmount>) = HashMap::new();
+        let mut spl_token_map: HashMap<Pubkey, Pubkey> = HashMap::new();
+        let mut spl_decimals_map: HashMap<Pubkey, u8> = HashMap::new();
 
         if let Some(meta) = meta {
             // 解析转账前余额
             if let Some(pre_balances) = &meta.pre_token_balances {
                 for balance in pre_balances.iter() {
                     if let Some(account_key) = &balance.account_address {
-                        if let Ok(pubkey) = account_key.parse() {
+                        if let Ok(pubkey) = account_key.parse::<Pubkey>() {
                             token_balance_changes
                                 .entry(pubkey)
                                 .or_insert_with(|| (Some(balance.ui_token_amount.clone()), None));
 
                             // 保存 Mint 信息
                             if let Some(mint) = &balance.mint {
-                                if let Ok(mint_pubkey) = mint.parse() {
+                                if let Ok(mint_pubkey) = mint.parse::<Pubkey>() {
                                     spl_token_map.insert(pubkey, mint_pubkey);
                                 }
                             }
@@ -141,13 +141,13 @@ impl TransactionAdapter {
             }
 
             // 解析转账后余额
-            if let Some(post_balances) = &meta.post_token_balances {
+            if let solana_transaction_status::option_serializer::OptionSerializer::Some(post_balances) = &meta.post_token_balances {
                 for balance in post_balances.iter() {
                     if let Some(account_key) = &balance.account_address {
-                        if let Ok(pubkey) = account_key.parse() {
+                        if let Ok(pubkey) = account_key.parse::<Pubkey>() {
                             token_balance_changes
                                 .entry(pubkey)
-                                .and_modify(|(pre, post)| {
+                                .and_modify(|(pre, post): (Option<UiTokenAmount>, Option<UiTokenAmount>)| {
                                     if post.is_none() {
                                         *post = Some(balance.ui_token_amount.clone());
                                     }
@@ -155,7 +155,7 @@ impl TransactionAdapter {
 
                             // 保存 Mint 和精度信息
                             if let Some(mint) = &balance.mint {
-                                if let Ok(mint_pubkey) = mint.parse() {
+                                if let Ok(mint_pubkey) = mint.parse::<Pubkey>() {
                                     spl_token_map.insert(pubkey, mint_pubkey);
                                     spl_decimals_map.insert(mint_pubkey, balance.ui_token_amount.decimals);
                                 }

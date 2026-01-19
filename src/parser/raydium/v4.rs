@@ -71,7 +71,7 @@ impl RaydiumV4Parser {
     }
 
     /// 从 Transfer 记录中提取唯一的代币
-    fn extract_unique_tokens(&self, transfers: &[TransferRecord]) -> Vec<&TransferRecord> {
+    fn extract_unique_tokens<'a>(&self, transfers: &'a [TransferRecord]) -> Vec<&'a TransferRecord> {
         let mut seen = std::collections::HashSet::new();
         let mut unique = Vec::new();
 
@@ -85,11 +85,11 @@ impl RaydiumV4Parser {
     }
 
     /// 判断交易类型（买入/卖出）
-    fn determine_trade_type(
+    fn determine_trade_type<'a>(
         &self,
         user: Pubkey,
-        transfers: &[TransferRecord],
-    ) -> Result<(TradeType, &TransferRecord, &TransferRecord), ParseError> {
+        transfers: &'a [TransferRecord],
+    ) -> Result<(TradeType, &'a TransferRecord, &'a TransferRecord), ParseError> {
         // SOL 的 mint 地址
         let sol_mint = "So11111111111111111111111111111111111111112"
             .parse::<Pubkey>()
