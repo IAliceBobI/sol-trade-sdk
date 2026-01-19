@@ -15,7 +15,10 @@ fn test_dex_parser_has_clmm_registered() {
     let clmm_program_id = DexProtocol::RaydiumClmm.program_id();
     assert_eq!(clmm_program_id, "CAMMCzo5YL8w4VFF8KVHrK22GGUsp5VTaW7grrKgrWqK");
 
-    // 注意：当前无法直接访问 parsers HashMap（私有字段）
-    // 这个测试验证 Program ID 常量的正确性
-    // 实际的路由测试需要通过 parse_transaction() 进行
+    // 验证 parsers HashMap 中已注册 CLMM Parser
+    assert!(parser.parsers.contains_key(clmm_program_id));
+
+    // 验证 parsers 中至少包含 PumpSwap 和 CLMM
+    assert!(parser.parsers.len() >= 2);
+    assert!(parser.parsers.contains_key(DexProtocol::PumpSwap.program_id()));
 }

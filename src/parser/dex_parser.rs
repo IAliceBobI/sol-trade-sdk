@@ -26,11 +26,13 @@ use super::{
 ///
 /// 主入口，负责获取交易并分发到对应的协议解析器
 #[derive(Clone)]
-#[allow(dead_code)]  // config 字段还未使用
 pub struct DexParser {
-    config: ParserConfig,
+    /// 解析器配置
+    pub config: ParserConfig,
+    /// RPC 客户端
     rpc_client: Arc<RpcClient>,
-    parsers: HashMap<String, Arc<dyn DexParserTrait>>,
+    /// 已注册的协议解析器（key: program_id）
+    pub parsers: HashMap<String, Arc<dyn DexParserTrait>>,
 }
 
 impl DexParser {

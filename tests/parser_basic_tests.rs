@@ -8,10 +8,16 @@ fn test_dex_parser_default_creation() {
     // Step 1: 写测试 - 使用默认配置创建解析器
     let parser = DexParser::default();
 
-    // Step 2: 验证解析器创建成功
-    // 注意：无法直接访问私有字段 config，但可以通过 parse_transaction 方法验证功能
-    // 当前测试只验证解析器能够成功创建
-    assert!(true);  // 如果能到达这里说明创建成功
+    // Step 2: 验证默认配置正确
+    assert!(!parser.config.verbose, "默认 verbose 应该是 false");
+    assert_eq!(
+        parser.config.rpc_url,
+        "http://127.0.0.1:8899",
+        "默认 RPC URL 应该是本地测试节点"
+    );
+
+    // Step 3: 验证解析器已正确初始化
+    assert!(!parser.parsers.is_empty(), "应该注册了至少一个解析器");
 }
 
 #[test]
@@ -24,10 +30,16 @@ fn test_dex_parser_custom_config() {
 
     let parser = DexParser::new(config);
 
-    // Step 2: 验证配置正确应用
-    // 注意：无法直接访问私有字段 config，但可以通过 parse_transaction 方法验证功能
-    // 当前测试只验证解析器能够成功创建
-    assert!(true);  // 如果能到达这里说明创建成功
+    // Step 2: 验证自定义配置正确应用
+    assert!(parser.config.verbose, "verbose 应该是 true");
+    assert_eq!(
+        parser.config.rpc_url,
+        "http://custom.endpoint:8899",
+        "RPC URL 应该使用自定义值"
+    );
+
+    // Step 3: 验证解析器仍然正确初始化
+    assert!(!parser.parsers.is_empty(), "应该注册了至少一个解析器");
 }
 
 #[tokio::test]

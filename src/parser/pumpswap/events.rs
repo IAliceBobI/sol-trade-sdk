@@ -214,7 +214,7 @@ mod tests {
     #[test]
     fn test_parse_buy_event_discriminator_only() {
         // 只有 discriminator，没有事件数据
-        let mut data = pumpswap::BUY_EVENT.to_vec();
+        let data = pumpswap::BUY_EVENT.to_vec();
         let result = parse_pumpswap_event(&data);
         // 应该能识别 discriminator，但解析事件数据会失败
         assert!(result.is_none());
