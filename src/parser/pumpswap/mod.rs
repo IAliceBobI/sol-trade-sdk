@@ -5,7 +5,6 @@
 pub mod events;
 
 use async_trait::async_trait;
-use solana_sdk::pubkey::Pubkey;
 
 use crate::parser::{
     transaction_adapter::TransactionAdapter,

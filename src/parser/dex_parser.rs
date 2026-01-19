@@ -25,6 +25,7 @@ use super::{
 ///
 /// 主入口，负责获取交易并分发到对应的协议解析器
 #[derive(Clone)]
+#[allow(dead_code)]  // config 和 parsers 将在后续实现中使用
 pub struct DexParser {
     config: ParserConfig,
     rpc_client: Arc<RpcClient>,
@@ -119,6 +120,7 @@ impl DexParser {
     }
 
     /// 识别协议并分发到对应的解析器
+    #[allow(dead_code)]  // 将在后续实现中使用
     async fn parse_with_correct_parser(
         &self,
         adapter: &TransactionAdapter,

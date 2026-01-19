@@ -4,7 +4,6 @@
 
 use solana_sdk::pubkey::Pubkey;
 use crate::parser::{
-    transaction_adapter::TransactionAdapter,
     utils::BinaryReader,
     constants::discriminators::pumpswap,
 };

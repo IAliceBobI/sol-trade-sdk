@@ -4,7 +4,6 @@ use solana_sdk::pubkey::Pubkey;
 use solana_account_decoder::parse_token::UiTokenAmount;
 use std::collections::HashMap;
 
-use super::types::TokenInfo;
 
 /// 交易适配器错误
 #[derive(Debug, thiserror::Error)]
