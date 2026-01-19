@@ -137,7 +137,7 @@ impl DexProtocol {
         match self {
             DexProtocol::PumpSwap => "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P",
             DexProtocol::RaydiumV4 => "675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8",
-            DexProtocol::RaydiumClmm => "CAMMCzo5YL8w4VFF8KVHrK22GGUQpMpTFb5iJHJxgKWs",
+            DexProtocol::RaydiumClmm => "CAMMCzo5YL8w4VFF8KVHrK22GGUsp5VTaW7grrKgrWqK",
             DexProtocol::RaydiumCpmm => "CPMMoo8L3F4NbTegBCKVNunggL7H5ZQdwpK3bqdrh4jM",
         }
     }
@@ -157,7 +157,7 @@ impl DexProtocol {
         match program_id {
             "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P" => Some(DexProtocol::PumpSwap),
             "675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8" => Some(DexProtocol::RaydiumV4),
-            "CAMMCzo5YL8w4VFF8KVHrK22GGUQpMpTFb5iJHJxgKWs" => Some(DexProtocol::RaydiumClmm),
+            "CAMMCzo5YL8w4VFF8KVHrK22GGUsp5VTaW7grrKgrWqK" => Some(DexProtocol::RaydiumClmm),
             "CPMMoo8L3F4NbTegBCKVNunggL7H5ZQdwpK3bqdrh4jM" => Some(DexProtocol::RaydiumCpmm),
             _ => None,
         }
