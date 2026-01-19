@@ -16,6 +16,7 @@ use super::{
     base_parser::{DexParserTrait, ParseError},
     types::{ParseResult, ParserConfig, DexProtocol},
     pumpswap::PumpswapParser,
+    raydium::clmm::RaydiumClmmParser,
 };
 
 // TODO: Raydium V4 待完善 Transfer 解析后再启用
@@ -25,7 +26,7 @@ use super::{
 ///
 /// 主入口，负责获取交易并分发到对应的协议解析器
 #[derive(Clone)]
-#[allow(dead_code)]  // config 和 parsers 将在后续实现中使用
+#[allow(dead_code)]  // config 字段还未使用
 pub struct DexParser {
     config: ParserConfig,
     rpc_client: Arc<RpcClient>,
@@ -43,6 +44,11 @@ impl DexParser {
         parsers.insert(
             DexProtocol::PumpSwap.program_id().to_string(),
             Arc::new(PumpswapParser) as Arc<dyn DexParserTrait>
+        );
+        // 注册 Raydium CLMM Parser
+        parsers.insert(
+            DexProtocol::RaydiumClmm.program_id().to_string(),
+            Arc::new(RaydiumClmmParser) as Arc<dyn DexParserTrait>
         );
         // TODO: Raydium V4 待完善 Transfer 解析后再启用
 

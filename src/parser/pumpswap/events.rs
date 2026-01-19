@@ -169,6 +169,9 @@ fn parse_create_event(_data: &[u8]) -> Option<()> {
 
 /// 创建空的买入事件（用于占位）
 fn create_dummy_buy() -> PumpswapBuyEvent {
+    let data = pumpswap::BUY_EVENT.to_vec();
+    let _ = data; // 暂时忽略，避免 unused 警告
+
     PumpswapBuyEvent {
         timestamp: 0,
         base_amount_out: 0,

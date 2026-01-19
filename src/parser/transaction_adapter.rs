@@ -163,6 +163,7 @@ impl TransactionAdapter {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::parser::types::TokenInfo;
 
     #[test]
     fn test_token_info_from_raw_amount() {
