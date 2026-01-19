@@ -50,7 +50,7 @@ async fn test_raydium_clmm_get_pool_by_mint_wsol_cache_and_force() {
     println!("=== 测试：Raydium CLMM get_pool_by_mint (WSOL, cache & force) ===");
 
     let wsol_mint = Pubkey::from_str(WSOL_MINT).expect("Invalid WSOL mint");
-    let rpc_url = "https://api.mainnet-beta.solana.com";
+    let rpc_url = "http://127.0.0.1:8899";
     let rpc = RpcClient::new(rpc_url.to_string());
 
     // 1. 清空缓存，确保从干净状态开始
@@ -142,7 +142,6 @@ async fn test_raydium_clmm_get_pool_by_address() {
 
     // 使用之前测试中找到的 pool 地址
     let wsol_mint = Pubkey::from_str(WSOL_MINT).expect("Invalid WSOL mint");
-    // let rpc_url = "https://api.mainnet-beta.solana.com";
     let rpc_url = "http://127.0.0.1:8899";
     let rpc = RpcClient::new(rpc_url.to_string());
 
@@ -207,7 +206,7 @@ async fn test_raydium_clmm_get_pool_by_address() {
 async fn test_raydium_clmm_get_wsol_price_in_usd() {
     println!("=== 测试：Raydium CLMM get_wsol_price_in_usd (WSOL-USDT anchor) ===");
 
-    let rpc_url = "https://api.mainnet-beta.solana.com";
+    let rpc_url = "http://127.0.0.1:8899";
     let rpc = RpcClient::new(rpc_url.to_string());
 
     let anchor_pool = Pubkey::from_str(WSOL_USDT_CLMM_POOL).expect("Invalid WSOL-USDT pool");
@@ -231,7 +230,7 @@ async fn test_raydium_clmm_get_wsol_price_in_usd() {
 async fn test_raydium_clmm_get_jup_price_in_usd() {
     println!("=== 测试：Raydium CLMM get_token_price_in_usd (JUP) ===");
 
-    let rpc_url = "https://api.mainnet-beta.solana.com";
+    let rpc_url = "http://127.0.0.1:8899";
     let rpc = RpcClient::new(rpc_url.to_string());
 
     let jup_mint = Pubkey::from_str(JUP_MINT).expect("Invalid JUP mint");
@@ -255,7 +254,7 @@ async fn test_raydium_clmm_get_jup_price_in_usd() {
 async fn test_raydium_clmm_get_jup_price_in_usd_with_pool() {
     println!("=== 测试：Raydium CLMM get_token_price_in_usd_with_pool (JUP, 跳过查找) ===");
 
-    let rpc_url = "https://api.mainnet-beta.solana.com";
+    let rpc_url = "http://127.0.0.1:8899";
     let rpc = RpcClient::new(rpc_url.to_string());
 
     let jup_mint = Pubkey::from_str(JUP_MINT).expect("Invalid JUP mint");

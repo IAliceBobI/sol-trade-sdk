@@ -35,7 +35,7 @@ use std::{
 // 设置 payer
 static PAYER: LazyLock<Keypair> = LazyLock::new(|| Keypair::new());
 // 设置 rpc url
-static RPC_URL: &str = "https://api.mainnet-beta.solana.com";
+static RPC_URL: &str = "http://127.0.0.1:8899";
 
 static DEXS: &[&str] = &["pumpfun", "pumpswap", "bonk", "raydium_v4", "raydium_cpmm"];
 

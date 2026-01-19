@@ -25,7 +25,7 @@ async fn main() -> AnyResult<()> {
     };
     println!("📝 钱包地址: {}", payer.pubkey());
 
-    let rpc_url = env::var("RPC_URL").unwrap_or_else(|_| "https://api.mainnet-beta.solana.com".to_string());
+    let rpc_url = env::var("RPC_URL").unwrap_or_else(|_| "http://127.0.0.1:8899".to_string());
     let commitment = CommitmentConfig::confirmed();
 
     // 配置4个SWQOS节点并发发送
@@ -33,7 +33,7 @@ async fn main() -> AnyResult<()> {
         SwqosConfig::Jito(
             String::new(),  // uuid
             SwqosRegion::Default,
-            Some(env::var("SWQOS_JITO").unwrap_or_else(|_| "https://mainnet.block-engine.jito.wtf/api/v1/transactions".to_string()))
+            Some(env::var("SWQOS_JITO").unwrap_or_else(|_| "http://127.0.0.1:8899".to_string()))
         ),
         SwqosConfig::Bloxroute(
             String::new(),  // api_token

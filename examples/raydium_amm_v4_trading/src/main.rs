@@ -128,7 +128,7 @@ fn create_event_callback() -> impl Fn(Box<dyn UnifiedEvent>) {
 async fn create_solana_trade_client() -> AnyResult<SolanaTrade> {
     println!("🚀 Initializing SolanaTrade client...");
     let payer = Keypair::from_base58_string("your_payer_keypair_here");
-    let rpc_url = "https://api.mainnet-beta.solana.com".to_string();
+    let rpc_url = "http://127.0.0.1:8899".to_string();
     let commitment = CommitmentConfig::confirmed();
     let swqos_configs: Vec<SwqosConfig> = vec![SwqosConfig::Default(rpc_url.clone())];
     let trade_config = TradeConfig::new(rpc_url, swqos_configs, commitment);

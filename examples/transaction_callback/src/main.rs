@@ -101,7 +101,7 @@ async fn main() -> Result<()> {
     let payer = Arc::new(Keypair::new());
 
     // 配置 RPC
-    let rpc_url = "https://api.mainnet-beta.solana.com".to_string();
+    let rpc_url = "http://127.0.0.1:8899".to_string();
     let commitment = CommitmentConfig::confirmed();
 
     // 配置 SWQOS 服务

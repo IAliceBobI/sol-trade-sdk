@@ -19,7 +19,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 async fn create_solana_trade_client() -> AnyResult<SolanaTrade> {
     println!("Creating SolanaTrade client...");
     let payer = Keypair::from_base58_string("use_your_payer_keypair_here");
-    let rpc_url = "https://mainnet.helius-rpc.com/?api-key=xxxxxx".to_string();
+    let rpc_url = "http://127.0.0.1:8899".to_string();
     println!("rpc_url: {}", rpc_url);
     let commitment = CommitmentConfig::processed();
     let swqos_configs: Vec<SwqosConfig> = vec![

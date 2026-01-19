@@ -39,7 +39,7 @@ async fn main() -> Result<(), anyhow::Error> {
 
     // 配置
     let payer = Keypair::new(); // 使用新钱包，避免安全问题
-    let rpc_url = "https://api.mainnet-beta.solana.com".to_string();
+    let rpc_url = "http://127.0.0.1:8899".to_string();
     let commitment = CommitmentConfig::confirmed();
     let swqos_configs: Vec<SwqosConfig> = vec![SwqosConfig::Default(rpc_url.clone())];
     let trade_config =

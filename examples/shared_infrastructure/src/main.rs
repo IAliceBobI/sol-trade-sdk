@@ -25,7 +25,7 @@ use std::sync::Arc;
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Configuration (same for all wallets)
-    let rpc_url = "https://mainnet.helius-rpc.com/?api-key=xxxxxx".to_string();
+    let rpc_url = "http://127.0.0.1:8899".to_string();
     let commitment = CommitmentConfig::processed();
     let swqos_configs: Vec<SwqosConfig> = vec![
         SwqosConfig::Default(rpc_url.clone()),

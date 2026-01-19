@@ -369,9 +369,9 @@ async fn test_public_rpc_limitations() {
     
     let wsol_mint = Pubkey::from_str("So11111111111111111111111111111111111111112")
         .expect("Invalid WSOL mint");
-    let rpc_url = "https://api.mainnet-beta.solana.com";
+    let rpc_url = "http://127.0.0.1:8899";
     let rpc = RpcClient::new(rpc_url.to_string());
-    
+
     // 尝试查询 coin_mint offset (400)
     let filters = vec![
         RpcFilterType::DataSize(752),  // AMM_INFO_SIZE
@@ -432,7 +432,7 @@ async fn test_list_pools_by_mint_wsol() {
 
     let wsol_mint = Pubkey::from_str("So11111111111111111111111111111111111111112")
         .expect("Invalid WSOL mint");
-    let rpc_url = "https://api.mainnet-beta.solana.com";
+    let rpc_url = "http://127.0.0.1:8899";
     let rpc = RpcClient::new(rpc_url.to_string());
 
     println!("开始查询 WSOL 相关的 AMM V4 池子...");
@@ -497,7 +497,7 @@ async fn test_get_amm_v4_token_price_in_usd() {
 
     let token_mint = Pubkey::from_str(OIIAOIIA_MINT).unwrap();
     let pool_address = Pubkey::from_str(OIIAOIIA_POOL).unwrap();
-    let rpc_url = "https://api.mainnet-beta.solana.com";
+    let rpc_url = "http://127.0.0.1:8899";
     let rpc = RpcClient::new(rpc_url.to_string());
 
     println!("Token Mint: {}", token_mint);

@@ -189,7 +189,7 @@ mod tests {
     #[tokio::test]
     async fn test_get_token_decimals_wsol() {
         use solana_client::nonblocking::rpc_client::RpcClient;
-        let rpc = RpcClient::new("https://api.mainnet-beta.solana.com".to_string());
+        let rpc = RpcClient::new("http://127.0.0.1:8899".to_string());
         let wsol = Pubkey::from_str_const("So11111111111111111111111111111111111111112");
         
         let decimals = get_token_decimals(&rpc, &wsol).await.unwrap();
@@ -199,7 +199,7 @@ mod tests {
     #[tokio::test]
     async fn test_get_token_decimals_usdc() {
         use solana_client::nonblocking::rpc_client::RpcClient;
-        let rpc = RpcClient::new("https://api.mainnet-beta.solana.com".to_string());
+        let rpc = RpcClient::new("http://127.0.0.1:8899".to_string());
         let usdc = Pubkey::from_str_const("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v");
         
         let decimals = get_token_decimals(&rpc, &usdc).await.unwrap();
@@ -209,7 +209,7 @@ mod tests {
     #[tokio::test]
     async fn test_get_token_symbol_pumpfun() {
         use solana_client::nonblocking::rpc_client::RpcClient;
-        let rpc = RpcClient::new("https://api.mainnet-beta.solana.com".to_string());
+        let rpc = RpcClient::new("http://127.0.0.1:8899".to_string());
         // Pump.fun 测试代币
         let pump = Pubkey::from_str_const("pumpCmXqMfrsAkQ5r49WcJnRayYRqmXz6ae8H7H9Dfn");
 
@@ -222,7 +222,7 @@ mod tests {
     #[tokio::test]
     async fn test_get_token_decimals_pumpfun() {
         use solana_client::nonblocking::rpc_client::RpcClient;
-        let rpc = RpcClient::new("https://api.mainnet-beta.solana.com".to_string());
+        let rpc = RpcClient::new("http://127.0.0.1:8899".to_string());
         // Pump.fun 测试代币
         let pump = Pubkey::from_str_const("pumpCmXqMfrsAkQ5r49WcJnRayYRqmXz6ae8H7H9Dfn");
 
@@ -234,7 +234,7 @@ mod tests {
     #[tokio::test]
     async fn test_decimals_cache_miss() {
         use solana_client::nonblocking::rpc_client::RpcClient;
-        let rpc = RpcClient::new("https://api.mainnet-beta.solana.com".to_string());
+        let rpc = RpcClient::new("http://127.0.0.1:8899".to_string());
         let wsol = Pubkey::from_str_const("So11111111111111111111111111111111111111112");
 
         // 清除缓存确保冷启动
@@ -247,7 +247,7 @@ mod tests {
     #[tokio::test]
     async fn test_symbol_cache_miss() {
         use solana_client::nonblocking::rpc_client::RpcClient;
-        let rpc = RpcClient::new("https://api.mainnet-beta.solana.com".to_string());
+        let rpc = RpcClient::new("http://127.0.0.1:8899".to_string());
         let pump = Pubkey::from_str_const("pumpCmXqMfrsAkQ5r49WcJnRayYRqmXz6ae8H7H9Dfn");
 
         // 清除缓存确保冷启动
@@ -260,7 +260,7 @@ mod tests {
     #[tokio::test]
     async fn test_decimals_cache_hit() {
         use solana_client::nonblocking::rpc_client::RpcClient;
-        let rpc = RpcClient::new("https://api.mainnet-beta.solana.com".to_string());
+        let rpc = RpcClient::new("http://127.0.0.1:8899".to_string());
         let usdc = Pubkey::from_str_const("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v");
 
         // 先触发一次缓存填充
@@ -278,7 +278,7 @@ mod tests {
     #[tokio::test]
     async fn test_symbol_cache_hit() {
         use solana_client::nonblocking::rpc_client::RpcClient;
-        let rpc = RpcClient::new("https://api.mainnet-beta.solana.com".to_string());
+        let rpc = RpcClient::new("http://127.0.0.1:8899".to_string());
         let pump = Pubkey::from_str_const("pumpCmXqMfrsAkQ5r49WcJnRayYRqmXz6ae8H7H9Dfn");
 
         // 先触发一次缓存填充
@@ -295,7 +295,7 @@ mod tests {
     #[tokio::test]
     async fn test_get_mint_info_usdc() {
         use solana_client::nonblocking::rpc_client::RpcClient;
-        let rpc = RpcClient::new("https://api.mainnet-beta.solana.com".to_string());
+        let rpc = RpcClient::new("http://127.0.0.1:8899".to_string());
         let usdc = Pubkey::from_str_const("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v");
 
         let info = get_mint_info(&rpc, &usdc).await.unwrap();
@@ -307,7 +307,7 @@ mod tests {
     #[tokio::test]
     async fn test_get_mint_info_pumpfun() {
         use solana_client::nonblocking::rpc_client::RpcClient;
-        let rpc = RpcClient::new("https://api.mainnet-beta.solana.com".to_string());
+        let rpc = RpcClient::new("http://127.0.0.1:8899".to_string());
         let pump = Pubkey::from_str_const("pumpCmXqMfrsAkQ5r49WcJnRayYRqmXz6ae8H7H9Dfn");
 
         let info = get_mint_info(&rpc, &pump).await.unwrap();
@@ -319,7 +319,7 @@ mod tests {
     #[tokio::test]
     async fn test_cached_mint_info() {
         use solana_client::nonblocking::rpc_client::RpcClient;
-        let rpc = RpcClient::new("https://api.mainnet-beta.solana.com".to_string());
+        let rpc = RpcClient::new("http://127.0.0.1:8899".to_string());
         let wsol = Pubkey::from_str_const("So11111111111111111111111111111111111111112");
 
         // 清除缓存确保冷启动

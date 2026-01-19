@@ -218,7 +218,7 @@ async fn test_raydium_cpmm_get_pool_by_mint_wsol_cache_and_force() {
     println!("=== 测试：Raydium CPMM get_pool_by_mint (WSOL, cache & force) ===");
 
     let wsol_mint = Pubkey::from_str(WSOL_MINT).expect("Invalid WSOL mint");
-    let rpc_url = "https://api.mainnet-beta.solana.com";
+    let rpc_url = "http://127.0.0.1:8899";
     let rpc = RpcClient::new(rpc_url.to_string());
 
     // 1. 清空缓存，确保从干净状态开始
@@ -263,8 +263,7 @@ async fn test_raydium_cpmm_list_pools_by_mint_wsol() {
     println!("=== 测试：Raydium CPMM list_pools_by_mint (WSOL) ===");
 
     let wsol_mint = Pubkey::from_str(WSOL_MINT).expect("Invalid WSOL mint");
-    // let rpc_url = "http://127.0.0.1:8899";
-    let rpc_url = "https://api.mainnet-beta.solana.com".to_string();
+    let rpc_url = "http://127.0.0.1:8899".to_string();
     let rpc = RpcClient::new(rpc_url.to_string());
 
     let pools = list_pools_by_mint(&rpc, &wsol_mint).await.expect("list_pools_by_mint failed");
@@ -291,7 +290,7 @@ async fn test_get_cpmm_token_price_in_usd() {
 
     let token_mint = Pubkey::from_str(PIPE_MINT).unwrap();
     let pool_address = Pubkey::from_str(PIPE_POOL).unwrap();
-    let rpc_url = "https://api.mainnet-beta.solana.com";
+    let rpc_url = "http://127.0.0.1:8899";
     let rpc = RpcClient::new(rpc_url.to_string());
 
     println!("Token Mint: {}", token_mint);
