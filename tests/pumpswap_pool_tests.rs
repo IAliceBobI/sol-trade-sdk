@@ -13,7 +13,8 @@
 //! 注意：使用公共 Solana RPC 端点
 
 use sol_trade_sdk::instruction::utils::pumpswap::{
-    find_pool, get_pool_by_address, get_token_balances, get_token_price_in_usd_with_pool,
+    clear_pool_cache, find_pool, get_pool_by_address, get_token_balances,
+    get_token_price_in_usd_with_pool,
 };
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_sdk::pubkey::Pubkey;
@@ -30,6 +31,9 @@ const PUMP_POOL_ADDRESS: &str = "539m4mVWt6iduB6W8rDGPMarzNCMesuqY5eUTiiYHAgR";
 #[serial_test::serial]
 async fn test_find_pool_by_mint() {
     println!("=== 测试：通过 mint 查找 pool 地址 ===");
+
+    // 清空缓存，确保从干净状态开始
+    clear_pool_cache();
 
     let mint = Pubkey::from_str(PUMP_MINT).unwrap();
     let rpc_url = "http://127.0.0.1:8899";
@@ -51,8 +55,12 @@ async fn test_find_pool_by_mint() {
 
 /// 测试：通过地址获取 pool 数据（带缓存）
 #[tokio::test]
+#[serial_test::serial]
 async fn test_get_pool_by_address() {
     println!("=== 测试：通过地址获取 pool 数据（带缓存） ===");
+
+    // 清空缓存，确保从干净状态开始
+    clear_pool_cache();
 
     let pool_address = Pubkey::from_str(PUMP_POOL_ADDRESS).unwrap();
     let rpc_url = "http://127.0.0.1:8899";
@@ -104,8 +112,12 @@ async fn test_get_pool_by_address() {
 
 /// 测试：获取 PumpSwap token 的 USD 价格
 #[tokio::test]
+#[serial_test::serial]
 async fn test_get_pumpswap_token_price_in_usd() {
     println!("=== 测试：获取 PumpSwap token 的 USD 价格 ===");
+
+    // 清空缓存，确保从干净状态开始
+    clear_pool_cache();
 
     let token_mint = Pubkey::from_str(PUMP_MINT).unwrap();
     let pool_address = Pubkey::from_str(PUMP_POOL_ADDRESS).unwrap();
