@@ -281,7 +281,7 @@ mod tests {
         let pool_address = Pubkey::from_str("5UUBHfBssdFDtqFrcuPYA8xvYftYwYWEawucDuAH45KX").unwrap();
 
         // Use public Solana RPC endpoint
-        let rpc_url = "https://api.mainnet-beta.solana.com";
+        let rpc_url = "http://127.0.0.1:8899";
         let rpc = RpcClient::new(rpc_url.to_string());
 
         // Call get_pool_by_address
