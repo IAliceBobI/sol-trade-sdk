@@ -2,6 +2,8 @@
 //!
 //! 参考 solana-dex-parser 的 PumpswapParser 实现
 
+pub mod events;
+
 use async_trait::async_trait;
 use solana_sdk::pubkey::Pubkey;
 
@@ -10,7 +12,7 @@ use crate::parser::{
     base_parser::{DexParserTrait, ParseError},
     types::{ParsedTradeInfo, TradeType, TokenInfo, DexProtocol},
 };
-use super::events::{parse_pumpswap_event, EventData, PumpswapEventType};
+use crate::parser::pumpswap::events::{parse_pumpswap_event, EventData, PumpswapEventType};
 
 /// PumpSwap 解析器
 pub struct PumpswapParser;
@@ -23,7 +25,7 @@ impl PumpswapParser {
     /// 解析买入事件为交易信息
     fn parse_buy_event(
         &self,
-        event: &super::events::PumpswapBuyEvent,
+        event: &crate::parser::pumpswap::events::PumpswapBuyEvent,
         adapter: &TransactionAdapter,
     ) -> Result<ParsedTradeInfo, ParseError> {
         // 获取代币信息
@@ -101,7 +103,7 @@ impl PumpswapParser {
     /// 解析卖出事件为交易信息
     fn parse_sell_event(
         &self,
-        event: &super::events::PumpswapSellEvent,
+        event: &crate::parser::pumpswap::events::PumpswapSellEvent,
         adapter: &TransactionAdapter,
     ) -> Result<ParsedTradeInfo, ParseError> {
         let input_mint = *adapter
