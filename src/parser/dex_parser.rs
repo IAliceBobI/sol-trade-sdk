@@ -65,51 +65,33 @@ impl DexParser {
     /// # 返回
     /// 解析结果
     pub async fn parse_transaction(&self, signature: &str) -> ParseResult {
-        // 1. 获取交易数据
-        let (slot, block_time) = match self.fetch_transaction_slot_time(signature).await {
-            Ok(data) => data,
-            Err(e) => {
-                return ParseResult {
-                    success: false,
-                    trades: vec![],
-                    error: Some(format!("获取交易失败: {}", e)),
-                };
-            }
-        };
-
-        // TODO: 2. 创建交易适配器（需要完整的交易数据）
-        // let adapter = match TransactionAdapter::from_confirmed_transaction(&tx, slot, block_time).await {
-        //     Ok(adapter) => adapter,
-        //     Err(e) => {
-        //         return ParseResult {
-        //             success: false,
-        //             trades: vec![],
-        //             error: Some(format!("创建适配器失败: {}", e)),
-        //         };
-        //     }
-        // };
-
-        // TODO: 3. 识别协议并分发到对应的解析器
-        // 当前返回空结果
-        ParseResult {
-            success: false,
-            trades: vec![],
-            error: Some("完整解析功能待实现".to_string()),
+        // 1. 获取并解析交易数据
+        match self.fetch_and_parse_transaction(signature).await {
+            Ok(trades) => ParseResult {
+                success: !trades.is_empty(),
+                trades,
+                error: None,
+            },
+            Err(e) => ParseResult {
+                success: false,
+                trades: vec![],
+                error: Some(format!("解析失败: {}", e)),
+            },
         }
     }
 
-    /// 获取交易的 slot 和 block_time
-    async fn fetch_transaction_slot_time(
+    /// 获取并解析交易
+    async fn fetch_and_parse_transaction(
         &self,
         signature: &str,
-    ) -> Result<(u64, Option<i64>), Box<dyn std::error::Error + Send + Sync>> {
+    ) -> Result<Vec<super::types::ParsedTradeInfo>, Box<dyn std::error::Error + Send + Sync>> {
         let rpc_client = self.rpc_client.clone();
         let signature = signature.to_string();
 
         let sig = Signature::from_str(&signature)
             .map_err(|e| format!("无效签名: {}", e))?;
 
-        let (slot, block_time) = tokio::task::spawn_blocking(move || {
+        let tx_data = tokio::task::spawn_blocking(move || {
             let config = RpcTransactionConfig {
                 encoding: Some(UiTransactionEncoding::JsonParsed),
                 commitment: Some(CommitmentConfig::confirmed()),
@@ -122,12 +104,18 @@ impl DexParser {
             let slot = tx.slot;
             let block_time = tx.block_time;
 
-            Ok::<_, Box<dyn std::error::Error + Send + Sync>>((slot, block_time))
+            Ok::<_, Box<dyn std::error::Error + Send + Sync>>((tx, slot, block_time))
         })
         .await
         .map_err(|e| format!("任务执行失败: {}", e))??;
 
-        Ok((slot, block_time))
+        let (tx, slot, block_time) = tx_data;
+
+        // TODO: 创建交易适配器并解析
+        // 当前返回空列表
+        let _adapter = TransactionAdapter::from_confirmed_transaction(&tx, slot, block_time).await?;
+
+        Ok(vec![])
     }
 
     /// 识别协议并分发到对应的解析器
