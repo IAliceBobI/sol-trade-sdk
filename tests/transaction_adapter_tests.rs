@@ -57,3 +57,31 @@ fn test_instruction_info_structure() {
     assert_eq!(instruction.index, 0);
 }
 
+#[test]
+fn test_inner_instruction_info_structure() {
+    // Step 1: 写测试 - 验证 InnerInstructionInfo 结构
+
+    use sol_trade_sdk::parser::transaction_adapter::{InstructionInfo, InnerInstructionInfo};
+
+    let program_id = Pubkey::new_unique();
+    let account = Pubkey::new_unique();
+
+    let instruction = InstructionInfo {
+        program_id,
+        accounts: vec![account],
+        data: vec![1, 2, 3],
+        index: 0,
+    };
+
+    let inner_instruction = InnerInstructionInfo {
+        outer_index: 1,
+        inner_index: 0,
+        instruction,
+    };
+
+    // Step 2: 验证结构
+    assert_eq!(inner_instruction.outer_index, 1);
+    assert_eq!(inner_instruction.inner_index, 0);
+    assert_eq!(inner_instruction.instruction.program_id, program_id);
+}
+
