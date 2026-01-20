@@ -50,15 +50,6 @@ impl RaydiumClmmParser {
         Ok(accounts[2])
     }
 
-    /// 从账户列表中提取用户地址
-    /// Raydium CLMM: 用户通常是 payer (accounts[0])
-    fn extract_user_address(&self, accounts: &[Pubkey]) -> Result<Pubkey, ParseError> {
-        if accounts.is_empty() {
-            return Err(ParseError::MissingAccountData);
-        }
-        Ok(accounts[0])
-    }
-
     /// 获取指令相关的 Transfer 记录
     fn get_transfers_for_instruction(
         &self,
@@ -204,9 +195,14 @@ impl DexParserTrait for RaydiumClmmParser {
                 continue;
             }
 
-            // 提取池和用户信息
+            // 提取池地址
             let pool = self.extract_pool_address(&inner_ix.instruction.accounts)?;
-            let user = self.extract_user_address(&inner_ix.instruction.accounts)?;
+
+            // 从 Transfer 的 authority 中提取用户地址
+            // 而不是从账户列表中提取,因为账户列表中的用户地址可能不准确
+            let user = transfers.iter()
+                .find_map(|t| t.authority)
+                .ok_or(ParseError::ParseFailed("无法从 Transfer 记录中提取用户地址".into()))?;
 
             // 提取唯一代币
             let unique_transfers = self.extract_unique_tokens(&transfers);

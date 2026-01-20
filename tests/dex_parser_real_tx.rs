@@ -105,6 +105,11 @@ async fn test_parse_raydium_v4_transaction() {
     println!("  类型: {:?}", trade.trade_type);
     println!("  输入: {} {}", trade.input_token.amount, trade.input_token.mint);
     println!("  输出: {} {}", trade.output_token.amount, trade.output_token.mint);
+
+    // Solscan 显示: Swap 0.036626474 AVYS for 0.039489 USDC
+    // 这是一个卖出交易: 用户卖出 AVYS, 收到 USDC
+    // 所以 input 应该是 AVYS, output 应该是 USDC
+    println!("  Solscan 显示: Swap 0.036626474 AVYS for 0.039489 USDC");
 }
 
 /// Raydium CPMM 交易测试
@@ -135,6 +140,10 @@ async fn test_parse_raydium_cpmm_transaction() {
     println!("  用户: {}", trade.user);
     println!("  池: {}", trade.pool);
     println!("  类型: {:?}", trade.trade_type);
+    println!("  输入: {} {}", trade.input_token.amount, trade.input_token.mint);
+    println!("  输出: {} {}", trade.output_token.amount, trade.output_token.mint);
+    // Solscan 显示: Swap 0.01 WSOL for 73,296.433626 Fartpad
+    println!("  Solscan 显示: Swap 0.01 WSOL for 73,296.433626 Fartpad");
 }
 
 /// Raydium CLMM 交易测试
@@ -165,4 +174,7 @@ async fn test_parse_raydium_clmm_transaction() {
     println!("  用户: {}", trade.user);
     println!("  池: {}", trade.pool);
     println!("  类型: {:?}", trade.trade_type);
+    println!("  输入: {} {}", trade.input_token.amount, trade.input_token.mint);
+    println!("  输出: {} {}", trade.output_token.amount, trade.output_token.mint);
+    // CLMM 交易金额请根据实际 Solscan 显示
 }

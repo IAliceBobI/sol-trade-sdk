@@ -50,15 +50,6 @@ impl RaydiumV4Parser {
         Ok(accounts[1])
     }
 
-    /// 从账户列表中提取用户地址
-    /// Raydium V4: accounts[14] 是用户钱包
-    fn extract_user_address(&self, accounts: &[Pubkey]) -> Result<Pubkey, ParseError> {
-        if accounts.len() < 15 {
-            return Err(ParseError::MissingAccountData);
-        }
-        Ok(accounts[14])
-    }
-
     /// 获取指令相关的 Transfer 记录
     fn get_transfers_for_instruction(
         &self,
@@ -203,9 +194,14 @@ impl DexParserTrait for RaydiumV4Parser {
                 continue;
             }
 
-            // 提取池和用户信息
+            // 提取池地址
             let pool = self.extract_pool_address(&instr.accounts)?;
-            let user = self.extract_user_address(&instr.accounts)?;
+
+            // 从 Transfer 的 authority 中提取用户地址
+            // 而不是从账户列表中提取,因为账户列表中的用户地址可能不准确
+            let user = transfers.iter()
+                .find_map(|t| t.authority)
+                .ok_or(ParseError::ParseFailed("无法从 Transfer 记录中提取用户地址".into()))?;
 
             // 提取唯一代币
             let unique_transfers = self.extract_unique_tokens(&transfers);
