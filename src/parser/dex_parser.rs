@@ -16,11 +16,12 @@ use super::{
     base_parser::{DexParserTrait, ParseError},
     types::{ParseResult, ParserConfig, DexProtocol},
     pumpswap::PumpswapParser,
-    raydium::clmm::RaydiumClmmParser,
+    raydium::{
+        clmm::RaydiumClmmParser,
+        v4::RaydiumV4Parser,
+        cpmm::RaydiumCpmmParser,
+    },
 };
-
-// TODO: Raydium V4 待完善 Transfer 解析后再启用
-// use raydium::v4::RaydiumV4Parser;
 
 /// DEX 解析器
 ///
@@ -43,16 +44,26 @@ impl DexParser {
         let mut parsers: HashMap<String, Arc<dyn DexParserTrait>> = HashMap::new();
 
         // 注册协议解析器
+        // Pumpswap
         parsers.insert(
             DexProtocol::PumpSwap.program_id().to_string(),
             Arc::new(PumpswapParser) as Arc<dyn DexParserTrait>
         );
-        // 注册 Raydium CLMM Parser
+        // Raydium CLMM
         parsers.insert(
             DexProtocol::RaydiumClmm.program_id().to_string(),
             Arc::new(RaydiumClmmParser) as Arc<dyn DexParserTrait>
         );
-        // TODO: Raydium V4 待完善 Transfer 解析后再启用
+        // Raydium V4
+        parsers.insert(
+            DexProtocol::RaydiumV4.program_id().to_string(),
+            Arc::new(RaydiumV4Parser) as Arc<dyn DexParserTrait>
+        );
+        // Raydium CPMM
+        parsers.insert(
+            DexProtocol::RaydiumCpmm.program_id().to_string(),
+            Arc::new(RaydiumCpmmParser) as Arc<dyn DexParserTrait>
+        );
 
         Self {
             config,
@@ -120,11 +131,21 @@ impl DexParser {
 
         let (tx, slot, block_time) = tx_data;
 
-        // TODO: 创建交易适配器并解析
-        // 当前返回空列表
-        let _adapter = TransactionAdapter::from_confirmed_transaction(&tx, slot, block_time).await?;
+        // 创建交易适配器并解析
+        let adapter = TransactionAdapter::from_encoded_transaction(&tx, slot, block_time)?;
 
-        Ok(vec![])
+        // 识别协议并分发到对应的解析器
+        match self.parse_with_correct_parser(&adapter).await {
+            Ok(trades) => Ok(trades),
+            Err(ParseError::UnsupportedProtocol(msg)) => {
+                // 如果无法识别协议，返回空结果而不是错误
+                if self.config.verbose {
+                    println!("无法识别协议: {}", msg);
+                }
+                Ok(vec![])
+            }
+            Err(e) => Err(Box::new(e)),
+        }
     }
 
     /// 识别协议并分发到对应的解析器

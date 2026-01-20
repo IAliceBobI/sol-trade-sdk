@@ -1,0 +1,243 @@
+//! TransactionAdapter 集成测试
+//!
+//! 测试从真实交易数据中解析指令和转账信息
+
+use sol_trade_sdk::parser::transaction_adapter::TransactionAdapter;
+use solana_sdk::pubkey::Pubkey;
+use solana_rpc_client::rpc_client::RpcClient;
+use solana_sdk::signature::Signature;
+use solana_client::rpc_config::RpcTransactionConfig;
+use solana_transaction_status::{
+    UiTransaction, UiTransactionEncoding, EncodedConfirmedTransactionWithStandingInfo,
+    UiInnerInstructions, UiInstruction, UiParsedInstruction
+};
+use solana_commitment_config::CommitmentConfig;
+use std::str::FromStr;
+
+#[test]
+fn test_transaction_adapter_creation() {
+    // Step 1: 写测试 - 验证 TransactionAdapter 能创建基本结构
+
+    // 创建一个空的适配器（使用占位符数据）
+    let adapter = TransactionAdapter {
+        signature: "test_signature".to_string(),
+        slot: 12345,
+        timestamp: 1234567890,
+        account_keys: vec![],
+        token_balance_changes: std::collections::HashMap::new(),
+        spl_token_map: std::collections::HashMap::new(),
+        spl_decimals_map: std::collections::HashMap::new(),
+        instructions: vec![],
+        inner_instructions: vec![],
+    };
+
+    // Step 2: 验证基本字段
+    assert_eq!(adapter.signature, "test_signature");
+    assert_eq!(adapter.slot, 12345);
+    assert_eq!(adapter.timestamp, 1234567890);
+    assert!(adapter.account_keys.is_empty());
+    assert!(adapter.instructions.is_empty());
+    assert!(adapter.inner_instructions.is_empty());
+}
+
+#[test]
+fn test_instruction_info_structure() {
+    // Step 1: 写测试 - 验证 InstructionInfo 结构
+
+    use sol_trade_sdk::parser::transaction_adapter::InstructionInfo;
+
+    let program_id = Pubkey::new_unique();
+    let account1 = Pubkey::new_unique();
+    let account2 = Pubkey::new_unique();
+
+    let instruction = InstructionInfo {
+        program_id,
+        accounts: vec![account1, account2],
+        data: vec![1, 2, 3, 4],
+        index: 0,
+    };
+
+    // Step 2: 验证结构
+    assert_eq!(instruction.program_id, program_id);
+    assert_eq!(instruction.accounts.len(), 2);
+    assert_eq!(instruction.accounts[0], account1);
+    assert_eq!(instruction.accounts[1], account2);
+    assert_eq!(instruction.data, vec![1, 2, 3, 4]);
+    assert_eq!(instruction.index, 0);
+}
+
+#[test]
+fn test_inner_instruction_info_structure() {
+    // Step 1: 写测试 - 验证 InnerInstructionInfo 结构
+
+    use sol_trade_sdk::parser::transaction_adapter::{InstructionInfo, InnerInstructionInfo};
+
+    let program_id = Pubkey::new_unique();
+    let account = Pubkey::new_unique();
+
+    let instruction = InstructionInfo {
+        program_id,
+        accounts: vec![account],
+        data: vec![1, 2, 3],
+        index: 0,
+    };
+
+    let inner_instruction = InnerInstructionInfo {
+        outer_index: 1,
+        inner_index: 0,
+        instruction,
+    };
+
+    // Step 2: 验证结构
+    assert_eq!(inner_instruction.outer_index, 1);
+    assert_eq!(inner_instruction.inner_index, 0);
+    assert_eq!(inner_instruction.instruction.program_id, program_id);
+}
+
+/// PumpSwap 买入交易集成测试
+///
+/// 签名: 5GCZ3TR31aDRP9LZxznKPBux86jWDyCxt1noCAAhX43d6Cmtqi8HvK6oHErq7DBr9j5KRcqeYumW2wHt5qJG1tQK
+///
+/// 测试目标：
+/// 1. 从 RPC 获取真实交易数据
+/// 2. 解析账户密钥
+/// 3. 解析指令和内部指令
+/// 4. 验证能找到 Token 转账指令
+#[test]
+fn test_pumpswap_buy_real_transaction() {
+    let rpc_url = "http://127.0.0.1:8899";
+    let signature_str = "5GCZ3TR31aDRP9LZxznKPBux86jWDyCxt1noCAAhX43d6Cmtqi8HvK6oHErq7DBr9j5KRcqeYumW2wHt5qJG1tQK";
+
+    // 获取交易数据
+    let rpc_client = RpcClient::new(rpc_url);
+    let signature = Signature::from_str(signature_str).unwrap();
+
+    let config = RpcTransactionConfig {
+        encoding: Some(UiTransactionEncoding::JsonParsed),
+        commitment: Some(CommitmentConfig::confirmed()),
+        max_supported_transaction_version: Some(0),
+    };
+
+    let tx = rpc_client.get_transaction_with_config(&signature, config).unwrap();
+    let slot = tx.slot;
+    let block_time = tx.block_time;
+
+    // 验证交易基本信息
+    assert_eq!(slot, 394648935);
+
+    // 解析交易
+    let encoded_tx = tx.transaction;
+    match encoded_tx {
+        EncodedConfirmedTransactionWithStandingInfo::EncodedTransactionWithMeta(encoded) => {
+            let transaction = encoded.transaction;
+            let meta = encoded.meta.unwrap();
+
+            // 提取签名
+            let sig = signature_str.to_string();
+
+            // 提取账户密钥
+            let account_keys = match &transaction {
+                UiTransaction::Parsed(parsed) => {
+                    parsed.message.account_keys.iter()
+                        .map(|key| Pubkey::from_str(&key.pubkey).unwrap())
+                        .collect()
+                }
+                _ => panic!("Expected parsed transaction"),
+            };
+
+            println!("Total account keys: {}", account_keys.len());
+            assert_eq!(account_keys[0].to_string(), "DyfL9o7NwK2GVxpjGi9QwwjmvYAn3WKHkGiiFkptwWf9");
+
+            // 提取 inner instructions
+            let inner_instructions: Vec<UiInnerInstructions> = meta.inner_instructions.unwrap_or_default();
+
+            println!("Total inner instruction sets: {}", inner_instructions.len());
+            assert!(!inner_instructions.is_empty());
+
+            // 找到 Token Program 的指令
+            let token_program = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA";
+
+            for inner_set in &inner_instructions {
+                for (idx, ix) in inner_set.instructions.iter().enumerate() {
+                    match ix {
+                        UiInstruction::Parsed(parsed_ix) => {
+                            if parsed_ix.program == "spl-token" {
+                                println!("Found spl-token instruction at index {}-{}: {}",
+                                    inner_set.index, idx, parsed_ix.parsed.type);
+
+                                // 检查是否是 transferChecked
+                                if parsed_ix.parsed.type == "transferChecked" {
+                                    println!("  TransferChecked detected!");
+                                }
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+            }
+
+            // 验证代币余额
+            if let Some(post_token_balances) = meta.post_token_balances {
+                println!("Post token balances: {}", post_token_balances.len());
+                for balance in &post_token_balances {
+                    if let Some(mint) = &balance.mint {
+                        let account = &account_keys[balance.account_index];
+                        println!("  Account {} has mint: {}", account, mint);
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// 测试提取 WSOL 转账指令
+#[test]
+fn test_extract_wsol_transfer_from_pumpswap() {
+    let rpc_url = "http://127.0.0.1:8899";
+    let signature_str = "5GCZ3TR31aDRP9LZxznKPBux86jWDyCxt1noCAAhX43d6Cmtqi8HvK6oHErq7DBr9j5KRcqeYumW2wHt5qJG1tQK";
+
+    let rpc_client = RpcClient::new(rpc_url);
+    let signature = Signature::from_str(signature_str).unwrap();
+
+    let config = RpcTransactionConfig {
+        encoding: Some(UiTransactionEncoding::JsonParsed),
+        commitment: Some(CommitmentConfig::confirmed()),
+        max_supported_transaction_version: Some(0),
+    };
+
+    let tx = rpc_client.get_transaction_with_config(&signature, config).unwrap();
+    let encoded_tx = tx.transaction;
+
+    match encoded_tx {
+        EncodedConfirmedTransactionWithStandingInfo::EncodedTransactionWithMeta(encoded) => {
+            let meta = encoded.meta.unwrap();
+            let inner_instructions = meta.inner_instructions.unwrap_or_default();
+
+            let wsol_mint = "So11111111111111111111111111111111111111112";
+            let mut found_wsol_transfer = false;
+
+            for inner_set in &inner_instructions {
+                for ix in &inner_set.instructions {
+                    if let UiInstruction::Parsed(parsed_ix) = ix {
+                        if parsed_ix.program == "spl-token" && parsed_ix.parsed.type == "transferChecked" {
+                            if let Some(info) = parsed_ix.parsed.info.get("mint") {
+                                if let Some(mint_str) = info.as_str() {
+                                    if mint_str == wsol_mint {
+                                        found_wsol_transfer = true;
+                                        println!("Found WSOL transfer:");
+                                        println!("  Source: {:?}", parsed_ix.parsed.info.get("source"));
+                                        println!("  Destination: {:?}", parsed_ix.parsed.info.get("destination"));
+                                        println!("  Amount: {:?}", parsed_ix.parsed.info.get("tokenAmount"));
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            assert!(found_wsol_transfer, "Should find WSOL transfer in PumpSwap buy transaction");
+        }
+    }
+}
+
