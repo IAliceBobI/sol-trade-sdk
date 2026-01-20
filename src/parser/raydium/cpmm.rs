@@ -286,8 +286,8 @@ mod tests {
     fn test_is_swap_instruction() {
         let parser = RaydiumCpmmParser::new();
 
-        // Swap 指令（任何非流动性操作的指令）
-        assert!(parser.is_swap_instruction(&[0, 0, 0, 0, 0, 0, 0, 1]));
+        // Swap 指令
+        assert!(parser.is_swap_instruction(&raydium_cpmm::SWAP));
 
         // 非 Swap 指令
         assert!(!parser.is_swap_instruction(&raydium_cpmm::ADD_LIQUIDITY));
