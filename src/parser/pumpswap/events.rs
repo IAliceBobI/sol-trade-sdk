@@ -100,7 +100,7 @@ fn parse_buy_event(data: &[u8]) -> Option<PumpswapBuyEvent> {
     let lp_fee = reader.read_u64().ok()?;
     let _protocol_fee_basis_points = reader.read_u64().ok()?;
     let protocol_fee = reader.read_u64().ok()?;
-    let _quote_amount_in_with_lp_fee = reader.read_u64().ok()?;
+    let quote_amount_in_with_lp_fee = reader.read_u64().ok()?;
     let _user_quote_amount_in = reader.read_u64().ok()?;
     let pool = reader.read_pubkey().ok()?;
     let user = reader.read_pubkey().ok()?;
@@ -113,7 +113,7 @@ fn parse_buy_event(data: &[u8]) -> Option<PumpswapBuyEvent> {
         timestamp,
         base_amount_out,
         quote_amount_in,
-        quote_amount_in_with_lp_fee: quote_amount_in + lp_fee,
+        quote_amount_in_with_lp_fee,  // 使用事件中的值
         lp_fee,
         protocol_fee,
         pool,
@@ -139,7 +139,7 @@ fn parse_sell_event(data: &[u8]) -> Option<PumpswapSellEvent> {
     let lp_fee = reader.read_u64().ok()?;
     let _protocol_fee_basis_points = reader.read_u64().ok()?;
     let protocol_fee = reader.read_u64().ok()?;
-    let _quote_amount_out_without_lp_fee = reader.read_u64().ok()?;
+    let quote_amount_out_without_lp_fee = reader.read_u64().ok()?;
     let _user_quote_amount_out = reader.read_u64().ok()?;
     let pool = reader.read_pubkey().ok()?;
     let user = reader.read_pubkey().ok()?;
@@ -152,7 +152,7 @@ fn parse_sell_event(data: &[u8]) -> Option<PumpswapSellEvent> {
         timestamp,
         base_amount_in,
         quote_amount_out,
-        quote_amount_out_without_lp_fee: quote_amount_out + lp_fee,
+        quote_amount_out_without_lp_fee,  // 使用事件中的值
         lp_fee,
         protocol_fee,
         pool,

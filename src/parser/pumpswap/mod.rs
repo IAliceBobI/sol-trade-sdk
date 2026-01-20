@@ -59,13 +59,15 @@ impl PumpswapParser {
             .ok_or(ParseError::MissingTokenInfo)?;
 
         // 计算实际数量（考虑精度）
-        let input_amount = event.quote_amount_in as f64 / 10_f64.powi(input_decimals as i32);
+        // 使用 quote_amount_in_with_lp_fee 作为输入金额，因为这是用户实际向池转账的金额
+        // LP 费用包含在输入金额中（给流动性提供者），协议费用单独转账
+        let input_amount = event.quote_amount_in_with_lp_fee as f64 / 10_f64.powi(input_decimals as i32);
         let output_amount = event.base_amount_out as f64 / 10_f64.powi(output_decimals as i32);
 
         let input_token = TokenInfo {
             mint: input_mint,
             amount: input_amount,
-            amount_raw: event.quote_amount_in.to_string(),
+            amount_raw: event.quote_amount_in_with_lp_fee.to_string(),
             decimals: input_decimals,
             authority: Some(event.user),
             source: Some(event.user_quote_token_account),
@@ -82,13 +84,12 @@ impl PumpswapParser {
             destination: Some(event.user_base_token_account),
         };
 
-        // 手续费
-        let fee = if event.lp_fee > 0 || event.protocol_fee > 0 {
-            let total_fee = event.lp_fee + event.protocol_fee;
+        // 手续费：只显示协议费用，因为 LP 费用已经包含在输入金额中
+        let fee = if event.protocol_fee > 0 {
             Some(TokenInfo {
                 mint: input_mint,
-                amount: total_fee as f64 / 10_f64.powi(input_decimals as i32),
-                amount_raw: total_fee.to_string(),
+                amount: event.protocol_fee as f64 / 10_f64.powi(input_decimals as i32),
+                amount_raw: event.protocol_fee.to_string(),
                 decimals: input_decimals,
                 authority: None,
                 source: None,
