@@ -116,6 +116,9 @@ async fn test_raydium_clmm_buy_and_sell_jup() {
     println!("[调试] buy_sigs: {:?}", buy_sigs);
     println!("✅ 买入成功，签名: {:?}", buy_sigs.get(0));
 
+    // 等待链上状态更新和交易确认
+    tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
+
     // 解析买入交易
     if let Some(buy_sig) = buy_sigs.get(0) {
         println!("\n📋 解析买入交易...");
@@ -217,6 +220,9 @@ async fn test_raydium_clmm_buy_and_sell_jup() {
     }
     assert!(success_sell, "卖出交易应成功");
     println!("✅ 卖出成功，签名: {:?}", sell_sigs.get(0));
+
+    // 等待链上状态更新和交易确认
+    tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
 
     // 解析卖出交易
     if let Some(sell_sig) = sell_sigs.get(0) {

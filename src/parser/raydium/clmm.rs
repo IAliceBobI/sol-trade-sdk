@@ -178,7 +178,7 @@ impl DexParserTrait for RaydiumClmmParser {
         let program_pubkey = program_id_str.parse()
             .map_err(|_| ParseError::UnsupportedProtocol("Invalid Raydium CLMM program ID".to_string()))?;
 
-        // CLMM 指令通常在 inner instructions 中
+        // 1. 首先尝试从 inner instructions 中解析 CLMM 指令
         let inner_instructions = adapter.get_inner_instructions_by_program(&program_pubkey);
 
         for inner_ix in inner_instructions {
@@ -240,6 +240,72 @@ impl DexParserTrait for RaydiumClmmParser {
             });
         }
 
+        // 2. 如果没有从 inner instructions 中找到，尝试从外层指令解析
+        if trades.is_empty() {
+            for (idx, instruction) in adapter.instructions.iter().enumerate() {
+                // 只处理 CLMM 程序的指令
+                if instruction.program_id != program_pubkey {
+                    continue;
+                }
+
+                // 过滤非 Swap 指令
+                if !self.is_swap_instruction(&instruction.data) {
+                    continue;
+                }
+
+                // 获取 Transfer 记录
+                let transfers = self.get_transfers_for_instruction(adapter, idx)?;
+
+                // 至少需要 2 个 transfer
+                if transfers.len() < 2 {
+                    continue;
+                }
+
+                // 提取池地址（accounts[2]）
+                let pool = self.extract_pool_address(&instruction.accounts)?;
+
+                // 从 Transfer 的 authority 中提取用户地址
+                let user = transfers.iter()
+                    .find_map(|t| t.authority)
+                    .ok_or(ParseError::ParseFailed("无法从 Transfer 记录中提取用户地址".into()))?;
+
+                // 提取唯一代币
+                let unique_transfers = self.extract_unique_tokens(&transfers);
+                if unique_transfers.len() < 2 {
+                    continue;
+                }
+
+                // 判断交易类型
+                let (trade_type, input_transfer, output_transfer) =
+                    self.determine_trade_type(user, &transfers)?;
+
+                // 构建 TokenInfo
+                let input_token = self.transfer_to_tokeninfo(input_transfer, user);
+                let output_token = self.transfer_to_tokeninfo(output_transfer, user);
+
+                // 检测费用（第3个 transfer）
+                let fee = if transfers.len() > 2 {
+                    Some(self.transfer_to_tokeninfo(&transfers[2], user))
+                } else {
+                    None
+                };
+
+                trades.push(ParsedTradeInfo {
+                    user,
+                    trade_type,
+                    pool,
+                    input_token,
+                    output_token,
+                    fee,
+                    fees: vec![],
+                    dex: DexProtocol::RaydiumClmm.name().to_string(),
+                    signature: adapter.signature.clone(),
+                    slot: adapter.slot,
+                    timestamp: adapter.timestamp,
+                });
+            }
+        }
+
         if trades.is_empty() {
             return Err(ParseError::ParseFailed(
                 "未找到有效的 Raydium CLMM 交易".to_string(),
@@ -253,13 +319,19 @@ impl DexParserTrait for RaydiumClmmParser {
         DexProtocol::RaydiumClmm
     }
 
-    /// 重写 can_parse 方法，检查内部指令
+    /// 重写 can_parse 方法，检查外层指令和内部指令
     fn can_parse(&self, adapter: &TransactionAdapter) -> bool {
         let program_id = self.protocol().program_id();
         let program_pubkey: solana_sdk::pubkey::Pubkey = program_id.parse().unwrap();
 
-        // CLMM 的指令在 inner instructions 中
-        !adapter.get_inner_instructions_by_program(&program_pubkey).is_empty()
+        // 检查 inner instructions 中是否有 CLMM 程序的指令
+        let has_inner = !adapter.get_inner_instructions_by_program(&program_pubkey).is_empty();
+
+        // 也检查外层指令中是否有 CLMM 程序的指令
+        let has_outer = adapter.instructions.iter()
+            .any(|ix| ix.program_id == program_pubkey);
+
+        has_inner || has_outer
     }
 }
 
