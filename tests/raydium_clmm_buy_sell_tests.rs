@@ -1,16 +1,14 @@
 use sol_trade_sdk::{
     common::{GasFeeStrategy, TradeConfig},
-    swqos::SwqosConfig,
+    parser::DexParser,
     trading::core::params::{DexParamEnum, RaydiumClmmParams},
     DexType, SolanaTrade, TradeBuyParams, TradeSellParams, TradeTokenType,
 };
-use solana_client::nonblocking::rpc_client::RpcClient as RpcClientAsync;
-use solana_commitment_config::CommitmentConfig;
-use solana_sdk::{pubkey::Pubkey, signature::Keypair, signer::Signer};
-use std::{str::FromStr, sync::Arc};
+use solana_sdk::{pubkey::Pubkey, signer::Signer};
+use std::str::FromStr;
 
 mod test_helpers;
-use test_helpers::{print_balances, print_token_balance};
+use test_helpers::{create_test_client, print_balances, print_token_balance};
 
 /// JUP Token mint
 const JUP_MINT: &str = "JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN";
@@ -18,116 +16,17 @@ const JUP_MINT: &str = "JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN";
 /// WSOL-JUP CLMM Pool
 const WSOL_JUP_POOL: &str = "EZVkeboWeXygtq8LMyENHyXdF5wpYrtExRNH9UwB1qYw";
 
-/// 测试所需的最低 SOL 余额（lamports）
-const MIN_REQUIRED_BALANCE: u64 = 2_000_000_000; // 2 SOL
-
 #[tokio::test]
 #[serial_test::serial]
 async fn test_raydium_clmm_buy_and_sell_jup() {
     println!("\n=== 测试：Raydium CLMM 完整交易流程（买入+卖出 JUP） ===");
 
-    // 使用官方配置的账户
-    use std::fs;
-    let payer_path = "docs/id.json";
-    let keypair_bytes = fs::read_to_string(payer_path).expect("Failed to read payer keypair file");
-    let keypair_vec: Vec<u8> =
-        serde_json::from_str(&keypair_bytes).expect("Failed to parse keypair JSON");
-    // Keypair JSON 文件格式：[secret_key(32 bytes) + public_key(32 bytes)] = 64 bytes
-    // new_from_array 只需要前32字节（secret key）
-    let mut keypair_array = [0u8; 32];
-    keypair_array.copy_from_slice(&keypair_vec[..32]);
-    let payer = Arc::new(Keypair::new_from_array(keypair_array));
-
+    // 使用 create_test_client 创建随机测试账户
+    let client = create_test_client().await;
     let rpc_url = "http://127.0.0.1:8899";
-    let rpc_url_for_client = rpc_url.to_string();
-    let commitment = CommitmentConfig::confirmed();
 
-    let payer_pubkey = payer.pubkey();
+    let payer_pubkey = client.payer.as_ref().pubkey();
     println!("测试钱包: {}", payer_pubkey);
-
-    // ===== 步骤 0: 检查余额并自动空投 =====
-    let rpc_client = RpcClientAsync::new(rpc_url.to_string());
-
-    let balance = rpc_client
-        .get_balance_with_commitment(&payer_pubkey, commitment)
-        .await
-        .expect("Failed to get balance")
-        .value;
-
-    println!("当前 SOL 余额: {} lamports ({:.4} SOL)", balance, balance as f64 / 1e9);
-
-    if balance < MIN_REQUIRED_BALANCE {
-        println!(
-            "⚠️  余额不足，需要至少 {:.4} SOL",
-            MIN_REQUIRED_BALANCE as f64 / 1e9
-        );
-        println!("💸 正在申请空投 2 SOL...");
-
-        // 直接使用最简单的空投方法
-        let signature_result = rpc_client
-            .request_airdrop(&payer_pubkey, MIN_REQUIRED_BALANCE)
-            .await;
-
-        let signature = match signature_result {
-            Ok(sig) => sig,
-            Err(e) => {
-                println!("⚠️  自动空投失败: {}", e);
-                println!("提示: 本地测试节点可能不支持空投");
-                println!("请手动执行: solana airdrop 2 {} --url {}", payer_pubkey, rpc_url);
-                panic!("需要手动空投 SOL 以继续测试");
-            }
-        };
-
-        println!("✅ 空投请求已提交！签名: {}", signature);
-
-        // 确认交易
-        println!("⏳ 等待空投确认...");
-        let max_retries = 30;
-        let mut retries = 0;
-        loop {
-            let confirmed = rpc_client
-                .get_signature_status(&signature)
-                .await
-                .expect("Failed to check confirmation");
-
-            if let Some(Ok(_)) = confirmed {
-                println!("✅ 空投已确认！");
-                break;
-            }
-
-            retries += 1;
-            if retries >= max_retries {
-                panic!("空投确认超时");
-            }
-
-            tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
-            println!("  等待中... ({}/{})", retries, max_retries);
-        }
-
-        // 等待链上状态更新
-        tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
-
-        let new_balance = rpc_client
-            .get_balance_with_commitment(&payer_pubkey, commitment)
-            .await
-            .expect("Failed to get balance after airdrop")
-            .value;
-        println!(
-            "空投后余额: {} lamports ({:.4} SOL)",
-            new_balance,
-            new_balance as f64 / 1e9
-        );
-    } else {
-        println!("✅ 余额充足，无需空投");
-    }
-
-    // ===== 步骤 1: 创建 TradingClient =====
-    let swqos_configs: Vec<SwqosConfig> = vec![SwqosConfig::Default(rpc_url_for_client.clone())];
-    let trade_config = TradeConfig::new(rpc_url_for_client.clone(), swqos_configs, commitment)
-        .with_wsol_ata_config(true, false);
-    let client = SolanaTrade::new(payer.clone(), trade_config).await;
-
-    println!("✅ TradingClient 创建成功");
 
     // 记录初始 SOL 余额
     let (initial_sol, _) =
@@ -211,6 +110,39 @@ async fn test_raydium_clmm_buy_and_sell_jup() {
     println!("[调试] buy_sigs: {:?}", buy_sigs);
     println!("✅ 买入成功，签名: {:?}", buy_sigs.get(0));
 
+    // 解析买入交易
+    if let Some(buy_sig) = buy_sigs.get(0) {
+        println!("\n📋 解析买入交易...");
+        let parser = DexParser::default();
+        let buy_sig_str = buy_sig.to_string();
+        let parse_result = parser.parse_transaction(&buy_sig_str).await;
+
+        if parse_result.success && !parse_result.trades.is_empty() {
+            println!("✅ 买入交易解析成功:");
+            for trade in &parse_result.trades {
+                println!("  DEX: {}", trade.dex);
+                println!("  用户: {}", trade.user);
+                println!("  Pool: {}", trade.pool);
+                println!("  交易类型: {:?}", trade.trade_type);
+                println!("  输入: {} {} ({} decimals)",
+                    trade.input_token.amount,
+                    trade.input_token.mint,
+                    trade.input_token.decimals
+                );
+                println!("  输出: {} {} ({} decimals)",
+                    trade.output_token.amount,
+                    trade.output_token.mint,
+                    trade.output_token.decimals
+                );
+                if let Some(ref fee) = trade.fee {
+                    println!("  费用: {} {}", fee.amount, fee.mint);
+                }
+            }
+        } else {
+            println!("⚠️  买入交易解析失败: {:?}", parse_result.error);
+        }
+    }
+
     // 等待链上状态更新
     tokio::time::sleep(tokio::time::Duration::from_secs(3)).await;
 
@@ -279,6 +211,39 @@ async fn test_raydium_clmm_buy_and_sell_jup() {
     }
     assert!(success_sell, "卖出交易应成功");
     println!("✅ 卖出成功，签名: {:?}", sell_sigs.get(0));
+
+    // 解析卖出交易
+    if let Some(sell_sig) = sell_sigs.get(0) {
+        println!("\n📋 解析卖出交易...");
+        let parser = DexParser::default();
+        let sell_sig_str = sell_sig.to_string();
+        let parse_result = parser.parse_transaction(&sell_sig_str).await;
+
+        if parse_result.success && !parse_result.trades.is_empty() {
+            println!("✅ 卖出交易解析成功:");
+            for trade in &parse_result.trades {
+                println!("  DEX: {}", trade.dex);
+                println!("  用户: {}", trade.user);
+                println!("  Pool: {}", trade.pool);
+                println!("  交易类型: {:?}", trade.trade_type);
+                println!("  输入: {} {} ({} decimals)",
+                    trade.input_token.amount,
+                    trade.input_token.mint,
+                    trade.input_token.decimals
+                );
+                println!("  输出: {} {} ({} decimals)",
+                    trade.output_token.amount,
+                    trade.output_token.mint,
+                    trade.output_token.decimals
+                );
+                if let Some(ref fee) = trade.fee {
+                    println!("  费用: {} {}", fee.amount, fee.mint);
+                }
+            }
+        } else {
+            println!("⚠️  卖出交易解析失败: {:?}", parse_result.error);
+        }
+    }
 
     // 等待链上状态更新
     tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;

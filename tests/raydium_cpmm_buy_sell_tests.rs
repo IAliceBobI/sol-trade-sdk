@@ -20,6 +20,7 @@ use sol_trade_sdk::{
         clear_pool_cache, get_pool_by_address, get_pool_by_mint, get_pool_by_mint_force, list_pools_by_mint,
         get_token_price_in_usd_with_pool,
     },
+    parser::DexParser,
     trading::core::params::{DexParamEnum, RaydiumCpmmParams},
     DexType, TradeBuyParams, TradeSellParams, TradeTokenType,
 };
@@ -139,6 +140,39 @@ async fn test_raydium_cpmm_buy_sell_complete() {
     assert!(success_buy, "买入交易应成功");
     println!("✅ 买入成功，签名: {:?}", buy_sigs.get(0));
 
+    // 解析买入交易
+    if let Some(buy_sig) = buy_sigs.get(0) {
+        println!("\n📋 解析买入交易...");
+        let parser = DexParser::default();
+        let buy_sig_str = buy_sig.to_string();
+        let parse_result = parser.parse_transaction(&buy_sig_str).await;
+
+        if parse_result.success && !parse_result.trades.is_empty() {
+            println!("✅ 买入交易解析成功:");
+            for trade in &parse_result.trades {
+                println!("  DEX: {}", trade.dex);
+                println!("  用户: {}", trade.user);
+                println!("  Pool: {}", trade.pool);
+                println!("  交易类型: {:?}", trade.trade_type);
+                println!("  输入: {} {} ({} decimals)",
+                    trade.input_token.amount,
+                    trade.input_token.mint,
+                    trade.input_token.decimals
+                );
+                println!("  输出: {} {} ({} decimals)",
+                    trade.output_token.amount,
+                    trade.output_token.mint,
+                    trade.output_token.decimals
+                );
+                if let Some(ref fee) = trade.fee {
+                    println!("  费用: {} {}", fee.amount, fee.mint);
+                }
+            }
+        } else {
+            println!("⚠️  买入交易解析失败: {:?}", parse_result.error);
+        }
+    }
+
     // 买入后的代币余额
     let token_after_buy = print_token_balance(rpc_url, &payer_pubkey, &target_mint, "Target")
         .await
@@ -181,6 +215,39 @@ async fn test_raydium_cpmm_buy_sell_complete() {
         client.sell(sell_params).await.expect("Raydium CPMM 卖出交易执行失败");
     assert!(success_sell, "卖出交易应成功");
     println!("✅ 卖出成功，签名: {:?}", sell_sigs.get(0));
+
+    // 解析卖出交易
+    if let Some(sell_sig) = sell_sigs.get(0) {
+        println!("\n📋 解析卖出交易...");
+        let parser = DexParser::default();
+        let sell_sig_str = sell_sig.to_string();
+        let parse_result = parser.parse_transaction(&sell_sig_str).await;
+
+        if parse_result.success && !parse_result.trades.is_empty() {
+            println!("✅ 卖出交易解析成功:");
+            for trade in &parse_result.trades {
+                println!("  DEX: {}", trade.dex);
+                println!("  用户: {}", trade.user);
+                println!("  Pool: {}", trade.pool);
+                println!("  交易类型: {:?}", trade.trade_type);
+                println!("  输入: {} {} ({} decimals)",
+                    trade.input_token.amount,
+                    trade.input_token.mint,
+                    trade.input_token.decimals
+                );
+                println!("  输出: {} {} ({} decimals)",
+                    trade.output_token.amount,
+                    trade.output_token.mint,
+                    trade.output_token.decimals
+                );
+                if let Some(ref fee) = trade.fee {
+                    println!("  费用: {} {}", fee.amount, fee.mint);
+                }
+            }
+        } else {
+            println!("⚠️  卖出交易解析失败: {:?}", parse_result.error);
+        }
+    }
 
     // 等待链上状态更新
     tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
