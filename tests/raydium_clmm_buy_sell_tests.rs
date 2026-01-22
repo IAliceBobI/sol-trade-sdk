@@ -103,7 +103,13 @@ async fn test_raydium_clmm_buy_and_sell_jup() {
         println!("   - 官方实现：temp/raydium-clmm/client/src/instructions/utils.rs");
         println!("   - 当前状态：卖出功能正常✅，买入功能待修复❌");
 
-        panic!("❌ 买入失败，无法继续测试卖出流程");
+        panic!(
+            "❌ 买入失败，无法继续测试卖出流程\n\
+             Pool 地址: {}\n\
+             交易签名: {:?}\n\
+             错误详情: {}",
+            WSOL_JUP_POOL, buy_sigs, err.message
+        );
     }
 
     println!("\n[调试] success_buy: {}", success_buy);

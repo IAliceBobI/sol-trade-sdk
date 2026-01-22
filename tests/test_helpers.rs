@@ -74,7 +74,9 @@ pub async fn create_test_client_with_seed_optimize(use_seed_optimize: bool) -> S
 
     // 空投 SOL
     let payer_pubkey = payer.pubkey();
-    let _ = airdrop_to_payer(&rpc_url, &payer_pubkey).await;
+    if let Err(e) = airdrop_to_payer(&rpc_url, &payer_pubkey).await {
+        println!("⚠️  空投 SOL 失败: {}，账户: {}", e, payer_pubkey);
+    }
 
     let commitment = CommitmentConfig::confirmed();
     let swqos_configs: Vec<SwqosConfig> = vec![SwqosConfig::Default(rpc_url.clone())];
@@ -118,7 +120,13 @@ pub async fn print_balances(
     let (wsol_amount, wsol_decimals, wsol_ui_amount_str) =
         match client.get_token_account_balance(&wsol_ata).await {
             Ok(token) => {
-                let amount: u64 = token.amount.parse().unwrap_or(0);
+                let amount: u64 = token.amount.parse().unwrap_or_else(|e| {
+                    println!(
+                        "⚠️  解析 WSOL amount 字符串失败: {}，原始值: '{}'，账户: {}，视为余额 0",
+                        e, token.amount, wsol_ata
+                    );
+                    0
+                });
                 (amount, token.decimals, token.ui_amount_string)
             }
             Err(e) => {
@@ -179,17 +187,29 @@ pub async fn get_token_balance(
 ) -> Result<u64, Box<dyn std::error::Error>> {
     let client = RpcClient::new(rpc_url.to_string());
 
-    // 尝试 TOKEN_PROGRAM 和 TOKEN_PROGRAM_2022
+    // 尝试 TOKEN_PROGRAM
     let ata = get_associated_token_address_with_program_id_fast(payer, mint, &TOKEN_PROGRAM);
     if let Ok(token) = client.get_token_account_balance(&ata).await {
-        let amount: u64 = token.amount.parse().unwrap_or(0);
+        let amount: u64 = token.amount.parse().unwrap_or_else(|e| {
+            println!(
+                "⚠️  解析 token amount 字符串失败: {}，原始值: '{}'，账户: {}，使用 TOKEN_PROGRAM",
+                e, token.amount, ata
+            );
+            0
+        });
         return Ok(amount);
     }
 
     // 尝试 TOKEN_PROGRAM_2022
     let ata2022 = get_associated_token_address_with_program_id_fast(payer, mint, &TOKEN_PROGRAM_2022);
     if let Ok(token) = client.get_token_account_balance(&ata2022).await {
-        let amount: u64 = token.amount.parse().unwrap_or(0);
+        let amount: u64 = token.amount.parse().unwrap_or_else(|e| {
+            println!(
+                "⚠️  解析 token amount 字符串失败: {}，原始值: '{}'，账户: {}，使用 TOKEN_PROGRAM_2022",
+                e, token.amount, ata2022
+            );
+            0
+        });
         return Ok(amount);
     }
 

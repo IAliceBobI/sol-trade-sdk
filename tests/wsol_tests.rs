@@ -120,7 +120,9 @@ async fn test_wsol_multiple_wraps() {
     println!("=== 连续包装测试通过 ===");
 
     // 清理：关闭 WSOL 账户
-    let _ = client.close_wsol().await;
+    if let Err(e) = client.close_wsol().await {
+        println!("⚠️  清理 WSOL 账户失败: {}", e);
+    }
 }
 
 /// 测试：创建 WSOL ATA（幂等性）
@@ -148,7 +150,9 @@ async fn test_wsol_ata_creation_idempotent() {
     println!("=== ATA 幂等创建测试通过 ===");
 
     // 清理
-    let _ = client.close_wsol().await;
+    if let Err(e) = client.close_wsol().await {
+        println!("⚠️  清理 WSOL 账户失败: {}", e);
+    }
 }
 
 #[tokio::test]
@@ -165,7 +169,22 @@ async fn test_trade_with_wsol() {
         .expect("Invalid mint address");
 
     // 使用工具函数购买 0.01 SOL 的 Pump 代币
-    let _ = buy_pump_with_sol(&client, pool, mint, 10_000_000, Some(500)).await;
+    let (success, signatures, error) = buy_pump_with_sol(&client, pool, mint, 10_000_000, Some(500))
+        .await
+        .expect("Pump 交易执行失败");
+
+    assert!(success, "Pump 交易应该成功");
+    assert!(!signatures.is_empty(), "应该获得交易签名");
+
+    println!("✅ 交易成功！签名数量: {}", signatures.len());
+    for (i, sig) in signatures.iter().enumerate() {
+        println!("    [{}] {}", i + 1, sig);
+    }
+
+    if let Some(err) = error {
+        println!("⚠️  交易有警告: {}", err);
+    }
+
     println!("=== 交易 WSOL 测试完成 ===");
 }
 

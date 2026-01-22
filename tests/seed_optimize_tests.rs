@@ -75,7 +75,9 @@ async fn test_seed_ata_address_characteristics() {
     println!("✅ 两个地址都不是零地址");
 
     // 打印 4 个地址的余额信息
-    let _ = print_seed_optimize_balances(&rpc_url, &payer_pubkey, &mint).await;
+    if let Err(e) = print_seed_optimize_balances(&rpc_url, &payer_pubkey, &mint).await {
+        println!("⚠️  打印余额信息失败: {}", e);
+    }
 
     println!("=== Seed ATA 地址特性测试通过 (Token-2022) ===");
     println!("注意：Seed 优化会生成确定性但不同的 ATA 地址");

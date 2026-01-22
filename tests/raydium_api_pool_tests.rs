@@ -24,7 +24,10 @@ const USDC_MINT: &str = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
 
 fn init_env_and_print_proxy() {
     // 加载 .env，如果存在的话
-    let _ = dotenv();
+    match dotenv() {
+        Ok(path) => println!("[raydium_api_pool_tests] 已加载 .env 文件: {}", path.display()),
+        Err(_) => println!("[raydium_api_pool_tests] 未找到 .env 文件，使用环境变量或默认配置"),
+    }
 
     let https_proxy = env::var("HTTPS_PROXY").or_else(|_| env::var("https_proxy")).ok();
     let http_proxy = env::var("HTTP_PROXY").or_else(|_| env::var("http_proxy")).ok();
