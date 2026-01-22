@@ -14,7 +14,6 @@
 //!
 //! 注意：使用 surfpool (localhost:8899) 进行测试
 
-use serial_test::serial;
 use sol_trade_sdk::instruction::utils::raydium_clmm::{
     clear_pool_cache, get_pool_by_address, get_pool_by_mint, get_pool_by_mint_force,
     get_token_price_in_usd, get_token_price_in_usd_with_pool, get_wsol_price_in_usd,
@@ -45,7 +44,7 @@ const JUP_MINT: &str = "JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN";
 /// 5. 使用 `get_pool_by_mint` 查找最优 Pool 并验证缓存
 /// 6. 使用 `get_pool_by_mint_force` 强制刷新（结果通常相同）
 #[tokio::test]
-#[serial]
+#[serial_test::serial(global_dex_cache)]
 async fn test_raydium_clmm_get_pool_by_mint_wsol_cache_and_force() {
     println!("=== 测试：Raydium CLMM get_pool_by_mint (WSOL, cache & force) ===");
 
@@ -136,7 +135,7 @@ async fn test_raydium_clmm_get_pool_by_mint_wsol_cache_and_force() {
 
 /// 测试：通过地址获取 pool 数据（带缓存）
 #[tokio::test]
-#[serial]
+#[serial_test::serial(global_dex_cache)]
 async fn test_raydium_clmm_get_pool_by_address() {
     println!("=== 测试：Raydium CLMM get_pool_by_address (带缓存) ===");
 
@@ -202,7 +201,7 @@ async fn test_raydium_clmm_get_pool_by_address() {
 
 /// 测试：通过 WSOL-USDT 锚定池获取 WSOL 的 USD 价格（实时、主网）
 #[tokio::test]
-#[serial]
+#[serial_test::serial(global_dex_cache)]
 async fn test_raydium_clmm_get_wsol_price_in_usd() {
     println!("=== 测试：Raydium CLMM get_wsol_price_in_usd (WSOL-USDT anchor) ===");
 
@@ -226,7 +225,7 @@ async fn test_raydium_clmm_get_wsol_price_in_usd() {
 
 /// 测试：通过 Raydium CLMM 获取 JUP 的 USD 价格（X-WSOL 池 + WSOL-USD 锚定池，主网）
 #[tokio::test]
-#[serial]
+#[serial_test::serial(global_dex_cache)]
 async fn test_raydium_clmm_get_jup_price_in_usd() {
     println!("=== 测试：Raydium CLMM get_token_price_in_usd (JUP) ===");
 
@@ -250,7 +249,7 @@ async fn test_raydium_clmm_get_jup_price_in_usd() {
 
 /// 测试：通过 Raydium CLMM 获取 JUP 的 USD 价格（直接传入池地址，跳过查找，主网）
 #[tokio::test]
-#[serial]
+#[serial_test::serial(global_dex_cache)]
 async fn test_raydium_clmm_get_jup_price_in_usd_with_pool() {
     println!("=== 测试：Raydium CLMM get_token_price_in_usd_with_pool (JUP, 跳过查找) ===");
 

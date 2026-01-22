@@ -1,8 +1,8 @@
 use sol_trade_sdk::{
-    common::{GasFeeStrategy, TradeConfig},
+    common::GasFeeStrategy,
     parser::DexParser,
     trading::core::params::{DexParamEnum, RaydiumClmmParams},
-    DexType, SolanaTrade, TradeBuyParams, TradeSellParams, TradeTokenType,
+    DexType, TradeBuyParams, TradeSellParams, TradeTokenType,
 };
 use solana_sdk::{pubkey::Pubkey, signer::Signer};
 use std::str::FromStr;

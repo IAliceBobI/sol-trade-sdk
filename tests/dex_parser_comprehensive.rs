@@ -5,7 +5,6 @@
 //! 测试数据来源: docs/plans/task.md
 
 use sol_trade_sdk::parser::DexParser;
-use serial_test::serial;
 
 /// 测试所有 4 个 DEX 的交易解析
 ///
@@ -15,7 +14,7 @@ use serial_test::serial;
 /// 3. Raydium CPMM 解析功能
 /// 4. Raydium CLMM 解析功能
 #[tokio::test]
-#[serial]
+#[serial_test::serial(global_dex_cache)]
 async fn test_all_dex_parsing() {
     let parser = DexParser::default();
 
@@ -111,6 +110,7 @@ async fn test_all_dex_parsing() {
 
 /// 测试能正确识别不同的 DEX 协议
 #[tokio::test]
+#[serial_test::serial(global_dex_cache)]
 async fn test_dex_protocol_detection() {
     use sol_trade_sdk::parser::types::DexProtocol;
 
@@ -145,6 +145,7 @@ async fn test_dex_protocol_detection() {
 
 /// 测试解析器配置
 #[tokio::test]
+#[serial_test::serial(global_dex_cache)]
 async fn test_parser_config() {
     use sol_trade_sdk::parser::types::ParserConfig;
 
@@ -167,7 +168,7 @@ async fn test_parser_config() {
 
 /// 测试单个 DEX 的详细解析（PumpSwap）
 #[tokio::test]
-#[serial]
+#[serial_test::serial(global_dex_cache)]
 async fn test_pumpswap_detailed_parsing() {
     let parser = DexParser::default();
     let signature = "5GCZ3TR31aDRP9LZxznKPBux86jWDyCxt1noCAAhX43d6Cmtqi8HvK6oHErq7DBr9j5KRcqeYumW2wHt5qJG1tQK";
@@ -196,7 +197,7 @@ async fn test_pumpswap_detailed_parsing() {
 
 /// 测试单个 DEX 的详细解析（Raydium V4）
 #[tokio::test]
-#[serial]
+#[serial_test::serial(global_dex_cache)]
 async fn test_raydium_v4_detailed_parsing() {
     let parser = DexParser::default();
     let signature = "5tqpXeLDzBKXdWUrTXb5pApjhapj6PLZZLvcLFBsYUdGgtnW9MYTC7N16gF4GyVZHQgGZKApNRP3bAUckr7MdpJr";
@@ -222,7 +223,7 @@ async fn test_raydium_v4_detailed_parsing() {
 
 /// 测试单个 DEX 的详细解析（Raydium CPMM）
 #[tokio::test]
-#[serial]
+#[serial_test::serial(global_dex_cache)]
 async fn test_raydium_cpmm_detailed_parsing() {
     let parser = DexParser::default();
     let signature = "7Q5gThWgQkbSR6GSLVSAjo9x762DSuLQwg6ne6KKomjfWSho26Zmr7qfPQ7zzJk7sdTvHPqhW9grxaNzGhJgRrn";
@@ -248,7 +249,7 @@ async fn test_raydium_cpmm_detailed_parsing() {
 
 /// 测试单个 DEX 的详细解析（Raydium CLMM）
 #[tokio::test]
-#[serial]
+#[serial_test::serial(global_dex_cache)]
 async fn test_raydium_clmm_detailed_parsing() {
     let parser = DexParser::default();
     let signature = "5DiDUkUntQVmDMUes3mwpiPTRHQW4YWeUWfFyDFDpsKezXdw9xZQmprgrK6ddu7YaNaJ3K5GT6RGUJ8v7828TXJU";

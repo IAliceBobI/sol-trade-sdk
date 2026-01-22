@@ -28,7 +28,7 @@ const PUMP_POOL_ADDRESS: &str = "539m4mVWt6iduB6W8rDGPMarzNCMesuqY5eUTiiYHAgR";
 
 /// 测试：通过 mint 查找 pool 地址
 #[tokio::test]
-#[serial_test::serial]
+#[serial_test::serial(global_dex_cache)]
 async fn test_find_pool_by_mint() {
     println!("=== 测试：通过 mint 查找 pool 地址 ===");
 
@@ -55,7 +55,7 @@ async fn test_find_pool_by_mint() {
 
 /// 测试：通过地址获取 pool 数据（带缓存）
 #[tokio::test]
-#[serial_test::serial]
+#[serial_test::serial(global_dex_cache)]
 async fn test_get_pool_by_address() {
     println!("=== 测试：通过地址获取 pool 数据（带缓存） ===");
 
@@ -112,7 +112,7 @@ async fn test_get_pool_by_address() {
 
 /// 测试：获取 PumpSwap token 的 USD 价格
 #[tokio::test]
-#[serial_test::serial]
+#[serial_test::serial(global_dex_cache)]
 async fn test_get_pumpswap_token_price_in_usd() {
     println!("=== 测试：获取 PumpSwap token 的 USD 价格 ===");
 

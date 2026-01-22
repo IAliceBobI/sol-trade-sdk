@@ -5,13 +5,12 @@
 
 use sol_trade_sdk::parser::DexParser;
 use sol_trade_sdk::parser::types::TradeType;
-use serial_test::serial;
 
 /// Pumpswap 买入交易测试
 ///
 /// 交易: https://solscan.io/tx/5GCZ3TR31aDRP9LZxznKPBux86jWDyCxt1noCAAhX43d6Cmtqi8HvK6oHErq7DBr9j5KRcqeYumW2wHt5qJG1tQK?cluster=custom&customUrl=http://127.0.0.1:8899
 #[tokio::test]
-#[serial]
+#[serial_test::serial(global_dex_cache)]
 async fn test_parse_pumpswap_buy_transaction() {
     let parser = DexParser::default();
     let signature = "5GCZ3TR31aDRP9LZxznKPBux86jWDyCxt1noCAAhX43d6Cmtqi8HvK6oHErq7DBr9j5KRcqeYumW2wHt5qJG1tQK";
@@ -58,7 +57,7 @@ async fn test_parse_pumpswap_buy_transaction() {
 
 /// Pumpswap 卖出交易测试
 #[tokio::test]
-#[serial]
+#[serial_test::serial(global_dex_cache)]
 async fn test_parse_pumpswap_sell_transaction() {
     let parser = DexParser::default();
     // 使用任务中提供的买入交易哈希，实际测试时可以替换为卖出交易
@@ -75,7 +74,7 @@ async fn test_parse_pumpswap_sell_transaction() {
 ///
 /// 交易: https://solscan.io/tx/5tqpXeLDzBKXdWUrTXb5pApjhapj6PLZZLvcLFBsYUdGgtnW9MYTC7N16gF4GyVZHQgGZKApNRP3bAUckr7MdpJr?cluster=custom&customUrl=http://127.0.0.1:8899
 #[tokio::test]
-#[serial]
+#[serial_test::serial(global_dex_cache)]
 async fn test_parse_raydium_v4_transaction() {
     let parser = DexParser::default();
     let signature = "5tqpXeLDzBKXdWUrTXb5pApjhapj6PLZZLvcLFBsYUdGgtnW9MYTC7N16gF4GyVZHQgGZKApNRP3bAUckr7MdpJr";
@@ -116,7 +115,7 @@ async fn test_parse_raydium_v4_transaction() {
 ///
 /// 交易: https://solscan.io/tx/7Q5gThWgQkbSR6GSLVSAjo9x762DSuLQwg6ne6KKomjfWSho26Zmr7qfPQ7zzJk7sdTvHPqhW9grxaNzGhJgRrn?cluster=custom&customUrl=http://127.0.0.1:8899
 #[tokio::test]
-#[serial]
+#[serial_test::serial(global_dex_cache)]
 async fn test_parse_raydium_cpmm_transaction() {
     let parser = DexParser::default();
     let signature = "7Q5gThWgQkbSR6GSLVSAjo9x762DSuLQwg6ne6KKomjfWSho26Zmr7qfPQ7zzJk7sdTvHPqhW9grxaNzGhJgRrn";
@@ -150,7 +149,7 @@ async fn test_parse_raydium_cpmm_transaction() {
 ///
 /// 交易: https://solscan.io/tx/5DiDUkUntQVmDMUes3mwpiPTRHQW4YWeUWfFyDFDpsKezXdw9xZQmprgrK6ddu7YaNaJ3K5GT6RGUJ8v7828TXJU?cluster=custom&customUrl=http://127.0.0.1:8899
 #[tokio::test]
-#[serial]
+#[serial_test::serial(global_dex_cache)]
 async fn test_parse_raydium_clmm_transaction() {
     let parser = DexParser::default();
     let signature = "5DiDUkUntQVmDMUes3mwpiPTRHQW4YWeUWfFyDFDpsKezXdw9xZQmprgrK6ddu7YaNaJ3K5GT6RGUJ8v7828TXJU";

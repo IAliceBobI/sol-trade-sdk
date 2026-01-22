@@ -39,7 +39,6 @@ use solana_sdk::pubkey::Pubkey;
 use std::str::FromStr;
 
 // 用于串行测试
-use serial_test::serial;
 
 /// 已知的 Raydium AMM V4 pool 地址
 /// WSOL-USDC pool on Raydium AMM V4
@@ -56,6 +55,7 @@ const OIIAOIIA_MINT: &str = "VaxZxmFXV8tmsd72hUn22ex6GFzZ5uq9DVJ5wA5pump";
 
 /// 测试：获取 AMM 信息并验证字段
 #[tokio::test]
+#[serial_test::serial(global_dex_cache)]
 async fn test_fetch_amm_info() {
     println!("=== 测试：获取 AMM 信息并验证字段 ===");
 
@@ -208,6 +208,7 @@ async fn test_fetch_amm_info() {
 
 /// 测试：缓存功能
 #[tokio::test]
+#[serial_test::serial(global_dex_cache)]
 async fn test_get_pool_by_address_cache() {
     println!("=== 测试：缓存功能 ===");
 
@@ -274,7 +275,7 @@ async fn test_get_pool_by_address_cache() {
 /// 测试：基于指定 mint (WSOL) 获取 Pool
 /// 注意：此测试会清除缓存，必须与其他测试串行运行
 #[tokio::test]
-#[serial]
+#[serial_test::serial(global_dex_cache)]
 async fn test_get_pool_by_mint_wsol() {
     println!("=== 测试：get_pool_by_mint (WSOL) ===");
 
@@ -359,6 +360,7 @@ async fn test_get_pool_by_mint_wsol() {
 /// - API 文档: https://api-v3.raydium.io/docs/
 /// 
 #[tokio::test]
+#[serial_test::serial(global_dex_cache)]
 async fn test_public_rpc_limitations() {
     println!("=== 测试：验证公共 RPC getProgramAccounts 限制 ===");
     
@@ -427,6 +429,7 @@ async fn test_public_rpc_limitations() {
 /// ```
 #[tokio::test]
 #[ignore]  // 默认忽略，因为公共 RPC 不支持
+#[serial_test::serial(global_dex_cache)]
 async fn test_list_pools_by_mint_wsol() {
     println!("=== 测试：list_pools_by_mint (WSOL) ===");
 
@@ -463,6 +466,7 @@ async fn test_list_pools_by_mint_wsol() {
 
 /// 测试：列出所有活跃的 WSOL Pool
 #[tokio::test]
+#[serial_test::serial(global_dex_cache)]
 async fn test_list_active_pools_by_mint_wsol() {
     println!("=== 测试：list_pools_by_mint (WSOL, active only) ===");
 
@@ -492,6 +496,7 @@ async fn test_list_active_pools_by_mint_wsol() {
 
 /// 测试：获取 AMM V4 token 的 USD 价格
 #[tokio::test]
+#[serial_test::serial(global_dex_cache)]
 async fn test_get_amm_v4_token_price_in_usd() {
     println!("=== 测试：获取 AMM V4 token 的 USD 价格 ===");
 

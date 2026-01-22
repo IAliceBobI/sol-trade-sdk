@@ -13,7 +13,6 @@
 //! 运行测试:
 //!     cargo test --test raydium_cpmm_buy_sell_tests -- --nocapture
 
-use serial_test::serial;
 use sol_trade_sdk::{
     common::GasFeeStrategy,
     instruction::utils::raydium_cpmm::{
@@ -49,6 +48,7 @@ const PIPE_POOL: &str = "BnYsRpYvJpz6biY3hV6U9smChVePCJ6YyupVDfcnXpTp";
 /// 4. 再将全部目标代币卖出换回 SOL
 /// 5. 验证 Token 余额变化和 SOL 净变化
 #[tokio::test]
+#[serial_test::serial(global_dex_cache)]
 async fn test_raydium_cpmm_buy_sell_complete() {
     println!("\n=== 测试：Raydium CPMM 完整买卖流程 ===");
 
@@ -280,7 +280,7 @@ async fn test_raydium_cpmm_buy_sell_complete() {
 /// 3. 再次调用 `get_pool_by_mint`（应命中缓存，结果相同）
 /// 4. 使用 `get_pool_by_mint_force` 强制刷新（结果通常相同）
 #[tokio::test]
-#[serial]
+#[serial_test::serial(global_dex_cache)]
 async fn test_raydium_cpmm_get_pool_by_mint_wsol_cache_and_force() {
     println!("=== 测试：Raydium CPMM get_pool_by_mint (WSOL, cache & force) ===");
 
@@ -326,6 +326,7 @@ async fn test_raydium_cpmm_get_pool_by_mint_wsol_cache_and_force() {
 /// - 返回列表非空
 /// - 所有池的 `token0_mint` 或 `token1_mint` 中至少一侧为 WSOL
 #[tokio::test]
+#[serial_test::serial(global_dex_cache)]
 async fn test_raydium_cpmm_list_pools_by_mint_wsol() {
     println!("=== 测试：Raydium CPMM list_pools_by_mint (WSOL) ===");
 
@@ -352,6 +353,7 @@ async fn test_raydium_cpmm_list_pools_by_mint_wsol() {
 
 /// 测试：获取 CPMM token 的 USD 价格
 #[tokio::test]
+#[serial_test::serial(global_dex_cache)]
 async fn test_get_cpmm_token_price_in_usd() {
     println!("=== 测试：获取 CPMM token 的 USD 价格 ===");
 
