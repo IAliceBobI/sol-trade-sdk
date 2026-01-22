@@ -10,7 +10,7 @@ use crate::parser::{
     transaction_adapter::TransactionAdapter,
     base_parser::{DexParserTrait, ParseError},
     types::{ParsedTradeInfo, TradeType, TokenInfo, DexProtocol},
-    constants::discriminators::raydium_v4,
+    discriminators::{DiscriminatorRegistry, DexProtocol as ParserDexProtocol},
 };
 
 /// Transfer 记录
@@ -32,13 +32,17 @@ impl RaydiumV4Parser {
         Self
     }
 
-    /// 判断是否是 Swap 指令（排除流动性操作）
+    /// 判断是否是 Swap 指令
+    /// 使用 discriminator 系统精确识别，排除流动性操作
     fn is_swap_instruction(&self, data: &[u8]) -> bool {
         if data.is_empty() {
             return false;
         }
-        // Raydium V4 Swap 的 discriminator 是 9
-        data[0] == raydium_v4::SWAP
+
+        let registry = DiscriminatorRegistry::default();
+
+        // 只有确认不是流动性操作才认为是 Swap
+        !registry.is_liquidity_discriminator(ParserDexProtocol::RaydiumV4, data)
     }
 
     /// 从账户列表中提取池地址
@@ -267,11 +271,15 @@ mod tests {
     fn test_is_swap_instruction() {
         let parser = RaydiumV4Parser::new();
 
-        // Swap 指令
-        assert!(parser.is_swap_instruction(&[raydium_v4::SWAP]));
+        // Swap 指令 (1 字节)
+        let swap_data = [9u8];
+        assert!(parser.is_swap_instruction(&swap_data));
 
-        // 非 Swap 指令
-        assert!(!parser.is_swap_instruction(&[raydium_v4::ADD_LIQUIDITY]));
-        assert!(!parser.is_swap_instruction(&[raydium_v4::REMOVE_LIQUIDITY]));
+        // 流动性操作
+        let add_liq_data = [1u8];
+        assert!(!parser.is_swap_instruction(&add_liq_data));
+
+        let remove_liq_data = [2u8];
+        assert!(!parser.is_swap_instruction(&remove_liq_data));
     }
 }

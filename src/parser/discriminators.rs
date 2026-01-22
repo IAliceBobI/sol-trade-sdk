@@ -57,6 +57,12 @@ impl DiscriminatorRegistry {
         // 注册 PumpSwap discriminators
         registry.register_pumpswap();
 
+        // 注册 Raydium CPMM discriminators
+        registry.register_raydium_cpmm();
+
+        // 注册 Raydium V4 discriminators
+        registry.register_raydium_v4();
+
         registry
     }
 
@@ -129,14 +135,57 @@ impl DiscriminatorRegistry {
         self.discriminators.insert((DexProtocol::PumpSwap, remove_liquidity), RemoveLiquidity);
     }
 
+    /// 注册 Raydium CPMM 的 discriminators
+    fn register_raydium_cpmm(&mut self) {
+        use InstructionType::*;
+
+        // SWAP 操作 (8 字节 discriminator)
+        let swap = [0x8f, 0xbe, 0x5a, 0xda, 0xc4, 0x1e, 0x33, 0xde];
+        self.discriminators.insert((DexProtocol::RaydiumCpmm, swap), Swap);
+
+        // 流动性操作
+        let create_pool = [175, 175, 109, 31, 13, 152, 155, 237];
+        self.discriminators.insert((DexProtocol::RaydiumCpmm, create_pool), CreatePool);
+
+        let add_liquidity = [242, 35, 198, 137, 82, 225, 242, 182];
+        self.discriminators.insert((DexProtocol::RaydiumCpmm, add_liquidity), AddLiquidity);
+
+        let remove_liquidity = [183, 18, 70, 156, 148, 109, 161, 34];
+        self.discriminators.insert((DexProtocol::RaydiumCpmm, remove_liquidity), RemoveLiquidity);
+    }
+
+    /// 注册 Raydium V4 的 discriminators
+    fn register_raydium_v4(&mut self) {
+        use InstructionType::*;
+
+        // V4 使用 1 字节 discriminator，为了兼容系统，我们转换为 8 字节（前 1 字节有效）
+        // SWAP 操作 (discriminator = 9)
+        let swap = [9, 0, 0, 0, 0, 0, 0, 0];
+        self.discriminators.insert((DexProtocol::RaydiumV4, swap), Swap);
+
+        // 流动性操作
+        let add_liquidity = [1, 0, 0, 0, 0, 0, 0, 0];
+        self.discriminators.insert((DexProtocol::RaydiumV4, add_liquidity), AddLiquidity);
+
+        let remove_liquidity = [2, 0, 0, 0, 0, 0, 0, 0];
+        self.discriminators.insert((DexProtocol::RaydiumV4, remove_liquidity), RemoveLiquidity);
+
+        let create_pool = [0, 0, 0, 0, 0, 0, 0, 0];
+        self.discriminators.insert((DexProtocol::RaydiumV4, create_pool), CreatePool);
+    }
+
     /// 识别指令类型
     pub fn identify(&self, protocol: DexProtocol, data: &[u8]) -> InstructionType {
-        if data.len() < 8 {
+        // Raydium V4 使用 1 字节 discriminator，其他协议使用 8 字节
+        let min_len = if matches!(protocol, DexProtocol::RaydiumV4) { 1 } else { 8 };
+
+        if data.len() < min_len {
             return InstructionType::Unknown;
         }
 
         let mut key = [0u8; 8];
-        key.copy_from_slice(&data[0..8]);
+        let copy_len = std::cmp::min(data.len(), 8);
+        key[0..copy_len].copy_from_slice(&data[0..copy_len]);
 
         self.discriminators
             .get(&(protocol, key))

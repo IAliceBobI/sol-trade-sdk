@@ -10,7 +10,7 @@ use crate::parser::{
     transaction_adapter::TransactionAdapter,
     base_parser::{DexParserTrait, ParseError},
     types::{ParsedTradeInfo, TradeType, TokenInfo, DexProtocol},
-    constants::discriminators::raydium_cpmm,
+    discriminators::{DiscriminatorRegistry, DexProtocol as ParserDexProtocol},
 };
 
 /// Transfer 记录
@@ -32,28 +32,17 @@ impl RaydiumCpmmParser {
         Self
     }
 
-    /// 判断是否是 Swap 指令（排除流动性操作）
+    /// 判断是否是 Swap 指令
+    /// 使用 discriminator 系统精确识别，排除流动性操作
     fn is_swap_instruction(&self, data: &[u8]) -> bool {
         if data.len() < 8 {
             return false;
         }
-        // Raydium CPMM Swap 的 discriminator 是 8 字节
-        &data[0..8] == raydium_cpmm::SWAP
-    }
 
-    #[allow(dead_code)]
-    fn is_add_liquidity(&self, data: &[u8]) -> bool {
-        data.len() >= 8 && &data[0..8] == raydium_cpmm::ADD_LIQUIDITY
-    }
+        let registry = DiscriminatorRegistry::default();
 
-    #[allow(dead_code)]
-    fn is_remove_liquidity(&self, data: &[u8]) -> bool {
-        data.len() >= 8 && &data[0..8] == raydium_cpmm::REMOVE_LIQUIDITY
-    }
-
-    #[allow(dead_code)]
-    fn is_create_pool(&self, data: &[u8]) -> bool {
-        data.len() >= 8 && &data[0..8] == raydium_cpmm::CREATE_POOL
+        // 只有确认不是流动性操作才认为是 Swap
+        !registry.is_liquidity_discriminator(ParserDexProtocol::RaydiumCpmm, data)
     }
 
     /// 从账户列表中提取池地址
@@ -282,12 +271,15 @@ mod tests {
     fn test_is_swap_instruction() {
         let parser = RaydiumCpmmParser::new();
 
-        // Swap 指令
-        assert!(parser.is_swap_instruction(&raydium_cpmm::SWAP));
+        // Swap 指令 (8 字节)
+        let swap_data = [0x8f, 0xbe, 0x5a, 0xda, 0xc4, 0x1e, 0x33, 0xde];
+        assert!(parser.is_swap_instruction(&swap_data));
 
-        // 非 Swap 指令
-        assert!(!parser.is_swap_instruction(&raydium_cpmm::ADD_LIQUIDITY));
-        assert!(!parser.is_swap_instruction(&raydium_cpmm::REMOVE_LIQUIDITY));
-        assert!(!parser.is_swap_instruction(&raydium_cpmm::CREATE_POOL));
+        // 流动性操作
+        let add_liq_data = [242, 35, 198, 137, 82, 225, 242, 182];
+        assert!(!parser.is_swap_instruction(&add_liq_data));
+
+        let remove_liq_data = [183, 18, 70, 156, 148, 109, 161, 34];
+        assert!(!parser.is_swap_instruction(&remove_liq_data));
     }
 }
