@@ -10,6 +10,7 @@ use crate::parser::{
     transaction_adapter::TransactionAdapter,
     base_parser::{DexParserTrait, ParseError},
     types::{ParsedTradeInfo, TradeType, TokenInfo, DexProtocol},
+    discriminators::{DiscriminatorRegistry, DexProtocol as ParserDexProtocol},
 };
 
 /// Transfer 记录
@@ -32,13 +33,16 @@ impl RaydiumClmmParser {
     }
 
     /// 判断是否是 Swap 指令
-    /// CLMM 的 Swap 指令通常在 inner instructions 中
-    /// 这里我们简化判断：只要有 CLMM 程序指令且不是流动性操作，就认为是 swap
+    /// 使用 discriminator 系统精确识别，排除流动性操作
     fn is_swap_instruction(&self, data: &[u8]) -> bool {
-        // Raydium CLMM 使用 8-byte discriminator
-        // 这里我们简化处理：只要有数据长度 >= 8，就认为是可能的 swap
-        // 实际的 swap 指令识别需要排除流动性操作
-        data.len() >= 8
+        if data.len() < 8 {
+            return false;
+        }
+
+        let registry = DiscriminatorRegistry::default();
+
+        // 只有确认不是流动性操作才认为是 Swap
+        !registry.is_liquidity_discriminator(ParserDexProtocol::RaydiumClmm, data)
     }
 
     /// 从账户列表中提取池地址
