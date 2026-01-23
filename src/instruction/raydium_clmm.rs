@@ -249,7 +249,7 @@ impl InstructionBuilder for RaydiumClmmInstructionBuilder {
             
             // 从 RPC 获取 tick arrays
             match crate::instruction::utils::raydium_clmm::get_tick_arrays(
-                rpc,
+                params.rpc.as_ref().ok_or_else(|| anyhow!("RPC client required"))?,
                 &protocol_params.pool_state,
                 &tick_array_indices,
             ).await {
@@ -623,22 +623,7 @@ impl InstructionBuilder for RaydiumClmmInstructionBuilder {
 
         let amount_in: u64 = params.input_amount.unwrap_or(0);
 
-        // Calculate expected output amount using price
-        let price = if is_token0_in {
-            price_token0_in_token1(
-                pool_state.sqrt_price_x64,
-                protocol_params.token0_decimals,
-                protocol_params.token1_decimals,
-            )
-        } else {
-            price_token1_in_token0(
-                pool_state.sqrt_price_x64,
-                protocol_params.token0_decimals,
-                protocol_params.token1_decimals,
-            )
-        };
-
-        // Calculate output amount (simplified - actual CLMM calculation is more complex)
+        // 获取 decimals（用于简化计算降级）
         let input_decimals = if input_mint == protocol_params.token0_mint {
             protocol_params.token0_decimals
         } else {
@@ -651,9 +636,125 @@ impl InstructionBuilder for RaydiumClmmInstructionBuilder {
             protocol_params.token1_decimals
         };
 
-        let input_amount_f64 = amount_in as f64 / 10f64.powi(input_decimals as i32);
-        let output_amount_f64 = input_amount_f64 * price;
-        let expected_output = (output_amount_f64 * 10f64.powi(output_decimals as i32)) as u64;
+        // 获取 AMM config 以获取费率
+        let amm_config = crate::instruction::utils::raydium_clmm::get_amm_config(
+            params.rpc.as_ref().ok_or_else(|| anyhow!("RPC client required"))?,
+            &pool_state.amm_config,
+        ).await?;
+
+        let fee_rate = amm_config.trade_fee_rate;
+
+        // zero_for_one: token0 -> token1 为 true, token1 -> token0 为 false
+        let zero_for_one = is_token0_in;
+
+        // 尝试使用完整的 tick-by-tick 算法（与买入指令相同）
+        let expected_output = if pool_state.liquidity > 0 {
+            // 计算需要的 tick array start indices
+            let current_tick_array_start = crate::instruction::utils::raydium_clmm::get_tick_array_start_index(
+                pool_state.tick_current,
+                pool_state.tick_spacing,
+            );
+
+            // 获取附近的 3 个 tick arrays（当前 + 前后各1个）
+            let tick_spacing_i32 = pool_state.tick_spacing as i32;
+            let ticks_per_array = 60 * tick_spacing_i32;
+
+            let mut tick_array_indices = vec![current_tick_array_start];
+
+            // 添加前一个和后一个 tick array
+            let prev_index = current_tick_array_start - ticks_per_array;
+            let next_index = current_tick_array_start + ticks_per_array;
+
+            if prev_index >= clmm_math::MIN_TICK {
+                tick_array_indices.push(prev_index);
+            }
+            if next_index <= clmm_math::MAX_TICK {
+                tick_array_indices.push(next_index);
+            }
+
+            // 从 RPC 获取 tick arrays
+            match crate::instruction::utils::raydium_clmm::get_tick_arrays(
+                params.rpc.as_ref().ok_or_else(|| anyhow!("RPC client required"))?,
+                &protocol_params.pool_state,
+                &tick_array_indices,
+            ).await {
+                Ok(tick_arrays) if !tick_arrays.is_empty() => {
+                    // 转换为算法需要的格式
+                    let tick_data: Vec<(i32, Vec<(i32, i128, u128)>)> = tick_arrays
+                        .iter()
+                        .map(|(start_index, tick_array)| {
+                            let ticks = tick_array.ticks
+                                .iter()
+                                .filter(|t| t.liquidity_gross > 0)
+                                .map(|t| (t.tick, t.liquidity_net, t.liquidity_gross))
+                                .collect();
+                            (*start_index, ticks)
+                        })
+                        .collect();
+
+                    // 使用完整算法计算
+                    match clmm_math::calculate_swap_amount_with_tick_arrays(
+                        amount_in,
+                        pool_state.sqrt_price_x64,
+                        pool_state.liquidity,
+                        pool_state.tick_current,
+                        pool_state.tick_spacing,
+                        fee_rate,
+                        zero_for_one,
+                        &tick_data,
+                    ) {
+                        Ok(amount) => {
+                            // 使用官方的精确计算
+                            amount
+                        },
+                        Err(_e) => {
+                            // 降级到简化算法
+                            fallback_simple_calculation(
+                                amount_in,
+                                pool_state.sqrt_price_x64,
+                                pool_state.liquidity,
+                                pool_state.tick_current,
+                                fee_rate,
+                                zero_for_one,
+                                is_token0_in,
+                                input_decimals,
+                                output_decimals,
+                                &protocol_params,
+                            )
+                        }
+                    }
+                },
+                _ => {
+                    // 降级到简化算法
+                    fallback_simple_calculation(
+                        amount_in,
+                        pool_state.sqrt_price_x64,
+                        pool_state.liquidity,
+                        pool_state.tick_current,
+                        fee_rate,
+                        zero_for_one,
+                        is_token0_in,
+                        input_decimals,
+                        output_decimals,
+                        &protocol_params,
+                    )
+                }
+            }
+        } else {
+            // 降级到简化算法
+            fallback_simple_calculation(
+                amount_in,
+                pool_state.sqrt_price_x64,
+                pool_state.liquidity,
+                pool_state.tick_current,
+                fee_rate,
+                zero_for_one,
+                is_token0_in,
+                input_decimals,
+                output_decimals,
+                &protocol_params,
+            )
+        };
 
         // Apply slippage
         let slippage = params.slippage_basis_points.unwrap_or(DEFAULT_SLIPPAGE);
@@ -719,16 +820,45 @@ impl InstructionBuilder for RaydiumClmmInstructionBuilder {
             );
         }
 
-        // Calculate tick array PDA
+        // Calculate tick arrays - CLMM requires multiple tick arrays for swap
+        // 根据官方 client 实现，需要获取多个 tick arrays（最多 5 个）
         let zero_for_one = is_token0_in;
-        let tick_array_start_index = crate::instruction::utils::raydium_clmm::get_first_initialized_tick_array_start_index(
+        let mut tick_array_start_index = crate::instruction::utils::raydium_clmm::get_first_initialized_tick_array_start_index(
             &pool_state,
             zero_for_one,
         );
-        let (tick_array_pda, _) = get_tick_array_pda(&protocol_params.pool_state, tick_array_start_index)?;
-        
+
+        let mut tick_array_pdas = Vec::new();
+        let (first_tick_array_pda, _) = get_tick_array_pda(&protocol_params.pool_state, tick_array_start_index)?;
+        tick_array_pdas.push(first_tick_array_pda);
+
+        // 获取后续的 tick arrays（最多 5 个）
+        let tick_spacing = pool_state.tick_spacing as i32;
+        const TICK_ARRAY_SIZE: i32 = 60; // raydium_amm_v3::states::TICK_ARRAY_SIZE
+        let ticks_per_array = tick_spacing * TICK_ARRAY_SIZE;
+
+        for _ in 0..4 {
+            tick_array_start_index = if zero_for_one {
+                tick_array_start_index - ticks_per_array
+            } else {
+                tick_array_start_index + ticks_per_array
+            };
+
+            // 检查是否超出范围
+            const MIN_TICK: i32 = -443636;
+            const MAX_TICK: i32 = 443636;
+            if (zero_for_one && tick_array_start_index < MIN_TICK) ||
+               (!zero_for_one && tick_array_start_index > MAX_TICK) {
+                break;
+            }
+
+            if let Ok((tick_array_pda, _)) = get_tick_array_pda(&protocol_params.pool_state, tick_array_start_index) {
+                tick_array_pdas.push(tick_array_pda);
+            }
+        }
+
         // Get tick array bitmap extension PDA (may not exist)
-        let (_tick_array_bitmap_extension_pda, _) = crate::instruction::utils::raydium_clmm::get_tick_array_bitmap_extension_pda(&protocol_params.pool_state);
+        let (tick_array_bitmap_extension_pda, _) = crate::instruction::utils::raydium_clmm::get_tick_array_bitmap_extension_pda(&protocol_params.pool_state);
 
         // Create swap instruction
         // SwapV2 指令账户顺序（与 buy 相同）
@@ -748,10 +878,14 @@ impl InstructionBuilder for RaydiumClmmInstructionBuilder {
             AccountMeta::new_readonly(input_mint, false), // 11. Input Mint (readonly)
             AccountMeta::new_readonly(output_mint, false), // 12. Output Mint (readonly)
         ];
-        
-        // remainingAccounts
-        account_metas.push(AccountMeta::new_readonly(_tick_array_bitmap_extension_pda, false)); // 13. TickArray Bitmap Extension
-        account_metas.push(AccountMeta::new(tick_array_pda, false)); // 14. Tick Array (writable)
+
+        // remainingAccounts: exTickArrayBitmap (readonly for SwapV2) + tickArrays (writable)
+        account_metas.push(AccountMeta::new_readonly(tick_array_bitmap_extension_pda, false)); // 13. TickArray Bitmap Extension (readonly)
+
+        // 添加额外的 tick arrays（全部 writable）
+        for i in 0..tick_array_pdas.len() {
+            account_metas.push(AccountMeta::new(tick_array_pdas[i], false));
+        }
 
         // Create instruction data: discriminator (8 bytes) + amount (u64) + other_amount_threshold (u64) + sqrt_price_limit_x64 (u128) + is_base_input (bool)
         // 使用 SwapV2 指令 discriminator
