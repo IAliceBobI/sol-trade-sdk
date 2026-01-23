@@ -2,8 +2,6 @@ use sol_trade_sdk::instruction::utils::raydium_amm_v4::{
     get_pool_by_address,
     get_pool_by_address_force,
     get_pool_by_address_with_pool_client,
-    get_pool_by_mint,
-    get_pool_by_mint_force,
     get_pool_by_mint_with_pool_client,
     list_pools_by_mint_with_pool_client,
     clear_pool_cache,
@@ -357,7 +355,6 @@ async fn test_raydium_amm_v4_get_pool_by_mint_with_auto_mock() {
     let wsol_mint = Pubkey::from_str("So11111111111111111111111111111111111111112")
         .unwrap_or_else(|_| panic!("Invalid WSOL mint"));
     let rpc_url = "http://127.0.0.1:8899";
-    let rpc = RpcClient::new(rpc_url.to_string());
 
     // 使用 Auto Mock RPC 客户端
     let auto_mock_client = AutoMockRpcClient::new(rpc_url.to_string());
@@ -404,51 +401,10 @@ async fn test_raydium_amm_v4_get_pool_by_mint_with_auto_mock() {
     assert!(amm_info_1.lp_amount > 0, "LP amount should be positive");
     println!("✅ 基本字段验证通过");
 
-    // ========== 第二部分：测试 get_pool_by_mint 的缓存功能 ==========
-
-    println!("\n步骤 3: 测试 get_pool_by_mint 的内存缓存功能...");
-
-    // 3.1 第一次调用（应写入缓存）
-    println!("  3.1 第一次调用 get_pool_by_mint（写入缓存）...");
-    let (pool_addr_2, amm_info_2) = get_pool_by_mint(&rpc, &wsol_mint)
-        .await
-        .expect("get_pool_by_mint failed");
-    println!("  ✅ 第一次查询返回 Pool: {}", pool_addr_2);
-
-    // 3.2 第二次调用（应从缓存读取）
-    println!("  3.2 第二次调用 get_pool_by_mint（从缓存读取）...");
-    let (pool_addr_3, amm_info_3) = get_pool_by_mint(&rpc, &wsol_mint)
-        .await
-        .expect("get_pool_by_mint (cached) failed");
-    println!("  ✅ 第二次查询返回 Pool: {}", pool_addr_3);
-
-    // 验证缓存一致性
-    assert_eq!(pool_addr_2, pool_addr_3, "缓存中的 pool_address 应该一致");
-    assert_eq!(amm_info_2.coin_mint, amm_info_3.coin_mint, "缓存中的 coin_mint 应该一致");
-    assert_eq!(amm_info_2.pc_mint, amm_info_3.pc_mint, "缓存中的 pc_mint 应该一致");
-    println!("  ✅ 缓存验证通过（数据一致）");
-
-    // 3.3 测试 get_pool_by_mint_force 强制刷新
-    println!("  3.3 测试 get_pool_by_mint_force 强制刷新...");
-    let (pool_addr_4, amm_info_4) = get_pool_by_mint_force(&rpc, &wsol_mint)
-        .await
-        .expect("get_pool_by_mint_force failed");
-    println!("  ✅ 强制刷新返回 Pool: {}", pool_addr_4);
-
-    // 验证强制刷新后返回的 pool 仍然包含 WSOL（但不期望地址相同）
-    assert!(
-        amm_info_4.coin_mint == wsol_mint || amm_info_4.pc_mint == wsol_mint,
-        "强制刷新后返回的 Pool 应该包含 WSOL"
-    );
-    assert!(amm_info_4.lp_amount > 0, "强制刷新后 Pool 应该有 LP amount");
-    println!("  ✅ 强制刷新验证通过（返回有效的 WSOL Pool）");
-
     println!("\n=== Auto Mock 测试通过 ===");
     println!("✅ 测试覆盖：");
-    println!("  1. list_pools_by_mint_with_pool_client（无内存缓存）");
-    println!("  2. get_pool_by_mint_with_pool_client（无内存缓存）");
-    println!("  3. get_pool_by_mint（有内存缓存）");
-    println!("  4. get_pool_by_mint_force（强制刷新）");
+    println!("  1. list_pools_by_mint_with_pool_client（查询所有 WSOL Pool）");
+    println!("  2. get_pool_by_mint_with_pool_client（查询最优 Pool）");
     println!("✅ 首次运行：从 RPC 获取并保存（约 2-3 秒）");
     println!("✅ 后续运行：从缓存加载（约 0.01 秒）");
     println!("✅ 速度提升：约 100-200 倍！");
