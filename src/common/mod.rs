@@ -6,7 +6,6 @@ pub mod fast_fn;
 pub mod fast_timing;
 pub mod gas_fee_strategy;
 pub mod global;
-pub mod mock_rpc;
 pub mod nonce_cache;
 pub mod rpc_client_wrapper;
 pub mod seed;
