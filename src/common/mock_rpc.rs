@@ -303,7 +303,7 @@ mod tests {
 
         // 创建临时目录
         let temp_dir = TempDir::new().unwrap();
-        let mock = MockRpcMode::new_with_mode(
+        let mut mock = MockRpcMode::new_with_mode(
             "http://127.0.0.1:8899".to_string(),
             MockMode::Record,
         );
