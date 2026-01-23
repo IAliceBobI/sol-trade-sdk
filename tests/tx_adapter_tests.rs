@@ -17,7 +17,8 @@ fn test_transaction_adapter_extract_transfer_checked() {
     let signature_str = "5GCZ3TR31aDRP9LZxznKPBux86jWDyCxt1noCAAhX43d6Cmtqi8HvK6oHErq7DBr9j5KRcqeYumW2wHt5qJG1tQK";
 
     let rpc_client = RpcClient::new(rpc_url);
-    let signature = Signature::from_str(signature_str).unwrap();
+    let signature = Signature::from_str(signature_str)
+        .expect("Failed to parse signature from string");
 
     let config = RpcTransactionConfig {
         encoding: Some(UiTransactionEncoding::JsonParsed),
@@ -25,10 +26,12 @@ fn test_transaction_adapter_extract_transfer_checked() {
         max_supported_transaction_version: Some(0),
     };
 
-    let tx = rpc_client.get_transaction_with_config(&signature, config).unwrap();
+    let tx = rpc_client.get_transaction_with_config(&signature, config)
+        .expect("Failed to get transaction from RPC");
 
     // 创建 TransactionAdapter
-    let adapter = TransactionAdapter::from_encoded_transaction(&tx, tx.slot, tx.block_time).unwrap();
+    let adapter = TransactionAdapter::from_encoded_transaction(&tx, tx.slot, tx.block_time)
+        .expect("Failed to create TransactionAdapter from encoded transaction");
 
     // 验证基本信息
     assert_eq!(adapter.slot, 394648935);
@@ -73,7 +76,8 @@ fn test_transaction_adapter_extract_all_transfers() {
     let signature_str = "5GCZ3TR31aDRP9LZxznKPBux86jWDyCxt1noCAAhX43d6Cmtqi8HvK6oHErq7DBr9j5KRcqeYumW2wHt5qJG1tQK";
 
     let rpc_client = RpcClient::new(rpc_url);
-    let signature = Signature::from_str(signature_str).unwrap();
+    let signature = Signature::from_str(signature_str)
+        .expect("Failed to parse signature from string");
 
     let config = RpcTransactionConfig {
         encoding: Some(UiTransactionEncoding::JsonParsed),
@@ -81,7 +85,8 @@ fn test_transaction_adapter_extract_all_transfers() {
         max_supported_transaction_version: Some(0),
     };
 
-    let tx = rpc_client.get_transaction_with_config(&signature, config).unwrap();
+    let tx = rpc_client.get_transaction_with_config(&signature, config)
+        .expect("Failed to get transaction from RPC");
 
     let adapter = TransactionAdapter::from_encoded_transaction(&tx, tx.slot, tx.block_time).unwrap();
 
@@ -125,7 +130,8 @@ fn test_transaction_adapter_token_balances() {
     let signature_str = "5GCZ3TR31aDRP9LZxznKPBux86jWDyCxt1noCAAhX43d6Cmtqi8HvK6oHErq7DBr9j5KRcqeYumW2wHt5qJG1tQK";
 
     let rpc_client = RpcClient::new(rpc_url);
-    let signature = Signature::from_str(signature_str).unwrap();
+    let signature = Signature::from_str(signature_str)
+        .expect("Failed to parse signature from string");
 
     let config = RpcTransactionConfig {
         encoding: Some(UiTransactionEncoding::JsonParsed),
@@ -133,7 +139,8 @@ fn test_transaction_adapter_token_balances() {
         max_supported_transaction_version: Some(0),
     };
 
-    let tx = rpc_client.get_transaction_with_config(&signature, config).unwrap();
+    let tx = rpc_client.get_transaction_with_config(&signature, config)
+        .expect("Failed to get transaction from RPC");
 
     let adapter = TransactionAdapter::from_encoded_transaction(&tx, tx.slot, tx.block_time).unwrap();
 
@@ -168,7 +175,8 @@ fn test_transaction_adapter_get_transfer_actions() {
     let signature_str = "5GCZ3TR31aDRP9LZxznKPBux86jWDyCxt1noCAAhX43d6Cmtqi8HvK6oHErq7DBr9j5KRcqeYumW2wHt5qJG1tQK";
 
     let rpc_client = RpcClient::new(rpc_url);
-    let signature = Signature::from_str(signature_str).unwrap();
+    let signature = Signature::from_str(signature_str)
+        .expect("Failed to parse signature from string");
 
     let config = RpcTransactionConfig {
         encoding: Some(UiTransactionEncoding::JsonParsed),
@@ -176,7 +184,8 @@ fn test_transaction_adapter_get_transfer_actions() {
         max_supported_transaction_version: Some(0),
     };
 
-    let tx = rpc_client.get_transaction_with_config(&signature, config).unwrap();
+    let tx = rpc_client.get_transaction_with_config(&signature, config)
+        .expect("Failed to get transaction from RPC");
 
     let adapter = TransactionAdapter::from_encoded_transaction(&tx, tx.slot, tx.block_time).unwrap();
 

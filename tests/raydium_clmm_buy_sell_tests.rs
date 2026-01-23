@@ -30,11 +30,15 @@ async fn test_raydium_clmm_buy_and_sell_jup() {
 
     // 记录初始 SOL 余额
     let (initial_sol, _) =
-        print_balances(rpc_url, &payer_pubkey).await.expect("Failed to fetch initial balances");
+        print_balances(rpc_url, &payer_pubkey)
+            .await
+            .unwrap_or_else(|e| panic!("获取初始余额失败: {}\n  钱包: {}\n  RPC: {}", e, payer_pubkey, rpc_url));
 
     // ===== 步骤 2: 使用指定的 WSOL-JUP CLMM Pool =====
-    let pool_address = Pubkey::from_str(WSOL_JUP_POOL).expect("Invalid pool address");
-    let jup_mint = Pubkey::from_str(JUP_MINT).expect("Invalid JUP mint");
+    let pool_address = Pubkey::from_str(WSOL_JUP_POOL)
+        .expect("Failed to parse CLMM pool address");
+    let jup_mint = Pubkey::from_str(JUP_MINT)
+        .expect("Failed to parse JUP mint address");
 
     println!("\n🔍 使用 WSOL-JUP CLMM Pool: {}", pool_address);
     println!("交易 Token: JUP ({})", jup_mint);
@@ -42,7 +46,7 @@ async fn test_raydium_clmm_buy_and_sell_jup() {
     // 记录初始 JUP 代币余额
     let initial_jup_balance = print_token_balance(rpc_url, &payer_pubkey, &jup_mint, "JUP")
         .await
-        .expect("Failed to fetch initial JUP balance");
+        .unwrap_or_else(|e| panic!("获取初始 JUP 余额失败: {}\n  钱包: {}\n  JUP Mint: {}", e, payer_pubkey, jup_mint));
 
     println!("初始 JUP 余额: {} (raw units)", initial_jup_balance);
 
@@ -50,7 +54,10 @@ async fn test_raydium_clmm_buy_and_sell_jup() {
     println!("\n🧮 从 Pool 构建 RaydiumClmmParams...");
     let clmm_params = RaydiumClmmParams::from_pool_address_by_rpc(&client.rpc, &pool_address)
         .await
-        .expect("Failed to build RaydiumClmmParams from pool address");
+        .unwrap_or_else(|e| panic!(
+            "从 Pool 地址构建 RaydiumClmmParams 失败: {}\n  Pool: {}\n  钱包: {}",
+            e, pool_address, payer_pubkey
+        ));
 
     println!("Pool 配置:");
     println!("  token0_mint: {}", clmm_params.token0_mint);
@@ -68,7 +75,9 @@ async fn test_raydium_clmm_buy_and_sell_jup() {
     gas_fee_strategy_buy.set_global_fee_strategy(1_400_000, 1_400_000, 0, 0, 0.0, 0.0);
 
     let recent_blockhash_buy =
-        client.rpc.get_latest_blockhash().await.expect("Failed to get latest blockhash for buy");
+        client.rpc.get_latest_blockhash()
+            .await
+            .unwrap_or_else(|e| panic!("获取最新 blockhash 失败（买入）: {}\n  RPC: {}", e, rpc_url));
 
     let buy_params = TradeBuyParams {
         dex_type: DexType::RaydiumClmm,
@@ -92,7 +101,11 @@ async fn test_raydium_clmm_buy_and_sell_jup() {
     };
 
     let (success_buy, buy_sigs, error_buy) =
-        client.buy(buy_params).await.expect("Raydium CLMM 买入交易执行失败");
+        client.buy(buy_params).await
+            .unwrap_or_else(|e| panic!(
+                "Raydium CLMM 买入交易执行失败: {}\n  Pool: {}\n  JUP Mint: {}\n  买入金额: {} lamports\n  钱包: {}",
+                e, pool_address, jup_mint, buy_amount_sol, payer_pubkey
+            ));
 
     if let Some(err) = &error_buy {
         println!("\n⚠️  买入失败：{}", err.message);
@@ -106,9 +119,13 @@ async fn test_raydium_clmm_buy_and_sell_jup() {
         panic!(
             "❌ 买入失败，无法继续测试卖出流程\n\
              Pool 地址: {}\n\
+             JUP Mint: {}\n\
+             买入金额: {} lamports ({:.4} SOL)\n\
              交易签名: {:?}\n\
-             错误详情: {}",
-            WSOL_JUP_POOL, buy_sigs, err.message
+             错误详情: {}\n\
+             钱包: {}",
+            WSOL_JUP_POOL, jup_mint, buy_amount_sol, buy_amount_sol as f64 / 1e9,
+            buy_sigs, err.message, payer_pubkey
         );
     }
 
@@ -157,11 +174,13 @@ async fn test_raydium_clmm_buy_and_sell_jup() {
 
     // 验证买入后的余额
     let (after_buy_sol, _) =
-        print_balances(rpc_url, &payer_pubkey).await.expect("Failed to fetch balances after buy");
+        print_balances(rpc_url, &payer_pubkey)
+            .await
+            .unwrap_or_else(|e| panic!("获取买入后余额失败: {}\n  钱包: {}", e, payer_pubkey));
     let after_buy_jup_balance =
         print_token_balance(rpc_url, &payer_pubkey, &jup_mint, "JUP")
             .await
-            .expect("Failed to fetch JUP balance after buy");
+            .unwrap_or_else(|e| panic!("获取买入后 JUP 余额失败: {}\n  钱包: {}", e, payer_pubkey));
 
     println!("\n📊 买入结果:");
     let sol_diff_buy = (after_buy_sol as i128) - (initial_sol as i128);
@@ -186,7 +205,9 @@ async fn test_raydium_clmm_buy_and_sell_jup() {
     gas_fee_strategy_sell.set_global_fee_strategy(1_400_000, 1_400_000, 0, 0, 0.0, 0.0);
 
     let recent_blockhash_sell =
-        client.rpc.get_latest_blockhash().await.expect("Failed to get latest blockhash for sell");
+        client.rpc.get_latest_blockhash()
+            .await
+            .unwrap_or_else(|e| panic!("获取最新 blockhash 失败（卖出）: {}\n  RPC: {}", e, rpc_url));
 
     let sell_params = TradeSellParams {
         dex_type: DexType::RaydiumClmm,
@@ -211,7 +232,11 @@ async fn test_raydium_clmm_buy_and_sell_jup() {
     };
 
     let (success_sell, sell_sigs, error_sell) =
-        client.sell(sell_params).await.expect("Raydium CLMM 卖出交易执行失败");
+        client.sell(sell_params).await
+            .unwrap_or_else(|e| panic!(
+                "Raydium CLMM 卖出交易执行失败: {}\n  Pool: {}\n  JUP Mint: {}\n  卖出数量: {}\n  钱包: {}",
+                e, pool_address, jup_mint, sell_amount, payer_pubkey
+            ));
 
     println!("\n[调试] success_sell: {}", success_sell);
     println!("[调试] sell_sigs: {:?}", sell_sigs);
@@ -262,10 +287,12 @@ async fn test_raydium_clmm_buy_and_sell_jup() {
 
     // ===== 步骤 6: 验证最终余额 =====
     let (final_sol, _) =
-        print_balances(rpc_url, &payer_pubkey).await.expect("Failed to fetch final balances");
+        print_balances(rpc_url, &payer_pubkey)
+            .await
+            .unwrap_or_else(|e| panic!("获取最终余额失败: {}\n  钱包: {}", e, payer_pubkey));
     let final_jup_balance = print_token_balance(rpc_url, &payer_pubkey, &jup_mint, "JUP")
         .await
-        .expect("Failed to fetch final JUP balance");
+        .unwrap_or_else(|e| panic!("获取最终 JUP 余额失败: {}\n  钱包: {}", e, payer_pubkey));
 
     println!("\n📊 最终结果:");
     let sol_diff_total = (final_sol as i128) - (initial_sol as i128);

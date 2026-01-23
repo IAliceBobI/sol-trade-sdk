@@ -75,7 +75,10 @@ pub async fn create_test_client_with_seed_optimize(use_seed_optimize: bool) -> S
     // 空投 SOL
     let payer_pubkey = payer.pubkey();
     if let Err(e) = airdrop_to_payer(&rpc_url, &payer_pubkey).await {
-        println!("⚠️  空投 SOL 失败: {}，账户: {}", e, payer_pubkey);
+        panic!(
+            "空投 SOL 失败，无法继续测试: {}\n  账户: {}\n  RPC: {}",
+            e, payer_pubkey, rpc_url
+        );
     }
 
     let commitment = CommitmentConfig::confirmed();
@@ -375,11 +378,16 @@ pub async fn buy_pump_with_sol(
     // 1. 从 RPC 获取池信息
     let pump_swap_params = PumpSwapParams::from_pool_address_by_rpc(&client.rpc, &pool)
         .await
-        .expect("Failed to fetch pool info from RPC");
+        .unwrap_or_else(|e| panic!(
+            "从 RPC 获取 PumpSwap Pool 信息失败: {}\n  Pool: {}\n  RPC: {}",
+            e, pool, client.rpc.url()
+        ));
     println!("  - 池信息获取成功");
 
     // 2. 从 RPC 获取最新的 blockhash
-    let recent_blockhash = client.rpc.get_latest_blockhash().await?;
+    let recent_blockhash = client.rpc.get_latest_blockhash()
+        .await
+        .map_err(|e| anyhow::anyhow!("获取最新 blockhash 失败: {}\n  RPC: {}", e, client.rpc.url()))?;
 
     // 3. 设置 Gas 策略
     let gas_fee_strategy = GasFeeStrategy::new();
@@ -461,11 +469,16 @@ pub async fn buy_pump_with_fixed_output(
     // 1. 从 RPC 获取池信息
     let pump_swap_params = PumpSwapParams::from_pool_address_by_rpc(&client.rpc, &pool)
         .await
-        .expect("Failed to fetch pool info from RPC");
+        .unwrap_or_else(|e| panic!(
+            "从 RPC 获取 PumpSwap Pool 信息失败: {}\n  Pool: {}\n  RPC: {}",
+            e, pool, client.rpc.url()
+        ));
     println!("  - 池信息获取成功");
 
     // 2. 从 RPC 获取最新的 blockhash
-    let recent_blockhash = client.rpc.get_latest_blockhash().await?;
+    let recent_blockhash = client.rpc.get_latest_blockhash()
+        .await
+        .map_err(|e| anyhow::anyhow!("获取最新 blockhash 失败: {}\n  RPC: {}", e, client.rpc.url()))?;
 
     // 3. 设置 Gas 策略
     let gas_fee_strategy = GasFeeStrategy::new();

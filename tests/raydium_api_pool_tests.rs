@@ -51,7 +51,8 @@ async fn test_raydium_api_get_pool_list_standard() {
     init_env_and_print_proxy();
     println!("=== Raydium API：获取标准池列表（/pools/info/list） ===");
 
-    let client = RaydiumApiClient::mainnet_default().expect("failed to create RaydiumApiClient");
+    let client = RaydiumApiClient::mainnet_default()
+        .expect("Failed to create RaydiumApiClient (mainnet_default)");
 
     let req = GetPoolListRequest {
         r#type: Some(PoolFetchType::Standard),
@@ -64,7 +65,7 @@ async fn test_raydium_api_get_pool_list_standard() {
     let page = client
         .get_pool_list(&req)
         .await
-        .expect("get_pool_list request failed");
+        .expect("get_pool_list request failed - Raydium API 可能不可用");
 
     println!("count = {}, has_next_page = {}", page.count, page.has_next_page);
     if let Some(first) = page.data.get(0) {
@@ -81,10 +82,13 @@ async fn test_raydium_api_fetch_pools_by_mints_sol_usdc() {
     init_env_and_print_proxy();
     println!("=== Raydium API：按 SOL-USDC mint 查询池（/pools/info/mint） ===");
 
-    let client = RaydiumApiClient::mainnet_default().expect("failed to create RaydiumApiClient");
+    let client = RaydiumApiClient::mainnet_default()
+        .expect("Failed to create RaydiumApiClient (mainnet_default)");
 
-    let sol = Pubkey::from_str(SOL_MINT).expect("invalid SOL mint");
-    let usdc = Pubkey::from_str(USDC_MINT).expect("invalid USDC mint");
+    let sol = Pubkey::from_str(SOL_MINT)
+        .expect("Failed to parse SOL_MINT address");
+    let usdc = Pubkey::from_str(USDC_MINT)
+        .expect("Failed to parse USDC_MINT address");
 
     let req = FetchPoolsByMintsRequest {
         mint1: sol.to_string(),
@@ -98,7 +102,7 @@ async fn test_raydium_api_fetch_pools_by_mints_sol_usdc() {
     let page = client
         .fetch_pools_by_mints(&req)
         .await
-        .expect("fetch_pools_by_mints request failed");
+        .expect("fetch_pools_by_mints request failed - Raydium API 可能不可用");
 
     println!("SOL-USDC pools count = {}", page.count);
     if let Some(first) = page.data.get(0) {
@@ -115,7 +119,8 @@ async fn test_raydium_api_fetch_by_ids_and_clmm_liquidity_lines() {
     init_env_and_print_proxy();
     println!("=== Raydium API：按 ID 查询池 & CLMM 流动性曲线 ===");
 
-    let client = RaydiumApiClient::mainnet_default().expect("failed to create RaydiumApiClient");
+    let client = RaydiumApiClient::mainnet_default()
+        .expect("Failed to create RaydiumApiClient (mainnet_default)");
 
     // 1. 获取一个 Standard 池，用于 /pools/info/ids & /pools/key/ids 测试
     let list_req = GetPoolListRequest {
@@ -128,7 +133,7 @@ async fn test_raydium_api_fetch_by_ids_and_clmm_liquidity_lines() {
     let list_page = client
         .get_pool_list(&list_req)
         .await
-        .expect("get_pool_list (standard) failed");
+        .expect("get_pool_list (standard) failed - Raydium API 可能不可用");
 
     let first_pool = list_page
         .data
@@ -146,14 +151,14 @@ async fn test_raydium_api_fetch_by_ids_and_clmm_liquidity_lines() {
     let pools_by_ids = client
         .fetch_pools_by_ids(&[first_id.clone()])
         .await
-        .expect("fetch_pools_by_ids failed");
+        .expect("fetch_pools_by_ids failed - Raydium API 可能不可用");
     assert_eq!(pools_by_ids.len(), 1, "should return exactly one pool");
 
     // 3. /pools/key/ids
     let pool_keys = client
         .fetch_pool_keys_by_ids(&[first_id.clone()])
         .await
-        .expect("fetch_pool_keys_by_ids failed");
+        .expect("fetch_pool_keys_by_ids failed - Raydium API 可能不可用");
     assert_eq!(pool_keys.len(), 1, "should return exactly one pool keys object");
 
     // 4. 获取一个 CLMM 池并测试 /pools/line/liquidity
@@ -167,7 +172,7 @@ async fn test_raydium_api_fetch_by_ids_and_clmm_liquidity_lines() {
     let clmm_page = client
         .get_pool_list(&clmm_list_req)
         .await
-        .expect("get_pool_list (concentrated) failed");
+        .expect("get_pool_list (concentrated) failed - Raydium API 可能不可用");
 
     let clmm_pool = clmm_page
         .data
@@ -183,7 +188,7 @@ async fn test_raydium_api_fetch_by_ids_and_clmm_liquidity_lines() {
     let lines: Vec<ClmmLiquidityPoint> = client
         .get_clmm_pool_liquidity_lines(clmm_id)
         .await
-        .expect("get_clmm_pool_liquidity_lines failed");
+        .expect("get_clmm_pool_liquidity_lines failed - Raydium API 可能不可用");
 
     println!("CLMM liquidity points count = {}", lines.len());
     if let Some(first_line) = lines.get(0) {
