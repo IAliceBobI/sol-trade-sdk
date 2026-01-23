@@ -1,28 +1,8 @@
-//! Raydium AMM V4 Buy & Sell 交易测试
-//!
-//! 本测试文件专门用于测试 Raydium AMM V4 的买入和卖出交易功能。
-//!
-//! ## 测试场景
-//! - 参数初始化：从 RPC 获取 AMM 参数
-//! - 买入交易：用 WSOL 购买 USDC
-//! - 卖出交易：卖出 USDC 获得 WSOL
-//! - 完整流程：买入后卖出全部
-//! - 滑点保护：验证极小滑点会导致交易失败
-//!
-//! ## 已知测试池
-//! - **WSOL-USDC Pool**: `58oQChx4yWmvKdwLLZzBi4ChoCc2fqCUWBkwMihLYQo2`
-//!   - WSOL: `So11111111111111111111111111111111111111112`
-//!   - USDC: `EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v`
-//!
-//! 运行测试:
-//!     cargo test --test raydium_amm_v4_buy_sell_tests -- --nocapture
-
 use sol_trade_sdk::{
-    common::GasFeeStrategy,
+    common::{auto_mock_rpc::AutoMockRpcClient, GasFeeStrategy},
     trading::core::params::{DexParamEnum, RaydiumAmmV4Params},
     DexType, TradeBuyParams, TradeSellParams, TradeTokenType,
 };
-use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_sdk::pubkey::Pubkey;
 use solana_sdk::signer::Signer;
 use std::str::FromStr;
@@ -37,17 +17,17 @@ const SOL_USDC_AMM: &str = "58oQChx4yWmvKdwLLZzBi4ChoCc2fqCUWBkwMihLYQo2";
 /// 已知的 USDC mint
 const USDC_MINT: &str = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
 
-/// 测试：从 AMM 地址创建 RaydiumAmmV4Params
+/// 测试：从 AMM 地址创建 RaydiumAmmV4Params（使用 Auto Mock 加速）
 #[tokio::test]
 async fn test_raydium_amm_v4_params_from_rpc() {
-    println!("\n=== 测试：RaydiumAmmV4Params::from_amm_address_by_rpc ===");
+    println!("\n=== 测试：RaydiumAmmV4Params::from_amm_address_by_rpc (Auto Mock) ===");
 
     let amm_address = Pubkey::from_str(SOL_USDC_AMM)
         .expect("Failed to parse AMM address");
     let rpc_url = "http://127.0.0.1:8899";
-    let rpc = RpcClient::new(rpc_url.to_string());
+    let rpc = AutoMockRpcClient::new(rpc_url.to_string());
 
-    let params = RaydiumAmmV4Params::from_amm_address_by_rpc(&rpc, amm_address).await
+    let params = RaydiumAmmV4Params::from_amm_address_by_rpc_with_client(&rpc, amm_address).await
         .unwrap_or_else(|e| panic!("从 RPC 获取 AMM 参数失败: {}\n  AMM: {}\n  RPC: {}", e, amm_address, rpc_url));
     println!("✅ 参数创建成功");
     println!("  - AMM: {}", params.amm);

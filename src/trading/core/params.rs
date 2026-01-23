@@ -1,14 +1,14 @@
 use crate::common::bonding_curve::BondingCurveAccount;
 use crate::common::nonce_cache::DurableNonceInfo;
 use crate::common::spl_associated_token_account::get_associated_token_address_with_program_id;
-use crate::common::{GasFeeStrategy, SolanaRpcClient};
+use crate::common::{auto_mock_rpc::PoolRpcClient, GasFeeStrategy, SolanaRpcClient};
 use crate::utils::token::calculate_ata;
 use crate::constants::TOKEN_PROGRAM;
 use crate::instruction::utils::pumpfun::global_constants::MAYHEM_FEE_RECIPIENT;
 use crate::instruction::utils::pumpswap::accounts::MAYHEM_FEE_RECIPIENT as MAYHEM_FEE_RECIPIENT_SWAP;
 use crate::swqos::{SwqosClient, TradeType};
 use crate::trading::MiddlewareManager;
-use crate::trading::common::get_multi_token_balances;
+use crate::trading::common::get_multi_token_balances_with_client;
 use solana_hash::Hash;
 use solana_sdk::message::AddressLookupTableAccount;
 use solana_sdk::{pubkey::Pubkey, signature::Keypair};
@@ -638,13 +638,15 @@ impl RaydiumAmmV4Params {
     ) -> Self {
         Self { amm, coin_mint, pc_mint, token_coin, token_pc, coin_reserve, pc_reserve }
     }
-    pub async fn from_amm_address_by_rpc(
-        rpc: &SolanaRpcClient,
+
+    /// 从 AMM 地址通过 RPC 获取参数（泛型版本，支持 Auto Mock）
+    pub async fn from_amm_address_by_rpc_with_client<T: PoolRpcClient + ?Sized>(
+        rpc: &T,
         amm: Pubkey,
     ) -> Result<Self, anyhow::Error> {
-        let amm_info = crate::instruction::utils::raydium_amm_v4::get_pool_by_address(rpc, &amm).await?;
+        let amm_info = crate::instruction::utils::raydium_amm_v4::get_pool_by_address_with_pool_client(rpc, &amm).await?;
         let (coin_reserve, pc_reserve) =
-            get_multi_token_balances(rpc, &amm_info.token_coin, &amm_info.token_pc).await?;
+            get_multi_token_balances_with_client(rpc, &amm_info.token_coin, &amm_info.token_pc).await?;
         Ok(Self {
             amm,
             coin_mint: amm_info.coin_mint,
@@ -654,6 +656,14 @@ impl RaydiumAmmV4Params {
             coin_reserve,
             pc_reserve,
         })
+    }
+
+    /// 从 AMM 地址通过 RPC 获取参数（便捷封装）
+    pub async fn from_amm_address_by_rpc(
+        rpc: &SolanaRpcClient,
+        amm: Pubkey,
+    ) -> Result<Self, anyhow::Error> {
+        Self::from_amm_address_by_rpc_with_client(rpc, amm).await
     }
 }
 
