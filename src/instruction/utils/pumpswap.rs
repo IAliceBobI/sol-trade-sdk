@@ -382,6 +382,7 @@ const BASE_MINT_OFFSET: usize = 43;
 const QUOTE_MINT_OFFSET: usize = 75;
 
 /// 通用内部实现：通过 offset 查找所有 Pool（返回 Vec）
+#[allow(dead_code)]
 async fn find_pools_by_mint_offset_collect(
     rpc: &SolanaRpcClient,
     mint: &Pubkey,
@@ -516,6 +517,7 @@ async fn find_all_pools_by_mint_impl_with_pool_client<T: PoolRpcClient + ?Sized>
 /// 1. 优先尝试 canonical pool (PumpFun 迁移的 mint/WSOL 对)
 /// 2. 在所有池中优先选择稳定币对（USDC/USDT），再考虑 WSOL 对
 /// 3. 在同类池子中，按 LP 供应量从大到小排序
+#[allow(dead_code)]
 async fn find_pool_by_mint_impl(
     rpc: &SolanaRpcClient,
     mint: &Pubkey,

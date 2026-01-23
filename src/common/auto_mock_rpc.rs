@@ -186,6 +186,7 @@ impl AutoMockRpcClient {
     /// Auto 模式调用核心逻辑
     ///
     /// 通用方法，处理所有 Auto 模式的 RPC 调用
+    #[allow(dead_code)]
     async fn auto_call<M, P, R>(&self, method: &str, params: &P, rpc_call: M) -> Result<R, String>
     where
         M: FnOnce() -> Result<R, Box<dyn std::error::Error>>,

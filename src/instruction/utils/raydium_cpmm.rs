@@ -662,11 +662,12 @@ async fn find_all_pools_by_mint_impl_with_pool_client<T: PoolRpcClient + ?Sized>
 }
 
 /// 内部实现：查找 mint 对应的最优池
-/// 
+///
 /// 策略（参考 CLMM 的 Hot Token 优先策略）：
 /// 1. 优先选择包含 Hot Mint (WSOL/USDC/USDT) 的交易对
 /// 2. 在 Hot 对中优先选择稳定币对（USDC/USDT），再考虑 WSOL 对
 /// 3. 在同类池子中，按 LP 供应量从大到小排序
+#[allow(dead_code)]
 async fn find_pool_by_mint_impl(
     rpc: &SolanaRpcClient,
     mint: &Pubkey,
