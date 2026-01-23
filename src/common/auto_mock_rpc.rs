@@ -99,7 +99,10 @@ impl PoolRpcClient for NonblockingRpcClient {
 ///    ```
 ///
 /// 2. **代码中指定**：
-///    ```rust
+///    ```rust,no_run
+///    use sol_trade_sdk::common::auto_mock_rpc::AutoMockRpcClient;
+///
+///    let rpc_url = "http://127.0.0.1:8899";
 ///    let client = AutoMockRpcClient::new_with_namespace(
 ///        rpc_url.to_string(),
 ///        Some("test1".to_string())
@@ -149,7 +152,11 @@ impl AutoMockRpcClient {
     /// - `namespace`: 命名空间标识符，None 表示不使用命名空间（共享 mock 数据）
     ///
     /// # 示例
-    /// ```rust
+    /// ```rust,no_run
+    /// use sol_trade_sdk::common::auto_mock_rpc::AutoMockRpcClient;
+    ///
+    /// let rpc_url = "http://127.0.0.1:8899";
+    ///
     /// // 使用独立命名空间
     /// let client = AutoMockRpcClient::new_with_namespace(
     ///     rpc_url.to_string(),
