@@ -1,5 +1,5 @@
 use crate::{
-    common::SolanaRpcClient,
+    common::{SolanaRpcClient, auto_mock_rpc::PoolRpcClient},
     instruction::utils::raydium_amm_v4_types::{amm_info_decode, AmmInfo, AMM_INFO_SIZE},
     constants::{SOL_MINT, USDC_MINT, USDT_MINT},
 };
@@ -106,13 +106,25 @@ pub async fn get_pool_by_address(
     rpc: &SolanaRpcClient,
     pool_address: &Pubkey,
 ) -> Result<AmmInfo, anyhow::Error> {
+    get_pool_by_address_with_pool_client(rpc, pool_address).await
+}
+
+/// 根据地址获取 AMM Pool 信息（使用 PoolRpcClient trait，支持 Auto Mock）
+///
+/// 这是一个泛型版本，可以接受任何实现了 PoolRpcClient 的客户端。
+/// 支持标准的 RpcClient 和 AutoMockRpcClient。
+pub async fn get_pool_by_address_with_pool_client<T: PoolRpcClient + ?Sized>(
+    rpc: &T,
+    pool_address: &Pubkey,
+) -> Result<AmmInfo, anyhow::Error> {
     // 1. 检查缓存
     if let Some(amm_info) = get_cached_pool_by_address(pool_address) {
         return Ok(amm_info);
     }
 
     // 2. RPC 查询
-    let account = rpc.get_account(pool_address).await?;
+    let account = rpc.get_account(pool_address).await
+        .map_err(|e| anyhow!("RPC 调用失败: {}", e))?;
     if account.owner != accounts::RAYDIUM_AMM_V4 {
         return Err(anyhow!("Account is not owned by Raydium AMM V4 program"));
     }

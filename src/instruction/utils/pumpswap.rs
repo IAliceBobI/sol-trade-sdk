@@ -1,6 +1,8 @@
 use crate::{
     common::{
-        SolanaRpcClient, spl_associated_token_account::get_associated_token_address_with_program_id,
+        SolanaRpcClient,
+        auto_mock_rpc::PoolRpcClient,
+        spl_associated_token_account::get_associated_token_address_with_program_id,
     },
     constants::{TOKEN_PROGRAM, WSOL_TOKEN_ACCOUNT, USDC_MINT, USDT_MINT},
     instruction::utils::pumpswap_types::{Pool, pool_decode},
@@ -230,12 +232,24 @@ pub async fn get_pool_by_address(
     rpc: &SolanaRpcClient,
     pool_address: &Pubkey,
 ) -> Result<Pool, anyhow::Error> {
+    get_pool_by_address_with_pool_client(rpc, pool_address).await
+}
+
+/// 使用 PoolRpcClient trait 获取 Pool（支持 Auto Mock）
+///
+/// 这是一个泛型版本，可以接受任何实现了 PoolRpcClient 的客户端。
+/// 支持标准的 RpcClient 和 AutoMockRpcClient。
+pub async fn get_pool_by_address_with_pool_client<T: PoolRpcClient + ?Sized>(
+    rpc: &T,
+    pool_address: &Pubkey,
+) -> Result<Pool, anyhow::Error> {
     // 1. 检查缓存
     if let Some(pool) = pump_swap_cache::get_cached_pool_by_address(pool_address) {
         return Ok(pool);
     }
     // 2. RPC 查询
-    let account = rpc.get_account(pool_address).await?;
+    let account = rpc.get_account(pool_address).await
+        .map_err(|e| anyhow!("RPC 调用失败: {}", e))?;
     if account.owner != accounts::AMM_PROGRAM {
         return Err(anyhow!("Account is not owned by PumpSwap program"));
     }

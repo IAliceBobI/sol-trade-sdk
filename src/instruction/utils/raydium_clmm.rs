@@ -1,5 +1,5 @@
 use crate::{
-    common::SolanaRpcClient,
+    common::{SolanaRpcClient, auto_mock_rpc::PoolRpcClient},
     constants::{SOL_MINT, USDC_MINT, USDT_MINT},
     instruction::utils::raydium_clmm_types::{
         pool_state_decode, amm_config_decode, tick_array_state_decode,
@@ -186,12 +186,24 @@ pub async fn get_pool_by_address(
     rpc: &SolanaRpcClient,
     pool_address: &Pubkey,
 ) -> Result<PoolState, anyhow::Error> {
+    get_pool_by_address_with_pool_client(rpc, pool_address).await
+}
+
+/// 使用 PoolRpcClient trait 获取 Pool（支持 Auto Mock）
+///
+/// 这是一个泛型版本，可以接受任何实现了 PoolRpcClient 的客户端。
+/// 支持标准的 RpcClient 和 AutoMockRpcClient。
+pub async fn get_pool_by_address_with_pool_client<T: PoolRpcClient + ?Sized>(
+    rpc: &T,
+    pool_address: &Pubkey,
+) -> Result<PoolState, anyhow::Error> {
     // 1. 检查缓存
     if let Some(pool) = raydium_clmm_cache::get_cached_pool_by_address(pool_address) {
         return Ok(pool);
     }
     // 2. RPC 查询
-    let account = rpc.get_account(pool_address).await?;
+    let account = rpc.get_account(pool_address).await
+        .map_err(|e| anyhow!("RPC 调用失败: {}", e))?;
     if account.owner != accounts::RAYDIUM_CLMM {
         return Err(anyhow!("Account is not owned by Raydium CLMM program"));
     }

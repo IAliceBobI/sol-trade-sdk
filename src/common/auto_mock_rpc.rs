@@ -7,6 +7,7 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use solana_account_decoder::UiAccount;
+use solana_client::nonblocking::rpc_client::RpcClient as NonblockingRpcClient;
 use solana_client::rpc_config::{RpcProgramAccountsConfig, RpcTransactionConfig};
 use solana_client::rpc_client::RpcClient;
 use solana_sdk::{
@@ -20,6 +21,49 @@ use std::fs;
 use std::hash::{Hash, Hasher};
 use std::path::Path;
 use std::sync::Arc;
+
+/// Pool 查询 RPC 客户端 Trait
+///
+/// 统一 `RpcClient` 和 `AutoMockRpcClient` 的接口，让 Pool 查询函数可以接受两者。
+#[async_trait::async_trait]
+pub trait PoolRpcClient: Send + Sync {
+    /// 获取账户信息
+    async fn get_account(&self, pubkey: &Pubkey) -> Result<Account, String>;
+
+    /// 获取程序账户列表
+    async fn get_program_ui_accounts_with_config(
+        &self,
+        program_id: &Pubkey,
+        config: RpcProgramAccountsConfig,
+    ) -> Result<Vec<(String, UiAccount)>, String>;
+}
+
+/// 为标准的非阻塞 RpcClient 实现 PoolRpcClient
+#[async_trait::async_trait]
+impl PoolRpcClient for NonblockingRpcClient {
+    async fn get_account(&self, pubkey: &Pubkey) -> Result<Account, String> {
+        self.get_account(pubkey)
+            .await
+            .map_err(|e| format!("RPC 调用失败: {}", e))
+    }
+
+    async fn get_program_ui_accounts_with_config(
+        &self,
+        program_id: &Pubkey,
+        config: RpcProgramAccountsConfig,
+    ) -> Result<Vec<(String, UiAccount)>, String> {
+        let accounts = self
+            .get_program_ui_accounts_with_config(program_id, config)
+            .await
+            .map_err(|e| format!("RPC 调用失败: {}", e))?;
+
+        // 将 Pubkey 转换为 String 以保持一致性
+        Ok(accounts
+            .into_iter()
+            .map(|(pubkey, account)| (pubkey.to_string(), account))
+            .collect())
+    }
+}
 
 /// Auto Mock RPC 客户端
 ///
@@ -267,5 +311,21 @@ impl AutoMockRpcClient {
         self.save_mock_data("get_program_ui_accounts_with_config", &params_json, &result_json);
 
         Ok(accounts)
+    }
+}
+
+/// 为 AutoMockRpcClient 实现 PoolRpcClient
+#[async_trait::async_trait]
+impl PoolRpcClient for AutoMockRpcClient {
+    async fn get_account(&self, pubkey: &Pubkey) -> Result<Account, String> {
+        self.get_account(pubkey).await
+    }
+
+    async fn get_program_ui_accounts_with_config(
+        &self,
+        program_id: &Pubkey,
+        config: RpcProgramAccountsConfig,
+    ) -> Result<Vec<(String, UiAccount)>, String> {
+        self.get_program_ui_accounts_with_config(program_id, config).await
     }
 }
