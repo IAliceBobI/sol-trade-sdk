@@ -521,8 +521,8 @@ pub async fn get_pool_by_mint(
         }
     }
 
-    // 2. 未命中缓存时，查询链上数据
-    let (pool_address, amm) = find_pool_by_mint_impl(rpc, mint).await?;
+    // 2. 未命中缓存时，查询链上数据 - 复用 get_pool_by_mint_with_pool_client 的逻辑
+    let (pool_address, amm) = get_pool_by_mint_with_pool_client(rpc, mint).await?;
 
     // 3. 写入缓存
     cache_pool_address_by_mint(mint, &pool_address);
@@ -540,6 +540,69 @@ pub async fn get_pool_by_mint_force(
 ) -> Result<(Pubkey, AmmInfo), anyhow::Error> {
     MINT_TO_POOL_CACHE.remove(mint);
     get_pool_by_mint(rpc, mint).await
+}
+
+/// 使用 PoolRpcClient 获取指定 mint 对应的最优 Raydium AMM V4 池（支持 Auto Mock）
+///
+/// 这是一个简化版本，不支持缓存，主要用于测试环境加速。
+///
+/// # Arguments
+/// * `rpc`: 实现了 PoolRpcClient 的 RPC 客户端（支持 AutoMockRpcClient）
+/// * `mint`: Token mint 地址
+///
+/// # Returns
+/// 返回最优池的地址和 AMM 信息
+pub async fn get_pool_by_mint_with_pool_client<T: PoolRpcClient + ?Sized>(
+    rpc: &T,
+    mint: &Pubkey,
+) -> Result<(Pubkey, AmmInfo), anyhow::Error> {
+    // 使用 find_all_pools_by_mint_impl_with_pool_client 获取所有活跃池子
+    let active_pools = find_all_pools_by_mint_impl_with_pool_client(rpc, mint, true).await?;
+
+    if active_pools.is_empty() {
+        return Err(anyhow::anyhow!("No active AMM V4 pool found for mint: {}", mint));
+    }
+
+    // 分类：稳定币对 > WSOL 对 > 其他对
+    let mut stable_pools: Vec<(Pubkey, AmmInfo)> = Vec::new();
+    let mut wsol_pools: Vec<(Pubkey, AmmInfo)> = Vec::new();
+    let mut other_pools: Vec<(Pubkey, AmmInfo)> = Vec::new();
+
+    for (addr, amm) in active_pools.into_iter() {
+        // 找到与目标 mint 对应的另一侧 mint
+        let other_mint = if amm.coin_mint == *mint {
+            amm.pc_mint
+        } else if amm.pc_mint == *mint {
+            amm.coin_mint
+        } else {
+            other_pools.push((addr, amm));
+            continue;
+        };
+
+        // 按 Hot Token 优先级分类
+        if other_mint == USDC_MINT || other_mint == USDT_MINT {
+            stable_pools.push((addr, amm));
+        } else if other_mint == SOL_MINT {
+            wsol_pools.push((addr, amm));
+        } else if is_hot_mint(&other_mint) {
+            wsol_pools.push((addr, amm));
+        } else {
+            other_pools.push((addr, amm));
+        }
+    }
+
+    // 按优先级选择最佳池
+    let best_pool = if !stable_pools.is_empty() {
+        select_best_pool_by_volume(&stable_pools)
+    } else if !wsol_pools.is_empty() {
+        select_best_pool_by_volume(&wsol_pools)
+    } else if *mint == SOL_MINT {
+        select_best_pool_by_volume(&other_pools)
+    } else {
+        select_best_pool_by_volume(&other_pools)
+    };
+
+    Ok(best_pool)
 }
 
 /// 列出所有包含指定 mint 的 Raydium AMM V4 Pool

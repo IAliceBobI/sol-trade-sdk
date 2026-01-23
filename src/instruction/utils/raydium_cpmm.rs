@@ -1,5 +1,5 @@
 use crate::{
-    common::SolanaRpcClient,
+    common::{SolanaRpcClient, auto_mock_rpc::PoolRpcClient},
     instruction::utils::raydium_cpmm_types::{PoolState, pool_state_decode},
     trading::core::params::RaydiumCpmmParams,
     constants::{WSOL_TOKEN_ACCOUNT, USDC_MINT, USDT_MINT},
@@ -9,6 +9,7 @@ use solana_sdk::{pubkey, pubkey::Pubkey};
 use solana_account_decoder::UiAccountData;
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD;
+use std::str::FromStr;
 
 /// Raydium CLMM WSOL-USDT 锚定池（用于 USD 价格计算）
 /// 如果不传入锚定池参数，默认使用此池
@@ -137,8 +138,8 @@ pub async fn get_pool_by_mint(
             return Ok((pool_address, pool));
         }
     }
-    // 2. RPC 查询
-    let (pool_address, pool) = find_pool_by_mint_impl(rpc, mint).await?;
+    // 2. RPC 查询 - 复用 get_pool_by_mint_with_pool_client 的逻辑
+    let (pool_address, pool) = get_pool_by_mint_with_pool_client(rpc, mint).await?;
     // 3. 写入缓存
     raydium_cpmm_cache::cache_pool_address_by_mint(mint, &pool_address);
     raydium_cpmm_cache::cache_pool_by_address(&pool_address, &pool);
@@ -159,6 +160,126 @@ pub async fn get_pool_by_mint_force(
 ) -> Result<(Pubkey, PoolState), anyhow::Error> {
     raydium_cpmm_cache::MINT_TO_POOL_CACHE.remove(mint);
     get_pool_by_mint(rpc, mint).await
+}
+
+/// 使用 PoolRpcClient 获取指定 mint 对应的最优 CPMM 池（支持 Auto Mock）
+///
+/// 这是一个简化版本，不支持缓存，主要用于测试环境加速。
+///
+/// # Arguments
+/// * `rpc`: 实现了 PoolRpcClient 的 RPC 客户端（支持 AutoMockRpcClient）
+/// * `mint`: Token mint 地址
+///
+/// # Returns
+/// 返回最优池的地址和状态
+pub async fn get_pool_by_mint_with_pool_client<T: PoolRpcClient + ?Sized>(
+    rpc: &T,
+    mint: &Pubkey,
+) -> Result<(Pubkey, PoolState), anyhow::Error> {
+    // 使用 find_all_pools_by_mint_impl_with_pool_client 获取所有包含该 mint 的池
+    let all_pools = find_all_pools_by_mint_impl_with_pool_client(rpc, mint).await?;
+
+    if all_pools.is_empty() {
+        return Err(anyhow!("No CPMM pool found for mint: {}", mint));
+    }
+
+    // 分类：稳定币对 > WSOL 对 > 其他对
+    let mut stable_pools: Vec<(Pubkey, PoolState)> = Vec::new();
+    let mut wsol_pools: Vec<(Pubkey, PoolState)> = Vec::new();
+    let mut other_pools: Vec<(Pubkey, PoolState)> = Vec::new();
+
+    for (addr, pool) in all_pools.into_iter() {
+        // 找到与目标 mint 对应的另一侧 mint
+        let other_mint = if pool.token0_mint == *mint {
+            pool.token1_mint
+        } else if pool.token1_mint == *mint {
+            pool.token0_mint
+        } else {
+            other_pools.push((addr, pool));
+            continue;
+        };
+
+        // 按 Hot Token 优先级分类
+        if other_mint == USDC_MINT || other_mint == USDT_MINT {
+            stable_pools.push((addr, pool));
+        } else if other_mint == WSOL_TOKEN_ACCOUNT {
+            wsol_pools.push((addr, pool));
+        } else if is_hot_mint(&other_mint) {
+            wsol_pools.push((addr, pool));
+        } else {
+            other_pools.push((addr, pool));
+        }
+    }
+
+    // 按优先级选择最佳池
+    let best_pool = if !stable_pools.is_empty() {
+        select_best_pool_by_liquidity(&stable_pools)
+    } else if !wsol_pools.is_empty() {
+        select_best_pool_by_liquidity(&wsol_pools)
+    } else if *mint == WSOL_TOKEN_ACCOUNT {
+        select_best_pool_by_liquidity(&other_pools)
+    } else {
+        select_best_pool_by_liquidity(&other_pools)
+    };
+
+    Ok(best_pool)
+}
+
+/// 使用 PoolRpcClient 列出所有包含指定 mint 的 Raydium CPMM Pool（支持 Auto Mock）
+///
+/// 此函数与 `list_pools_by_mint` 功能相同，但接受 `PoolRpcClient` trait，
+/// 可以使用 AutoMockRpcClient 来加速测试。
+///
+/// # Arguments
+/// * `rpc`: 实现了 PoolRpcClient 的 RPC 客户端（支持 AutoMockRpcClient）
+/// * `mint`: Token mint 地址
+///
+/// # Returns
+/// 返回按 Hot Token 优先策略排序后的池子列表
+pub async fn list_pools_by_mint_with_pool_client<T: PoolRpcClient + ?Sized>(
+    rpc: &T,
+    mint: &Pubkey,
+) -> Result<Vec<(Pubkey, PoolState)>, anyhow::Error> {
+    let all_pools = find_all_pools_by_mint_impl_with_pool_client(rpc, mint).await?;
+
+    // 分类：稳定币对 > WSOL 对 > 其他对
+    let mut stable_pools: Vec<(Pubkey, PoolState)> = Vec::new();
+    let mut wsol_pools: Vec<(Pubkey, PoolState)> = Vec::new();
+    let mut other_pools: Vec<(Pubkey, PoolState)> = Vec::new();
+
+    for (addr, pool) in all_pools.into_iter() {
+        let other_mint = if pool.token0_mint == *mint {
+            pool.token1_mint
+        } else if pool.token1_mint == *mint {
+            pool.token0_mint
+        } else {
+            other_pools.push((addr, pool));
+            continue;
+        };
+
+        if other_mint == USDC_MINT || other_mint == USDT_MINT {
+            stable_pools.push((addr, pool));
+        } else if other_mint == WSOL_TOKEN_ACCOUNT {
+            wsol_pools.push((addr, pool));
+        } else if is_hot_mint(&other_mint) {
+            wsol_pools.push((addr, pool));
+        } else {
+            other_pools.push((addr, pool));
+        }
+    }
+
+    // 排序
+    stable_pools.sort_by(|(_, a), (_, b)| b.lp_supply.cmp(&a.lp_supply));
+    wsol_pools.sort_by(|(_, a), (_, b)| b.lp_supply.cmp(&a.lp_supply));
+    other_pools.sort_by(|(_, a), (_, b)| b.lp_supply.cmp(&a.lp_supply));
+
+    // 合并结果
+    let mut result = Vec::new();
+    result.extend(stable_pools);
+    result.extend(wsol_pools);
+    result.extend(other_pools);
+
+    Ok(result)
 }
 
 pub fn clear_pool_cache() {
@@ -302,6 +423,53 @@ async fn find_pools_by_mint_offset_collect(
     Ok(pools)
 }
 
+/// 使用 PoolRpcClient 通过 offset 查找所有 Pool（支持 Auto Mock）
+async fn find_pools_by_mint_offset_collect_with_pool_client<T: PoolRpcClient + ?Sized>(
+    rpc: &T,
+    mint: &Pubkey,
+    offset: usize,
+) -> Result<Vec<(Pubkey, PoolState)>, anyhow::Error> {
+    use solana_account_decoder::UiAccountEncoding;
+    use solana_rpc_client_api::{config::RpcProgramAccountsConfig, filter::RpcFilterType};
+    use solana_client::rpc_filter::Memcmp;
+
+    let filters = vec![
+        RpcFilterType::Memcmp(Memcmp::new_base58_encoded(offset, &mint.to_bytes())),
+    ];
+    let config = RpcProgramAccountsConfig {
+        filters: Some(filters),
+        account_config: solana_rpc_client_api::config::RpcAccountInfoConfig {
+            encoding: Some(UiAccountEncoding::Base64),
+            data_slice: None,
+            commitment: None,
+            min_context_slot: None,
+        },
+        with_context: None,
+        sort_results: None,
+    };
+
+    let accounts = rpc.get_program_ui_accounts_with_config(&accounts::RAYDIUM_CPMM, config).await
+        .map_err(|e| anyhow!("RPC error: {}", e))?;
+
+    let pools: Vec<(Pubkey, PoolState)> = accounts
+        .into_iter()
+        .filter_map(|(addr, acc)| {
+            let pubkey = Pubkey::from_str(&addr).ok()?;
+            let data_bytes = match &acc.data {
+                UiAccountData::Binary(base64_str, _) => STANDARD.decode(base64_str).ok()?,
+                _ => return None,
+            };
+            if data_bytes.len() > 8 {
+                pool_state_decode(&data_bytes[8..]).map(|pool| (pubkey, pool))
+            } else {
+                None
+            }
+        })
+        .collect();
+
+    Ok(pools)
+}
+
 /// 按 LP 供应量选择最佳池（CPMM 池没有交易量字段，使用 lp_supply 作为流动性指标）
 /// 
 /// 策略：
@@ -358,6 +526,50 @@ async fn find_all_pools_by_mint_impl(
     let (token0_result, token1_result) = tokio::join!(
         find_pools_by_mint_offset_collect(rpc, mint, TOKEN0_MINT_OFFSET),
         find_pools_by_mint_offset_collect(rpc, mint, TOKEN1_MINT_OFFSET),
+    );
+
+    // 检测是否都失败，如果都失败则返回第一个错误（通常包含 RPC 限制信息）
+    if token0_result.is_err() && token1_result.is_err() {
+        // 返回 token0_result 的错误，它包含我们的自定义错误消息
+        return Err(token0_result.unwrap_err());
+    }
+
+    let mut all_pools: Vec<(Pubkey, PoolState)> = Vec::new();
+
+    if let Ok(pools) = token0_result {
+        all_pools.extend(pools);
+    }
+
+    if let Ok(quote_pools) = token1_result {
+        let mut seen: HashSet<Pubkey> = all_pools.iter().map(|(addr, _)| *addr).collect();
+        for (addr, pool) in quote_pools {
+            if seen.insert(addr) {
+                all_pools.push((addr, pool));
+            }
+        }
+    }
+
+    if all_pools.is_empty() {
+        return Err(anyhow!("No CPMM pool found for mint {}", mint));
+    }
+
+    Ok(all_pools)
+}
+
+/// 内部实现：查找指定 mint 的所有 Raydium CPMM Pool（支持 PoolRpcClient）
+///
+/// 策略：
+/// 1. 并行查询 token0_mint 与 token1_mint 包含该 mint 的所有池
+/// 2. 合并并去重
+async fn find_all_pools_by_mint_impl_with_pool_client<T: PoolRpcClient + ?Sized>(
+    rpc: &T,
+    mint: &Pubkey,
+) -> Result<Vec<(Pubkey, PoolState)>, anyhow::Error> {
+    use std::collections::HashSet;
+
+    let (token0_result, token1_result) = tokio::join!(
+        find_pools_by_mint_offset_collect_with_pool_client(rpc, mint, TOKEN0_MINT_OFFSET),
+        find_pools_by_mint_offset_collect_with_pool_client(rpc, mint, TOKEN1_MINT_OFFSET),
     );
 
     // 检测是否都失败，如果都失败则返回第一个错误（通常包含 RPC 限制信息）

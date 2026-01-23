@@ -268,7 +268,7 @@ pub async fn get_pool_by_mint(
 }
 
 /// 获取指定 mint 对应的最优 CLMM 池（带选项）
-/// 
+///
 /// # Arguments
 /// * `use_vault_balance` - 是否使用金库余额选池策略（需要RPC调用，但更准确）
 ///   - `true`: 并发读取候选池的USDC/USDT/WSOL金库余额，按余额从大到小选择（推荐用于生产环境）
@@ -284,8 +284,18 @@ pub async fn get_pool_by_mint_with_options(
             return Ok((pool_address, pool));
         }
     }
-    // 2. RPC 查询
-    let (pool_address, pool) = find_pool_by_mint_impl(rpc, mint, use_vault_balance).await?;
+
+    // 2. RPC 查询 - 复用 get_pool_by_mint_with_pool_client 的逻辑
+    // 注意：当 use_vault_balance=true 时，仍使用旧的 find_pool_by_mint_impl
+    // 当 use_vault_balance=false 时，使用共享的 get_pool_by_mint_with_pool_client 逻辑
+    let (pool_address, pool) = if use_vault_balance {
+        // 使用金库余额策略（需要额外 RPC 调用）
+        find_pool_by_mint_impl(rpc, mint, true).await?
+    } else {
+        // 使用共享逻辑（零额外网络开销）
+        get_pool_by_mint_with_pool_client(rpc, mint).await?
+    };
+
     // 3. 写入缓存
     raydium_clmm_cache::cache_pool_address_by_mint(mint, &pool_address);
     raydium_clmm_cache::cache_pool_by_address(&pool_address, &pool);
@@ -316,6 +326,62 @@ pub async fn get_pool_by_mint_force_with_options(
 ) -> Result<(Pubkey, PoolState), anyhow::Error> {
     raydium_clmm_cache::MINT_TO_POOL_CACHE.remove(mint);
     get_pool_by_mint_with_options(rpc, mint, use_vault_balance).await
+}
+
+/// 使用 PoolRpcClient 获取指定 mint 对应的最优 CLMM 池（支持 Auto Mock）
+///
+/// 这是一个简化版本，不支持缓存和 use_vault_balance 选项，
+/// 主要用于测试环境加速。
+///
+/// # Arguments
+/// * `rpc`: 实现了 PoolRpcClient 的 RPC 客户端（支持 AutoMockRpcClient）
+/// * `mint`: Token mint 地址
+///
+/// # Returns
+/// 返回最优池的地址和状态
+pub async fn get_pool_by_mint_with_pool_client<T: PoolRpcClient + ?Sized>(
+    rpc: &T,
+    mint: &Pubkey,
+) -> Result<(Pubkey, PoolState), anyhow::Error> {
+    // 使用 list_pools_by_mint_with_pool_client 获取所有包含该 mint 的池
+    let all_pools = list_pools_by_mint_with_pool_client(rpc, mint).await?;
+
+    if all_pools.is_empty() {
+        return Err(anyhow::anyhow!("No CLMM pool found for mint: {}", mint));
+    }
+
+    // 简单选择策略：优先选择与 Hot Mint（WSOL/USDC/USDT）配对的池
+    let mut hot_pools: Vec<(Pubkey, PoolState)> = Vec::new();
+    let mut other_pools: Vec<(Pubkey, PoolState)> = Vec::new();
+
+    for (addr, pool) in all_pools.into_iter() {
+        // 找到与目标 mint 对应的另一侧 mint
+        let other_mint = if pool.token_mint0 == *mint {
+            pool.token_mint1
+        } else if pool.token_mint1 == *mint {
+            pool.token_mint0
+        } else {
+            other_pools.push((addr, pool));
+            continue;
+        };
+
+        if is_hot_mint(&other_mint) {
+            hot_pools.push((addr, pool));
+        } else {
+            other_pools.push((addr, pool));
+        }
+    }
+
+    // 使用累计交易量选池（零网络开销）
+    let best_pool = if !hot_pools.is_empty() {
+        select_best_pool_by_volume(&hot_pools)
+    } else if *mint == SOL_MINT {
+        select_best_pool_by_volume(&other_pools)
+    } else {
+        select_best_pool_by_volume(&other_pools)
+    };
+
+    Ok(best_pool)
 }
 
 pub fn clear_pool_cache() {
