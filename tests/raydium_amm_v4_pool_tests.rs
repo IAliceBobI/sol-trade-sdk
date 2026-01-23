@@ -38,8 +38,11 @@ async fn test_fetch_amm_info() {
         .unwrap_or_else(|_| panic!("Invalid AMM address: {}", SOL_USDC_AMM));
     let rpc_url = "http://127.0.0.1:8899";
 
-    // 使用 Auto Mock RPC 客户端加速测试
-    let rpc = AutoMockRpcClient::new(rpc_url.to_string());
+    // 使用 Auto Mock RPC 客户端加速测试（使用独立命名空间）
+    let rpc = AutoMockRpcClient::new_with_namespace(
+        rpc_url.to_string(),
+        Some("raydium_amm_v4_pool_tests".to_string())
+    );
 
     // 清除缓存，确保测试从干净状态开始
     clear_pool_cache();
@@ -349,8 +352,11 @@ async fn test_raydium_amm_v4_get_pool_by_mint_with_auto_mock() {
         .unwrap_or_else(|_| panic!("Invalid WSOL mint"));
     let rpc_url = "http://127.0.0.1:8899";
 
-    // 使用 Auto Mock RPC 客户端
-    let auto_mock_client = AutoMockRpcClient::new(rpc_url.to_string());
+    // 使用 Auto Mock RPC 客户端（使用独立命名空间避免与其他测试冲突）
+    let auto_mock_client = AutoMockRpcClient::new_with_namespace(
+        rpc_url.to_string(),
+        Some("raydium_amm_v4_tests".to_string())
+    );
 
     println!("Token Mint: {}", wsol_mint);
 

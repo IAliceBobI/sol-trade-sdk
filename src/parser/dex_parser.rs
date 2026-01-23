@@ -83,10 +83,19 @@ impl DexParser {
 
     /// 使用 Auto Mock 模式创建解析器（测试环境）
     pub fn new_with_mock(config: ParserConfig) -> Self {
+        Self::new_with_mock_and_namespace(config, None)
+    }
+
+    /// 使用 Auto Mock 模式创建解析器（测试环境，带 namespace）
+    ///
+    /// # 参数
+    /// - `config`: 解析器配置
+    /// - `namespace`: 可选的命名空间，用于隔离不同测试的 mock 数据
+    pub fn new_with_mock_and_namespace(config: ParserConfig, namespace: Option<String>) -> Self {
         use crate::common::auto_mock_rpc::AutoMockRpcClient;
 
         let rpc_client = RpcClientWrapper::AutoMock(
-            Arc::new(AutoMockRpcClient::new(config.rpc_url.clone()))
+            Arc::new(AutoMockRpcClient::new_with_namespace(config.rpc_url.clone(), namespace))
         );
 
         let mut parsers: HashMap<String, Arc<dyn DexParserTrait>> = HashMap::new();

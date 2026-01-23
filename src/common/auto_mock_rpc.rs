@@ -86,11 +86,37 @@ impl PoolRpcClient for NonblockingRpcClient {
 /// 智能 Auto 模式：
 /// - 有缓存数据 → 从文件加载
 /// - 无缓存数据 → 调用 RPC 并保存
+///
+/// # Namespace（命名空间）
+///
+/// 通过设置 namespace，可以让不同测试使用独立的 mock 数据文件，避免冲突。
+///
+/// ## 设置方式
+///
+/// 1. **环境变量**（推荐）：
+///    ```bash
+///    MOCK_NAMESPACE=test1 cargo test --test xxx
+///    ```
+///
+/// 2. **代码中指定**：
+///    ```rust
+///    let client = AutoMockRpcClient::new_with_namespace(
+///        rpc_url.to_string(),
+///        Some("test1".to_string())
+///    );
+///    ```
+///
+/// ## 文件命名规则
+///
+/// - 有 namespace: `{method}_{namespace}_{params_hash}.json`
+/// - 无 namespace: `{method}_{params_hash}.json`
 pub struct AutoMockRpcClient {
     /// 内部 RPC 客户端
     inner: Arc<RpcClient>,
     /// Mock 数据目录
     mock_dir: String,
+    /// 命名空间（可选，用于隔离不同测试的 mock 数据）
+    namespace: Option<String>,
 }
 
 impl AutoMockRpcClient {
@@ -101,14 +127,55 @@ impl AutoMockRpcClient {
     ///
     /// # 环境变量
     /// - `MOCK_DIR`: Mock 数据目录（默认: tests/mock_data）
+    /// - `MOCK_NAMESPACE`: Mock 命名空间（可选，用于隔离不同测试的 mock 数据）
     pub fn new(rpc_url: String) -> Self {
+        let mock_dir = std::env::var("MOCK_DIR")
+            .unwrap_or_else(|_| "tests/mock_data".to_string());
+
+        // 从环境变量读取 namespace
+        let namespace = std::env::var("MOCK_NAMESPACE").ok();
+
+        Self {
+            inner: Arc::new(RpcClient::new(rpc_url)),
+            mock_dir,
+            namespace,
+        }
+    }
+
+    /// 创建新的 Auto Mock RPC 客户端（指定命名空间）
+    ///
+    /// # 参数
+    /// - `rpc_url`: RPC 节点地址
+    /// - `namespace`: 命名空间标识符，None 表示不使用命名空间（共享 mock 数据）
+    ///
+    /// # 示例
+    /// ```rust
+    /// // 使用独立命名空间
+    /// let client = AutoMockRpcClient::new_with_namespace(
+    ///     rpc_url.to_string(),
+    ///     Some("my_test".to_string())
+    /// );
+    ///
+    /// // 共享 mock 数据（不使用命名空间）
+    /// let client = AutoMockRpcClient::new_with_namespace(
+    ///     rpc_url.to_string(),
+    ///     None
+    /// );
+    /// ```
+    pub fn new_with_namespace(rpc_url: String, namespace: Option<String>) -> Self {
         let mock_dir = std::env::var("MOCK_DIR")
             .unwrap_or_else(|_| "tests/mock_data".to_string());
 
         Self {
             inner: Arc::new(RpcClient::new(rpc_url)),
             mock_dir,
+            namespace,
         }
+    }
+
+    /// 获取当前命名空间
+    pub fn namespace(&self) -> Option<&str> {
+        self.namespace.as_deref()
     }
 
     /// 获取 Mock 数据目录
@@ -118,14 +185,25 @@ impl AutoMockRpcClient {
 
     /// 生成文件名
     ///
-    /// 格式: {method}_{params_hash}.json
+    /// 格式:
+    /// - 有 namespace: `{method}_{namespace}_{params_hash}.json`
+    /// - 无 namespace: `{method}_{params_hash}.json`
     pub fn generate_file_name(&self, method: &str, params: &Value) -> String {
         let params_str = params.to_string();
         let mut hasher = DefaultHasher::new();
+
+        // 如果有 namespace，将其纳入 hash 计算，确保不同 namespace 的数据不会冲突
+        if let Some(ns) = &self.namespace {
+            ns.hash(&mut hasher);
+        }
         params_str.hash(&mut hasher);
         let hash = hasher.finish();
 
-        format!("{}_{:016x}.json", method, hash)
+        // 文件名格式：method_namespace_hash 或 method_hash
+        match &self.namespace {
+            Some(ns) => format!("{}_{}_{:016x}.json", method, ns, hash),
+            None => format!("{}_{:016x}.json", method, hash),
+        }
     }
 
     /// 检查 Mock 数据是否存在

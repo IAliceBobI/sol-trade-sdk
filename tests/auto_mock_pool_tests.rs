@@ -25,8 +25,11 @@ const RAYDIUM_AMM_V4: &str = "675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8";
 async fn test_auto_mock_get_pool_account() {
     println!("=== 测试：Auto Mock get_account ===");
 
-    // 创建 Auto Mock RPC 客户端
-    let client = AutoMockRpcClient::new("http://127.0.0.1:8899".to_string());
+    // 创建 Auto Mock RPC 客户端（使用独立命名空间）
+    let client = AutoMockRpcClient::new_with_namespace(
+        "http://127.0.0.1:8899".to_string(),
+        Some("auto_mock_pool_tests".to_string())
+    );
 
     let pool_address = Pubkey::from_str(WSOL_USDC_POOL).unwrap();
 
@@ -60,8 +63,11 @@ async fn test_auto_mock_get_program_accounts() {
     use solana_client::rpc_filter::Memcmp;
     use solana_rpc_client_api::{config::RpcProgramAccountsConfig, filter::RpcFilterType};
 
-    // 创建 Auto Mock RPC 客户端
-    let client = AutoMockRpcClient::new("http://127.0.0.1:8899".to_string());
+    // 创建 Auto Mock RPC 客户端（使用独立命名空间避免与其他测试冲突）
+    let client = AutoMockRpcClient::new_with_namespace(
+        "http://127.0.0.1:8899".to_string(),
+        Some("auto_mock_pool_tests".to_string())
+    );
 
     let program_id = Pubkey::from_str(RAYDIUM_AMM_V4).unwrap();
     let wsol_mint = Pubkey::from_str("So11111111111111111111111111111111111111112").unwrap();
@@ -116,7 +122,10 @@ async fn test_auto_mock_get_program_accounts() {
 async fn test_auto_mock_cache_mechanism() {
     println!("=== 测试：Auto Mock 缓存机制 ===");
 
-    let client = AutoMockRpcClient::new("http://127.0.0.1:8899".to_string());
+    let client = AutoMockRpcClient::new_with_namespace(
+        "http://127.0.0.1:8899".to_string(),
+        Some("auto_mock_pool_tests".to_string())
+    );
     let pool_address = Pubkey::from_str(WSOL_USDC_POOL).unwrap();
 
     // 第一次调用：从 RPC 获取并保存
@@ -155,7 +164,10 @@ fn test_auto_mock_check_data_exists() {
 
     use serde_json::json;
 
-    let client = AutoMockRpcClient::new("http://127.0.0.1:8899".to_string());
+    let client = AutoMockRpcClient::new_with_namespace(
+        "http://127.0.0.1:8899".to_string(),
+        Some("auto_mock_pool_tests".to_string())
+    );
     let pool_address = Pubkey::from_str(WSOL_USDC_POOL).unwrap();
 
     let params = json!([pool_address.to_string()]);

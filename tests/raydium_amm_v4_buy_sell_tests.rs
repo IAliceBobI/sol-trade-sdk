@@ -25,7 +25,10 @@ async fn test_raydium_amm_v4_params_from_rpc() {
     let amm_address = Pubkey::from_str(SOL_USDC_AMM)
         .expect("Failed to parse AMM address");
     let rpc_url = "http://127.0.0.1:8899";
-    let rpc = AutoMockRpcClient::new(rpc_url.to_string());
+    let rpc = AutoMockRpcClient::new_with_namespace(
+        rpc_url.to_string(),
+        Some("raydium_amm_v4_buy_sell_tests".to_string())
+    );
 
     let params = RaydiumAmmV4Params::from_amm_address_by_rpc_with_client(&rpc, amm_address).await
         .unwrap_or_else(|e| panic!("从 RPC 获取 AMM 参数失败: {}\n  AMM: {}\n  RPC: {}", e, amm_address, rpc_url));

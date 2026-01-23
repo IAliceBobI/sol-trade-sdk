@@ -8,7 +8,10 @@ use std::str::FromStr;
 
 #[test]
 fn test_auto_mock_client_creation() {
-    let client = AutoMockRpcClient::new("http://127.0.0.1:8899".to_string());
+    let client = AutoMockRpcClient::new_with_namespace(
+        "http://127.0.0.1:8899".to_string(),
+        Some("auto_mock_rpc_test".to_string())
+    );
 
     assert_eq!(client.mock_dir(), "tests/mock_data");
     println!("✅ AutoMockRpcClient 创建成功");
@@ -16,7 +19,10 @@ fn test_auto_mock_client_creation() {
 
 #[test]
 fn test_generate_file_name() {
-    let client = AutoMockRpcClient::new("http://127.0.0.1:8899".to_string());
+    let client = AutoMockRpcClient::new_with_namespace(
+        "http://127.0.0.1:8899".to_string(),
+        Some("auto_mock_rpc_test".to_string())
+    );
 
     let sig = Signature::from_str("5GCZ3TR31aDRP9LZxznKPBux86jWDyCxt1noCAAhX43d6Cmtqi8HvK6oHErq7DBr9j5KRcqeYumW2wHt5qJG1tQK").unwrap();
     let params = serde_json::json!([sig, {"encoding": "jsonParsed"}]);
@@ -34,7 +40,10 @@ fn test_generate_file_name() {
 
 #[test]
 fn test_has_mock_data() {
-    let client = AutoMockRpcClient::new("http://127.0.0.1:8899".to_string());
+    let client = AutoMockRpcClient::new_with_namespace(
+        "http://127.0.0.1:8899".to_string(),
+        Some("auto_mock_rpc_test".to_string())
+    );
 
     let sig = Signature::from_str("5GCZ3TR31aDRP9LZxznKPBux86jWDyCxt1noCAAhX43d6Cmtqi8HvK6oHErq7DBr9j5KRcqeYumW2wHt5qJG1tQK").unwrap();
     let params = serde_json::json!([sig, {"encoding": "jsonParsed"}]);
@@ -48,7 +57,10 @@ fn test_has_mock_data() {
 #[tokio::test]
 #[ignore]  // 需要 RPC 节点，手动运行
 async fn test_auto_mode_first_call() {
-    let client = AutoMockRpcClient::new("http://127.0.0.1:8899".to_string());
+    let client = AutoMockRpcClient::new_with_namespace(
+        "http://127.0.0.1:8899".to_string(),
+        Some("auto_mock_rpc_test".to_string())
+    );
 
     let sig = Signature::from_str("5GCZ3TR31aDRP9LZxznKPBux86jWDyCxt1noCAAhX43d6Cmtqi8HvK6oHErq7DBr9j5KRcqeYumW2wHt5qJG1tQK").unwrap();
 

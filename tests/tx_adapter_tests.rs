@@ -25,8 +25,11 @@ async fn test_transaction_adapter_extract_transfer_checked() {
     let rpc_url = "http://127.0.0.1:8899";
     let signature_str = "5GCZ3TR31aDRP9LZxznKPBux86jWDyCxt1noCAAhX43d6Cmtqi8HvK6oHErq7DBr9j5KRcqeYumW2wHt5qJG1tQK";
 
-    // 使用 Auto Mock RPC 客户端
-    let auto_mock_client = AutoMockRpcClient::new(rpc_url.to_string());
+    // 使用 Auto Mock RPC 客户端（使用独立命名空间）
+    let auto_mock_client = AutoMockRpcClient::new_with_namespace(
+        rpc_url.to_string(),
+        Some("tx_adapter_tests".to_string())
+    );
 
     let signature = Signature::from_str(signature_str)
         .expect("Failed to parse signature from string");
@@ -94,8 +97,11 @@ async fn test_transaction_adapter_extract_all_transfers() {
     let rpc_url = "http://127.0.0.1:8899";
     let signature_str = "5GCZ3TR31aDRP9LZxznKPBux86jWDyCxt1noCAAhX43d6Cmtqi8HvK6oHErq7DBr9j5KRcqeYumW2wHt5qJG1tQK";
 
-    // 使用 Auto Mock RPC 客户端
-    let auto_mock_client = AutoMockRpcClient::new(rpc_url.to_string());
+    // 使用 Auto Mock RPC 客户端（使用独立命名空间）
+    let auto_mock_client = AutoMockRpcClient::new_with_namespace(
+        rpc_url.to_string(),
+        Some("tx_adapter_tests".to_string())
+    );
 
     let signature = Signature::from_str(signature_str)
         .expect("Failed to parse signature from string");
@@ -157,8 +163,11 @@ async fn test_transaction_adapter_token_balances() {
     let rpc_url = "http://127.0.0.1:8899";
     let signature_str = "5GCZ3TR31aDRP9LZxznKPBux86jWDyCxt1noCAAhX43d6Cmtqi8HvK6oHErq7DBr9j5KRcqeYumW2wHt5qJG1tQK";
 
-    // 使用 Auto Mock RPC 客户端
-    let auto_mock_client = AutoMockRpcClient::new(rpc_url.to_string());
+    // 使用 Auto Mock RPC 客户端（使用独立命名空间）
+    let auto_mock_client = AutoMockRpcClient::new_with_namespace(
+        rpc_url.to_string(),
+        Some("tx_adapter_tests".to_string())
+    );
 
     let signature = Signature::from_str(signature_str)
         .expect("Failed to parse signature from string");
@@ -211,8 +220,11 @@ async fn test_transaction_adapter_get_transfer_actions() {
     let rpc_url = "http://127.0.0.1:8899";
     let signature_str = "5GCZ3TR31aDRP9LZxznKPBux86jWDyCxt1noCAAhX43d6Cmtqi8HvK6oHErq7DBr9j5KRcqeYumW2wHt5qJG1tQK";
 
-    // 使用 Auto Mock RPC 客户端
-    let auto_mock_client = AutoMockRpcClient::new(rpc_url.to_string());
+    // 使用 Auto Mock RPC 客户端（使用独立命名空间）
+    let auto_mock_client = AutoMockRpcClient::new_with_namespace(
+        rpc_url.to_string(),
+        Some("tx_adapter_tests".to_string())
+    );
 
     let signature = Signature::from_str(signature_str)
         .expect("Failed to parse signature from string");

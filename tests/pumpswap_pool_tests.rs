@@ -24,8 +24,11 @@ async fn test_find_pool_by_mint() {
     let mint = Pubkey::from_str(PUMP_MINT).unwrap();
     let rpc_url = "http://127.0.0.1:8899";
 
-    // 使用 Auto Mock RPC 客户端（首次运行会录制，后续运行使用缓存）
-    let rpc = AutoMockRpcClient::new(rpc_url.to_string());
+    // 使用 Auto Mock RPC 客户端（使用独立命名空间）
+    let rpc = AutoMockRpcClient::new_with_namespace(
+        rpc_url.to_string(),
+        Some("pumpswap_pool_tests".to_string())
+    );
 
     // 调用泛型版本的 find_pool_with_client
     let result = find_pool_with_client(&rpc, &mint).await;
@@ -53,8 +56,11 @@ async fn test_get_pool_by_address() {
     let pool_address = Pubkey::from_str(PUMP_POOL_ADDRESS).unwrap();
     let rpc_url = "http://127.0.0.1:8899";
 
-    // 使用 Auto Mock RPC 客户端
-    let rpc = AutoMockRpcClient::new(rpc_url.to_string());
+    // 使用 Auto Mock RPC 客户端（使用独立命名空间）
+    let rpc = AutoMockRpcClient::new_with_namespace(
+        rpc_url.to_string(),
+        Some("pumpswap_pool_tests".to_string())
+    );
 
     // 第一次调用（会写入缓存）
     println!("第一次调用（写入缓存）...");
@@ -113,8 +119,11 @@ async fn test_get_pumpswap_token_price_in_usd() {
     let pool_address = Pubkey::from_str(PUMP_POOL_ADDRESS).unwrap();
     let rpc_url = "http://127.0.0.1:8899";
 
-    // 使用 Auto Mock RPC 客户端
-    let rpc = AutoMockRpcClient::new(rpc_url.to_string());
+    // 使用 Auto Mock RPC 客户端（使用独立命名空间）
+    let rpc = AutoMockRpcClient::new_with_namespace(
+        rpc_url.to_string(),
+        Some("pumpswap_pool_tests".to_string())
+    );
 
     println!("Token Mint: {}", token_mint);
     println!("Pool 地址: {}", pool_address);

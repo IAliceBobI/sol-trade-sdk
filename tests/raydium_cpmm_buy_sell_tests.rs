@@ -289,8 +289,11 @@ async fn test_get_cpmm_token_price_in_usd() {
     let pool_address = Pubkey::from_str(PIPE_POOL).unwrap();
     let rpc_url = "http://127.0.0.1:8899";
 
-    // 使用 Auto Mock RPC 客户端
-    let auto_mock_client = AutoMockRpcClient::new(rpc_url.to_string());
+    // 使用 Auto Mock RPC 客户端（使用独立命名空间）
+    let auto_mock_client = AutoMockRpcClient::new_with_namespace(
+        rpc_url.to_string(),
+        Some("raydium_cpmm_buy_sell_tests".to_string())
+    );
 
     println!("Token Mint: {}", token_mint);
     println!("Pool 地址: {}", pool_address);
@@ -336,8 +339,11 @@ async fn test_raydium_cpmm_get_pool_by_mint_with_auto_mock() {
         .unwrap_or_else(|_| panic!("Invalid WSOL mint: {}", WSOL_MINT));
     let rpc_url = "http://127.0.0.1:8899";
 
-    // 使用 Auto Mock RPC 客户端
-    let auto_mock_client = AutoMockRpcClient::new(rpc_url.to_string());
+    // 使用 Auto Mock RPC 客户端（使用独立命名空间）
+    let auto_mock_client = AutoMockRpcClient::new_with_namespace(
+        rpc_url.to_string(),
+        Some("raydium_cpmm_buy_sell_tests".to_string())
+    );
 
     println!("Token Mint: {}", wsol_mint);
 
