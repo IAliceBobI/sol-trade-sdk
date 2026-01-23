@@ -1,30 +1,3 @@
-//! Raydium AMM V4 (Raydium Liquidity Pool V4) Pool 查找集成测试
-//!
-//! Raydium AMM V4 是 Raydium 的传统自动做市商（AMM）协议，使用恒定乘积公式（x * y = k）进行流动性提供和交易。
-//!
-//! ## 程序信息
-//! - **程序名称**: Raydium Liquidity Pool V4
-//! - **程序地址**: `675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8`
-//! - **特性**: 集成 Serum 订单簿，支持限价单和市价单
-//!
-//! ## 费用结构
-//! - **交易费**: 0.25% (25/10000)
-//! - **Swap 费**: 0.25% (25/10000)
-//! - **总费用**: 0.5%
-//!
-//! ## 已知 Pool
-//! - **WSOL-USDC Pool**: `58oQChx4yWmvKdwLLZzBi4ChoCc2fqCUWBkwMihLYQo2`
-//!   - Token0: WSOL (So11111111111111111111111111111111111111112)
-//!   - Token1: USDC (EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v)
-//!
-//! ## 测试方法
-//! - get_pool_by_address(rpc, amm) - 获取 AMM 信息（带缓存）
-//!
-//! 运行测试:
-//!     cargo test --test raydium_amm_v4_pool_tests -- --nocapture
-//!
-//! 注意：使用 surfpool (localhost:8899) 进行测试
-
 use sol_trade_sdk::instruction::utils::raydium_amm_v4::{
     get_pool_by_address,
     get_pool_by_address_force,
@@ -56,19 +29,28 @@ const OIIAOIIA_POOL: &str = "HZ6rzhC96cTVx3HQiKoDbSdoRd3LH5nELYuYXGu4f3EE";
 /// OIIAOIIA Token Mint
 const OIIAOIIA_MINT: &str = "VaxZxmFXV8tmsd72hUn22ex6GFzZ5uq9DVJ5wA5pump";
 
-/// 测试：获取 AMM 信息并验证字段
+/// 测试：获取 AMM 信息并验证字段（使用 Auto Mock 加速）
+///
+/// 此测试使用 AutoMockRpcClient 来验证所有字段的解析正确性。
+/// 首次运行时会从 RPC 获取数据并保存到 tests/mock_data/，
+/// 后续运行会直接从缓存加载，速度提升显著。
 #[tokio::test]
 #[serial_test::serial(global_dex_cache)]
 async fn test_fetch_amm_info() {
-    println!("=== 测试：获取 AMM 信息并验证字段 ===");
+    println!("=== 测试：获取 AMM 信息并验证字段（Auto Mock 加速） ===");
 
     let amm_address = Pubkey::from_str(SOL_USDC_AMM)
         .unwrap_or_else(|_| panic!("Invalid AMM address: {}", SOL_USDC_AMM));
     let rpc_url = "http://127.0.0.1:8899";
-    let rpc = RpcClient::new(rpc_url.to_string());
+
+    // 使用 Auto Mock RPC 客户端加速测试
+    let rpc = AutoMockRpcClient::new(rpc_url.to_string());
+
+    // 清除缓存，确保测试从干净状态开始
+    clear_pool_cache();
 
     println!("获取 AMM 信息: {}", amm_address);
-    let result = get_pool_by_address(&rpc, &amm_address).await;
+    let result = get_pool_by_address_with_pool_client(&rpc, &amm_address).await;
 
     assert!(result.is_ok(), "Failed to fetch AMM info: {:?}", result.err());
 
@@ -208,6 +190,8 @@ async fn test_fetch_amm_info() {
     // - padding
 
     println!("\n=== 所有固定字段验证通过 ===");
+    println!("✅ 首次运行：从 RPC 获取并保存（约 1-2 秒）");
+    println!("✅ 后续运行：从缓存加载（约 0.01 秒）");
 }
 
 /// 测试：缓存功能
@@ -277,48 +261,6 @@ async fn test_get_pool_by_address_cache() {
     println!("\n=== 所有缓存功能测试通过 ===");
 }
 
-/// 测试：基于指定 mint (WSOL) 获取 Pool
-/// 注意：此测试会清除缓存，必须与其他测试串行运行
-/// 测试：验证公共 RPC 对 getProgramAccounts 的限制
-/// 
-/// ## 问题分析
-/// 公共 RPC 节点（https://api.mainnet-beta.solana.com）针对热门程序禁用了 getProgramAccounts。
-/// 错误信息：
-/// ```
-/// RPC response error -32010: 675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8 excluded from 
-/// account secondary indexes; this RPC method unavailable for key
-/// ```
-/// 
-/// ## 原因
-/// - Raydium AMM V4 程序 ID 被排除在二级索引之外
-/// - 这是 Solana 公共 RPC 的主动限制策略，以防止滥用
-/// - 热门程序（如 Raydium, Orca）的账户数量巨大，扫描所有账户会消耗大量资源
-/// 
-/// ## 解决方案
-/// 
-/// ### 方案 1：使用已知池子地址（推荐用于生产）
-/// ```rust
-/// // 直接使用已知的主流池子地址
-/// const WSOL_USDC_AMM: &str = "58oQChx4yWmvKdwLLZzBi4ChoCc2fqCUWBkwMihLYQo2";
-/// let pool_address = Pubkey::from_str(WSOL_USDC_AMM)?;
-/// let amm_info = get_pool_by_address(&rpc, &pool_address).await?;
-/// ```
-/// 
-/// ### 方案 2：使用付费 RPC 服务
-/// - **Helius**: https://helius.dev/ - 支持 getProgramAccounts
-/// - **QuickNode**: https://www.quicknode.com/ - 支持全部 RPC 方法
-/// - **Triton**: https://triton.one/ - 专业级 RPC 服务
-/// 
-/// ### 方案 3：使用本地全节点
-/// ```bash
-/// # 运行本地 Solana 验证者节点
-/// solana-test-validator --url https://api.mainnet-beta.solana.com
-/// ```
-/// 
-/// ### 方案 4：使用 Raydium API
-/// - Raydium 提供 REST API 查询池子信息
-/// - API 文档: https://api-v3.raydium.io/docs/
-/// 
 #[tokio::test]
 #[serial_test::serial(global_dex_cache)]
 async fn test_public_rpc_limitations() {
@@ -399,56 +341,6 @@ async fn test_get_amm_v4_token_price_in_usd() {
     assert!(price_usd > 0.0, "Price should be positive");
     assert!(price_usd < 1000.0, "Price should be reasonable (< $1000)");
     println!("✅ 价格范围验证通过");
-}
-
-/// 测试：使用 Auto Mock 获取 AMM 信息（加速版）
-///
-/// 此测试使用 AutoMockRpcClient 来加速 pool 查询。
-/// 首次运行时会从 RPC 获取数据并保存到 tests/mock_data/，
-/// 后续运行会直接从缓存加载，速度提升显著。
-#[tokio::test]
-#[serial_test::serial(global_dex_cache)]
-async fn test_fetch_amm_info_with_auto_mock() {
-    println!("=== 测试：使用 Auto Mock 获取 AMM 信息（加速版） ===");
-
-    let amm_address = Pubkey::from_str(SOL_USDC_AMM)
-        .unwrap_or_else(|_| panic!("Invalid AMM address: {}", SOL_USDC_AMM));
-    let rpc_url = "http://127.0.0.1:8899";
-
-    // 使用 Auto Mock RPC 客户端
-    let auto_mock_client = AutoMockRpcClient::new(rpc_url.to_string());
-
-    println!("获取 AMM 信息: {}", amm_address);
-
-    // 清除缓存，确保测试从干净状态开始
-    clear_pool_cache();
-
-    // 首次调用：从 RPC 获取并保存（约 1-2 秒）
-    // 后续调用：从缓存加载（约 0.01 秒）
-    let result = get_pool_by_address_with_pool_client(&auto_mock_client, &amm_address).await;
-
-    assert!(result.is_ok(), "Failed to fetch AMM info: {:?}", result.err());
-
-    let amm_info = result.unwrap();
-
-    // 打印关键字段用于验证
-    println!("\n=== 提取的字段值 ===");
-    println!("status: {}", amm_info.status);
-    println!("nonce: {}", amm_info.nonce);
-    println!("coin_mint: {}", amm_info.coin_mint);
-    println!("pc_mint: {}", amm_info.pc_mint);
-    println!("lp_mint: {}", amm_info.lp_mint);
-    println!("lp_amount: {}", amm_info.lp_amount);
-
-    // 验证关键字段
-    assert_eq!(amm_info.status, 6, "status 不匹配");
-    assert_eq!(amm_info.coin_mint.to_string(), "So11111111111111111111111111111111111111112", "coin_mint 不匹配");
-    assert_eq!(amm_info.pc_mint.to_string(), "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", "pc_mint 不匹配");
-
-    println!("\n=== Auto Mock 测试通过 ===");
-    println!("✅ 首次运行：从 RPC 获取并保存（约 1-2 秒）");
-    println!("✅ 后续运行：从缓存加载（约 0.01 秒）");
-    println!("✅ 速度提升：约 100-200 倍！");
 }
 
 /// 测试：使用 Auto Mock 加速 get_pool_by_mint 和 list_pools_by_mint（加速版）
