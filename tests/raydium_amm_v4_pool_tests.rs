@@ -32,7 +32,6 @@ use sol_trade_sdk::instruction::utils::raydium_amm_v4::{
     get_pool_by_mint,
     get_pool_by_mint_force,
     get_pool_by_mint_with_pool_client,
-    list_pools_by_mint,
     list_pools_by_mint_with_pool_client,
     clear_pool_cache,
     get_token_price_in_usd_with_pool,
@@ -372,90 +371,6 @@ async fn test_public_rpc_limitations() {
     }
 }
 
-/// 测试：列出所有包含 WSOL 的 Raydium AMM V4 Pool
-/// 
-/// **注意**：此测试在公共 RPC 上会失败！
-/// 
-/// Solana 公共 RPC 节点禁用了 Raydium AMM V4 的 getProgramAccounts 查询。
-/// 这是因为 WSOL 相关的池子太多（数百个），扫描所有账户会消耗大量资源。
-/// 
-/// 要运行此测试，请使用：
-/// 1. 付费 RPC 服务（Helius, QuickNode, Triton）
-/// 2. 本地全节点
-/// 
-/// 对于生产环境，建议直接使用已知池子地址：
-/// ```rust
-/// const WSOL_USDC_AMM: &str = "58oQChx4yWmvKdwLLZzBi4ChoCc2fqCUWBkwMihLYQo2";
-/// let pool = get_pool_by_address(&rpc, &Pubkey::from_str(WSOL_USDC_AMM)?).await?;
-/// ```
-#[tokio::test]
-#[ignore]  // 默认忽略，因为公共 RPC 不支持
-#[serial_test::serial(global_dex_cache)]
-async fn test_list_pools_by_mint_wsol() {
-    println!("=== 测试：list_pools_by_mint (WSOL) ===");
-
-    let wsol_mint = Pubkey::from_str("So11111111111111111111111111111111111111112")
-        .unwrap_or_else(|_| panic!("Invalid WSOL mint: So11111111111111111111111111111111111111112"));
-    let rpc_url = "http://127.0.0.1:8899";
-    let rpc = RpcClient::new(rpc_url.to_string());
-
-    println!("开始查询 WSOL 相关的 AMM V4 池子...");
-    println!("这可能需要一些时间,因为需要扫描所有 Raydium AMM V4 程序账户...");
-    
-    let pools = list_pools_by_mint(&rpc, &wsol_mint, true).await;
-    assert!(pools.is_ok(), "list_pools_by_mint failed: {:?}", pools.err());
-    let pools = pools.unwrap();
-
-    assert!(!pools.is_empty(), "WSOL 相关的 Pool 列表不应为空");
-
-    // 所有池都应该包含 WSOL
-    for (addr, amm) in pools.iter() {
-        println!("WSOL Pool: {} (coin_mint={}, pc_mint={}, status={})", addr, amm.coin_mint, amm.pc_mint, amm.status);
-        assert!(
-            amm.coin_mint.to_string() == "So11111111111111111111111111111111111111112"
-                || amm.pc_mint.to_string() == "So11111111111111111111111111111111111111112",
-            "Pool {} 不包含 WSOL",
-            addr,
-        );
-    }
-
-    // 确认已知的 WSOL-USDC AMM 池在列表中（若本地 RPC 同步了主网数据）
-    let target = Pubkey::from_str(SOL_USDC_AMM)
-        .unwrap_or_else(|_| panic!("Invalid AMM address: {}", SOL_USDC_AMM));
-    let found = pools.iter().any(|(addr, _)| *addr == target);
-    assert!(found, "WSOL-USDC 主池未出现在 list_pools_by_mint 结果中");
-}
-
-/// 测试：列出所有活跃的 WSOL Pool
-#[tokio::test]
-#[serial_test::serial(global_dex_cache)]
-async fn test_list_active_pools_by_mint_wsol() {
-    println!("=== 测试：list_pools_by_mint (WSOL, active only) ===");
-
-    let wsol_mint = Pubkey::from_str("So11111111111111111111111111111111111111112")
-        .unwrap_or_else(|_| panic!("Invalid WSOL mint: So11111111111111111111111111111111111111112"));
-    let rpc_url = "http://127.0.0.1:8899";
-    let rpc = RpcClient::new(rpc_url.to_string());
-
-    let pools = list_pools_by_mint(&rpc, &wsol_mint, true).await;
-    assert!(pools.is_ok(), "list_pools_by_mint (active only) failed: {:?}", pools.err());
-    let pools = pools.unwrap();
-
-    assert!(!pools.is_empty(), "WSOL 相关的活跃 Pool 列表不应为空");
-
-    // 所有池都应该包含 WSOL 且是活跃状态
-    for (addr, amm) in pools.iter() {
-        println!("Active WSOL Pool: {} (coin_mint={}, pc_mint={}, status={})", addr, amm.coin_mint, amm.pc_mint, amm.status);
-        assert!(
-            amm.coin_mint.to_string() == "So11111111111111111111111111111111111111112"
-                || amm.pc_mint.to_string() == "So11111111111111111111111111111111111111112",
-            "Pool {} 不包含 WSOL",
-            addr,
-        );
-        assert_eq!(amm.status, 6, "Pool {} 不是活跃状态", addr); // 6 = ACTIVE
-    }
-}
-
 /// 测试：获取 AMM V4 token 的 USD 价格
 #[tokio::test]
 #[serial_test::serial(global_dex_cache)]
@@ -538,10 +453,7 @@ async fn test_fetch_amm_info_with_auto_mock() {
 
 /// 测试：使用 Auto Mock 加速 get_pool_by_mint 和 list_pools_by_mint（加速版）
 ///
-/// 此测试使用 AutoMockRpcClient 来加速 pool 查询。
-/// 替代慢测试：
-/// - test_get_pool_by_mint_wsol
-/// - test_list_pools_by_mint_wsol
+/// 此测试使用 AutoMockRpcClient 来加速 pool 查询，替代需要扫描所有 Pool 的慢测试。
 ///
 /// 首次运行时会从 RPC 获取数据并保存到 tests/mock_data/，
 /// 后续运行会直接从缓存加载，速度提升显著。
