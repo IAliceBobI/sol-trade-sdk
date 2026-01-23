@@ -179,7 +179,15 @@ fn select_best_pool_by_liquidity(pools: &[(Pubkey, Pool)]) -> (Pubkey, Pool) {
 
 /// Find a pool for a specific mint
 pub async fn find_pool(rpc: &SolanaRpcClient, mint: &Pubkey) -> Result<Pubkey, anyhow::Error> {
-    let (pool_address, _) = get_pool_by_mint(rpc, mint).await?;
+    find_pool_with_client(rpc, mint).await
+}
+
+/// Find a pool for a specific mint（泛型版本，支持 Auto Mock）
+pub async fn find_pool_with_client<T: PoolRpcClient + ?Sized>(
+    rpc: &T,
+    mint: &Pubkey,
+) -> Result<Pubkey, anyhow::Error> {
+    let (pool_address, _) = get_pool_by_mint_with_client(rpc, mint).await?;
     Ok(pool_address)
 }
 
@@ -264,6 +272,14 @@ pub async fn get_pool_by_mint(
     rpc: &SolanaRpcClient,
     mint: &Pubkey,
 ) -> Result<(Pubkey, Pool), anyhow::Error> {
+    get_pool_by_mint_with_client(rpc, mint).await
+}
+
+/// 带缓存的 mint 查询（泛型版本，支持 Auto Mock）
+pub async fn get_pool_by_mint_with_client<T: PoolRpcClient + ?Sized>(
+    rpc: &T,
+    mint: &Pubkey,
+) -> Result<(Pubkey, Pool), anyhow::Error> {
     // 1. 检查缓存
     if let Some(pool_address) = pump_swap_cache::get_cached_pool_address_by_mint(mint) {
         if let Some(pool) = pump_swap_cache::get_cached_pool_by_address(&pool_address) {
@@ -271,7 +287,7 @@ pub async fn get_pool_by_mint(
         }
     }
     // 2. RPC 查询
-    let (pool_address, pool) = find_pool_by_mint_impl(rpc, mint).await?;
+    let (pool_address, pool) = find_pool_by_mint_impl_with_client(rpc, mint).await?;
     // 3. 写入缓存
     pump_swap_cache::cache_pool_address_by_mint(mint, &pool_address);
     pump_swap_cache::cache_pool_by_address(&pool_address, &pool);
@@ -283,8 +299,16 @@ pub async fn get_pool_by_address_force(
     rpc: &SolanaRpcClient,
     pool_address: &Pubkey,
 ) -> Result<Pool, anyhow::Error> {
+    get_pool_by_address_force_with_client(rpc, pool_address).await
+}
+
+/// Force 刷新：强制重新查询指定 Pool（泛型版本，支持 Auto Mock）
+pub async fn get_pool_by_address_force_with_client<T: PoolRpcClient + ?Sized>(
+    rpc: &T,
+    pool_address: &Pubkey,
+) -> Result<Pool, anyhow::Error> {
     pump_swap_cache::POOL_DATA_CACHE.remove(pool_address);
-    get_pool_by_address(rpc, pool_address).await
+    get_pool_by_address_with_pool_client(rpc, pool_address).await
 }
 
 /// Force 刷新：强制重新查询 mint 对应的 Pool
@@ -487,7 +511,7 @@ async fn find_all_pools_by_mint_impl_with_pool_client<T: PoolRpcClient + ?Sized>
 }
 
 /// 内部实现：查找 mint 对应的最优池
-/// 
+///
 /// 策略（参考 CLMM 的 Hot Token 优先策略）：
 /// 1. 优先尝试 canonical pool (PumpFun 迁移的 mint/WSOL 对)
 /// 2. 在所有池中优先选择稳定币对（USDC/USDT），再考虑 WSOL 对
@@ -496,10 +520,23 @@ async fn find_pool_by_mint_impl(
     rpc: &SolanaRpcClient,
     mint: &Pubkey,
 ) -> Result<(Pubkey, Pool), anyhow::Error> {
+    find_pool_by_mint_impl_with_client(rpc, mint).await
+}
+
+/// 内部实现：查找 mint 对应的最优池（泛型版本，支持 Auto Mock）
+///
+/// 策略（参考 CLMM 的 Hot Token 优先策略）：
+/// 1. 优先尝试 canonical pool (PumpFun 迁移的 mint/WSOL 对)
+/// 2. 在所有池中优先选择稳定币对（USDC/USDT），再考虑 WSOL 对
+/// 3. 在同类池子中，按 LP 供应量从大到小排序
+async fn find_pool_by_mint_impl_with_client<T: PoolRpcClient + ?Sized>(
+    rpc: &T,
+    mint: &Pubkey,
+) -> Result<(Pubkey, Pool), anyhow::Error> {
     // Priority 1: Try to find canonical pool (mint/WSOL pair) first
     // This is the most common case for PumpFun migrated tokens
     if let Some((pool_address, _)) = calculate_canonical_pool_pda(mint) {
-        if let Ok(pool) = get_pool_by_address(rpc, &pool_address).await {
+        if let Ok(pool) = get_pool_by_address_with_pool_client(rpc, &pool_address).await {
             // Verify it's actually a mint/WSOL pool
             if (pool.base_mint == *mint && pool.quote_mint == WSOL_TOKEN_ACCOUNT) ||
                (pool.base_mint == WSOL_TOKEN_ACCOUNT && pool.quote_mint == *mint) {
@@ -509,7 +546,7 @@ async fn find_pool_by_mint_impl(
     }
 
     // Priority 2 & 3: 获取所有池子
-    let all_pools = find_all_pools_by_mint_impl(rpc, mint).await?;
+    let all_pools = find_all_pools_by_mint_impl_with_pool_client(rpc, mint).await?;
 
     // 分类：稳定币对 > WSOL 对 > 其他对
     let mut stable_pools: Vec<(Pubkey, Pool)> = Vec::new();
@@ -697,16 +734,25 @@ pub async fn get_token_balances(
     pool: &Pool,
     rpc: &SolanaRpcClient,
 ) -> Result<(u64, u64), anyhow::Error> {
+    get_token_balances_with_client(pool, rpc).await
+}
+
+/// 获取 Token 余额（泛型版本，支持 Auto Mock）
+pub async fn get_token_balances_with_client<T: PoolRpcClient + ?Sized>(
+    pool: &Pool,
+    rpc: &T,
+) -> Result<(u64, u64), anyhow::Error> {
     let (base_balance_result, quote_balance_result) = tokio::join!(
         rpc.get_token_account_balance(&pool.pool_base_token_account),
         rpc.get_token_account_balance(&pool.pool_quote_token_account),
     );
 
-    let base_balance = base_balance_result?;
-    let quote_balance = quote_balance_result?;
+    let base_balance = base_balance_result.map_err(|e| anyhow::anyhow!("获取 base token 余额失败: {}", e))?;
+    let quote_balance = quote_balance_result.map_err(|e| anyhow::anyhow!("获取 quote token 余额失败: {}", e))?;
 
-    let base_amount = base_balance.amount.parse::<u64>().map_err(|e| anyhow!(e))?;
-    let quote_amount = quote_balance.amount.parse::<u64>().map_err(|e| anyhow!(e))?;
+    // UiTokenAmount 的 amount 字段是字符串形式
+    let base_amount = base_balance.amount.parse::<u64>().map_err(|e| anyhow!("解析 base token 余额失败: {}", e))?;
+    let quote_amount = quote_balance.amount.parse::<u64>().map_err(|e| anyhow!("解析 quote token 余额失败: {}", e))?;
 
     Ok((base_amount, quote_amount))
 }
@@ -854,6 +900,26 @@ pub async fn get_token_price_in_usd_with_pool(
     x_wsol_pool_address: &Pubkey,
     wsol_usd_clmm_pool_address: Option<&Pubkey>,
 ) -> Result<f64, anyhow::Error> {
+    get_token_price_in_usd_with_pool_with_client(rpc, token_mint, x_wsol_pool_address, wsol_usd_clmm_pool_address).await
+}
+
+/// 获取任意 Token 在 PumpSwap 上的 USD 价格（泛型版本，支持 Auto Mock）
+///
+/// 与 `get_token_price_in_usd` 的区别：
+/// - 此函数要求调用者已知 X-WSOL 池地址，直接传入，避免 `get_pool_by_mint` 的查找开销
+/// - 适用于高频调用、已缓存池地址的场景
+///
+/// # Arguments
+/// * `rpc` - RPC 客户端（支持 AutoMockRpcClient）
+/// * `token_mint` - Token X 的 mint 地址
+/// * `x_wsol_pool_address` - Token X 与 WSOL 配对的 PumpSwap 池地址
+/// * `wsol_usd_clmm_pool_address` - Raydium CLMM 上的 WSOL-USDT/USDC 锚定池地址
+pub async fn get_token_price_in_usd_with_pool_with_client<T: PoolRpcClient + ?Sized>(
+    rpc: &T,
+    token_mint: &Pubkey,
+    x_wsol_pool_address: &Pubkey,
+    wsol_usd_clmm_pool_address: Option<&Pubkey>,
+) -> Result<f64, anyhow::Error> {
     let wsol_usd_pool = wsol_usd_clmm_pool_address.unwrap_or(&DEFAULT_WSOL_USDT_CLMM_POOL);
     use crate::constants::{SOL_MINT, USDC_MINT, USDT_MINT, WSOL_TOKEN_ACCOUNT};
     use crate::utils::price::pumpswap::{price_base_in_quote, price_quote_in_base};
@@ -865,7 +931,7 @@ pub async fn get_token_price_in_usd_with_pool(
 
     // WSOL/SOL 的价格通过 Raydium CLMM 锚定池获取
     if *token_mint == SOL_MINT || *token_mint == WSOL_TOKEN_ACCOUNT {
-        return crate::instruction::utils::raydium_clmm::get_wsol_price_in_usd(
+        return crate::instruction::utils::raydium_clmm::get_wsol_price_in_usd_with_client(
             rpc,
             Some(wsol_usd_pool),
         )
@@ -873,7 +939,7 @@ pub async fn get_token_price_in_usd_with_pool(
     }
 
     // 1. 直接强制刷新指定的 X-WSOL 池（跳过查找步骤）
-    let pool = get_pool_by_address_force(rpc, x_wsol_pool_address).await?;
+    let pool = get_pool_by_address_force_with_client(rpc, x_wsol_pool_address).await?;
 
     // 2. 只处理 X-WSOL 对（X 是任意 token，另一侧必须是 WSOL_TOKEN_ACCOUNT）
     let is_base_x = pool.base_mint == *token_mint && pool.quote_mint == WSOL_TOKEN_ACCOUNT;
@@ -887,11 +953,11 @@ pub async fn get_token_price_in_usd_with_pool(
     }
 
     // 3. 获取池子实时余额
-    let (base_reserve, quote_reserve) = get_token_balances(&pool, rpc).await?;
+    let (base_reserve, quote_reserve) = get_token_balances_with_client(&pool, rpc).await?;
 
     // 4. 获取两侧代币精度
-    let base_decimals = crate::utils::token::get_token_decimals(rpc, &pool.base_mint).await?;
-    let quote_decimals = crate::utils::token::get_token_decimals(rpc, &pool.quote_mint).await?;
+    let base_decimals = crate::utils::token::get_token_decimals_with_client(rpc, &pool.base_mint).await?;
+    let quote_decimals = crate::utils::token::get_token_decimals_with_client(rpc, &pool.quote_mint).await?;
 
     // 5. 计算 X 相对 WSOL 的价格
     let price_x_in_wsol = if is_base_x {
@@ -907,7 +973,7 @@ pub async fn get_token_price_in_usd_with_pool(
     }
 
     // 6. 获取 WSOL 的 USD 价格（通过 Raydium CLMM 锚定池）
-    let price_wsol_in_usd = crate::instruction::utils::raydium_clmm::get_wsol_price_in_usd(
+    let price_wsol_in_usd = crate::instruction::utils::raydium_clmm::get_wsol_price_in_usd_with_client(
         rpc,
         Some(wsol_usd_pool),
     )

@@ -1,23 +1,8 @@
-//! PumpSwap Pool 查找集成测试
-//!
-//! 测试所有 pool 查找方法：
-//! - find_pool(rpc, mint) - 通过 mint 查找 pool 地址
-//! - get_pool_by_address(rpc, pool_address) - 通过地址获取 pool 数据（带缓存）
-//! - get_pool_by_mint(rpc, mint) - 通过 mint 获取 pool（带缓存，返回最优池）
-//! - get_pool_by_address_force(rpc, pool_address) - 强制刷新缓存后获取
-//! - get_pool_by_mint_force(rpc, mint) - 强制刷新缓存后通过 mint 获取
-//!
-//! 运行测试:
-//!     cargo test --test pumpswap_pool_tests -- --nocapture
-//!
-//! 注意：使用公共 Solana RPC 端点
-
 use sol_trade_sdk::instruction::utils::pumpswap::{
-    clear_pool_cache, find_pool, get_pool_by_address, get_pool_by_address_with_pool_client,
-    get_token_balances, get_token_price_in_usd_with_pool,
+    clear_pool_cache, find_pool_with_client, get_pool_by_address_with_pool_client,
+    get_token_balances_with_client, get_token_price_in_usd_with_pool_with_client,
 };
 use sol_trade_sdk::common::auto_mock_rpc::AutoMockRpcClient;
-use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_sdk::pubkey::Pubkey;
 use std::str::FromStr;
 
@@ -27,21 +12,23 @@ const PUMP_MINT: &str = "pumpCmXqMfrsAkQ5r49WcJnRayYRqmXz6ae8H7H9Dfn";
 /// 已知的 PumpSwap pool 地址
 const PUMP_POOL_ADDRESS: &str = "539m4mVWt6iduB6W8rDGPMarzNCMesuqY5eUTiiYHAgR";
 
-/// 测试：通过 mint 查找 pool 地址
+/// 测试：通过 mint 查找 pool 地址（使用 Auto Mock 加速）
 #[tokio::test]
 #[serial_test::serial(global_dex_cache)]
 async fn test_find_pool_by_mint() {
-    println!("=== 测试：通过 mint 查找 pool 地址 ===");
+    println!("=== 测试：通过 mint 查找 pool 地址（Auto Mock 加速） ===");
 
     // 清空缓存，确保从干净状态开始
     clear_pool_cache();
 
     let mint = Pubkey::from_str(PUMP_MINT).unwrap();
     let rpc_url = "http://127.0.0.1:8899";
-    let rpc = RpcClient::new(rpc_url.to_string());
 
-    // 调用 find_pool
-    let result = find_pool(&rpc, &mint).await;
+    // 使用 Auto Mock RPC 客户端（首次运行会录制，后续运行使用缓存）
+    let rpc = AutoMockRpcClient::new(rpc_url.to_string());
+
+    // 调用泛型版本的 find_pool_with_client
+    let result = find_pool_with_client(&rpc, &mint).await;
 
     // 验证结果
     assert!(result.is_ok(), "Failed to find pool: {:?}", result.err());
@@ -54,22 +41,24 @@ async fn test_find_pool_by_mint() {
     println!("✅ Pool 地址验证通过（非零地址）");
 }
 
-/// 测试：通过地址获取 pool 数据（带缓存）
+/// 测试：通过地址获取 pool 数据（带缓存，使用 Auto Mock 加速）
 #[tokio::test]
 #[serial_test::serial(global_dex_cache)]
 async fn test_get_pool_by_address() {
-    println!("=== 测试：通过地址获取 pool 数据（带缓存） ===");
+    println!("=== 测试：通过地址获取 pool 数据（Auto Mock 加速） ===");
 
     // 清空缓存，确保从干净状态开始
     clear_pool_cache();
 
     let pool_address = Pubkey::from_str(PUMP_POOL_ADDRESS).unwrap();
     let rpc_url = "http://127.0.0.1:8899";
-    let rpc = RpcClient::new(rpc_url.to_string());
+
+    // 使用 Auto Mock RPC 客户端
+    let rpc = AutoMockRpcClient::new(rpc_url.to_string());
 
     // 第一次调用（会写入缓存）
     println!("第一次调用（写入缓存）...");
-    let result1 = get_pool_by_address(&rpc, &pool_address).await;
+    let result1 = get_pool_by_address_with_pool_client(&rpc, &pool_address).await;
     assert!(result1.is_ok(), "Failed to get pool by address: {:?}", result1.err());
 
     let pool_state = result1.unwrap();
@@ -86,8 +75,8 @@ async fn test_get_pool_by_address() {
     println!("  Coin Creator: {}", pool_state.coin_creator);
     println!("  Is Mayhem Mode: {}", pool_state.is_mayhem_mode);
 
-    // 获取 token 余额
-    let (base_balance, quote_balance) = get_token_balances(&pool_state, &rpc).await.unwrap();
+    // 获取 token 余额（使用泛型版本）
+    let (base_balance, quote_balance) = get_token_balances_with_client(&pool_state, &rpc).await.unwrap();
     println!("  Base Token Balance: {}", base_balance);
     println!("  Quote Token Balance: {}", quote_balance);
 
@@ -101,7 +90,7 @@ async fn test_get_pool_by_address() {
 
     // 第二次调用（应该从缓存读取）
     println!("\n第二次调用（从缓存读取）...");
-    let result2 = get_pool_by_address(&rpc, &pool_address).await;
+    let result2 = get_pool_by_address_with_pool_client(&rpc, &pool_address).await;
     assert!(result2.is_ok(), "Failed to get pool from cache: {:?}", result2.err());
 
     let pool_state2 = result2.unwrap();
@@ -111,11 +100,11 @@ async fn test_get_pool_by_address() {
     println!("✅ 缓存验证通过（数据一致）");
 }
 
-/// 测试：获取 PumpSwap token 的 USD 价格
+/// 测试：获取 PumpSwap token 的 USD 价格（使用 Auto Mock 加速）
 #[tokio::test]
 #[serial_test::serial(global_dex_cache)]
 async fn test_get_pumpswap_token_price_in_usd() {
-    println!("=== 测试：获取 PumpSwap token 的 USD 价格 ===");
+    println!("=== 测试：获取 PumpSwap token 的 USD 价格（Auto Mock 加速） ===");
 
     // 清空缓存，确保从干净状态开始
     clear_pool_cache();
@@ -123,14 +112,16 @@ async fn test_get_pumpswap_token_price_in_usd() {
     let token_mint = Pubkey::from_str(PUMP_MINT).unwrap();
     let pool_address = Pubkey::from_str(PUMP_POOL_ADDRESS).unwrap();
     let rpc_url = "http://127.0.0.1:8899";
-    let rpc = RpcClient::new(rpc_url.to_string());
+
+    // 使用 Auto Mock RPC 客户端
+    let rpc = AutoMockRpcClient::new(rpc_url.to_string());
 
     println!("Token Mint: {}", token_mint);
     println!("Pool 地址: {}", pool_address);
     println!("WSOL-USDT 锚定池: 使用默认锚定池");
 
-    // 调用价格计算函数
-    let result = get_token_price_in_usd_with_pool(&rpc, &token_mint, &pool_address, None).await;
+    // 调用泛型版本的价格计算函数
+    let result = get_token_price_in_usd_with_pool_with_client(&rpc, &token_mint, &pool_address, None).await;
 
     // 验证结果
     assert!(result.is_ok(), "Failed to get token price in USD: {:?}", result.err());

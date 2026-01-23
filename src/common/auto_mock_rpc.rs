@@ -10,6 +10,7 @@ use solana_account_decoder::UiAccount;
 use solana_client::nonblocking::rpc_client::RpcClient as NonblockingRpcClient;
 use solana_client::rpc_config::{RpcProgramAccountsConfig, RpcTransactionConfig};
 use solana_client::rpc_client::RpcClient;
+use solana_client::rpc_response::UiTokenAmount;
 use solana_sdk::{
     account::Account,
     pubkey::Pubkey,
@@ -36,6 +37,12 @@ pub trait PoolRpcClient: Send + Sync {
         program_id: &Pubkey,
         config: RpcProgramAccountsConfig,
     ) -> Result<Vec<(String, UiAccount)>, String>;
+
+    /// 获取 Token 账户余额
+    async fn get_token_account_balance(
+        &self,
+        pubkey: &Pubkey,
+    ) -> Result<UiTokenAmount, String>;
 }
 
 /// 为标准的非阻塞 RpcClient 实现 PoolRpcClient
@@ -62,6 +69,15 @@ impl PoolRpcClient for NonblockingRpcClient {
             .into_iter()
             .map(|(pubkey, account)| (pubkey.to_string(), account))
             .collect())
+    }
+
+    async fn get_token_account_balance(
+        &self,
+        pubkey: &Pubkey,
+    ) -> Result<UiTokenAmount, String> {
+        self.get_token_account_balance(pubkey)
+            .await
+            .map_err(|e| format!("RPC 调用失败: {}", e))
     }
 }
 
@@ -312,6 +328,39 @@ impl AutoMockRpcClient {
 
         Ok(accounts)
     }
+
+    /// 获取 Token 账户余额（Auto 模式）
+    ///
+    /// 智能 Auto 模式：有缓存就用，没缓存就调用 RPC 并保存
+    pub async fn get_token_account_balance(
+        &self,
+        pubkey: &Pubkey,
+    ) -> Result<UiTokenAmount, String> {
+        let params_json = serde_json::json!((pubkey.to_string(),));
+
+        // 有缓存就用
+        if self.has_mock_data("get_token_account_balance", &params_json) {
+            return self.load_mock_data("get_token_account_balance", &params_json);
+        }
+
+        // 没缓存就调用 RPC 并保存
+        let inner = self.inner.clone();
+        let pk = *pubkey;
+
+        let balance = tokio::task::spawn_blocking(move || {
+            inner.get_token_account_balance(&pk)
+                .map_err(|e| format!("RPC 调用失败: {}", e))
+        })
+        .await
+        .map_err(|e| format!("任务执行失败: {}", e))??;
+
+        // 保存到文件
+        let result_json = serde_json::to_value(&balance)
+            .map_err(|e| format!("序列化结果失败: {}", e))?;
+        self.save_mock_data("get_token_account_balance", &params_json, &result_json);
+
+        Ok(balance)
+    }
 }
 
 /// 为 AutoMockRpcClient 实现 PoolRpcClient
@@ -327,5 +376,12 @@ impl PoolRpcClient for AutoMockRpcClient {
         config: RpcProgramAccountsConfig,
     ) -> Result<Vec<(String, UiAccount)>, String> {
         self.get_program_ui_accounts_with_config(program_id, config).await
+    }
+
+    async fn get_token_account_balance(
+        &self,
+        pubkey: &Pubkey,
+    ) -> Result<UiTokenAmount, String> {
+        self.get_token_account_balance(pubkey).await
     }
 }

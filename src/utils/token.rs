@@ -3,6 +3,7 @@
 //! 提供跨项目使用的 Token 相关工具函数
 
 use crate::constants::{SOL_MINT, USDC_MINT, USDT_MINT, RAY_MINT};
+use crate::common::auto_mock_rpc::PoolRpcClient;
 use anyhow::Result;
 use dashmap::DashMap;
 use once_cell::sync::Lazy;
@@ -95,11 +96,84 @@ pub async fn get_mint_info(
     ))
 }
 
+/// 获取 Mint 账户的完整信息（泛型版本，支持 Auto Mock）
+///
+/// 使用全局缓存减少 RPC 调用
+pub async fn get_mint_info_with_client<T: PoolRpcClient + ?Sized>(
+    rpc: &T,
+    mint: &Pubkey,
+) -> Result<MintInfo> {
+    let account = rpc.get_account(mint).await
+        .map_err(|e| anyhow::anyhow!("RPC 调用失败: {}", e))?;
+    let is_token2022 = account.owner == spl_token_2022::ID;
+
+    // 尝试解析为传统 Token 程序的 Mint
+    if !is_token2022 {
+        if let Ok(mint_account) = Mint::unpack(&account.data) {
+            let info = MintInfo {
+                decimals: mint_account.decimals,
+                symbol: get_known_token_symbol(mint),
+                is_token2022: false,
+            };
+            MINT_INFO_CACHE.insert(*mint, info.clone());
+            return Ok(info);
+        }
+    }
+
+    // 尝试解析为 Token2022 的 Mint
+    if is_token2022 {
+        use spl_token_2022::extension::{BaseStateWithExtensions, StateWithExtensions};
+        use spl_token_2022::state::Mint as Mint2022;
+        if let Ok(mint_account) = StateWithExtensions::<Mint2022>::unpack(&account.data) {
+            let decimals = mint_account.base.decimals;
+
+            // 尝试获取 TokenMetadata 中的 symbol
+            let symbol = if let Ok(metadata) = mint_account
+                .get_variable_len_extension::<spl_token_metadata_interface::state::TokenMetadata>()
+            {
+                let s = metadata.symbol.to_string();
+                if s.is_empty() {
+                    get_known_token_symbol(mint)
+                } else {
+                    s
+                }
+            } else {
+                get_known_token_symbol(mint)
+            };
+
+            let info = MintInfo {
+                decimals,
+                symbol,
+                is_token2022: true,
+            };
+            MINT_INFO_CACHE.insert(*mint, info.clone());
+            return Ok(info);
+        }
+    }
+
+    Err(anyhow::anyhow!(
+        "无法解析 mint 账户数据: {} (数据长度: {}, owner: {})",
+        mint,
+        account.data.len(),
+        account.owner
+    ))
+}
+
 /// 获取代币精度（统一实现，支持 Token 和 Token2022）
 ///
 /// 使用全局缓存减少 RPC 调用
 pub async fn get_token_decimals(
     rpc: &crate::common::SolanaRpcClient,
+    mint: &Pubkey,
+) -> Result<u8> {
+    get_token_decimals_with_client(rpc, mint).await
+}
+
+/// 获取代币精度（泛型版本，支持 Auto Mock）
+///
+/// 使用全局缓存减少 RPC 调用
+pub async fn get_token_decimals_with_client<T: PoolRpcClient + ?Sized>(
+    rpc: &T,
     mint: &Pubkey,
 ) -> Result<u8> {
     // Fast path: 检查缓存
@@ -108,7 +182,7 @@ pub async fn get_token_decimals(
     }
 
     // 缓存未命中，获取完整 MintInfo
-    let info = get_mint_info(rpc, mint).await?;
+    let info = get_mint_info_with_client(rpc, mint).await?;
     Ok(info.decimals)
 }
 

@@ -306,8 +306,16 @@ pub async fn get_pool_by_address_force(
     rpc: &SolanaRpcClient,
     pool_address: &Pubkey,
 ) -> Result<PoolState, anyhow::Error> {
+    get_pool_by_address_force_with_client(rpc, pool_address).await
+}
+
+/// Force 刷新：强制重新查询指定 Pool（泛型版本，支持 Auto Mock）
+pub async fn get_pool_by_address_force_with_client<T: PoolRpcClient + ?Sized>(
+    rpc: &T,
+    pool_address: &Pubkey,
+) -> Result<PoolState, anyhow::Error> {
     raydium_clmm_cache::POOL_DATA_CACHE.remove(pool_address);
-    get_pool_by_address(rpc, pool_address).await
+    get_pool_by_address_with_pool_client(rpc, pool_address).await
 }
 
 pub async fn get_pool_by_mint_force(
@@ -1154,12 +1162,24 @@ pub async fn get_wsol_price_in_usd(
     rpc: &SolanaRpcClient,
     wsol_usd_pool_address: Option<&Pubkey>,
 ) -> Result<f64, anyhow::Error> {
+    get_wsol_price_in_usd_with_client(rpc, wsol_usd_pool_address).await
+}
+
+/// 获取 WSOL 的 USD 价格（泛型版本，支持 Auto Mock）
+///
+/// # Arguments
+/// * `rpc` - RPC 客户端（支持 AutoMockRpcClient）
+/// * `wsol_usd_pool_address` - WSOL-USDT/USDC CLMM 池地址（例如你提供的 USDT-WSOL 池）
+pub async fn get_wsol_price_in_usd_with_client<T: PoolRpcClient + ?Sized>(
+    rpc: &T,
+    wsol_usd_pool_address: Option<&Pubkey>,
+) -> Result<f64, anyhow::Error> {
     use crate::utils::price::raydium_clmm::{price_token0_in_token1, price_token1_in_token0};
 
     let wsol_usd_pool = wsol_usd_pool_address.unwrap_or(&DEFAULT_WSOL_USDT_CLMM_POOL);
 
     // 强制刷新：每次调用都重新从链上读取池状态，避免价格缓存
-    let pool_state = get_pool_by_address_force(rpc, wsol_usd_pool).await?;
+    let pool_state = get_pool_by_address_force_with_client(rpc, wsol_usd_pool).await?;
 
     // 只支持 WSOL <-> USDC/USDT 的稳定币池
     let is_token0_sol = pool_state.token_mint0 == SOL_MINT;
