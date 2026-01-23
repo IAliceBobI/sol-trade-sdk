@@ -6,7 +6,10 @@
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use solana_client::rpc_config::RpcTransactionConfig;
 use solana_client::rpc_client::RpcClient;
+use solana_sdk::signature::Signature;
+use solana_transaction_status::EncodedConfirmedTransactionWithStatusMeta;
 use std::collections::hash_map::DefaultHasher;
 use std::fs;
 use std::hash::{Hash, Hasher};
@@ -140,5 +143,48 @@ impl AutoMockRpcClient {
         self.save_mock_data(method, &params_json, &result_json);
 
         Ok(result)
+    }
+
+    /// 获取交易（Auto 模式）
+    ///
+    /// 智能模式：有缓存就用，没缓存就调用 RPC 并保存
+    pub async fn get_transaction(
+        &self,
+        signature: &Signature,
+        config: RpcTransactionConfig,
+    ) -> Result<EncodedConfirmedTransactionWithStatusMeta, String> {
+        // 在 async 函数内部调用 auto_call，但它需要一个同步闭包
+        // 所以我们使用一个特殊的 wrapper
+        let params_json = serde_json::json!((
+            signature.to_string(),
+            RpcTransactionConfig {
+                encoding: config.encoding.clone(),
+                commitment: config.commitment.clone(),
+                max_supported_transaction_version: config.max_supported_transaction_version,
+            }
+        ));
+
+        // 有缓存就用
+        if self.has_mock_data("get_transaction_with_config", &params_json) {
+            return self.load_mock_data("get_transaction_with_config", &params_json);
+        }
+
+        // 没缓存就调用 RPC 并保存（使用 tokio::task::spawn_blocking）
+        let inner = self.inner.clone();
+        let sig = *signature;
+
+        let tx = tokio::task::spawn_blocking(move || {
+            inner.get_transaction_with_config(&sig, config)
+                .map_err(|e| format!("RPC 调用失败: {}", e))
+        })
+        .await
+        .map_err(|e| format!("任务执行失败: {}", e))??;
+
+        // 保存到文件
+        let result_json = serde_json::to_value(&tx)
+            .map_err(|e| format!("序列化结果失败: {}", e))?;
+        self.save_mock_data("get_transaction_with_config", &params_json, &result_json);
+
+        Ok(tx)
     }
 }

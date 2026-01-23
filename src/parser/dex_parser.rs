@@ -8,8 +8,10 @@ use std::str::FromStr;
 use solana_rpc_client::rpc_client::RpcClient;
 use solana_client::rpc_config::RpcTransactionConfig;
 use solana_sdk::signature::Signature;
-use solana_transaction_status::UiTransactionEncoding;
+use solana_transaction_status::{UiTransactionEncoding, EncodedConfirmedTransactionWithStatusMeta};
 use solana_commitment_config::CommitmentConfig;
+
+use crate::common::rpc_client_wrapper::RpcClientWrapper;
 
 use super::{
     transaction_adapter::TransactionAdapter,
@@ -30,8 +32,8 @@ use super::{
 pub struct DexParser {
     /// 解析器配置
     pub config: ParserConfig,
-    /// RPC 客户端
-    rpc_client: Arc<RpcClient>,
+    /// RPC 客户端包装器
+    rpc_client: RpcClientWrapper,
     /// 已注册的协议解析器（key: program_id）
     pub parsers: HashMap<String, Arc<dyn DexParserTrait>>,
 }
@@ -39,7 +41,9 @@ pub struct DexParser {
 impl DexParser {
     /// 创建新的 DEX 解析器
     pub fn new(config: ParserConfig) -> Self {
-        let rpc_client = Arc::new(RpcClient::new(config.rpc_url.clone()));
+        let rpc_client = RpcClientWrapper::Standard(
+            Arc::new(RpcClient::new(config.rpc_url.clone()))
+        );
 
         let mut parsers: HashMap<String, Arc<dyn DexParserTrait>> = HashMap::new();
 
@@ -77,6 +81,45 @@ impl DexParser {
         Self::new(ParserConfig::default())
     }
 
+    /// 使用 Auto Mock 模式创建解析器（测试环境）
+    pub fn new_with_mock(config: ParserConfig) -> Self {
+        use crate::common::auto_mock_rpc::AutoMockRpcClient;
+
+        let rpc_client = RpcClientWrapper::AutoMock(
+            Arc::new(AutoMockRpcClient::new(config.rpc_url.clone()))
+        );
+
+        let mut parsers: HashMap<String, Arc<dyn DexParserTrait>> = HashMap::new();
+
+        // 注册协议解析器
+        // Pumpswap
+        parsers.insert(
+            DexProtocol::PumpSwap.program_id().to_string(),
+            Arc::new(PumpswapParser) as Arc<dyn DexParserTrait>
+        );
+        // Raydium CLMM
+        parsers.insert(
+            DexProtocol::RaydiumClmm.program_id().to_string(),
+            Arc::new(RaydiumClmmParser) as Arc<dyn DexParserTrait>
+        );
+        // Raydium V4
+        parsers.insert(
+            DexProtocol::RaydiumV4.program_id().to_string(),
+            Arc::new(RaydiumV4Parser) as Arc<dyn DexParserTrait>
+        );
+        // Raydium CPMM
+        parsers.insert(
+            DexProtocol::RaydiumCpmm.program_id().to_string(),
+            Arc::new(RaydiumCpmmParser) as Arc<dyn DexParserTrait>
+        );
+
+        Self {
+            config,
+            rpc_client,
+            parsers,
+        }
+    }
+
     /// 解析交易
     ///
     /// # 参数
@@ -105,31 +148,26 @@ impl DexParser {
         &self,
         signature: &str,
     ) -> Result<Vec<super::types::ParsedTradeInfo>, Box<dyn std::error::Error + Send + Sync>> {
-        let rpc_client = self.rpc_client.clone();
         let signature = signature.to_string();
 
         let sig = Signature::from_str(&signature)
             .map_err(|e| format!("无效签名: {}", e))?;
 
-        let tx_data = tokio::task::spawn_blocking(move || {
-            let config = RpcTransactionConfig {
-                encoding: Some(UiTransactionEncoding::JsonParsed),
-                commitment: Some(CommitmentConfig::confirmed()),
-                max_supported_transaction_version: Some(0),
-            };
+        // 使用 rpc_client 获取交易（异步调用）
+        let config = RpcTransactionConfig {
+            encoding: Some(UiTransactionEncoding::JsonParsed),
+            commitment: Some(CommitmentConfig::confirmed()),
+            max_supported_transaction_version: Some(0),
+        };
 
-            let tx = rpc_client.get_transaction_with_config(&sig, config)
-                .map_err(|e| format!("RPC 调用失败: {}", e))?;
+        let tx: EncodedConfirmedTransactionWithStatusMeta = self.rpc_client.get_transaction_with_config(
+            &sig,
+            config,
+        ).await
+        .map_err(|e| format!("获取交易失败: {}", e))?;
 
-            let slot = tx.slot;
-            let block_time = tx.block_time;
-
-            Ok::<_, Box<dyn std::error::Error + Send + Sync>>((tx, slot, block_time))
-        })
-        .await
-        .map_err(|e| format!("任务执行失败: {}", e))??;
-
-        let (tx, slot, block_time) = tx_data;
+        let slot = tx.slot;
+        let block_time = tx.block_time;
 
         // 创建交易适配器并解析
         let adapter = TransactionAdapter::from_encoded_transaction(&tx, slot, block_time)?;

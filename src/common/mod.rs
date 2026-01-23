@@ -8,6 +8,7 @@ pub mod gas_fee_strategy;
 pub mod global;
 pub mod mock_rpc;
 pub mod nonce_cache;
+pub mod rpc_client_wrapper;
 pub mod seed;
 pub mod spl_associated_token_account;
 pub mod spl_token;
