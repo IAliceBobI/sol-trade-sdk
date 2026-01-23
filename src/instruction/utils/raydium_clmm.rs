@@ -328,6 +328,15 @@ async fn find_pools_by_mint_offset_collect(
     mint: &Pubkey,
     offset: usize,
 ) -> Result<Vec<(Pubkey, PoolState)>, anyhow::Error> {
+    find_pools_by_mint_offset_collect_with_pool_client(rpc, mint, offset).await
+}
+
+/// 使用 PoolRpcClient 通过 offset 查找所有 Pool
+async fn find_pools_by_mint_offset_collect_with_pool_client<T: PoolRpcClient + ?Sized>(
+    rpc: &T,
+    mint: &Pubkey,
+    offset: usize,
+) -> Result<Vec<(Pubkey, PoolState)>, anyhow::Error> {
     use solana_account_decoder::UiAccountEncoding;
     use solana_client::rpc_filter::Memcmp;
     use solana_rpc_client_api::{config::RpcProgramAccountsConfig, filter::RpcFilterType};
@@ -349,7 +358,8 @@ async fn find_pools_by_mint_offset_collect(
         sort_results: None,
     };
 
-    let accounts = rpc.get_program_ui_accounts_with_config(&accounts::RAYDIUM_CLMM, config).await?;
+    let accounts = rpc.get_program_ui_accounts_with_config(&accounts::RAYDIUM_CLMM, config).await
+        .map_err(|e| anyhow!("RPC 调用失败: {}", e))?;
 
     // 检查是否需要限制返回数量（测试环境优化）
     // 生产环境通过环境变量 CLMM_POOL_SCAN_LIMIT 控制，默认不限制
@@ -365,12 +375,13 @@ async fn find_pools_by_mint_offset_collect(
         accounts
             .into_iter()
             .filter_map(|(addr, acc)| {
+                let addr_pubkey = addr.parse::<Pubkey>().ok()?;
                 let data_bytes = match &acc.data {
                     UiAccountData::Binary(base64_str, _) => STANDARD.decode(base64_str).ok()?,
                     _ => return None,
                 };
                 if data_bytes.len() > 8 {
-                    pool_state_decode(&data_bytes[8..]).map(|pool| (addr, pool))
+                    pool_state_decode(&data_bytes[8..]).map(|pool| (addr_pubkey, pool))
                 } else {
                     None
                 }
@@ -382,12 +393,13 @@ async fn find_pools_by_mint_offset_collect(
         accounts
             .into_iter()
             .filter_map(|(addr, acc)| {
+                let addr_pubkey = addr.parse::<Pubkey>().ok()?;
                 let data_bytes = match &acc.data {
                     UiAccountData::Binary(base64_str, _) => STANDARD.decode(base64_str).ok()?,
                     _ => return None,
                 };
                 if data_bytes.len() > 8 {
-                    pool_state_decode(&data_bytes[8..]).map(|pool| (addr, pool))
+                    pool_state_decode(&data_bytes[8..]).map(|pool| (addr_pubkey, pool))
                 } else {
                     None
                 }
@@ -865,6 +877,118 @@ pub async fn list_pools_by_mint(
 
     // 3. 写入缓存
     raydium_clmm_cache::cache_pools_list_by_mint(mint, &sorted_pools);
+
+    Ok(sorted_pools)
+}
+
+/// 使用 PoolRpcClient 列出所有包含指定 mint 的 Raydium CLMM Pool（支持 Auto Mock）
+///
+/// 此函数与 `list_pools_by_mint` 功能相同，但接受 `PoolRpcClient` trait，
+/// 因此可以使用 `AutoMockRpcClient` 来加速测试。
+///
+/// # 参数
+/// - `rpc`: 实现了 PoolRpcClient 的 RPC 客户端（支持 AutoMockRpcClient）
+/// - `mint`: 要查询的代币 mint 地址
+///
+/// # 返回
+/// - 返回排序后的包含指定 mint 的 pool 列表
+pub async fn list_pools_by_mint_with_pool_client<T: PoolRpcClient + ?Sized>(
+    rpc: &T,
+    mint: &Pubkey,
+) -> Result<Vec<(Pubkey, PoolState)>, anyhow::Error> {
+    use std::collections::HashSet;
+
+    // 注意：这里不使用内存缓存，直接查询
+    // Auto Mock 会在文件层面缓存
+
+    // Parallel search: scan both token_mint0 and token_mint1 simultaneously
+    let (result0, result1) = tokio::join!(
+        find_pools_by_mint_offset_collect_with_pool_client(rpc, mint, TOKEN_MINT0_OFFSET),
+        find_pools_by_mint_offset_collect_with_pool_client(rpc, mint, TOKEN_MINT1_OFFSET)
+    );
+
+    // 检测是否都失败，如果都失败则返回第一个错误（通常包含 RPC 限制信息）
+    if result0.is_err() && result1.is_err() {
+        // 返回 result0 的错误，它包含我们的自定义错误消息
+        return Err(result0.unwrap_err());
+    }
+
+    let mut all_pools: Vec<(Pubkey, PoolState)> = Vec::new();
+    let mut seen: HashSet<Pubkey> = HashSet::new();
+
+    // Merge token_mint0 results
+    if let Ok(token0_pools) = result0 {
+        for (addr, pool) in token0_pools {
+            if seen.insert(addr) {
+                all_pools.push((addr, pool));
+            }
+        }
+    }
+
+    // Merge token_mint1 results
+    if let Ok(token1_pools) = result1 {
+        for (addr, pool) in token1_pools {
+            if seen.insert(addr) {
+                all_pools.push((addr, pool));
+            }
+        }
+    }
+
+    if all_pools.is_empty() {
+        return Err(anyhow!("No CLMM pool found for mint {}", mint));
+    }
+
+    // 分类：稳定币对 > WSOL 对 > 其他对
+    let mut stable_pools: Vec<(Pubkey, PoolState)> = Vec::new();
+    let mut wsol_pools: Vec<(Pubkey, PoolState)> = Vec::new();
+    let mut other_pools: Vec<(Pubkey, PoolState)> = Vec::new();
+
+    for (addr, pool) in all_pools.into_iter() {
+        // 找到与目标 mint 对应的另一侧 mint
+        let other_mint = if pool.token_mint0 == *mint {
+            pool.token_mint1
+        } else if pool.token_mint1 == *mint {
+            pool.token_mint0
+        } else {
+            other_pools.push((addr, pool));
+            continue;
+        };
+
+        // 按 Hot Token 优先级分类
+        if other_mint == USDC_MINT || other_mint == USDT_MINT {
+            stable_pools.push((addr, pool));
+        } else if other_mint == SOL_MINT {
+            wsol_pools.push((addr, pool));
+        } else if is_hot_mint(&other_mint) {
+            // Hot mint 但不在上述分类中（理论上不会发生，但为了完整性）
+            wsol_pools.push((addr, pool));
+        } else {
+            other_pools.push((addr, pool));
+        }
+    }
+
+    // 在各分类内按累计交易量排序
+    stable_pools.sort_by(|(_, a), (_, b)| {
+        let volume_a = calculate_effective_volume(a);
+        let volume_b = calculate_effective_volume(b);
+        volume_b.cmp(&volume_a)
+    });
+    wsol_pools.sort_by(|(_, a), (_, b)| {
+        let volume_a = calculate_effective_volume(a);
+        let volume_b = calculate_effective_volume(b);
+        volume_b.cmp(&volume_a)
+    });
+    other_pools.sort_by(|(_, a), (_, b)| {
+        let volume_a = calculate_effective_volume(a);
+        let volume_b = calculate_effective_volume(b);
+        volume_b.cmp(&volume_a)
+    });
+
+    // 合并：稳定币对 > WSOL 对 > 其他对
+    let mut sorted_pools = Vec::new();
+    sorted_pools.extend(stable_pools);
+    sorted_pools.extend(wsol_pools);
+    sorted_pools.extend(other_pools);
 
     Ok(sorted_pools)
 }

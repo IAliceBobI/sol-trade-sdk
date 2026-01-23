@@ -363,6 +363,15 @@ async fn find_pools_by_mint_offset_collect(
     mint: &Pubkey,
     offset: usize,
 ) -> Result<Vec<(Pubkey, Pool)>, anyhow::Error> {
+    find_pools_by_mint_offset_collect_with_pool_client(rpc, mint, offset).await
+}
+
+/// 使用 PoolRpcClient 通过 offset 查找所有 Pool（返回 Vec）
+async fn find_pools_by_mint_offset_collect_with_pool_client<T: PoolRpcClient + ?Sized>(
+    rpc: &T,
+    mint: &Pubkey,
+    offset: usize,
+) -> Result<Vec<(Pubkey, Pool)>, anyhow::Error> {
     let filters = vec![solana_rpc_client_api::filter::RpcFilterType::Memcmp(
         solana_client::rpc_filter::Memcmp::new_base58_encoded(offset, &mint.to_bytes()),
     )];
@@ -378,17 +387,19 @@ async fn find_pools_by_mint_offset_collect(
         sort_results: None,
     };
     let program_id = accounts::AMM_PROGRAM;
-    let accounts = rpc.get_program_ui_accounts_with_config(&program_id, config).await?;
+    let accounts = rpc.get_program_ui_accounts_with_config(&program_id, config).await
+        .map_err(|e| anyhow!("RPC 调用失败: {}", e))?;
 
     let pools: Vec<(Pubkey, Pool)> = accounts
         .into_iter()
         .filter_map(|(addr, acc)| {
+            let addr_pubkey = addr.parse::<Pubkey>().ok()?;
             let data_bytes = match &acc.data {
                 UiAccountData::Binary(base64_str, _) => STANDARD.decode(base64_str).ok()?,
                 _ => return None,
             };
             if data_bytes.len() > 8 {
-                pool_decode(&data_bytes[8..]).map(|pool| (addr, pool))
+                pool_decode(&data_bytes[8..]).map(|pool| (addr_pubkey, pool))
             } else {
                 None
             }
@@ -432,11 +443,19 @@ async fn find_all_pools_by_mint_impl(
     rpc: &SolanaRpcClient,
     mint: &Pubkey,
 ) -> Result<Vec<(Pubkey, Pool)>, anyhow::Error> {
+    find_all_pools_by_mint_impl_with_pool_client(rpc, mint).await
+}
+
+/// 使用 PoolRpcClient 查找指定 mint 的所有 PumpSwap Pool
+async fn find_all_pools_by_mint_impl_with_pool_client<T: PoolRpcClient + ?Sized>(
+    rpc: &T,
+    mint: &Pubkey,
+) -> Result<Vec<(Pubkey, Pool)>, anyhow::Error> {
     use std::collections::HashSet;
 
     let (base_result, quote_result) = tokio::join!(
-        find_pools_by_mint_offset_collect(rpc, mint, BASE_MINT_OFFSET),
-        find_pools_by_mint_offset_collect(rpc, mint, QUOTE_MINT_OFFSET)
+        find_pools_by_mint_offset_collect_with_pool_client(rpc, mint, BASE_MINT_OFFSET),
+        find_pools_by_mint_offset_collect_with_pool_client(rpc, mint, QUOTE_MINT_OFFSET)
     );
 
     // 检测是否都失败，如果都失败则返回第一个错误（通常包含 RPC 限制信息）
@@ -606,6 +625,70 @@ pub async fn list_pools_by_mint(
 
     // 3. 写入缓存
     pump_swap_cache::cache_pools_list_by_mint(mint, &sorted_pools);
+
+    Ok(sorted_pools)
+}
+
+/// 使用 PoolRpcClient 列出所有包含指定 mint 的 PumpSwap Pool（支持 Auto Mock）
+///
+/// 此函数与 `list_pools_by_mint` 功能相同，但接受 `PoolRpcClient` trait，
+/// 因此可以使用 `AutoMockRpcClient` 来加速测试。
+///
+/// # 参数
+/// - `rpc`: 实现了 PoolRpcClient 的 RPC 客户端（支持 AutoMockRpcClient）
+/// - `mint`: 要查询的代币 mint 地址
+///
+/// # 返回
+/// - 返回排序后的包含指定 mint 的 pool 列表
+pub async fn list_pools_by_mint_with_pool_client<T: PoolRpcClient + ?Sized>(
+    rpc: &T,
+    mint: &Pubkey,
+) -> Result<Vec<(Pubkey, Pool)>, anyhow::Error> {
+    // 注意：这里不使用内存缓存，直接查询
+    // Auto Mock 会在文件层面缓存
+
+    // 2. 获取所有池子并分类排序
+    let all_pools = find_all_pools_by_mint_impl_with_pool_client(rpc, mint).await?;
+
+    // 分类：稳定币对 > WSOL 对 > 其他对
+    let mut stable_pools: Vec<(Pubkey, Pool)> = Vec::new();
+    let mut wsol_pools: Vec<(Pubkey, Pool)> = Vec::new();
+    let mut other_pools: Vec<(Pubkey, Pool)> = Vec::new();
+
+    for (addr, pool) in all_pools.into_iter() {
+        // 找到与目标 mint 对应的另一侧 mint
+        let other_mint = if pool.base_mint == *mint {
+            pool.quote_mint
+        } else if pool.quote_mint == *mint {
+            pool.base_mint
+        } else {
+            other_pools.push((addr, pool));
+            continue;
+        };
+
+        // 按 Hot Token 优先级分类
+        if other_mint == USDC_MINT || other_mint == USDT_MINT {
+            stable_pools.push((addr, pool));
+        } else if other_mint == WSOL_TOKEN_ACCOUNT {
+            wsol_pools.push((addr, pool));
+        } else if is_hot_mint(&other_mint) {
+            // Hot mint 但不在上述分类中（理论上不会发生，但为了完整性）
+            wsol_pools.push((addr, pool));
+        } else {
+            other_pools.push((addr, pool));
+        }
+    }
+
+    // 在各分类内按 LP 供应量排序
+    stable_pools.sort_by(|(_, a), (_, b)| b.lp_supply.cmp(&a.lp_supply));
+    wsol_pools.sort_by(|(_, a), (_, b)| b.lp_supply.cmp(&a.lp_supply));
+    other_pools.sort_by(|(_, a), (_, b)| b.lp_supply.cmp(&a.lp_supply));
+
+    // 合并：稳定币对 > WSOL 对 > 其他对
+    let mut sorted_pools = Vec::new();
+    sorted_pools.extend(stable_pools);
+    sorted_pools.extend(wsol_pools);
+    sorted_pools.extend(other_pools);
 
     Ok(sorted_pools)
 }

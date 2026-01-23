@@ -309,6 +309,15 @@ async fn find_pools_by_mint_offset_collect(
     mint: &Pubkey,
     offset: usize,
 ) -> Result<Vec<(Pubkey, AmmInfo)>, anyhow::Error> {
+    find_pools_by_mint_offset_collect_with_pool_client(rpc, mint, offset).await
+}
+
+/// 使用 PoolRpcClient 通过 offset 查找所有包含指定 mint 的 Raydium AMM V4 Pool
+async fn find_pools_by_mint_offset_collect_with_pool_client<T: PoolRpcClient + ?Sized>(
+    rpc: &T,
+    mint: &Pubkey,
+    offset: usize,
+) -> Result<Vec<(Pubkey, AmmInfo)>, anyhow::Error> {
     use solana_account_decoder::UiAccountEncoding;
     use solana_client::rpc_filter::Memcmp;
     use solana_rpc_client_api::{config::RpcProgramAccountsConfig, filter::RpcFilterType};
@@ -335,7 +344,7 @@ async fn find_pools_by_mint_offset_collect(
         .await
         .map_err(|e| {
             // 检测公共 RPC 限制错误
-            if e.to_string().contains("excluded from account secondary indexes") {
+            if e.contains("excluded from account secondary indexes") {
                 anyhow!(
                     "Public RPC does not support getProgramAccounts for Raydium AMM V4. \
                     Please use: (1) paid RPC service (Helius, QuickNode, Triton), \
@@ -349,13 +358,14 @@ async fn find_pools_by_mint_offset_collect(
     let pools: Vec<(Pubkey, AmmInfo)> = accounts
         .into_iter()
         .filter_map(|(addr, acc)| {
+            let addr_pubkey = addr.parse::<Pubkey>().ok()?;
             let data_bytes = match &acc.data {
                 solana_account_decoder::UiAccountData::Binary(base64_str, _) => {
                     STANDARD.decode(base64_str).ok()?
                 }
                 _ => return None,
             };
-            amm_info_decode(&data_bytes).map(|amm| (addr, amm))
+            amm_info_decode(&data_bytes).map(|amm| (addr_pubkey, amm))
         })
         .collect();
 
@@ -373,11 +383,20 @@ async fn find_all_pools_by_mint_impl(
     mint: &Pubkey,
     filter_active: bool,
 ) -> Result<Vec<(Pubkey, AmmInfo)>, anyhow::Error> {
+    find_all_pools_by_mint_impl_with_pool_client(rpc, mint, filter_active).await
+}
+
+/// 使用 PoolRpcClient 查找指定 mint 的所有 Raydium AMM V4 Pool
+async fn find_all_pools_by_mint_impl_with_pool_client<T: PoolRpcClient + ?Sized>(
+    rpc: &T,
+    mint: &Pubkey,
+    filter_active: bool,
+) -> Result<Vec<(Pubkey, AmmInfo)>, anyhow::Error> {
     use std::collections::HashSet;
 
     let (coin_result, pc_result) = tokio::join!(
-        find_pools_by_mint_offset_collect(rpc, mint, COIN_MINT_OFFSET),
-        find_pools_by_mint_offset_collect(rpc, mint, PC_MINT_OFFSET),
+        find_pools_by_mint_offset_collect_with_pool_client(rpc, mint, COIN_MINT_OFFSET),
+        find_pools_by_mint_offset_collect_with_pool_client(rpc, mint, PC_MINT_OFFSET),
     );
 
     // 检测是否都失败，如果都失败则返回第一个错误（通常包含 RPC 限制信息）
@@ -622,6 +641,100 @@ pub async fn list_pools_by_mint(
 
     // 3. 写入缓存（缓存排序后的完整列表）
     cache_pools_list_by_mint(mint, &sorted_pools);
+
+    // 如果需要过滤活跃状态的 pool
+    if filter_active {
+        let filtered: Vec<_> = sorted_pools
+            .into_iter()
+            .filter(|(_, amm)| is_pool_tradeable(amm))
+            .collect();
+        if filtered.is_empty() {
+            return Err(anyhow!(
+                "No active Raydium AMM V4 pool found for mint {} (all pools are disabled or not tradeable)",
+                mint
+            ));
+        }
+        return Ok(filtered);
+    }
+
+    Ok(sorted_pools)
+}
+
+/// 使用 PoolRpcClient 列出所有包含指定 mint 的 Raydium AMM V4 Pool（支持 Auto Mock）
+///
+/// 此函数与 `list_pools_by_mint` 功能相同，但接受 `PoolRpcClient` trait，
+/// 因此可以使用 `AutoMockRpcClient` 来加速测试。
+///
+/// # 参数
+/// - `rpc`: 实现了 PoolRpcClient 的 RPC 客户端（支持 AutoMockRpcClient）
+/// - `mint`: 要查询的代币 mint 地址
+/// - `filter_active`: 是否只返回活跃状态的 pool（适合交易的 pool）
+///
+/// # 返回
+/// - 返回排序后的包含指定 mint 的 pool 列表
+/// - 如果 `filter_active` 为 true，则只返回活跃状态的 pool
+pub async fn list_pools_by_mint_with_pool_client<T: PoolRpcClient + ?Sized>(
+    rpc: &T,
+    mint: &Pubkey,
+    filter_active: bool,
+) -> Result<Vec<(Pubkey, AmmInfo)>, anyhow::Error> {
+    // 注意：这里不使用内存缓存，直接查询
+    // Auto Mock 会在文件层面缓存
+
+    // 通过共用函数查询所有池子（不过滤）
+    let all_pools = find_all_pools_by_mint_impl_with_pool_client(rpc, mint, false).await?;
+
+    // 分类：稳定币对 > WSOL 对 > 其他对
+    let mut stable_pools: Vec<(Pubkey, AmmInfo)> = Vec::new();
+    let mut wsol_pools: Vec<(Pubkey, AmmInfo)> = Vec::new();
+    let mut other_pools: Vec<(Pubkey, AmmInfo)> = Vec::new();
+
+    for (addr, amm) in all_pools.into_iter() {
+        // 找到与目标 mint 对应的另一侧 mint
+        let other_mint = if amm.coin_mint == *mint {
+            amm.pc_mint
+        } else if amm.pc_mint == *mint {
+            amm.coin_mint
+        } else {
+            other_pools.push((addr, amm));
+            continue;
+        };
+
+        // 按 Hot Token 优先级分类
+        if other_mint == USDC_MINT || other_mint == USDT_MINT {
+            stable_pools.push((addr, amm));
+        } else if other_mint == SOL_MINT {
+            wsol_pools.push((addr, amm));
+        } else if is_hot_mint(&other_mint) {
+            // Hot mint 但不在上述分类中（理论上不会发生，但为了完整性）
+            wsol_pools.push((addr, amm));
+        } else {
+            other_pools.push((addr, amm));
+        }
+    }
+
+    // 在各分类内按累计交易量排序
+    stable_pools.sort_by(|(_, a), (_, b)| {
+        let volume_a = calculate_effective_volume(a);
+        let volume_b = calculate_effective_volume(b);
+        volume_b.cmp(&volume_a)
+    });
+    wsol_pools.sort_by(|(_, a), (_, b)| {
+        let volume_a = calculate_effective_volume(a);
+        let volume_b = calculate_effective_volume(b);
+        volume_b.cmp(&volume_a)
+    });
+    other_pools.sort_by(|(_, a), (_, b)| {
+        let volume_a = calculate_effective_volume(a);
+        let volume_b = calculate_effective_volume(b);
+        volume_b.cmp(&volume_a)
+    });
+
+    // 合并：稳定币对 > WSOL 对 > 其他对
+    let mut sorted_pools = Vec::new();
+    sorted_pools.extend(stable_pools);
+    sorted_pools.extend(wsol_pools);
+    sorted_pools.extend(other_pools);
 
     // 如果需要过滤活跃状态的 pool
     if filter_active {
