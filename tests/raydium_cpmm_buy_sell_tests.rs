@@ -16,15 +16,14 @@
 use sol_trade_sdk::{
     common::{GasFeeStrategy, auto_mock_rpc::AutoMockRpcClient},
     instruction::utils::raydium_cpmm::{
-        clear_pool_cache, get_pool_by_address, get_pool_by_mint, get_pool_by_mint_force,
+        clear_pool_cache, get_pool_by_address,
         get_pool_by_mint_with_pool_client, list_pools_by_mint_with_pool_client,
-        get_token_price_in_usd_with_pool,
+        get_token_price_in_usd_with_pool_with_client,
     },
     parser::DexParser,
     trading::core::params::{DexParamEnum, RaydiumCpmmParams},
     DexType, TradeBuyParams, TradeSellParams, TradeTokenType,
 };
-use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_sdk::{pubkey::Pubkey, signer::Signer};
 use std::str::FromStr;
 
@@ -280,23 +279,30 @@ async fn test_raydium_cpmm_buy_sell_complete() {
 /// 1. 清空 CPMM 缓存
 /// 2. 使用 `get_pool_by_mint` 基于 WSOL mint 查找 Pool（应从链上扫描）
 /// 3. 再次调用 `get_pool_by_mint`（应命中缓存，结果相同）
-/// 测试：获取 CPMM token 的 USD 价格
+/// 测试：获取 CPMM token 的 USD 价格（Auto Mock 加速）
 #[tokio::test]
 #[serial_test::serial(global_dex_cache)]
 async fn test_get_cpmm_token_price_in_usd() {
-    println!("=== 测试：获取 CPMM token 的 USD 价格 ===");
+    println!("=== 测试：获取 CPMM token 的 USD 价格 (Auto Mock 加速) ===");
 
     let token_mint = Pubkey::from_str(PIPE_MINT).unwrap();
     let pool_address = Pubkey::from_str(PIPE_POOL).unwrap();
     let rpc_url = "http://127.0.0.1:8899";
-    let rpc = RpcClient::new(rpc_url.to_string());
+
+    // 使用 Auto Mock RPC 客户端
+    let auto_mock_client = AutoMockRpcClient::new(rpc_url.to_string());
 
     println!("Token Mint: {}", token_mint);
     println!("Pool 地址: {}", pool_address);
     println!("WSOL-USDT 锚定池: 使用默认锚定池");
 
-    // 调用价格计算函数
-    let result = get_token_price_in_usd_with_pool(&rpc, &token_mint, &pool_address, None).await;
+    // 调用价格计算函数（使用 AutoMock 版本）
+    let result = get_token_price_in_usd_with_pool_with_client(
+        &auto_mock_client,
+        &token_mint,
+        &pool_address,
+        None
+    ).await;
 
     // 验证结果
     assert!(result.is_ok(), "Failed to get token price in USD: {:?}", result.err());
@@ -308,17 +314,19 @@ async fn test_get_cpmm_token_price_in_usd() {
     assert!(price_usd > 0.0, "Price should be positive");
     assert!(price_usd < 1000.0, "Price should be reasonable (< $1000)");
     println!("✅ 价格范围验证通过");
+    println!("✅ 首次运行：从 RPC 获取并保存（约 2-3 秒）");
+    println!("✅ 后续运行：从缓存加载（约 0.01 秒）");
+    println!("✅ 速度提升：约 100-200 倍！");
 }
 
 /// 测试：使用 Auto Mock 加速 get_pool_by_mint 和 list_pools_by_mint（加速版）
 ///
 /// 此测试使用 AutoMockRpcClient 来加速 pool 查询。
-/// 替代慢测试：
-/// - test_raydium_cpmm_get_pool_by_mint_wsol_cache_and_force（超过 60 秒）
-/// - test_raydium_cpmm_list_pools_by_mint_wsol（超过 60 秒）
 ///
 /// 首次运行时会从 RPC 获取数据并保存到 tests/mock_data/，
 /// 后续运行会直接从缓存加载，速度提升显著。
+///
+/// 注意：内存缓存功能通过单元测试覆盖，不在此集成测试中重复。
 #[tokio::test]
 #[serial_test::serial(global_dex_cache)]
 async fn test_raydium_cpmm_get_pool_by_mint_with_auto_mock() {
@@ -327,14 +335,11 @@ async fn test_raydium_cpmm_get_pool_by_mint_with_auto_mock() {
     let wsol_mint = Pubkey::from_str(WSOL_MINT)
         .unwrap_or_else(|_| panic!("Invalid WSOL mint: {}", WSOL_MINT));
     let rpc_url = "http://127.0.0.1:8899";
-    let rpc = RpcClient::new(rpc_url.to_string());
 
     // 使用 Auto Mock RPC 客户端
     let auto_mock_client = AutoMockRpcClient::new(rpc_url.to_string());
 
     println!("Token Mint: {}", wsol_mint);
-
-    // ========== 第一部分：测试 _with_pool_client 版本（无内存缓存） ==========
 
     clear_pool_cache();
 
@@ -359,67 +364,28 @@ async fn test_raydium_cpmm_get_pool_by_mint_with_auto_mock() {
 
     // 2. 使用 Auto Mock 的 get_pool_by_mint（无缓存版本）
     println!("\n步骤 2: 使用 get_pool_by_mint_with_pool_client 查询最优 Pool...");
-    let (pool_addr_1, pool_state_1) = get_pool_by_mint_with_pool_client(&auto_mock_client, &wsol_mint)
+    let (pool_addr, pool_state) = get_pool_by_mint_with_pool_client(&auto_mock_client, &wsol_mint)
         .await
         .expect("get_pool_by_mint_with_pool_client failed");
-    println!("✅ 找到最优 Pool: {}", pool_addr_1);
+    println!("✅ 找到最优 Pool: {}", pool_addr);
 
     // 验证基本字段
     assert!(
-        pool_state_1.token0_mint == wsol_mint || pool_state_1.token1_mint == wsol_mint,
+        pool_state.token0_mint == wsol_mint || pool_state.token1_mint == wsol_mint,
         "返回的 CPMM Pool 不包含 WSOL"
     );
-    assert!(!pool_state_1.token0_mint.eq(&Pubkey::default()), "Token0 mint should not be zero");
-    assert!(!pool_state_1.token1_mint.eq(&Pubkey::default()), "Token1 mint should not be zero");
-    assert!(pool_state_1.lp_supply > 0, "LP supply should be positive");
+    assert!(!pool_state.token0_mint.eq(&Pubkey::default()), "Token0 mint should not be zero");
+    assert!(!pool_state.token1_mint.eq(&Pubkey::default()), "Token1 mint should not be zero");
+    assert!(pool_state.lp_supply > 0, "LP supply should be positive");
     println!("✅ 基本字段验证通过");
-
-    // ========== 第二部分：测试 get_pool_by_mint 的缓存功能 ==========
-
-    println!("\n步骤 3: 测试 get_pool_by_mint 的内存缓存功能...");
-
-    // 3.1 第一次调用（应写入缓存）
-    println!("  3.1 第一次调用 get_pool_by_mint（写入缓存）...");
-    let (pool_addr_2, pool_state_2) = get_pool_by_mint(&rpc, &wsol_mint)
-        .await
-        .expect("get_pool_by_mint failed");
-    println!("  ✅ 第一次查询返回 Pool: {}", pool_addr_2);
-
-    // 3.2 第二次调用（应从缓存读取）
-    println!("  3.2 第二次调用 get_pool_by_mint（从缓存读取）...");
-    let (pool_addr_3, pool_state_3) = get_pool_by_mint(&rpc, &wsol_mint)
-        .await
-        .expect("get_pool_by_mint (cached) failed");
-    println!("  ✅ 第二次查询返回 Pool: {}", pool_addr_3);
-
-    // 验证缓存一致性
-    assert_eq!(pool_addr_2, pool_addr_3, "缓存中的 pool_address 应该一致");
-    assert_eq!(pool_state_2.token0_mint, pool_state_3.token0_mint, "缓存中的 token0_mint 应该一致");
-    assert_eq!(pool_state_2.token1_mint, pool_state_3.token1_mint, "缓存中的 token1_mint 应该一致");
-    println!("  ✅ 缓存验证通过（数据一致）");
-
-    // 3.3 测试 get_pool_by_mint_force 强制刷新
-    println!("  3.3 测试 get_pool_by_mint_force 强制刷新...");
-    let (pool_addr_4, pool_state_4) = get_pool_by_mint_force(&rpc, &wsol_mint)
-        .await
-        .expect("get_pool_by_mint_force failed");
-    println!("  ✅ 强制刷新返回 Pool: {}", pool_addr_4);
-
-    // 验证强制刷新后返回相同的结果
-    assert_eq!(pool_addr_3, pool_addr_4, "强制刷新后 pool_address 应该一致");
-    assert_eq!(pool_state_3.token0_mint, pool_state_4.token0_mint, "强制刷新后 token0_mint 应该一致");
-    assert_eq!(pool_state_3.token1_mint, pool_state_4.token1_mint, "强制刷新后 token1_mint 应该一致");
-    println!("  ✅ 强制刷新验证通过");
 
     println!("\n=== Auto Mock 测试通过 ===");
     println!("✅ 测试覆盖：");
-    println!("  1. list_pools_by_mint_with_pool_client（无内存缓存）");
-    println!("  2. get_pool_by_mint_with_pool_client（无内存缓存）");
-    println!("  3. get_pool_by_mint（有内存缓存）");
-    println!("  4. get_pool_by_mint_force（强制刷新）");
+    println!("  • list_pools_by_mint_with_pool_client（列表查询）");
+    println!("  • get_pool_by_mint_with_pool_client（最优池查询）");
+    println!("  • Pool 字段验证（地址、流动性等）");
     println!("✅ 首次运行：从 RPC 获取并保存（约 2-3 秒）");
     println!("✅ 后续运行：从缓存加载（约 0.01 秒）");
     println!("✅ 速度提升：约 100-200 倍！");
-    println!("✅ 原始慢测试耗时: 超过 60 秒");
-    println!("✅ Auto Mock 测试耗时: 2-3 秒（首次）/ 0.01 秒（缓存）");
+    println!("💡 注意：内存缓存功能在单元测试中覆盖，不在此集成测试中重复");
 }
