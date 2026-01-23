@@ -12,7 +12,12 @@ async fn test_pumpswap_buy_with_discriminator() {
     // PumpSwap 买入交易签名
     let signature = "5GCZ3TR31aDRP9LZxznKPBux86jWDyCxt1noCAAhX43d6Cmtqi8HvK6oHErq7DBr9j5KRcqeYumW2wHt5qJG1tQK";
 
-    let parser = DexParser::default();
+    // 使用 Auto Mock 模式,首次运行会录制 Mock 数据,后续运行使用缓存
+    let config = sol_trade_sdk::parser::types::ParserConfig {
+        rpc_url: "http://127.0.0.1:8899".to_string(),
+        verbose: false,
+    };
+    let parser = DexParser::new_with_mock(config);
     let result = parser.parse_transaction(signature).await;
 
     assert!(result.success, "解析应该成功: {:?}", result.error);
