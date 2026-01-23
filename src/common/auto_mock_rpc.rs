@@ -54,7 +54,7 @@ impl AutoMockRpcClient {
     /// 生成文件名
     ///
     /// 格式: {method}_{params_hash}.json
-    fn generate_file_name(&self, method: &str, params: &Value) -> String {
+    pub fn generate_file_name(&self, method: &str, params: &Value) -> String {
         let params_str = params.to_string();
         let mut hasher = DefaultHasher::new();
         params_str.hash(&mut hasher);
@@ -64,7 +64,7 @@ impl AutoMockRpcClient {
     }
 
     /// 检查 Mock 数据是否存在
-    fn has_mock_data(&self, method: &str, params: &Value) -> bool {
+    pub fn has_mock_data(&self, method: &str, params: &Value) -> bool {
         let file_name = self.generate_file_name(method, params);
         let file_path = Path::new(&self.mock_dir).join(&file_name);
         file_path.exists()
