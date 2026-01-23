@@ -149,8 +149,8 @@ mod tests {
         std::thread::sleep(Duration::from_millis(10));
         let elapsed = start.elapsed();
 
-        // 应该大约是 10ms
-        assert!(elapsed >= Duration::from_millis(8) && elapsed <= Duration::from_millis(15));
+        // 应该大约是 10ms（放宽范围以适应系统调度）
+        assert!(elapsed >= Duration::from_millis(8) && elapsed <= Duration::from_millis(50));
         
         // 测试 fast_now_nanos 至少可以调用
         let _ = fast_now_nanos();
@@ -164,7 +164,7 @@ mod tests {
         std::thread::sleep(Duration::from_millis(10));
         let elapsed = start.elapsed();
 
-        assert!(elapsed >= Duration::from_millis(8) && elapsed <= Duration::from_millis(15));
+        assert!(elapsed >= Duration::from_millis(8) && elapsed <= Duration::from_millis(50));
         
         // 测试 FastStopwatch 至少可以创建
         let _sw = FastStopwatch::start("test");

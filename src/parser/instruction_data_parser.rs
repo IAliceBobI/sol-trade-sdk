@@ -33,9 +33,12 @@ pub enum InstructionDataParseError {
 ///
 /// # 示例
 /// ```rust
+/// use sol_trade_sdk::parser::instruction_data_parser::parse_u64_from_offset;
+///
 /// let data = vec![0, 0, 0, 0, 0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc, 0xde, 0xf0];
 /// let amount = parse_u64_from_offset(&data, 4)?;
-/// assert_eq!(amount, 0x78563412f0debc9a);
+/// assert_eq!(amount, 0xf0debc9a78563412);
+/// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
 pub fn parse_u64_from_offset(data: &[u8], offset: usize) -> Result<u64, InstructionDataParseError> {
     // 检查数据长度
