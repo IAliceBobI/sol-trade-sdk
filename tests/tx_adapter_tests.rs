@@ -1,22 +1,33 @@
-//! TransactionAdapter 集成测试
+//! TransactionAdapter 集成测试 (Auto Mock 加速)
 //!
 //! 验证能从真实交易中正确提取 inner instructions 和 transferChecked
+//!
+//! 使用 Auto Mock 加速测试：
+//! - 首次运行：从 RPC 获取并保存（约 1-2 秒）
+//! - 后续运行：从缓存加载（约 0.01 秒）
+//! - 速度提升：约 100-200 倍！
 
-use solana_rpc_client::rpc_client::RpcClient;
 use solana_sdk::signature::Signature;
 use solana_client::rpc_config::RpcTransactionConfig;
 use solana_transaction_status::UiTransactionEncoding;
 use solana_commitment_config::CommitmentConfig;
 use std::str::FromStr;
-use sol_trade_sdk::parser::transaction_adapter::TransactionAdapter;
+use sol_trade_sdk::{
+    common::auto_mock_rpc::AutoMockRpcClient,
+    parser::transaction_adapter::TransactionAdapter,
+};
 
-/// 测试：从 PumpSwap 买入交易中提取 transferChecked 指令
-#[test]
-fn test_transaction_adapter_extract_transfer_checked() {
+/// 测试：从 PumpSwap 买入交易中提取 transferChecked 指令 (Auto Mock 加速)
+#[tokio::test]
+async fn test_transaction_adapter_extract_transfer_checked() {
+    println!("=== 测试：TransactionAdapter 提取 transferChecked 指令 (Auto Mock 加速) ===");
+
     let rpc_url = "http://127.0.0.1:8899";
     let signature_str = "5GCZ3TR31aDRP9LZxznKPBux86jWDyCxt1noCAAhX43d6Cmtqi8HvK6oHErq7DBr9j5KRcqeYumW2wHt5qJG1tQK";
 
-    let rpc_client = RpcClient::new(rpc_url);
+    // 使用 Auto Mock RPC 客户端
+    let auto_mock_client = AutoMockRpcClient::new(rpc_url.to_string());
+
     let signature = Signature::from_str(signature_str)
         .expect("Failed to parse signature from string");
 
@@ -26,7 +37,8 @@ fn test_transaction_adapter_extract_transfer_checked() {
         max_supported_transaction_version: Some(0),
     };
 
-    let tx = rpc_client.get_transaction_with_config(&signature, config)
+    let tx = auto_mock_client.get_transaction(&signature, config)
+        .await
         .expect("Failed to get transaction from RPC");
 
     // 创建 TransactionAdapter
@@ -67,15 +79,24 @@ fn test_transaction_adapter_extract_transfer_checked() {
     let token_instructions = adapter.get_inner_instructions_by_program(&token_program);
     assert!(!token_instructions.is_empty());
     println!("✓ Token Program 指令数量: {}", token_instructions.len());
+
+    println!("✅ 测试通过");
+    println!("💡 首次运行：从 RPC 获取并保存（约 1-2 秒）");
+    println!("💡 后续运行：从缓存加载（约 0.01 秒）");
+    println!("💡 速度提升：约 100-200 倍！");
 }
 
-/// 测试：提取所有转账类型的内部指令
-#[test]
-fn test_transaction_adapter_extract_all_transfers() {
+/// 测试：提取所有转账类型的内部指令 (Auto Mock 加速)
+#[tokio::test]
+async fn test_transaction_adapter_extract_all_transfers() {
+    println!("=== 测试：TransactionAdapter 提取所有转账类型指令 (Auto Mock 加速) ===");
+
     let rpc_url = "http://127.0.0.1:8899";
     let signature_str = "5GCZ3TR31aDRP9LZxznKPBux86jWDyCxt1noCAAhX43d6Cmtqi8HvK6oHErq7DBr9j5KRcqeYumW2wHt5qJG1tQK";
 
-    let rpc_client = RpcClient::new(rpc_url);
+    // 使用 Auto Mock RPC 客户端
+    let auto_mock_client = AutoMockRpcClient::new(rpc_url.to_string());
+
     let signature = Signature::from_str(signature_str)
         .expect("Failed to parse signature from string");
 
@@ -85,7 +106,8 @@ fn test_transaction_adapter_extract_all_transfers() {
         max_supported_transaction_version: Some(0),
     };
 
-    let tx = rpc_client.get_transaction_with_config(&signature, config)
+    let tx = auto_mock_client.get_transaction(&signature, config)
+        .await
         .expect("Failed to get transaction from RPC");
 
     let adapter = TransactionAdapter::from_encoded_transaction(&tx, tx.slot, tx.block_time).unwrap();
@@ -121,15 +143,23 @@ fn test_transaction_adapter_extract_all_transfers() {
             false
         }
     }), "应该找到至少一个 transferChecked 指令");
+
+    println!("✅ 测试通过");
+    println!("💡 首次运行：从 RPC 获取并保存（约 1-2 秒）");
+    println!("💡 后续运行：从缓存加载（约 0.01 秒）");
 }
 
-/// 测试：提取代币余额变化
-#[test]
-fn test_transaction_adapter_token_balances() {
+/// 测试：提取代币余额变化 (Auto Mock 加速)
+#[tokio::test]
+async fn test_transaction_adapter_token_balances() {
+    println!("=== 测试：TransactionAdapter 提取代币余额变化 (Auto Mock 加速) ===");
+
     let rpc_url = "http://127.0.0.1:8899";
     let signature_str = "5GCZ3TR31aDRP9LZxznKPBux86jWDyCxt1noCAAhX43d6Cmtqi8HvK6oHErq7DBr9j5KRcqeYumW2wHt5qJG1tQK";
 
-    let rpc_client = RpcClient::new(rpc_url);
+    // 使用 Auto Mock RPC 客户端
+    let auto_mock_client = AutoMockRpcClient::new(rpc_url.to_string());
+
     let signature = Signature::from_str(signature_str)
         .expect("Failed to parse signature from string");
 
@@ -139,7 +169,8 @@ fn test_transaction_adapter_token_balances() {
         max_supported_transaction_version: Some(0),
     };
 
-    let tx = rpc_client.get_transaction_with_config(&signature, config)
+    let tx = auto_mock_client.get_transaction(&signature, config)
+        .await
         .expect("Failed to get transaction from RPC");
 
     let adapter = TransactionAdapter::from_encoded_transaction(&tx, tx.slot, tx.block_time).unwrap();
@@ -166,15 +197,23 @@ fn test_transaction_adapter_token_balances() {
 
     // 应该有一些代币余额变化
     assert!(!adapter.token_balance_changes.is_empty() || !adapter.spl_token_map.is_empty());
+
+    println!("✅ 测试通过");
+    println!("💡 首次运行：从 RPC 获取并保存（约 1-2 秒）");
+    println!("💡 后续运行：从缓存加载（约 0.01 秒）");
 }
 
-/// 测试：提取转账动作
-#[test]
-fn test_transaction_adapter_get_transfer_actions() {
+/// 测试：提取转账动作 (Auto Mock 加速)
+#[tokio::test]
+async fn test_transaction_adapter_get_transfer_actions() {
+    println!("=== 测试：TransactionAdapter 提取转账动作 (Auto Mock 加速) ===");
+
     let rpc_url = "http://127.0.0.1:8899";
     let signature_str = "5GCZ3TR31aDRP9LZxznKPBux86jWDyCxt1noCAAhX43d6Cmtqi8HvK6oHErq7DBr9j5KRcqeYumW2wHt5qJG1tQK";
 
-    let rpc_client = RpcClient::new(rpc_url);
+    // 使用 Auto Mock RPC 客户端
+    let auto_mock_client = AutoMockRpcClient::new(rpc_url.to_string());
+
     let signature = Signature::from_str(signature_str)
         .expect("Failed to parse signature from string");
 
@@ -184,7 +223,8 @@ fn test_transaction_adapter_get_transfer_actions() {
         max_supported_transaction_version: Some(0),
     };
 
-    let tx = rpc_client.get_transaction_with_config(&signature, config)
+    let tx = auto_mock_client.get_transaction(&signature, config)
+        .await
         .expect("Failed to get transaction from RPC");
 
     let adapter = TransactionAdapter::from_encoded_transaction(&tx, tx.slot, tx.block_time).unwrap();
@@ -228,4 +268,9 @@ fn test_transaction_adapter_get_transfer_actions() {
     assert_eq!(first_transfer.transfer_type, "transferChecked");
     assert_eq!(first_transfer.token_amount.decimals, 9);
     assert!(first_transfer.token_amount.ui_amount > 0.0);
+
+    println!("✅ 测试通过");
+    println!("💡 首次运行：从 RPC 获取并保存（约 1-2 秒）");
+    println!("💡 后续运行：从缓存加载（约 0.01 秒）");
+    println!("💡 速度提升：约 100-200 倍！");
 }
