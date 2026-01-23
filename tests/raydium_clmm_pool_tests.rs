@@ -52,7 +52,8 @@ async fn test_raydium_clmm_get_pool_by_mint_wsol_cache_and_force() {
     // 设置环境变量，限制扫描的 Pool 数量（测试环境优化）
     std::env::set_var("CLMM_POOL_SCAN_LIMIT", "100");
 
-    let wsol_mint = Pubkey::from_str(WSOL_MINT).expect("Invalid WSOL mint");
+    let wsol_mint = Pubkey::from_str(WSOL_MINT)
+        .unwrap_or_else(|_| panic!("Invalid WSOL mint: {}", WSOL_MINT));
     let rpc_url = "http://127.0.0.1:8899";
     let rpc = RpcClient::new(rpc_url.to_string());
 
@@ -150,7 +151,8 @@ async fn test_raydium_clmm_get_pool_by_address() {
     std::env::set_var("CLMM_POOL_SCAN_LIMIT", "50");
 
     // 使用之前测试中找到的 pool 地址
-    let wsol_mint = Pubkey::from_str(WSOL_MINT).expect("Invalid WSOL mint");
+    let wsol_mint = Pubkey::from_str(WSOL_MINT)
+        .unwrap_or_else(|_| panic!("Invalid WSOL mint: {}", WSOL_MINT));
     let rpc_url = "http://127.0.0.1:8899";
     let rpc = RpcClient::new(rpc_url.to_string());
 
@@ -245,7 +247,8 @@ async fn test_raydium_clmm_get_jup_price_in_usd() {
     let rpc_url = "http://127.0.0.1:8899";
     let rpc = RpcClient::new(rpc_url.to_string());
 
-    let jup_mint = Pubkey::from_str(JUP_MINT).expect("Invalid JUP mint");
+    let jup_mint = Pubkey::from_str(JUP_MINT)
+        .unwrap_or_else(|_| panic!("Invalid JUP mint: {}", JUP_MINT));
 
     let price = get_token_price_in_usd(&rpc, &jup_mint, None)
         .await
@@ -269,7 +272,8 @@ async fn test_raydium_clmm_get_jup_price_in_usd_with_pool() {
     let rpc_url = "http://127.0.0.1:8899";
     let rpc = RpcClient::new(rpc_url.to_string());
 
-    let jup_mint = Pubkey::from_str(JUP_MINT).expect("Invalid JUP mint");
+    let jup_mint = Pubkey::from_str(JUP_MINT)
+        .unwrap_or_else(|_| panic!("Invalid JUP mint: {}", JUP_MINT));
 
     // 1. 先用标准接口找到 JUP-WSOL 池地址（模拟：你已经缓存了这个池地址）
     let (jup_wsol_pool, _) = get_pool_by_mint(&rpc, &jup_mint)
@@ -302,7 +306,8 @@ async fn test_raydium_clmm_get_pool_by_address_with_auto_mock() {
     println!("=== 测试：使用 Auto Mock 获取 CLMM Pool 数据（加速版） ===");
 
     // 使用已知的 WSOL-USDT CLMM Pool
-    let pool_address = Pubkey::from_str(WSOL_USDT_CLMM_POOL).expect("Invalid pool address");
+    let pool_address = Pubkey::from_str(WSOL_USDT_CLMM_POOL)
+        .unwrap_or_else(|_| panic!("Invalid pool address: {}", WSOL_USDT_CLMM_POOL));
     let rpc_url = "http://127.0.0.1:8899";
 
     // 使用 Auto Mock RPC 客户端

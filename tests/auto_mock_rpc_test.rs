@@ -79,7 +79,7 @@ async fn test_auto_mode_first_call() {
         }
         Err(e) => {
             eprintln!("❌ 调用失败: {}", e);
-            panic!("测试失败");
+            panic!("测试失败: {}", e);
         }
     }
 }

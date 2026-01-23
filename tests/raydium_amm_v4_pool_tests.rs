@@ -61,7 +61,8 @@ const OIIAOIIA_MINT: &str = "VaxZxmFXV8tmsd72hUn22ex6GFzZ5uq9DVJ5wA5pump";
 async fn test_fetch_amm_info() {
     println!("=== 测试：获取 AMM 信息并验证字段 ===");
 
-    let amm_address = Pubkey::from_str(SOL_USDC_AMM).expect("Invalid AMM address");
+    let amm_address = Pubkey::from_str(SOL_USDC_AMM)
+        .unwrap_or_else(|_| panic!("Invalid AMM address: {}", SOL_USDC_AMM));
     let rpc_url = "http://127.0.0.1:8899";
     let rpc = RpcClient::new(rpc_url.to_string());
 
@@ -214,7 +215,8 @@ async fn test_fetch_amm_info() {
 async fn test_get_pool_by_address_cache() {
     println!("=== 测试：缓存功能 ===");
 
-    let amm_address = Pubkey::from_str(SOL_USDC_AMM).expect("Invalid AMM address");
+    let amm_address = Pubkey::from_str(SOL_USDC_AMM)
+        .unwrap_or_else(|_| panic!("Invalid AMM address: {}", SOL_USDC_AMM));
     let rpc_url = "http://127.0.0.1:8899";
     let rpc = RpcClient::new(rpc_url.to_string());
 
@@ -282,7 +284,7 @@ async fn test_get_pool_by_mint_wsol() {
     println!("=== 测试：get_pool_by_mint (WSOL) ===");
 
     let wsol_mint = Pubkey::from_str("So11111111111111111111111111111111111111112")
-        .expect("Invalid WSOL mint");
+        .unwrap_or_else(|_| panic!("Invalid WSOL mint: So11111111111111111111111111111111111111112"));
     let rpc_url = "http://127.0.0.1:8899";
     let rpc = RpcClient::new(rpc_url.to_string());
 
@@ -372,7 +374,7 @@ async fn test_public_rpc_limitations() {
     use solana_rpc_client_api::{config::RpcProgramAccountsConfig, filter::RpcFilterType};
     
     let wsol_mint = Pubkey::from_str("So11111111111111111111111111111111111111112")
-        .expect("Invalid WSOL mint");
+        .unwrap_or_else(|_| panic!("Invalid WSOL mint: So11111111111111111111111111111111111111112"));
     let rpc_url = "http://127.0.0.1:8899";
     let rpc = RpcClient::new(rpc_url.to_string());
 
@@ -436,7 +438,7 @@ async fn test_list_pools_by_mint_wsol() {
     println!("=== 测试：list_pools_by_mint (WSOL) ===");
 
     let wsol_mint = Pubkey::from_str("So11111111111111111111111111111111111111112")
-        .expect("Invalid WSOL mint");
+        .unwrap_or_else(|_| panic!("Invalid WSOL mint: So11111111111111111111111111111111111111112"));
     let rpc_url = "http://127.0.0.1:8899";
     let rpc = RpcClient::new(rpc_url.to_string());
 
@@ -461,7 +463,8 @@ async fn test_list_pools_by_mint_wsol() {
     }
 
     // 确认已知的 WSOL-USDC AMM 池在列表中（若本地 RPC 同步了主网数据）
-    let target = Pubkey::from_str(SOL_USDC_AMM).expect("Invalid AMM address");
+    let target = Pubkey::from_str(SOL_USDC_AMM)
+        .unwrap_or_else(|_| panic!("Invalid AMM address: {}", SOL_USDC_AMM));
     let found = pools.iter().any(|(addr, _)| *addr == target);
     assert!(found, "WSOL-USDC 主池未出现在 list_pools_by_mint 结果中");
 }
@@ -473,7 +476,7 @@ async fn test_list_active_pools_by_mint_wsol() {
     println!("=== 测试：list_pools_by_mint (WSOL, active only) ===");
 
     let wsol_mint = Pubkey::from_str("So11111111111111111111111111111111111111112")
-        .expect("Invalid WSOL mint");
+        .unwrap_or_else(|_| panic!("Invalid WSOL mint: So11111111111111111111111111111111111111112"));
     let rpc_url = "http://127.0.0.1:8899";
     let rpc = RpcClient::new(rpc_url.to_string());
 
@@ -536,7 +539,8 @@ async fn test_get_amm_v4_token_price_in_usd() {
 async fn test_fetch_amm_info_with_auto_mock() {
     println!("=== 测试：使用 Auto Mock 获取 AMM 信息（加速版） ===");
 
-    let amm_address = Pubkey::from_str(SOL_USDC_AMM).expect("Invalid AMM address");
+    let amm_address = Pubkey::from_str(SOL_USDC_AMM)
+        .unwrap_or_else(|_| panic!("Invalid AMM address: {}", SOL_USDC_AMM));
     let rpc_url = "http://127.0.0.1:8899";
 
     // 使用 Auto Mock RPC 客户端

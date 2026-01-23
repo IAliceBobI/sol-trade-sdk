@@ -82,7 +82,8 @@ fn test_file_name_generation() {
 fn test_record_and_replay() {
     // 创建临时目录
     let temp_dir = std::env::temp_dir().join("mock_rpc_test");
-    std::fs::create_dir_all(&temp_dir).expect("无法创建临时目录");
+    std::fs::create_dir_all(&temp_dir)
+        .unwrap_or_else(|_| panic!("无法创建临时目录: {}", temp_dir.display()));
 
     // 创建 Mock RPC 客户端（Record 模式）
     let mut record_mock = MockRpcMode::new_with_mode(
@@ -184,7 +185,8 @@ async fn example_mock_usage() {
 fn test_clear_mock_data() {
     // 创建临时目录
     let temp_dir = std::env::temp_dir().join("mock_rpc_clear_test");
-    std::fs::create_dir_all(&temp_dir).expect("无法创建临时目录");
+    std::fs::create_dir_all(&temp_dir)
+        .unwrap_or_else(|_| panic!("无法创建临时目录: {}", temp_dir.display()));
 
     let mut mock_rpc = MockRpcMode::new_with_mode(
         "http://127.0.0.1:8899".to_string(),

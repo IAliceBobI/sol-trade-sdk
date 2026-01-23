@@ -38,7 +38,8 @@ async fn test_seed_ata_address_characteristics() {
     println!("钱包地址: {}", payer_pubkey);
 
     // 解析 token mint
-    let mint = Pubkey::from_str(PUMP_MINT).expect("Invalid mint address");
+    let mint = Pubkey::from_str(PUMP_MINT)
+        .unwrap_or_else(|_| panic!("Invalid mint address: {}", PUMP_MINT));
     println!("Token Mint: {}", mint);
     println!("Token Program: Token-2022");
 

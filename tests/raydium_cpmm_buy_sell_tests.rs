@@ -64,8 +64,9 @@ async fn test_raydium_cpmm_buy_sell_complete() {
 
     // ===== 1. 使用指定的 CPMM Pool (PIPE-WSOL) =====
     let pool_address = Pubkey::from_str("BnYsRpYvJpz6biY3hV6U9smChVePCJ6YyupVDfcnXpTp")
-        .expect("Invalid pool address");
-    let wsol_mint = Pubkey::from_str(WSOL_MINT).expect("Invalid WSOL mint");
+        .unwrap_or_else(|_| panic!("Invalid pool address: BnYsRpYvJpz6biY3hV6U9smChVePCJ6YyupVDfcnXpTp"));
+    let wsol_mint = Pubkey::from_str(WSOL_MINT)
+        .unwrap_or_else(|_| panic!("Invalid WSOL mint: {}", WSOL_MINT));
 
     println!("\n🔍 使用指定的 Raydium CPMM Pool: {}", pool_address);
 
@@ -284,7 +285,8 @@ async fn test_raydium_cpmm_buy_sell_complete() {
 async fn test_raydium_cpmm_get_pool_by_mint_wsol_cache_and_force() {
     println!("=== 测试：Raydium CPMM get_pool_by_mint (WSOL, cache & force) ===");
 
-    let wsol_mint = Pubkey::from_str(WSOL_MINT).expect("Invalid WSOL mint");
+    let wsol_mint = Pubkey::from_str(WSOL_MINT)
+        .unwrap_or_else(|_| panic!("Invalid WSOL mint: {}", WSOL_MINT));
     let rpc_url = "http://127.0.0.1:8899";
     let rpc = RpcClient::new(rpc_url.to_string());
 
@@ -330,7 +332,8 @@ async fn test_raydium_cpmm_get_pool_by_mint_wsol_cache_and_force() {
 async fn test_raydium_cpmm_list_pools_by_mint_wsol() {
     println!("=== 测试：Raydium CPMM list_pools_by_mint (WSOL) ===");
 
-    let wsol_mint = Pubkey::from_str(WSOL_MINT).expect("Invalid WSOL mint");
+    let wsol_mint = Pubkey::from_str(WSOL_MINT)
+        .unwrap_or_else(|_| panic!("Invalid WSOL mint: {}", WSOL_MINT));
     let rpc_url = "http://127.0.0.1:8899".to_string();
     let rpc = RpcClient::new(rpc_url.to_string());
 
