@@ -556,10 +556,15 @@ impl TransactionAdapter {
             .parse::<Pubkey>()
             .unwrap();
 
+        let token_2022_program_id = "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb"
+            .parse::<Pubkey>()
+            .unwrap();
+
         self.inner_instructions.iter()
             .filter(|ix| {
-                // 必须是 Token Program 的指令
-                if ix.instruction.program_id != token_program_id {
+                // 必须是 Token Program 或 Token-2022 Program 的指令
+                if ix.instruction.program_id != token_program_id
+                    && ix.instruction.program_id != token_2022_program_id {
                     return false;
                 }
 

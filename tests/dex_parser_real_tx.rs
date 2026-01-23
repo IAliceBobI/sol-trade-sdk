@@ -145,6 +145,56 @@ async fn test_parse_raydium_cpmm_transaction() {
     println!("  Solscan 显示: Swap 0.01 WSOL for 73,296.433626 Fartpad");
 }
 
+/// Raydium CPMM 卖出交易测试 (卖出代币获得 WSOL)
+///
+/// 交易: https://solscan.io/tx/23hEJ9AoF8H7zg3dN4rDcfgBqkhnPBBc89XzynyryXk5opGkKYtD66rV4Z2BPdmC718UvfeSbrWTbrjuFNd5ej2S?cluster=custom&customUrl=http://127.0.0.1:8899
+/// Solscan 显示: Swap 100,000 INMU for 0.252744512 WSOL
+#[tokio::test]
+#[serial_test::serial(global_dex_cache)]
+async fn test_parse_raydium_cpmm_sell_transaction() {
+    let parser = DexParser::default();
+    let signature = "23hEJ9AoF8H7zg3dN4rDcfgBqkhnPBBc89XzynyryXk5opGkKYtD66rV4Z2BPdmC718UvfeSbrWTbrjuFNd5ej2S";
+
+    let result = parser.parse_transaction(signature).await;
+
+    // 验证解析成功
+    assert!(result.success, "解析应该成功，错误: {:?}", result.error);
+    assert!(!result.trades.is_empty(), "应该解析出至少一笔交易");
+
+    let trade = &result.trades[0];
+
+    println!("Raydium CPMM Sell 交易解析成功:");
+    println!("  用户: {}", trade.user);
+    println!("  池: {}", trade.pool);
+    println!("  类型: {:?}", trade.trade_type);
+    println!("  输入: {} {} (精度: {})", trade.input_token.amount, trade.input_token.mint, trade.input_token.decimals);
+    println!("  输出: {} {} (精度: {})", trade.output_token.amount, trade.output_token.mint, trade.output_token.decimals);
+    // Solscan 显示: Swap 100,000 INMU for 0.252744512 WSOL
+    println!("  Solscan 显示: Swap 100,000 INMU for 0.252744512 WSOL");
+
+    // 验证 DEX 类型
+    assert!(trade.dex.contains("CPMM") || trade.dex.contains("Raydium"));
+
+    // 验证交易类型应该是 Sell（卖出 INMU）
+    assert_eq!(trade.trade_type, TradeType::Sell, "应该是卖出交易");
+
+    // 验证基本数据
+    assert_ne!(trade.user, solana_sdk::pubkey::Pubkey::default());
+    assert_ne!(trade.pool, solana_sdk::pubkey::Pubkey::default());
+
+    // 验证输入和输出数量都大于0
+    assert!(trade.input_token.amount > 0.0, "输入代币数量应大于0，当前: {}", trade.input_token.amount);
+    assert!(trade.output_token.amount > 0.0, "输出代币数量应大于0，当前: {}", trade.output_token.amount);
+
+    // 验证输入金额约为 100,000 INMU
+    assert!((trade.input_token.amount - 100_000.0).abs() < 1.0,
+        "输入金额应为约 100,000 INMU，当前: {}", trade.input_token.amount);
+
+    // 验证输出金额约为 0.252744512 WSOL
+    assert!((trade.output_token.amount - 0.252744512).abs() < 0.0001,
+        "输出金额应为约 0.252744512 WSOL，当前: {}", trade.output_token.amount);
+}
+
 /// Raydium CLMM 交易测试
 ///
 /// 交易: https://solscan.io/tx/5DiDUkUntQVmDMUes3mwpiPTRHQW4YWeUWfFyDFDpsKezXdw9xZQmprgrK6ddu7YaNaJ3K5GT6RGUJ8v7828TXJU?cluster=custom&customUrl=http://127.0.0.1:8899
