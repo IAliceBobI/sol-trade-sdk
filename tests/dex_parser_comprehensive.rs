@@ -5,6 +5,7 @@
 //! 测试数据来源: docs/plans/task.md
 
 use sol_trade_sdk::parser::DexParser;
+use sol_trade_sdk::parser::types::ParserConfig;
 
 /// 测试所有 4 个 DEX 的交易解析
 ///
@@ -16,7 +17,11 @@ use sol_trade_sdk::parser::DexParser;
 #[tokio::test]
 #[serial_test::serial(global_dex_cache)]
 async fn test_all_dex_parsing() {
-    let parser = DexParser::default();
+    let config = ParserConfig {
+        rpc_url: "http://127.0.0.1:8899".to_string(),
+        verbose: false,
+    };
+    let parser = DexParser::new_with_mock(config);  // 使用 Mock 模式
 
     // 测试交易列表
     let test_cases = vec![
@@ -170,7 +175,11 @@ async fn test_parser_config() {
 #[tokio::test]
 #[serial_test::serial(global_dex_cache)]
 async fn test_pumpswap_detailed_parsing() {
-    let parser = DexParser::default();
+    let config = ParserConfig {
+        rpc_url: "http://127.0.0.1:8899".to_string(),
+        verbose: false,
+    };
+    let parser = DexParser::new_with_mock(config);
     let signature = "5GCZ3TR31aDRP9LZxznKPBux86jWDyCxt1noCAAhX43d6Cmtqi8HvK6oHErq7DBr9j5KRcqeYumW2wHt5qJG1tQK";
 
     let result = parser.parse_transaction(signature).await;
@@ -199,7 +208,11 @@ async fn test_pumpswap_detailed_parsing() {
 #[tokio::test]
 #[serial_test::serial(global_dex_cache)]
 async fn test_raydium_v4_detailed_parsing() {
-    let parser = DexParser::default();
+    let config = ParserConfig {
+        rpc_url: "http://127.0.0.1:8899".to_string(),
+        verbose: false,
+    };
+    let parser = DexParser::new_with_mock(config);
     let signature = "5tqpXeLDzBKXdWUrTXb5pApjhapj6PLZZLvcLFBsYUdGgtnW9MYTC7N16gF4GyVZHQgGZKApNRP3bAUckr7MdpJr";
 
     let result = parser.parse_transaction(signature).await;
@@ -225,7 +238,11 @@ async fn test_raydium_v4_detailed_parsing() {
 #[tokio::test]
 #[serial_test::serial(global_dex_cache)]
 async fn test_raydium_cpmm_detailed_parsing() {
-    let parser = DexParser::default();
+    let config = ParserConfig {
+        rpc_url: "http://127.0.0.1:8899".to_string(),
+        verbose: false,
+    };
+    let parser = DexParser::new_with_mock(config);
     let signature = "7Q5gThWgQkbSR6GSLVSAjo9x762DSuLQwg6ne6KKomjfWSho26Zmr7qfPQ7zzJk7sdTvHPqhW9grxaNzGhJgRrn";
 
     let result = parser.parse_transaction(signature).await;
@@ -251,7 +268,11 @@ async fn test_raydium_cpmm_detailed_parsing() {
 #[tokio::test]
 #[serial_test::serial(global_dex_cache)]
 async fn test_raydium_clmm_detailed_parsing() {
-    let parser = DexParser::default();
+    let config = ParserConfig {
+        rpc_url: "http://127.0.0.1:8899".to_string(),
+        verbose: false,
+    };
+    let parser = DexParser::new_with_mock(config);
     let signature = "5DiDUkUntQVmDMUes3mwpiPTRHQW4YWeUWfFyDFDpsKezXdw9xZQmprgrK6ddu7YaNaJ3K5GT6RGUJ8v7828TXJU";
 
     let result = parser.parse_transaction(signature).await;
