@@ -12,8 +12,6 @@ use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_sdk::pubkey::Pubkey;
 use std::str::FromStr;
 
-// 用于串行测试
-
 /// 已知的 Raydium AMM V4 pool 地址
 /// WSOL-USDC pool on Raydium AMM V4
 /// - Pool Address: 58oQChx4yWmvKdwLLZzBi4ChoCc2fqCUWBkwMihLYQo2
@@ -33,7 +31,6 @@ const OIIAOIIA_MINT: &str = "VaxZxmFXV8tmsd72hUn22ex6GFzZ5uq9DVJ5wA5pump";
 /// 首次运行时会从 RPC 获取数据并保存到 tests/mock_data/，
 /// 后续运行会直接从缓存加载，速度提升显著。
 #[tokio::test]
-#[serial_test::serial(global_dex_cache)]
 async fn test_fetch_amm_info() {
     println!("=== 测试：获取 AMM 信息并验证字段（Auto Mock 加速） ===");
 
@@ -194,7 +191,6 @@ async fn test_fetch_amm_info() {
 
 /// 测试：缓存功能
 #[tokio::test]
-#[serial_test::serial(global_dex_cache)]
 async fn test_get_pool_by_address_cache() {
     println!("=== 测试：缓存功能 ===");
 
@@ -260,7 +256,6 @@ async fn test_get_pool_by_address_cache() {
 }
 
 #[tokio::test]
-#[serial_test::serial(global_dex_cache)]
 async fn test_public_rpc_limitations() {
     println!("=== 测试：验证公共 RPC getProgramAccounts 限制 ===");
     
@@ -313,7 +308,6 @@ async fn test_public_rpc_limitations() {
 
 /// 测试：获取 AMM V4 token 的 USD 价格
 #[tokio::test]
-#[serial_test::serial(global_dex_cache)]
 async fn test_get_amm_v4_token_price_in_usd() {
     println!("=== 测试：获取 AMM V4 token 的 USD 价格 ===");
 
@@ -348,7 +342,6 @@ async fn test_get_amm_v4_token_price_in_usd() {
 /// 首次运行时会从 RPC 获取数据并保存到 tests/mock_data/，
 /// 后续运行会直接从缓存加载，速度提升显著。
 #[tokio::test]
-#[serial_test::serial(global_dex_cache)]
 async fn test_raydium_amm_v4_get_pool_by_mint_with_auto_mock() {
     println!("=== 测试：使用 Auto Mock 加速 get_pool_by_mint 和 list_pools_by_mint ===");
 
