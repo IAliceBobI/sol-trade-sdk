@@ -1,3 +1,5 @@
+pub mod address_lookup;
+pub mod auto_mock_rpc;
 pub mod bonding_curve;
 pub mod dex_pool_cache;
 pub mod fast_fn;
@@ -12,7 +14,6 @@ pub mod spl_token;
 pub mod spl_token_2022;
 pub mod subscription_handle;
 pub mod types;
-pub mod address_lookup;
 pub mod raydium_api;
 
 pub use gas_fee_strategy::*;
