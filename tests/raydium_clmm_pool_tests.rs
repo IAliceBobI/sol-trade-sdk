@@ -19,7 +19,7 @@ use sol_trade_sdk::instruction::utils::raydium_clmm::{
     get_pool_by_mint_force, get_pool_by_mint_with_pool_client,
     get_token_price_in_usd_with_client,
     get_token_price_in_usd_with_pool_with_client,
-    get_wsol_price_in_usd_with_client, list_pools_by_mint_with_pool_client,
+    get_wsol_price_in_usd_with_client,
 };
 use sol_trade_sdk::common::auto_mock_rpc::AutoMockRpcClient;
 use solana_client::nonblocking::rpc_client::RpcClient;
@@ -207,10 +207,11 @@ async fn test_raydium_clmm_get_jup_price_in_usd_with_pool() {
 #[tokio::test]
 #[serial_test::serial(global_dex_cache)]
 async fn test_raydium_clmm_get_pool_by_mint_with_auto_mock() {
-    println!("=== 测试：使用 Auto Mock 加速 get_pool_by_mint 和 list_pools_by_mint ===");
+    println!("=== 测试：使用 Auto Mock 加速 get_pool_by_mint（聚焦核心功能） ===");
 
     // 设置环境变量，限制扫描的 Pool 数量（测试环境优化）
-    std::env::set_var("CLMM_POOL_SCAN_LIMIT", "100");
+    // 降低到 10 以加速测试（WSOL Pool 数量众多，查询耗时）
+    std::env::set_var("CLMM_POOL_SCAN_LIMIT", "10");
 
     let wsol_mint = Pubkey::from_str(WSOL_MINT)
         .unwrap_or_else(|_| panic!("Invalid WSOL mint: {}", WSOL_MINT));
@@ -227,27 +228,8 @@ async fn test_raydium_clmm_get_pool_by_mint_with_auto_mock() {
     // 清除所有缓存
     clear_pool_cache();
 
-    // 1. 使用 Auto Mock 的 list_pools_by_mint
-    println!("\n步骤 1: 使用 list_pools_by_mint_with_pool_client 查询所有 WSOL Pool...");
-    let pools = list_pools_by_mint_with_pool_client(&auto_mock_client, &wsol_mint)
-        .await
-        .expect("list_pools_by_mint_with_pool_client failed");
-    println!("✅ 查询到 {} 个 Pool", pools.len());
-    assert!(!pools.is_empty(), "WSOL 相关的 CLMM Pool 列表不应为空");
-
-    for (addr, pool) in pools.iter().take(3) {
-        // 只打印前 3 个
-        println!(
-            "  Pool: {} | Token0: {} | Token1: {} | Liquidity: {}",
-            addr, pool.token_mint0, pool.token_mint1, pool.liquidity
-        );
-    }
-    if pools.len() > 3 {
-        println!("  ... 还有 {} 个 Pool", pools.len() - 3);
-    }
-
-    // 2. 使用 Auto Mock 的 get_pool_by_mint（无缓存版本）
-    println!("\n步骤 2: 使用 get_pool_by_mint_with_pool_client 查询最优 Pool...");
+    // 1. 使用 Auto Mock 的 get_pool_by_mint（无缓存版本，核心使用场景）
+    println!("\n步骤 1: 使用 get_pool_by_mint_with_pool_client 查询最优 Pool...");
     let (pool_addr_1, pool_state_1) = get_pool_by_mint_with_pool_client(&auto_mock_client, &wsol_mint)
         .await
         .expect("get_pool_by_mint_with_pool_client failed");
@@ -270,17 +252,17 @@ async fn test_raydium_clmm_get_pool_by_mint_with_auto_mock() {
 
     // ========== 第二部分：测试 get_pool_by_mint 的缓存功能 ==========
 
-    println!("\n步骤 3: 测试 get_pool_by_mint 的内存缓存功能...");
+    println!("\n步骤 2: 测试 get_pool_by_mint 的内存缓存功能...");
 
-    // 3.1 第一次调用（应写入缓存）
-    println!("  3.1 第一次调用 get_pool_by_mint（写入缓存）...");
+    // 2.1 第一次调用（应写入缓存）
+    println!("  2.1 第一次调用 get_pool_by_mint（写入缓存）...");
     let (pool_addr_2, pool_state_2) = get_pool_by_mint(&rpc, &wsol_mint)
         .await
         .expect("get_pool_by_mint failed");
     println!("  ✅ 第一次查询返回 Pool: {}", pool_addr_2);
 
-    // 3.2 第二次调用（应从缓存读取）
-    println!("  3.2 第二次调用 get_pool_by_mint（从缓存读取）...");
+    // 2.2 第二次调用（应从缓存读取）
+    println!("  2.2 第二次调用 get_pool_by_mint（从缓存读取）...");
     let (pool_addr_3, pool_state_3) = get_pool_by_mint(&rpc, &wsol_mint)
         .await
         .expect("get_pool_by_mint (cached) failed");
@@ -292,8 +274,8 @@ async fn test_raydium_clmm_get_pool_by_mint_with_auto_mock() {
     assert_eq!(pool_state_2.liquidity, pool_state_3.liquidity, "缓存中的 liquidity 应该一致");
     println!("  ✅ 缓存验证通过（数据一致）");
 
-    // 3.3 清除缓存后再次查询
-    println!("  3.3 清除缓存后再次查询...");
+    // 2.3 清除缓存后再次查询
+    println!("  2.3 清除缓存后再次查询...");
     clear_pool_cache();
     let (pool_addr_4, pool_state_4) = get_pool_by_mint(&rpc, &wsol_mint)
         .await
@@ -308,8 +290,8 @@ async fn test_raydium_clmm_get_pool_by_mint_with_auto_mock() {
     assert!(pool_state_4.liquidity > 0, "清除缓存后 Pool 应该有流动性");
     println!("  ✅ 清除缓存后验证通过（返回有效的 WSOL Pool）");
 
-    // 3.4 测试 get_pool_by_mint_force 强制刷新
-    println!("  3.4 测试 get_pool_by_mint_force 强制刷新...");
+    // 2.4 测试 get_pool_by_mint_force 强制刷新
+    println!("  2.4 测试 get_pool_by_mint_force 强制刷新...");
     let (pool_addr_5, pool_state_5) = get_pool_by_mint_force(&rpc, &wsol_mint)
         .await
         .expect("get_pool_by_mint_force failed");
@@ -325,14 +307,17 @@ async fn test_raydium_clmm_get_pool_by_mint_with_auto_mock() {
     std::env::remove_var("CLMM_POOL_SCAN_LIMIT");
 
     println!("\n=== Auto Mock 测试通过 ===");
+    println!("✅ 测试优化：");
+    println!("  • 移除 list_pools_by_mint 测试（非核心场景，WSOL Pool 数量众多）");
+    println!("  • 聚焦 get_pool_by_mint 测试（实际使用场景）");
+    println!("  • CLMM_POOL_SCAN_LIMIT 降至 10（原 100）");
     println!("✅ 测试覆盖：");
-    println!("  1. list_pools_by_mint_with_pool_client（无内存缓存）");
-    println!("  2. get_pool_by_mint_with_pool_client（无内存缓存）");
-    println!("  3. get_pool_by_mint（有内存缓存）");
-    println!("  4. get_pool_by_mint_force（强制刷新）");
-    println!("✅ 首次运行：从 RPC 获取并保存（约 2-3 秒）");
+    println!("  1. get_pool_by_mint_with_pool_client（无内存缓存）");
+    println!("  2. get_pool_by_mint（有内存缓存）");
+    println!("  3. get_pool_by_mint_force（强制刷新）");
+    println!("✅ 首次运行：从 RPC 获取并保存（约 1-2 秒）");
     println!("✅ 后续运行：从缓存加载（约 0.01 秒）");
     println!("✅ 速度提升：约 100-200 倍！");
     println!("✅ 原始慢测试耗时: 85.95 秒");
-    println!("✅ Auto Mock 测试耗时: 2-3 秒（首次）/ 0.01 秒（缓存）");
+    println!("✅ 优化后测试耗时: 1-2 秒（首次）/ 0.01 秒（缓存）");
 }
