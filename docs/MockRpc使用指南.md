@@ -452,6 +452,131 @@ impl Deref for MockRpcMode {
 
 ---
 
+## 🚀 AutoMockRpcClient（智能模式）
+
+### 概述
+
+`AutoMockRpcClient` 是一个智能 Mock RPC 客户端，专为 DEX Parser 和 Pool 查询测试设计。
+
+**特点**：
+- 🤖 **智能模式**：有缓存就用，没有就调用 RPC 并保存
+- 🎯 **零配置**：无需环境变量，无需手动控制模式
+- 🔒 **生产安全**：必须显式调用 `new_with_mock()` 才启用
+
+### 使用方法
+
+```rust
+use sol_trade_sdk::parser::{DexParser, types::ParserConfig};
+
+// 测试环境
+let config = ParserConfig {
+    rpc_url: "http://127.0.0.1:8899".to_string(),
+    verbose: false,
+};
+let parser = DexParser::new_with_mock(config);
+
+// 解析交易（自动使用 Mock）
+let result = parser.parse_transaction(signature).await?;
+```
+
+### 工作流程
+
+1. **首次运行**：调用 RPC，保存响应到 `tests/mock_data/`
+2. **后续运行**：从文件加载，无需 RPC 调用
+3. **清理数据**：删除 Mock 文件，自动重新录制
+
+### 与 MockRpcMode 的区别
+
+| 特性 | MockRpcMode | AutoMockRpcClient |
+|------|-------------|-------------------|
+| 模式 | Record/Replay/Live | Auto（智能） |
+| 控制 | 环境变量 `MOCK_MODE` | 显式 API 调用 |
+| 用途 | Pool 测试 | DEX Parser、Pool 测试 |
+| 工作流 | 手动切换模式 | 自动判断 |
+
+### 文件命名
+
+与 MockRpcMode 共用同一套命名规则：
+- 格式：`{method}_{params_hash}.json`
+- 目录：`tests/mock_data/`
+
+### 性能提升
+
+| 测试 | 无 Mock | 有 Mock | 提升 |
+|------|---------|---------|------|
+| dex_parser_comprehensive | 14.51s | 0.18s | 98.76% |
+| raydium_amm_v4_pool_tests | 54s | 2s | 96% |
+
+### API 参考
+
+#### DexParser
+
+```rust
+impl DexParser {
+    // 生产环境
+    pub fn new(config: ParserConfig) -> Self;
+
+    // 测试环境
+    pub fn new_with_mock(config: ParserConfig) -> Self;
+}
+```
+
+#### AutoMockRpcClient
+
+```rust
+impl AutoMockRpcClient {
+    pub fn new(rpc_url: String) -> Self;
+    pub fn mock_dir(&self) -> &str;
+
+    // RPC 方法
+    pub async fn get_transaction_with_config(...) -> Result<...>;
+}
+```
+
+### 实际测试示例
+
+```rust
+use sol_trade_sdk::parser::{DexParser, types::ParserConfig};
+
+#[tokio::test]
+async fn test_dex_parser_with_mock() {
+    let config = ParserConfig {
+        rpc_url: "http://127.0.0.1:8899".to_string(),
+        verbose: false,
+    };
+
+    // 使用 Mock 模式
+    let parser = DexParser::new_with_mock(config);
+
+    // 首次运行：从 RPC 获取并保存（14.51s）
+    // 后续运行：从文件读取（0.18s）
+    let result = parser.parse_transaction(signature).await.unwrap();
+
+    assert!(result.success);
+    assert!(!result.trades.is_empty());
+}
+```
+
+### 测试工作流
+
+```bash
+# 1. 首次运行：自动录制 Mock 数据
+cargo test --test dex_parser_comprehensive
+
+# 2. 后续运行：使用缓存数据（快速）
+cargo test --test dex_parser_comprehensive
+
+# 3. 清理缓存：重新录制
+rm -rf tests/mock_data/getTransaction*.json
+cargo test --test dex_parser_comprehensive
+
+# 4. 临时查看真实 RPC 数据
+rm tests/mock_data/getTransaction_XXX.json
+cargo test --test dex_parser_comprehensive  # 自动重新获取
+```
+
+---
+
 ## ✅ 总结
 
 ### 优点
@@ -460,13 +585,15 @@ impl Deref for MockRpcMode {
 - ✅ **简单易用**：一个环境变量即可控制
 - ✅ **性能提升巨大**：减少 96-97% 的测试时间
 - ✅ **借鉴成熟设计**：参考 httpmock 的 Recording & Playback
+- ✅ **智能自动化**：AutoMockRpcClient 自动判断使用缓存或 RPC
 
 ### 下一步
 
 1. ✅ 基础功能已完成
-2. ⏭️ 开始在实际测试中使用
-3. ⏭️ 录制常用的 Pool 数据
-4. ⏭️ 优化 CI/CD 流程
+2. ✅ AutoMockRpcClient 智能模式已实现
+3. ⏭️ 开始在实际测试中使用
+4. ⏭️ 录制常用的 Pool 数据
+5. ⏭️ 优化 CI/CD 流程
 
 **参考文档**：
 - [httpmock 调研报告](/opt/projects/sol-trade-sdk/docs/httpmock调研报告.md)
