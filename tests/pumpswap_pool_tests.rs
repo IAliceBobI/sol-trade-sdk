@@ -1,6 +1,6 @@
 use sol_trade_sdk::instruction::utils::pumpswap::{
-    clear_pool_cache, find_pool_with_client, get_pool_by_address_with_pool_client,
-    get_token_balances_with_client, get_token_price_in_usd_with_pool_with_client,
+    clear_pool_cache, find_pool, get_pool_by_address,
+    get_token_balances, get_token_price_in_usd_with_pool,
 };
 use sol_trade_sdk::common::auto_mock_rpc::AutoMockRpcClient;
 use solana_sdk::pubkey::Pubkey;
@@ -31,7 +31,7 @@ async fn test_find_pool_by_mint() {
     );
 
     // 调用泛型版本的 find_pool_with_client
-    let result = find_pool_with_client(&rpc, &mint).await;
+    let result = find_pool(&rpc, &mint).await;
 
     // 验证结果
     assert!(result.is_ok(), "Failed to find pool: {:?}", result.err());
@@ -64,7 +64,7 @@ async fn test_get_pool_by_address() {
 
     // 第一次调用（会写入缓存）
     println!("第一次调用（写入缓存）...");
-    let result1 = get_pool_by_address_with_pool_client(&rpc, &pool_address).await;
+    let result1 = get_pool_by_address(&rpc, &pool_address).await;
     assert!(result1.is_ok(), "Failed to get pool by address: {:?}", result1.err());
 
     let pool_state = result1.unwrap();
@@ -82,7 +82,7 @@ async fn test_get_pool_by_address() {
     println!("  Is Mayhem Mode: {}", pool_state.is_mayhem_mode);
 
     // 获取 token 余额（使用泛型版本）
-    let (base_balance, quote_balance) = get_token_balances_with_client(&pool_state, &rpc).await.unwrap();
+    let (base_balance, quote_balance) = get_token_balances(&pool_state, &rpc).await.unwrap();
     println!("  Base Token Balance: {}", base_balance);
     println!("  Quote Token Balance: {}", quote_balance);
 
@@ -96,7 +96,7 @@ async fn test_get_pool_by_address() {
 
     // 第二次调用（应该从缓存读取）
     println!("\n第二次调用（从缓存读取）...");
-    let result2 = get_pool_by_address_with_pool_client(&rpc, &pool_address).await;
+    let result2 = get_pool_by_address(&rpc, &pool_address).await;
     assert!(result2.is_ok(), "Failed to get pool from cache: {:?}", result2.err());
 
     let pool_state2 = result2.unwrap();
@@ -130,7 +130,7 @@ async fn test_get_pumpswap_token_price_in_usd() {
     println!("WSOL-USDT 锚定池: 使用默认锚定池");
 
     // 调用泛型版本的价格计算函数
-    let result = get_token_price_in_usd_with_pool_with_client(&rpc, &token_mint, &pool_address, None).await;
+    let result = get_token_price_in_usd_with_pool(&rpc, &token_mint, &pool_address, None).await;
 
     // 验证结果
     assert!(result.is_ok(), "Failed to get token price in USD: {:?}", result.err());
@@ -167,7 +167,7 @@ async fn test_get_pool_by_address_with_auto_mock() {
 
     // 首次调用：从 RPC 获取并保存（约 1-2 秒）
     // 后续调用：从缓存加载（约 0.01 秒）
-    let result = get_pool_by_address_with_pool_client(&auto_mock_client, &pool_address).await;
+    let result = get_pool_by_address(&auto_mock_client, &pool_address).await;
     assert!(result.is_ok(), "Failed to get pool by address: {:?}", result.err());
 
     let pool_state = result.unwrap();

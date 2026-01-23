@@ -6,7 +6,7 @@
 //! - get_pool_by_address_force(rpc, pool_address) - 强制刷新缓存后获取
 //! - get_pool_by_mint_force(rpc, mint) - 强制刷新缓存后通过 mint 获取
 //! - list_pools_by_mint(rpc, mint) - 列出所有包含该 mint 的 pool
-//! - get_wsol_price_in_usd(rpc, wsol_usd_pool) - 通过锚定池获取 WSOL 的 USD 价格（实时，不缓存）
+//! - get_wsol_price_in_usd_with_client(rpc, wsol_usd_pool) - 通过锚定池获取 WSOL 的 USD 价格（实时，不缓存）
 //! - get_token_price_in_usd(rpc, token_mint, wsol_usd_pool) - 通过 X-WSOL 池 + 锚定池获取任意 Token 的 USD 价格
 //!
 //! 运行测试:
@@ -15,9 +15,9 @@
 //! 注意：使用 surfpool (localhost:8899) 进行测试
 
 use sol_trade_sdk::instruction::utils::raydium_clmm::{
-    clear_pool_cache, get_pool_by_address_with_pool_client, get_pool_by_mint_with_pool_client,
-    get_token_price_in_usd_with_client,
-    get_token_price_in_usd_with_pool_with_client,
+    clear_pool_cache, get_pool_by_address, get_pool_by_mint,
+    get_token_price_in_usd,
+    get_token_price_in_usd_with_pool,
     get_wsol_price_in_usd_with_client,
 };
 use sol_trade_sdk::common::auto_mock_rpc::AutoMockRpcClient;
@@ -62,7 +62,7 @@ async fn test_raydium_clmm_get_pool_by_address() {
 
     // 使用 Auto Mock 获取 pool 数据
     println!("\n使用 Auto Mock 获取 Pool 数据...");
-    let result = get_pool_by_address_with_pool_client(&auto_mock_client, &pool_address).await;
+    let result = get_pool_by_address(&auto_mock_client, &pool_address).await;
     assert!(result.is_ok(), "Failed to get pool by address: {:?}", result.err());
 
     let pool_state = result.unwrap();
@@ -104,7 +104,7 @@ async fn test_raydium_clmm_get_pool_by_address() {
 /// 测试：通过 WSOL-USDT 锚定池获取 WSOL 的 USD 价格（Auto Mock 加速）
 #[tokio::test]
 #[serial_test::serial(global_dex_cache)]
-async fn test_raydium_clmm_get_wsol_price_in_usd() {
+async fn test_raydium_clmm_get_wsol_price_in_usd_with_client() {
     println!("=== 测试：Raydium CLMM get_wsol_price_in_usd (Auto Mock 加速) ===");
 
     let rpc_url = "http://127.0.0.1:8899";
@@ -150,7 +150,7 @@ async fn test_raydium_clmm_get_jup_price_in_usd() {
     let jup_mint = Pubkey::from_str(JUP_MINT)
         .unwrap_or_else(|_| panic!("Invalid JUP mint: {}", JUP_MINT));
 
-    let price = get_token_price_in_usd_with_client(&auto_mock_client, &jup_mint, None)
+    let price = get_token_price_in_usd(&auto_mock_client, &jup_mint, None)
         .await
         .expect("Failed to get JUP price in USD");
 
@@ -184,13 +184,13 @@ async fn test_raydium_clmm_get_jup_price_in_usd_with_pool() {
         .unwrap_or_else(|_| panic!("Invalid JUP mint: {}", JUP_MINT));
 
     // 1. 先用 Auto Mock 接口找到 JUP-WSOL 池地址（模拟：你已经缓存了这个池地址）
-    let (jup_wsol_pool, _) = get_pool_by_mint_with_pool_client(&auto_mock_client, &jup_mint)
+    let (jup_wsol_pool, _) = get_pool_by_mint(&auto_mock_client, &jup_mint)
         .await
         .expect("Failed to find JUP-WSOL pool");
     println!("找到的 JUP-WSOL 池地址: {}", jup_wsol_pool);
 
-    // 2. 使用 get_token_price_in_usd_with_pool_with_client 直接传入池地址，避免重复查找
-    let price = get_token_price_in_usd_with_pool_with_client(&auto_mock_client, &jup_mint, &jup_wsol_pool, None)
+    // 2. 使用 get_token_price_in_usd_with_pool 直接传入池地址，避免重复查找
+    let price = get_token_price_in_usd_with_pool(&auto_mock_client, &jup_mint, &jup_wsol_pool, None)
         .await
         .expect("Failed to get JUP price in USD with pool");
 
@@ -239,10 +239,10 @@ async fn test_raydium_clmm_get_pool_by_mint_with_auto_mock() {
     clear_pool_cache();
 
     // 使用 Auto Mock 的 get_pool_by_mint（核心使用场景）
-    println!("\n使用 get_pool_by_mint_with_pool_client 查询最优 Pool...");
-    let (pool_addr, pool_state) = get_pool_by_mint_with_pool_client(&auto_mock_client, &wsol_mint)
+    println!("\n使用 get_pool_by_mint 查询最优 Pool...");
+    let (pool_addr, pool_state) = get_pool_by_mint(&auto_mock_client, &wsol_mint)
         .await
-        .expect("get_pool_by_mint_with_pool_client failed");
+        .expect("get_pool_by_mint failed");
 
     println!("✅ 找到最优 Pool: {}", pool_addr);
     println!("  token0_mint: {}", pool_state.token_mint0);
@@ -266,7 +266,7 @@ async fn test_raydium_clmm_get_pool_by_mint_with_auto_mock() {
 
     println!("\n=== Auto Mock 测试通过 ===");
     println!("✅ 测试覆盖：");
-    println!("  • get_pool_by_mint_with_pool_client（核心查询功能）");
+    println!("  • get_pool_by_mint（核心查询功能）");
     println!("  • Pool 字段验证（地址、流动性等）");
     println!("✅ 首次运行：从 RPC 获取并保存（约 1-2 秒）");
     println!("✅ 后续运行：从缓存加载（约 0.01 秒）");

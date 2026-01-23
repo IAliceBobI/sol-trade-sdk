@@ -178,16 +178,14 @@ fn select_best_pool_by_liquidity(pools: &[(Pubkey, Pool)]) -> (Pubkey, Pool) {
 }
 
 /// Find a pool for a specific mint
-pub async fn find_pool(rpc: &SolanaRpcClient, mint: &Pubkey) -> Result<Pubkey, anyhow::Error> {
-    find_pool_with_client(rpc, mint).await
-}
-
-/// Find a pool for a specific mint（泛型版本，支持 Auto Mock）
-pub async fn find_pool_with_client<T: PoolRpcClient + ?Sized>(
+/// 查找指定 mint 的 Pool（支持 Auto Mock）
+///
+/// 支持 PoolRpcClient trait，可以接受 AutoMockRpcClient 或标准 RpcClient。
+pub async fn find_pool<T: PoolRpcClient + ?Sized>(
     rpc: &T,
     mint: &Pubkey,
 ) -> Result<Pubkey, anyhow::Error> {
-    let (pool_address, _) = get_pool_by_mint_with_client(rpc, mint).await?;
+    let (pool_address, _) = get_pool_by_mint(rpc, mint).await?;
     Ok(pool_address)
 }
 
@@ -236,18 +234,10 @@ pub fn get_global_volume_accumulator_pda() -> Option<Pubkey> {
     pda.map(|pubkey| pubkey.0)
 }
 
-pub async fn get_pool_by_address(
-    rpc: &SolanaRpcClient,
-    pool_address: &Pubkey,
-) -> Result<Pool, anyhow::Error> {
-    get_pool_by_address_with_pool_client(rpc, pool_address).await
-}
-
-/// 使用 PoolRpcClient trait 获取 Pool（支持 Auto Mock）
+/// 获取指定地址的 Pool（支持 Auto Mock）
 ///
-/// 这是一个泛型版本，可以接受任何实现了 PoolRpcClient 的客户端。
-/// 支持标准的 RpcClient 和 AutoMockRpcClient。
-pub async fn get_pool_by_address_with_pool_client<T: PoolRpcClient + ?Sized>(
+/// 支持 PoolRpcClient trait，可以接受 AutoMockRpcClient 或标准 RpcClient。
+pub async fn get_pool_by_address<T: PoolRpcClient + ?Sized>(
     rpc: &T,
     pool_address: &Pubkey,
 ) -> Result<Pool, anyhow::Error> {
@@ -268,15 +258,10 @@ pub async fn get_pool_by_address_with_pool_client<T: PoolRpcClient + ?Sized>(
 }
 
 /// 带缓存的 mint 查询（返回最优池）
-pub async fn get_pool_by_mint(
-    rpc: &SolanaRpcClient,
-    mint: &Pubkey,
-) -> Result<(Pubkey, Pool), anyhow::Error> {
-    get_pool_by_mint_with_client(rpc, mint).await
-}
-
-/// 带缓存的 mint 查询（泛型版本，支持 Auto Mock）
-pub async fn get_pool_by_mint_with_client<T: PoolRpcClient + ?Sized>(
+/// 查询指定 mint 的 Pool（带缓存，支持 Auto Mock）
+///
+/// 支持 PoolRpcClient trait，可以接受 AutoMockRpcClient 或标准 RpcClient。
+pub async fn get_pool_by_mint<T: PoolRpcClient + ?Sized>(
     rpc: &T,
     mint: &Pubkey,
 ) -> Result<(Pubkey, Pool), anyhow::Error> {
@@ -287,33 +272,29 @@ pub async fn get_pool_by_mint_with_client<T: PoolRpcClient + ?Sized>(
         }
     }
     // 2. RPC 查询
-    let (pool_address, pool) = find_pool_by_mint_impl_with_client(rpc, mint).await?;
+    let (pool_address, pool) = find_pool_by_mint_impl(rpc, mint).await?;
     // 3. 写入缓存
     pump_swap_cache::cache_pool_address_by_mint(mint, &pool_address);
     pump_swap_cache::cache_pool_by_address(&pool_address, &pool);
     Ok((pool_address, pool))
 }
 
-/// Force 刷新：强制重新查询指定 Pool
-pub async fn get_pool_by_address_force(
-    rpc: &SolanaRpcClient,
-    pool_address: &Pubkey,
-) -> Result<Pool, anyhow::Error> {
-    get_pool_by_address_force_with_client(rpc, pool_address).await
-}
-
-/// Force 刷新：强制重新查询指定 Pool（泛型版本，支持 Auto Mock）
-pub async fn get_pool_by_address_force_with_client<T: PoolRpcClient + ?Sized>(
+/// 强制刷新并重新查询指定 Pool（支持 Auto Mock）
+///
+/// 支持 PoolRpcClient trait，可以接受 AutoMockRpcClient 或标准 RpcClient。
+pub async fn get_pool_by_address_force<T: PoolRpcClient + ?Sized>(
     rpc: &T,
     pool_address: &Pubkey,
 ) -> Result<Pool, anyhow::Error> {
     pump_swap_cache::POOL_DATA_CACHE.remove(pool_address);
-    get_pool_by_address_with_pool_client(rpc, pool_address).await
+    get_pool_by_address(rpc, pool_address).await
 }
 
-/// Force 刷新：强制重新查询 mint 对应的 Pool
-pub async fn get_pool_by_mint_force(
-    rpc: &SolanaRpcClient,
+/// 强制刷新并重新查询 mint 对应的 Pool（支持 Auto Mock）
+///
+/// 支持 PoolRpcClient trait，可以接受 AutoMockRpcClient 或标准 RpcClient。
+pub async fn get_pool_by_mint_force<T: PoolRpcClient + ?Sized>(
+    rpc: &T,
     mint: &Pubkey,
 ) -> Result<(Pubkey, Pool), anyhow::Error> {
     pump_swap_cache::MINT_TO_POOL_CACHE.remove(mint);
@@ -383,16 +364,8 @@ const QUOTE_MINT_OFFSET: usize = 75;
 
 /// 通用内部实现：通过 offset 查找所有 Pool（返回 Vec）
 #[allow(dead_code)]
-async fn find_pools_by_mint_offset_collect(
-    rpc: &SolanaRpcClient,
-    mint: &Pubkey,
-    offset: usize,
-) -> Result<Vec<(Pubkey, Pool)>, anyhow::Error> {
-    find_pools_by_mint_offset_collect_with_pool_client(rpc, mint, offset).await
-}
-
-/// 使用 PoolRpcClient 通过 offset 查找所有 Pool（返回 Vec）
-async fn find_pools_by_mint_offset_collect_with_pool_client<T: PoolRpcClient + ?Sized>(
+/// 通过 offset 查找所有 Pool（支持 Auto Mock）
+async fn find_pools_by_mint_offset_collect<T: PoolRpcClient + ?Sized>(
     rpc: &T,
     mint: &Pubkey,
     offset: usize,
@@ -459,28 +432,20 @@ pub fn calculate_canonical_pool_pda(mint: &Pubkey) -> Option<(Pubkey, Pubkey)> {
     Some((pool, pool_authority))
 }
 
-/// 内部实现：查找指定 mint 的所有 PumpSwap Pool
+/// 内部实现：查找指定 mint 的所有 PumpSwap Pool（支持 Auto Mock）
 ///
 /// 策略：
 /// 1. 并行查询 base_mint 与 quote_mint 包含该 mint 的所有池
 /// 2. 合并并去重
-async fn find_all_pools_by_mint_impl(
-    rpc: &SolanaRpcClient,
-    mint: &Pubkey,
-) -> Result<Vec<(Pubkey, Pool)>, anyhow::Error> {
-    find_all_pools_by_mint_impl_with_pool_client(rpc, mint).await
-}
-
-/// 使用 PoolRpcClient 查找指定 mint 的所有 PumpSwap Pool
-async fn find_all_pools_by_mint_impl_with_pool_client<T: PoolRpcClient + ?Sized>(
+async fn find_all_pools_by_mint_impl<T: PoolRpcClient + ?Sized>(
     rpc: &T,
     mint: &Pubkey,
 ) -> Result<Vec<(Pubkey, Pool)>, anyhow::Error> {
     use std::collections::HashSet;
 
     let (base_result, quote_result) = tokio::join!(
-        find_pools_by_mint_offset_collect_with_pool_client(rpc, mint, BASE_MINT_OFFSET),
-        find_pools_by_mint_offset_collect_with_pool_client(rpc, mint, QUOTE_MINT_OFFSET)
+        find_pools_by_mint_offset_collect(rpc, mint, BASE_MINT_OFFSET),
+        find_pools_by_mint_offset_collect(rpc, mint, QUOTE_MINT_OFFSET)
     );
 
     // 检测是否都失败，如果都失败则返回第一个错误（通常包含 RPC 限制信息）
@@ -511,34 +476,21 @@ async fn find_all_pools_by_mint_impl_with_pool_client<T: PoolRpcClient + ?Sized>
     Ok(all_pools)
 }
 
-/// 内部实现：查找 mint 对应的最优池
+/// 内部实现：查找 mint 对应的最优池（支持 Auto Mock）
 ///
 /// 策略（参考 CLMM 的 Hot Token 优先策略）：
 /// 1. 优先尝试 canonical pool (PumpFun 迁移的 mint/WSOL 对)
 /// 2. 在所有池中优先选择稳定币对（USDC/USDT），再考虑 WSOL 对
 /// 3. 在同类池子中，按 LP 供应量从大到小排序
 #[allow(dead_code)]
-async fn find_pool_by_mint_impl(
-    rpc: &SolanaRpcClient,
-    mint: &Pubkey,
-) -> Result<(Pubkey, Pool), anyhow::Error> {
-    find_pool_by_mint_impl_with_client(rpc, mint).await
-}
-
-/// 内部实现：查找 mint 对应的最优池（泛型版本，支持 Auto Mock）
-///
-/// 策略（参考 CLMM 的 Hot Token 优先策略）：
-/// 1. 优先尝试 canonical pool (PumpFun 迁移的 mint/WSOL 对)
-/// 2. 在所有池中优先选择稳定币对（USDC/USDT），再考虑 WSOL 对
-/// 3. 在同类池子中，按 LP 供应量从大到小排序
-async fn find_pool_by_mint_impl_with_client<T: PoolRpcClient + ?Sized>(
+async fn find_pool_by_mint_impl<T: PoolRpcClient + ?Sized>(
     rpc: &T,
     mint: &Pubkey,
 ) -> Result<(Pubkey, Pool), anyhow::Error> {
     // Priority 1: Try to find canonical pool (mint/WSOL pair) first
     // This is the most common case for PumpFun migrated tokens
     if let Some((pool_address, _)) = calculate_canonical_pool_pda(mint) {
-        if let Ok(pool) = get_pool_by_address_with_pool_client(rpc, &pool_address).await {
+        if let Ok(pool) = get_pool_by_address(rpc, &pool_address).await {
             // Verify it's actually a mint/WSOL pool
             if (pool.base_mint == *mint && pool.quote_mint == WSOL_TOKEN_ACCOUNT) ||
                (pool.base_mint == WSOL_TOKEN_ACCOUNT && pool.quote_mint == *mint) {
@@ -548,7 +500,7 @@ async fn find_pool_by_mint_impl_with_client<T: PoolRpcClient + ?Sized>(
     }
 
     // Priority 2 & 3: 获取所有池子
-    let all_pools = find_all_pools_by_mint_impl_with_pool_client(rpc, mint).await?;
+    let all_pools = find_all_pools_by_mint_impl(rpc, mint).await?;
 
     // 分类：稳定币对 > WSOL 对 > 其他对
     let mut stable_pools: Vec<(Pubkey, Pool)> = Vec::new();
@@ -610,8 +562,19 @@ async fn find_pool_by_mint_impl_with_client<T: PoolRpcClient + ?Sized>(
 /// 4. 同类池子按 LP 供应量从大到小排序
 ///
 /// Results are cached to improve performance on repeated queries.
-pub async fn list_pools_by_mint(
-    rpc: &SolanaRpcClient,
+/// 列出所有包含指定 mint 的 PumpSwap Pool（支持 Auto Mock）
+///
+/// 支持 PoolRpcClient trait，可以接受 AutoMockRpcClient 或标准 RpcClient。
+/// 结果已缓存以提高重复查询的性能。
+///
+/// # 参数
+/// - `rpc`: 实现了 PoolRpcClient 的 RPC 客户端（支持 AutoMockRpcClient 或标准 RpcClient）
+/// - `mint`: 要查询的代币 mint 地址
+///
+/// # 返回
+/// - 返回排序后的包含指定 mint 的 pool 列表
+pub async fn list_pools_by_mint<T: PoolRpcClient + ?Sized>(
+    rpc: &T,
     mint: &Pubkey,
 ) -> Result<Vec<(Pubkey, Pool)>, anyhow::Error> {
     // 1. 检查缓存
@@ -644,7 +607,6 @@ pub async fn list_pools_by_mint(
         } else if other_mint == WSOL_TOKEN_ACCOUNT {
             wsol_pools.push((addr, pool));
         } else if is_hot_mint(&other_mint) {
-            // Hot mint 但不在上述分类中（理论上不会发生，但为了完整性）
             wsol_pools.push((addr, pool));
         } else {
             other_pools.push((addr, pool));
@@ -668,79 +630,12 @@ pub async fn list_pools_by_mint(
     Ok(sorted_pools)
 }
 
-/// 使用 PoolRpcClient 列出所有包含指定 mint 的 PumpSwap Pool（支持 Auto Mock）
+
+
+/// 获取 Pool 的 base 和 quote token 余额（支持 Auto Mock）
 ///
-/// 此函数与 `list_pools_by_mint` 功能相同，但接受 `PoolRpcClient` trait，
-/// 因此可以使用 `AutoMockRpcClient` 来加速测试。
-///
-/// # 参数
-/// - `rpc`: 实现了 PoolRpcClient 的 RPC 客户端（支持 AutoMockRpcClient）
-/// - `mint`: 要查询的代币 mint 地址
-///
-/// # 返回
-/// - 返回排序后的包含指定 mint 的 pool 列表
-pub async fn list_pools_by_mint_with_pool_client<T: PoolRpcClient + ?Sized>(
-    rpc: &T,
-    mint: &Pubkey,
-) -> Result<Vec<(Pubkey, Pool)>, anyhow::Error> {
-    // 注意：这里不使用内存缓存，直接查询
-    // Auto Mock 会在文件层面缓存
-
-    // 2. 获取所有池子并分类排序
-    let all_pools = find_all_pools_by_mint_impl_with_pool_client(rpc, mint).await?;
-
-    // 分类：稳定币对 > WSOL 对 > 其他对
-    let mut stable_pools: Vec<(Pubkey, Pool)> = Vec::new();
-    let mut wsol_pools: Vec<(Pubkey, Pool)> = Vec::new();
-    let mut other_pools: Vec<(Pubkey, Pool)> = Vec::new();
-
-    for (addr, pool) in all_pools.into_iter() {
-        // 找到与目标 mint 对应的另一侧 mint
-        let other_mint = if pool.base_mint == *mint {
-            pool.quote_mint
-        } else if pool.quote_mint == *mint {
-            pool.base_mint
-        } else {
-            other_pools.push((addr, pool));
-            continue;
-        };
-
-        // 按 Hot Token 优先级分类
-        if other_mint == USDC_MINT || other_mint == USDT_MINT {
-            stable_pools.push((addr, pool));
-        } else if other_mint == WSOL_TOKEN_ACCOUNT {
-            wsol_pools.push((addr, pool));
-        } else if is_hot_mint(&other_mint) {
-            // Hot mint 但不在上述分类中（理论上不会发生，但为了完整性）
-            wsol_pools.push((addr, pool));
-        } else {
-            other_pools.push((addr, pool));
-        }
-    }
-
-    // 在各分类内按 LP 供应量排序
-    stable_pools.sort_by(|(_, a), (_, b)| b.lp_supply.cmp(&a.lp_supply));
-    wsol_pools.sort_by(|(_, a), (_, b)| b.lp_supply.cmp(&a.lp_supply));
-    other_pools.sort_by(|(_, a), (_, b)| b.lp_supply.cmp(&a.lp_supply));
-
-    // 合并：稳定币对 > WSOL 对 > 其他对
-    let mut sorted_pools = Vec::new();
-    sorted_pools.extend(stable_pools);
-    sorted_pools.extend(wsol_pools);
-    sorted_pools.extend(other_pools);
-
-    Ok(sorted_pools)
-}
-
-pub async fn get_token_balances(
-    pool: &Pool,
-    rpc: &SolanaRpcClient,
-) -> Result<(u64, u64), anyhow::Error> {
-    get_token_balances_with_client(pool, rpc).await
-}
-
-/// 获取 Token 余额（泛型版本，支持 Auto Mock）
-pub async fn get_token_balances_with_client<T: PoolRpcClient + ?Sized>(
+/// 支持 PoolRpcClient trait，可以接受 AutoMockRpcClient 或标准 RpcClient。
+pub async fn get_token_balances<T: PoolRpcClient + ?Sized>(
     pool: &Pool,
     rpc: &T,
 ) -> Result<(u64, u64), anyhow::Error> {
@@ -831,7 +726,7 @@ pub async fn get_token_price_in_usd(
 
     // WSOL/SOL 的价格通过 Raydium CLMM 锚定池获取
     if *token_mint == SOL_MINT || *token_mint == WSOL_TOKEN_ACCOUNT {
-        return crate::instruction::utils::raydium_clmm::get_wsol_price_in_usd(
+        return crate::instruction::utils::raydium_clmm::get_wsol_price_in_usd_with_client(
             rpc,
             Some(wsol_usd_pool),
         )
@@ -876,7 +771,7 @@ pub async fn get_token_price_in_usd(
     }
 
     // 7. 获取 WSOL 的 USD 价格（通过 Raydium CLMM 锚定池）
-    let price_wsol_in_usd = crate::instruction::utils::raydium_clmm::get_wsol_price_in_usd(
+    let price_wsol_in_usd = crate::instruction::utils::raydium_clmm::get_wsol_price_in_usd_with_client(
         rpc,
         Some(wsol_usd_pool),
     )
@@ -885,38 +780,18 @@ pub async fn get_token_price_in_usd(
     Ok(price_x_in_wsol * price_wsol_in_usd)
 }
 
-/// 获取任意 Token 在 PumpSwap 上的 USD 价格（直接传入 X-WSOL 池地址，跳过池查找）
+/// 获取任意 Token 在 PumpSwap 上的 USD 价格（支持 Auto Mock）
 ///
-/// 与 `get_token_price_in_usd` 的区别：
-/// - 此函数要求调用者已知 X-WSOL 池地址，直接传入，避免 `get_pool_by_mint` 的查找开销
-/// - 适用于高频调用、已缓存池地址的场景
+/// 支持 PoolRpcClient trait，可以接受 AutoMockRpcClient 或标准 RpcClient。
+/// 此函数要求调用者已知 X-WSOL 池地址，直接传入，避免 `get_pool_by_mint` 的查找开销。
+/// 适用于高频调用、已缓存池地址的场景。
 ///
 /// # Arguments
-/// * `rpc` - Solana RPC 客户端
+/// * `rpc` - 实现了 PoolRpcClient 的 RPC 客户端（支持 AutoMockRpcClient 或标准 RpcClient）
 /// * `token_mint` - Token X 的 mint 地址
 /// * `x_wsol_pool_address` - Token X 与 WSOL 配对的 PumpSwap 池地址
 /// * `wsol_usd_clmm_pool_address` - Raydium CLMM 上的 WSOL-USDT/USDC 锚定池地址
-pub async fn get_token_price_in_usd_with_pool(
-    rpc: &SolanaRpcClient,
-    token_mint: &Pubkey,
-    x_wsol_pool_address: &Pubkey,
-    wsol_usd_clmm_pool_address: Option<&Pubkey>,
-) -> Result<f64, anyhow::Error> {
-    get_token_price_in_usd_with_pool_with_client(rpc, token_mint, x_wsol_pool_address, wsol_usd_clmm_pool_address).await
-}
-
-/// 获取任意 Token 在 PumpSwap 上的 USD 价格（泛型版本，支持 Auto Mock）
-///
-/// 与 `get_token_price_in_usd` 的区别：
-/// - 此函数要求调用者已知 X-WSOL 池地址，直接传入，避免 `get_pool_by_mint` 的查找开销
-/// - 适用于高频调用、已缓存池地址的场景
-///
-/// # Arguments
-/// * `rpc` - RPC 客户端（支持 AutoMockRpcClient）
-/// * `token_mint` - Token X 的 mint 地址
-/// * `x_wsol_pool_address` - Token X 与 WSOL 配对的 PumpSwap 池地址
-/// * `wsol_usd_clmm_pool_address` - Raydium CLMM 上的 WSOL-USDT/USDC 锚定池地址
-pub async fn get_token_price_in_usd_with_pool_with_client<T: PoolRpcClient + ?Sized>(
+pub async fn get_token_price_in_usd_with_pool<T: PoolRpcClient + ?Sized>(
     rpc: &T,
     token_mint: &Pubkey,
     x_wsol_pool_address: &Pubkey,
@@ -941,7 +816,7 @@ pub async fn get_token_price_in_usd_with_pool_with_client<T: PoolRpcClient + ?Si
     }
 
     // 1. 直接强制刷新指定的 X-WSOL 池（跳过查找步骤）
-    let pool = get_pool_by_address_force_with_client(rpc, x_wsol_pool_address).await?;
+    let pool = get_pool_by_address_force(rpc, x_wsol_pool_address).await?;
 
     // 2. 只处理 X-WSOL 对（X 是任意 token，另一侧必须是 WSOL_TOKEN_ACCOUNT）
     let is_base_x = pool.base_mint == *token_mint && pool.quote_mint == WSOL_TOKEN_ACCOUNT;
@@ -955,7 +830,7 @@ pub async fn get_token_price_in_usd_with_pool_with_client<T: PoolRpcClient + ?Si
     }
 
     // 3. 获取池子实时余额
-    let (base_reserve, quote_reserve) = get_token_balances_with_client(&pool, rpc).await?;
+    let (base_reserve, quote_reserve) = get_token_balances(&pool, rpc).await?;
 
     // 4. 获取两侧代币精度
     let base_decimals = crate::utils::token::get_token_decimals_with_client(rpc, &pool.base_mint).await?;

@@ -81,6 +81,45 @@ impl PoolRpcClient for NonblockingRpcClient {
     }
 }
 
+/// 为 Arc<RpcClient> 实现 PoolRpcClient
+#[async_trait::async_trait]
+impl PoolRpcClient for Arc<NonblockingRpcClient> {
+    async fn get_account(&self, pubkey: &Pubkey) -> Result<Account, String> {
+        self.as_ref()
+            .get_account(pubkey)
+            .await
+            .map_err(|e| format!("RPC 调用失败: {}", e))
+    }
+
+    async fn get_program_ui_accounts_with_config(
+        &self,
+        program_id: &Pubkey,
+        config: RpcProgramAccountsConfig,
+    ) -> Result<Vec<(String, UiAccount)>, String> {
+        let accounts = self
+            .as_ref()
+            .get_program_ui_accounts_with_config(program_id, config)
+            .await
+            .map_err(|e| format!("RPC 调用失败: {}", e))?;
+
+        // 将 Pubkey 转换为 String 以保持一致性
+        Ok(accounts
+            .into_iter()
+            .map(|(pubkey, account)| (pubkey.to_string(), account))
+            .collect())
+    }
+
+    async fn get_token_account_balance(
+        &self,
+        pubkey: &Pubkey,
+    ) -> Result<UiTokenAmount, String> {
+        self.as_ref()
+            .get_token_account_balance(pubkey)
+            .await
+            .map_err(|e| format!("RPC 调用失败: {}", e))
+    }
+}
+
 /// Auto Mock RPC 客户端
 ///
 /// 智能 Auto 模式：
