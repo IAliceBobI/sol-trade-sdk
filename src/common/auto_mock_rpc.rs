@@ -6,9 +6,14 @@
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use solana_client::rpc_config::RpcTransactionConfig;
+use solana_account_decoder::UiAccount;
+use solana_client::rpc_config::{RpcProgramAccountsConfig, RpcTransactionConfig};
 use solana_client::rpc_client::RpcClient;
-use solana_sdk::signature::Signature;
+use solana_sdk::{
+    account::Account,
+    pubkey::Pubkey,
+    signature::Signature,
+};
 use solana_transaction_status::EncodedConfirmedTransactionWithStatusMeta;
 use std::collections::hash_map::DefaultHasher;
 use std::fs;
@@ -186,5 +191,81 @@ impl AutoMockRpcClient {
         self.save_mock_data("get_transaction_with_config", &params_json, &result_json);
 
         Ok(tx)
+    }
+
+    /// 获取账户信息（Auto 模式）
+    ///
+    /// 智能 Auto 模式：有缓存就用，没缓存就调用 RPC 并保存
+    pub async fn get_account(&self, pubkey: &Pubkey) -> Result<Account, String> {
+        let params_json = serde_json::json!((pubkey.to_string(),));
+
+        // 有缓存就用
+        if self.has_mock_data("get_account", &params_json) {
+            return self.load_mock_data("get_account", &params_json);
+        }
+
+        // 没缓存就调用 RPC 并保存
+        let inner = self.inner.clone();
+        let pk = *pubkey;
+
+        let account = tokio::task::spawn_blocking(move || {
+            inner.get_account(&pk)
+                .map_err(|e| format!("RPC 调用失败: {}", e))
+        })
+        .await
+        .map_err(|e| format!("任务执行失败: {}", e))??;
+
+        // 保存到文件
+        let result_json = serde_json::to_value(&account)
+            .map_err(|e| format!("序列化结果失败: {}", e))?;
+        self.save_mock_data("get_account", &params_json, &result_json);
+
+        Ok(account)
+    }
+
+    /// 获取程序账户列表（Auto 模式）
+    ///
+    /// 智能 Auto 模式：有缓存就用，没缓存就调用 RPC 并保存
+    pub async fn get_program_ui_accounts_with_config(
+        &self,
+        program_id: &Pubkey,
+        config: RpcProgramAccountsConfig,
+    ) -> Result<Vec<(String, UiAccount)>, String> {
+        // 序列化 config 用于缓存键（需要先克隆，因为后面还要用）
+        let config_for_json = serde_json::to_value(&config)
+            .map_err(|e| format!("序列化 config 失败: {}", e))?;
+        let params_json = serde_json::json!((
+            program_id.to_string(),
+            config_for_json
+        ));
+
+        // 有缓存就用
+        if self.has_mock_data("get_program_ui_accounts_with_config", &params_json) {
+            return self.load_mock_data("get_program_ui_accounts_with_config", &params_json);
+        }
+
+        // 没缓存就调用 RPC 并保存
+        let inner = self.inner.clone();
+        let pid = *program_id;
+
+        let accounts = tokio::task::spawn_blocking(move || {
+            inner.get_program_ui_accounts_with_config(&pid, config)
+                .map_err(|e| format!("RPC 调用失败: {}", e))
+        })
+        .await
+        .map_err(|e| format!("任务执行失败: {}", e))??;
+
+        // 将 Pubkey 转换为 String
+        let accounts: Vec<(String, UiAccount)> = accounts
+            .into_iter()
+            .map(|(pubkey, account)| (pubkey.to_string(), account))
+            .collect();
+
+        // 保存到文件（保存原始格式，Pubkey 转为 String）
+        let result_json = serde_json::to_value(&accounts)
+            .map_err(|e| format!("序列化结果失败: {}", e))?;
+        self.save_mock_data("get_program_ui_accounts_with_config", &params_json, &result_json);
+
+        Ok(accounts)
     }
 }
