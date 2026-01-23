@@ -16,9 +16,8 @@
 use sol_trade_sdk::{
     common::{GasFeeStrategy, auto_mock_rpc::AutoMockRpcClient},
     instruction::utils::raydium_cpmm::{
-        clear_pool_cache, get_pool_by_address,
-        get_pool_by_mint_with_pool_client, list_pools_by_mint_with_pool_client,
-        get_token_price_in_usd_with_pool_with_client,
+        clear_pool_cache, get_pool_by_address, get_pool_by_mint, list_pools_by_mint,
+        get_token_price_in_usd_with_pool,
     },
     parser::DexParser,
     trading::core::params::{DexParamEnum, RaydiumCpmmParams},
@@ -300,7 +299,7 @@ async fn test_get_cpmm_token_price_in_usd() {
     println!("WSOL-USDT 锚定池: 使用默认锚定池");
 
     // 调用价格计算函数（使用 AutoMock 版本）
-    let result = get_token_price_in_usd_with_pool_with_client(
+    let result: Result<f64, anyhow::Error> = get_token_price_in_usd_with_pool(
         &auto_mock_client,
         &token_mint,
         &pool_address,
@@ -350,10 +349,10 @@ async fn test_raydium_cpmm_get_pool_by_mint_with_auto_mock() {
     clear_pool_cache();
 
     // 1. 使用 Auto Mock 的 list_pools_by_mint
-    println!("\n步骤 1: 使用 list_pools_by_mint_with_pool_client 查询所有 WSOL Pool...");
-    let pools = list_pools_by_mint_with_pool_client(&auto_mock_client, &wsol_mint)
+    println!("\n步骤 1: 使用 list_pools_by_mint 查询所有 WSOL Pool...");
+    let pools: Vec<(Pubkey, sol_trade_sdk::instruction::utils::raydium_cpmm_types::PoolState)> = list_pools_by_mint(&auto_mock_client, &wsol_mint)
         .await
-        .expect("list_pools_by_mint_with_pool_client failed");
+        .expect("list_pools_by_mint failed");
     println!("✅ 查询到 {} 个 Pool", pools.len());
     assert!(!pools.is_empty(), "WSOL 相关的 CPMM Pool 列表不应为空");
 
@@ -369,10 +368,10 @@ async fn test_raydium_cpmm_get_pool_by_mint_with_auto_mock() {
     }
 
     // 2. 使用 Auto Mock 的 get_pool_by_mint（无缓存版本）
-    println!("\n步骤 2: 使用 get_pool_by_mint_with_pool_client 查询最优 Pool...");
-    let (pool_addr, pool_state) = get_pool_by_mint_with_pool_client(&auto_mock_client, &wsol_mint)
+    println!("\n步骤 2: 使用 get_pool_by_mint 查询最优 Pool...");
+    let (pool_addr, pool_state): (Pubkey, sol_trade_sdk::instruction::utils::raydium_cpmm_types::PoolState) = get_pool_by_mint(&auto_mock_client, &wsol_mint)
         .await
-        .expect("get_pool_by_mint_with_pool_client failed");
+        .expect("get_pool_by_mint failed");
     println!("✅ 找到最优 Pool: {}", pool_addr);
 
     // 验证基本字段
@@ -387,8 +386,8 @@ async fn test_raydium_cpmm_get_pool_by_mint_with_auto_mock() {
 
     println!("\n=== Auto Mock 测试通过 ===");
     println!("✅ 测试覆盖：");
-    println!("  • list_pools_by_mint_with_pool_client（列表查询）");
-    println!("  • get_pool_by_mint_with_pool_client（最优池查询）");
+    println!("  • list_pools_by_mint（列表查询）");
+    println!("  • get_pool_by_mint（最优池查询）");
     println!("  • Pool 字段验证（地址、流动性等）");
     println!("✅ 首次运行：从 RPC 获取并保存（约 2-3 秒）");
     println!("✅ 后续运行：从缓存加载（约 0.01 秒）");
