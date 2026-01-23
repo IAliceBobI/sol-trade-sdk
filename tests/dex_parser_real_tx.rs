@@ -2,6 +2,35 @@
 //!
 //! 使用真实交易数据测试各个 DEX 的解析器
 //! TDD 方式：先写测试，观察失败，再实现功能
+//!
+//! # 运行说明
+//!
+//! 这些测试依赖于本地测试节点（127.0.0.1:8899，surfpool）的真实交易数据。
+//! surfpool 是从主网 fork 的，包含主网历史交易数据。
+//!
+//! ## 测试分类
+//!
+//! ### 📡 主网历史交易（5 个）
+//! 这些交易是主网历史数据，永久存在，不会丢失：
+//! - `test_parse_pumpswap_buy_transaction` (slot: 394648935)
+//! - `test_parse_pumpswap_sell_transaction`
+//! - `test_parse_raydium_v4_transaction` (slot: 394648738)
+//! - `test_parse_raydium_cpmm_transaction` (slot: 394648506)
+//! - `test_parse_raydium_clmm_transaction` (slot: 394462433)
+//!
+//! ### ⚠️  测试交易（1 个）
+//! 这是测试节点上执行的临时交易，节点重启后会丢失：
+//! - `test_parse_raydium_cpmm_sell_transaction` (Token-2022 测试) ⭐
+//!
+//! ## 运行方式
+//!
+//! ```bash
+//! # 运行所有测试（会跳过丢失的测试）
+//! cargo test --test dex_parser_real_tx
+//!
+//! # 运行所有测试（包括需要主网数据的）
+//! TEST_REAL_TRANSACTIONS=1 cargo test --test dex_parser_real_tx
+//! ```
 
 use sol_trade_sdk::parser::DexParser;
 use sol_trade_sdk::parser::types::TradeType;
