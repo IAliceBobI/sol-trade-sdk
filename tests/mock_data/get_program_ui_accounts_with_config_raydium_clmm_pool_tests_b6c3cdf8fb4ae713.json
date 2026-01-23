@@ -1,0 +1,26 @@
+{
+  "method": "get_program_ui_accounts_with_config",
+  "params": [
+    "CAMMCzo5YL8w4VFF8KVHrK22GGUsp5VTaW7grrKgrWqK",
+    {
+      "dataSlice": null,
+      "encoding": "base64",
+      "filters": [
+        {
+          "dataSize": 1544
+        },
+        {
+          "memcmp": {
+            "bytes": "JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN",
+            "encoding": "base58",
+            "offset": 105
+          }
+        }
+      ],
+      "minContextSlot": null,
+      "sortResults": null,
+      "withContext": null
+    }
+  ],
+  "response": []
+}

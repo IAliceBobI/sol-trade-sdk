@@ -1,0 +1,12 @@
+{
+  "method": "get_token_account_balance",
+  "params": [
+    "9sP6TjGLBFLSdqAHy9LQkX6b6HDifnhnEnob8PutgzpY"
+  ],
+  "response": {
+    "amount": "26459414",
+    "decimals": 9,
+    "uiAmount": 0.026459414,
+    "uiAmountString": "0.026459414"
+  }
+}
