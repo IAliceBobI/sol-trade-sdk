@@ -163,10 +163,12 @@ pub(crate) mod raydium_clmm_cache {
         MINT_TO_POOL_CACHE.insert(*mint, *pool_address);
     }
 
+    #[expect(dead_code, reason = "预留用于未来缓存策略优化")]
     pub(crate) fn get_cached_pools_list_by_mint(mint: &Pubkey) -> Option<Vec<(Pubkey, PoolState)>> {
         MINT_TO_POOLS_LIST_CACHE.get(mint).map(|p| p.clone())
     }
 
+    #[expect(dead_code, reason = "预留用于未来缓存策略优化")]
     pub(crate) fn cache_pools_list_by_mint(mint: &Pubkey, pools: &[(Pubkey, PoolState)]) {
         MINT_TO_POOLS_LIST_CACHE.insert(*mint, pools.to_vec());
     }

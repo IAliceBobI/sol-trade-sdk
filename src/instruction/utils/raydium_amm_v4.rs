@@ -70,21 +70,25 @@ pub(crate) fn cache_pool_by_address(pool_address: &Pubkey, amm_info: &AmmInfo) {
 }
 
 /// 从缓存中根据 mint 获取 Pool 地址
+#[expect(dead_code, reason = "预留用于未来缓存策略优化")]
 pub(crate) fn get_cached_pool_address_by_mint(mint: &Pubkey) -> Option<Pubkey> {
     MINT_TO_POOL_CACHE.get(mint).map(|p| *p)
 }
 
 /// 将 mint → pool_address 映射写入缓存
+#[expect(dead_code, reason = "预留用于未来缓存策略优化")]
 pub(crate) fn cache_pool_address_by_mint(mint: &Pubkey, pool_address: &Pubkey) {
     MINT_TO_POOL_CACHE.insert(*mint, *pool_address);
 }
 
 /// 从缓存中获取 mint 对应的池子列表
+#[expect(dead_code, reason = "预留用于未来缓存策略优化")]
 pub(crate) fn get_cached_pools_list_by_mint(mint: &Pubkey) -> Option<Vec<(Pubkey, AmmInfo)>> {
     MINT_TO_POOLS_LIST_CACHE.get(mint).map(|p| p.clone())
 }
 
 /// 将 mint → Vec<(pool_address, AmmInfo)> 列表写入缓存
+#[expect(dead_code, reason = "预留用于未来缓存策略优化")]
 pub(crate) fn cache_pools_list_by_mint(mint: &Pubkey, pools: &[(Pubkey, AmmInfo)]) {
     MINT_TO_POOLS_LIST_CACHE.insert(*mint, pools.to_vec());
 }
