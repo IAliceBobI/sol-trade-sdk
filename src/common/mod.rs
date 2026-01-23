@@ -4,6 +4,7 @@ pub mod fast_fn;
 pub mod fast_timing;
 pub mod gas_fee_strategy;
 pub mod global;
+pub mod mock_rpc;
 pub mod nonce_cache;
 pub mod seed;
 pub mod spl_associated_token_account;
