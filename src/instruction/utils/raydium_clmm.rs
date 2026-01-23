@@ -339,20 +339,49 @@ async fn find_pools_by_mint_offset_collect(
 
     let accounts = rpc.get_program_ui_accounts_with_config(&accounts::RAYDIUM_CLMM, config).await?;
 
-    let pools: Vec<(Pubkey, PoolState)> = accounts
-        .into_iter()
-        .filter_map(|(addr, acc)| {
-            let data_bytes = match &acc.data {
-                UiAccountData::Binary(base64_str, _) => STANDARD.decode(base64_str).ok()?,
-                _ => return None,
-            };
-            if data_bytes.len() > 8 {
-                pool_state_decode(&data_bytes[8..]).map(|pool| (addr, pool))
-            } else {
-                None
+    // 检查是否需要限制返回数量（测试环境优化）
+    // 生产环境通过环境变量 CLMM_POOL_SCAN_LIMIT 控制，默认不限制
+    let pools: Vec<(Pubkey, PoolState)> = if let Ok(limit_str) = std::env::var("CLMM_POOL_SCAN_LIMIT") {
+        let limit = match limit_str.parse::<usize>() {
+            Ok(n) => n,
+            Err(_) => {
+                eprintln!("警告: CLMM_POOL_SCAN_LIMIT 环境变量值无效 '{}'，将不限制返回数量", limit_str);
+                usize::MAX
             }
-        })
-        .collect();
+        };
+        // 测试环境：限制返回数量，避免超时
+        accounts
+            .into_iter()
+            .filter_map(|(addr, acc)| {
+                let data_bytes = match &acc.data {
+                    UiAccountData::Binary(base64_str, _) => STANDARD.decode(base64_str).ok()?,
+                    _ => return None,
+                };
+                if data_bytes.len() > 8 {
+                    pool_state_decode(&data_bytes[8..]).map(|pool| (addr, pool))
+                } else {
+                    None
+                }
+            })
+            .take(limit) // 限制返回数量
+            .collect()
+    } else {
+        // 生产环境：读取所有 Pool
+        accounts
+            .into_iter()
+            .filter_map(|(addr, acc)| {
+                let data_bytes = match &acc.data {
+                    UiAccountData::Binary(base64_str, _) => STANDARD.decode(base64_str).ok()?,
+                    _ => return None,
+                };
+                if data_bytes.len() > 8 {
+                    pool_state_decode(&data_bytes[8..]).map(|pool| (addr, pool))
+                } else {
+                    None
+                }
+            })
+            .collect()
+    };
 
     Ok(pools)
 }

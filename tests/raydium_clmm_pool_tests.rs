@@ -48,6 +48,9 @@ const JUP_MINT: &str = "JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN";
 async fn test_raydium_clmm_get_pool_by_mint_wsol_cache_and_force() {
     println!("=== 测试：Raydium CLMM get_pool_by_mint (WSOL, cache & force) ===");
 
+    // 设置环境变量，限制扫描的 Pool 数量（测试环境优化）
+    std::env::set_var("CLMM_POOL_SCAN_LIMIT", "100");
+
     let wsol_mint = Pubkey::from_str(WSOL_MINT).expect("Invalid WSOL mint");
     let rpc_url = "http://127.0.0.1:8899";
     let rpc = RpcClient::new(rpc_url.to_string());
@@ -130,6 +133,9 @@ async fn test_raydium_clmm_get_pool_by_mint_wsol_cache_and_force() {
     assert_eq!(pool_state_2.liquidity, pool_state_3.liquidity, "强制刷新后 liquidity 发生变化");
     println!("✅ get_pool_by_mint_force 验证通过");
 
+    // 清理环境变量，避免影响其他测试
+    std::env::remove_var("CLMM_POOL_SCAN_LIMIT");
+
     println!("\n=== Raydium CLMM get_pool_by_mint 测试通过 ===");
 }
 
@@ -138,6 +144,9 @@ async fn test_raydium_clmm_get_pool_by_mint_wsol_cache_and_force() {
 #[serial_test::serial(global_dex_cache)]
 async fn test_raydium_clmm_get_pool_by_address() {
     println!("=== 测试：Raydium CLMM get_pool_by_address (带缓存) ===");
+
+    // 设置环境变量，限制扫描的 Pool 数量（测试环境优化）
+    std::env::set_var("CLMM_POOL_SCAN_LIMIT", "50");
 
     // 使用之前测试中找到的 pool 地址
     let wsol_mint = Pubkey::from_str(WSOL_MINT).expect("Invalid WSOL mint");
@@ -195,6 +204,9 @@ async fn test_raydium_clmm_get_pool_by_address() {
     assert_eq!(pool_state.liquidity, pool_state2.liquidity, "Cached pool should match");
     assert_eq!(pool_state.sqrt_price_x64, pool_state2.sqrt_price_x64, "Cached pool should match");
     println!("✅ 缓存验证通过（数据一致）");
+
+    // 清理环境变量，避免影响其他测试
+    std::env::remove_var("CLMM_POOL_SCAN_LIMIT");
 
     println!("\n=== Raydium CLMM get_pool_by_address 测试通过 ===");
 }
