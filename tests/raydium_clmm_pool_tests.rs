@@ -15,10 +15,11 @@
 //! 注意：使用 surfpool (localhost:8899) 进行测试
 
 use sol_trade_sdk::instruction::utils::raydium_clmm::{
-    clear_pool_cache, get_pool_by_address, get_pool_by_address_with_pool_client, get_pool_by_mint,
-    get_pool_by_mint_force, get_pool_by_mint_with_pool_client, get_token_price_in_usd,
-    get_token_price_in_usd_with_pool, get_wsol_price_in_usd,
-    list_pools_by_mint_with_pool_client,
+    clear_pool_cache, get_pool_by_address_with_pool_client, get_pool_by_mint,
+    get_pool_by_mint_force, get_pool_by_mint_with_pool_client,
+    get_token_price_in_usd_with_client,
+    get_token_price_in_usd_with_pool_with_client,
+    get_wsol_price_in_usd_with_client, list_pools_by_mint_with_pool_client,
 };
 use sol_trade_sdk::common::auto_mock_rpc::AutoMockRpcClient;
 use solana_client::nonblocking::rpc_client::RpcClient;
@@ -37,31 +38,33 @@ const WSOL_USDT_CLMM_POOL: &str = "ExcBWu8fGPdJiaF1b1z3iEef38sjQJks8xvj6M85pPY6"
 const JUP_MINT: &str = "JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN";
 
 /// 测试：通过地址获取 pool 数据（带缓存）
+///
+/// 使用 Auto Mock 加速测试，首次运行时从 RPC 获取并缓存，后续从文件加载。
+/// 内存缓存功能在 test_raydium_clmm_get_pool_by_mint_with_auto_mock 中已充分测试。
 #[tokio::test]
 #[serial_test::serial(global_dex_cache)]
 async fn test_raydium_clmm_get_pool_by_address() {
-    println!("=== 测试：Raydium CLMM get_pool_by_address (带缓存) ===");
+    println!("=== 测试：Raydium CLMM get_pool_by_address (Auto Mock 加速) ===");
 
-    // 设置环境变量，限制扫描的 Pool 数量（测试环境优化）
-    std::env::set_var("CLMM_POOL_SCAN_LIMIT", "50");
-
-    // 使用之前测试中找到的 pool 地址
-    let wsol_mint = Pubkey::from_str(WSOL_MINT)
-        .unwrap_or_else(|_| panic!("Invalid WSOL mint: {}", WSOL_MINT));
+    // 使用已知的 WSOL-USDT CLMM Pool
+    let pool_address = Pubkey::from_str(WSOL_USDT_CLMM_POOL)
+        .unwrap_or_else(|_| panic!("Invalid pool address: {}", WSOL_USDT_CLMM_POOL));
     let rpc_url = "http://127.0.0.1:8899";
-    let rpc = RpcClient::new(rpc_url.to_string());
 
-    // 先通过 mint 找到 pool 地址
-    let (pool_address, _) =
-        get_pool_by_mint(&rpc, &wsol_mint).await.expect("get_pool_by_mint failed");
-    println!("找到的 Pool 地址: {}", pool_address);
+    // 使用 Auto Mock RPC 客户端
+    let auto_mock_client = AutoMockRpcClient::new(rpc_url.to_string());
 
-    // 第一次调用（会写入缓存）
-    println!("\n第一次调用（写入缓存）...");
-    let result1 = get_pool_by_address(&rpc, &pool_address).await;
-    assert!(result1.is_ok(), "Failed to get pool by address: {:?}", result1.err());
+    println!("Pool 地址: {}", pool_address);
 
-    let pool_state = result1.unwrap();
+    // 清除缓存
+    clear_pool_cache();
+
+    // 使用 Auto Mock 获取 pool 数据
+    println!("\n使用 Auto Mock 获取 Pool 数据...");
+    let result = get_pool_by_address_with_pool_client(&auto_mock_client, &pool_address).await;
+    assert!(result.is_ok(), "Failed to get pool by address: {:?}", result.err());
+
+    let pool_state = result.unwrap();
     println!("✅ Pool State 获取成功!");
     println!("  Pool Address: {}", pool_address);
     println!("  Amm Config: {}", pool_state.amm_config);
@@ -90,37 +93,27 @@ async fn test_raydium_clmm_get_pool_by_address() {
     assert!(pool_state.tick_spacing > 0, "Tick spacing should be positive");
     println!("✅ 基本字段验证通过");
 
-    // 第二次调用（应该从缓存读取）
-    println!("\n第二次调用（从缓存读取）...");
-    let result2 = get_pool_by_address(&rpc, &pool_address).await;
-    assert!(result2.is_ok(), "Failed to get pool from cache: {:?}", result2.err());
-
-    let pool_state2 = result2.unwrap();
-    assert_eq!(pool_state.amm_config, pool_state2.amm_config, "Cached pool should match");
-    assert_eq!(pool_state.token_mint0, pool_state2.token_mint0, "Cached pool should match");
-    assert_eq!(pool_state.token_mint1, pool_state2.token_mint1, "Cached pool should match");
-    assert_eq!(pool_state.liquidity, pool_state2.liquidity, "Cached pool should match");
-    assert_eq!(pool_state.sqrt_price_x64, pool_state2.sqrt_price_x64, "Cached pool should match");
-    println!("✅ 缓存验证通过（数据一致）");
-
-    // 清理环境变量，避免影响其他测试
-    std::env::remove_var("CLMM_POOL_SCAN_LIMIT");
-
     println!("\n=== Raydium CLMM get_pool_by_address 测试通过 ===");
+    println!("✅ 首次运行：从 RPC 获取并保存（约 1-2 秒）");
+    println!("✅ 后续运行：从缓存加载（约 0.01 秒）");
+    println!("✅ 速度提升：约 100-200 倍！");
+    println!("💡 注意：内存缓存功能在 test_raydium_clmm_get_pool_by_mint_with_auto_mock 中已充分测试");
 }
 
-/// 测试：通过 WSOL-USDT 锚定池获取 WSOL 的 USD 价格（实时、主网）
+/// 测试：通过 WSOL-USDT 锚定池获取 WSOL 的 USD 价格（Auto Mock 加速）
 #[tokio::test]
 #[serial_test::serial(global_dex_cache)]
 async fn test_raydium_clmm_get_wsol_price_in_usd() {
-    println!("=== 测试：Raydium CLMM get_wsol_price_in_usd (WSOL-USDT anchor) ===");
+    println!("=== 测试：Raydium CLMM get_wsol_price_in_usd (Auto Mock 加速) ===");
 
     let rpc_url = "http://127.0.0.1:8899";
-    let rpc = RpcClient::new(rpc_url.to_string());
+
+    // 使用 Auto Mock RPC 客户端
+    let auto_mock_client = AutoMockRpcClient::new(rpc_url.to_string());
 
     let anchor_pool = Pubkey::from_str(WSOL_USDT_CLMM_POOL).expect("Invalid WSOL-USDT pool");
 
-    let price = get_wsol_price_in_usd(&rpc, Some(&anchor_pool))
+    let price = get_wsol_price_in_usd_with_client(&auto_mock_client, Some(&anchor_pool))
         .await
         .expect("Failed to get WSOL price in USD");
 
@@ -131,21 +124,26 @@ async fn test_raydium_clmm_get_wsol_price_in_usd() {
     assert!(price < 1000.0, "WSOL price in USD is unreasonably high");
 
     println!("✅ Raydium CLMM get_wsol_price_in_usd 测试通过");
+    println!("✅ 首次运行：从 RPC 获取并保存（约 1-2 秒）");
+    println!("✅ 后续运行：从缓存加载（约 0.01 秒）");
+    println!("✅ 速度提升：约 100-200 倍！");
 }
 
-/// 测试：通过 Raydium CLMM 获取 JUP 的 USD 价格（X-WSOL 池 + WSOL-USD 锚定池，主网）
+/// 测试：通过 Raydium CLMM 获取 JUP 的 USD 价格（Auto Mock 加速）
 #[tokio::test]
 #[serial_test::serial(global_dex_cache)]
 async fn test_raydium_clmm_get_jup_price_in_usd() {
-    println!("=== 测试：Raydium CLMM get_token_price_in_usd (JUP) ===");
+    println!("=== 测试：Raydium CLMM get_token_price_in_usd (JUP, Auto Mock 加速) ===");
 
     let rpc_url = "http://127.0.0.1:8899";
-    let rpc = RpcClient::new(rpc_url.to_string());
+
+    // 使用 Auto Mock RPC 客户端
+    let auto_mock_client = AutoMockRpcClient::new(rpc_url.to_string());
 
     let jup_mint = Pubkey::from_str(JUP_MINT)
         .unwrap_or_else(|_| panic!("Invalid JUP mint: {}", JUP_MINT));
 
-    let price = get_token_price_in_usd(&rpc, &jup_mint, None)
+    let price = get_token_price_in_usd_with_client(&auto_mock_client, &jup_mint, None)
         .await
         .expect("Failed to get JUP price in USD");
 
@@ -156,28 +154,33 @@ async fn test_raydium_clmm_get_jup_price_in_usd() {
     assert!(price < 100.0, "JUP price in USD is unreasonably high (likely an error)");
 
     println!("✅ Raydium CLMM get_token_price_in_usd (JUP) 测试通过");
+    println!("✅ 首次运行：从 RPC 获取并保存（约 2-3 秒）");
+    println!("✅ 后续运行：从缓存加载（约 0.01 秒）");
+    println!("✅ 速度提升：约 100-200 倍！");
 }
 
-/// 测试：通过 Raydium CLMM 获取 JUP 的 USD 价格（直接传入池地址，跳过查找，主网）
+/// 测试：通过 Raydium CLMM 获取 JUP 的 USD 价格（直接传入池地址，Auto Mock 加速）
 #[tokio::test]
 #[serial_test::serial(global_dex_cache)]
 async fn test_raydium_clmm_get_jup_price_in_usd_with_pool() {
-    println!("=== 测试：Raydium CLMM get_token_price_in_usd_with_pool (JUP, 跳过查找) ===");
+    println!("=== 测试：Raydium CLMM get_token_price_in_usd_with_pool (JUP, Auto Mock 加速) ===");
 
     let rpc_url = "http://127.0.0.1:8899";
-    let rpc = RpcClient::new(rpc_url.to_string());
+
+    // 使用 Auto Mock RPC 客户端
+    let auto_mock_client = AutoMockRpcClient::new(rpc_url.to_string());
 
     let jup_mint = Pubkey::from_str(JUP_MINT)
         .unwrap_or_else(|_| panic!("Invalid JUP mint: {}", JUP_MINT));
 
-    // 1. 先用标准接口找到 JUP-WSOL 池地址（模拟：你已经缓存了这个池地址）
-    let (jup_wsol_pool, _) = get_pool_by_mint(&rpc, &jup_mint)
+    // 1. 先用 Auto Mock 接口找到 JUP-WSOL 池地址（模拟：你已经缓存了这个池地址）
+    let (jup_wsol_pool, _) = get_pool_by_mint_with_pool_client(&auto_mock_client, &jup_mint)
         .await
         .expect("Failed to find JUP-WSOL pool");
     println!("找到的 JUP-WSOL 池地址: {}", jup_wsol_pool);
 
-    // 2. 使用 get_token_price_in_usd_with_pool 直接传入池地址，避免重复查找
-    let price = get_token_price_in_usd_with_pool(&rpc, &jup_mint, &jup_wsol_pool, None)
+    // 2. 使用 get_token_price_in_usd_with_pool_with_client 直接传入池地址，避免重复查找
+    let price = get_token_price_in_usd_with_pool_with_client(&auto_mock_client, &jup_mint, &jup_wsol_pool, None)
         .await
         .expect("Failed to get JUP price in USD with pool");
 
@@ -188,57 +191,11 @@ async fn test_raydium_clmm_get_jup_price_in_usd_with_pool() {
     assert!(price < 100.0, "JUP price in USD is unreasonably high (likely an error)");
 
     println!("✅ Raydium CLMM get_token_price_in_usd_with_pool (JUP) 测试通过");
-}
-
-/// 测试：使用 Auto Mock 获取 CLMM Pool 数据（加速版）
-///
-/// 此测试使用 AutoMockRpcClient 来加速 pool 查询。
-/// 首次运行时会从 RPC 获取数据并保存到 tests/mock_data/，
-/// 后续运行会直接从缓存加载，速度提升显著。
-#[tokio::test]
-#[serial_test::serial(global_dex_cache)]
-async fn test_raydium_clmm_get_pool_by_address_with_auto_mock() {
-    println!("=== 测试：使用 Auto Mock 获取 CLMM Pool 数据（加速版） ===");
-
-    // 使用已知的 WSOL-USDT CLMM Pool
-    let pool_address = Pubkey::from_str(WSOL_USDT_CLMM_POOL)
-        .unwrap_or_else(|_| panic!("Invalid pool address: {}", WSOL_USDT_CLMM_POOL));
-    let rpc_url = "http://127.0.0.1:8899";
-
-    // 使用 Auto Mock RPC 客户端
-    let auto_mock_client = AutoMockRpcClient::new(rpc_url.to_string());
-
-    println!("Pool 地址: {}", pool_address);
-
-    // 清除缓存
-    clear_pool_cache();
-
-    // 使用 Auto Mock 获取 pool 数据
-    println!("\n使用 Auto Mock 获取 Pool 数据...");
-    let result = get_pool_by_address_with_pool_client(&auto_mock_client, &pool_address).await;
-    assert!(result.is_ok(), "Failed to get pool by address: {:?}", result.err());
-
-    let pool_state = result.unwrap();
-    println!("✅ Pool State 获取成功!");
-    println!("  Amm Config: {}", pool_state.amm_config);
-    println!("  Token0 Mint: {}", pool_state.token_mint0);
-    println!("  Token1 Mint: {}", pool_state.token_mint1);
-    println!("  Tick Current: {}", pool_state.tick_current);
-    println!("  Tick Spacing: {}", pool_state.tick_spacing);
-    println!("  Sqrt Price X64: {}", pool_state.sqrt_price_x64);
-    println!("  Liquidity: {}", pool_state.liquidity);
-
-    // 验证基本字段
-    assert!(!pool_state.token_mint0.eq(&Pubkey::default()), "Token0 mint should not be zero");
-    assert!(!pool_state.token_mint1.eq(&Pubkey::default()), "Token1 mint should not be zero");
-    assert!(pool_state.liquidity > 0, "Liquidity should be positive");
-    assert!(pool_state.sqrt_price_x64 > 0, "Sqrt price should be positive");
-
-    println!("\n=== Auto Mock 测试通过 ===");
-    println!("✅ 首次运行：从 RPC 获取并保存（约 1-2 秒）");
+    println!("✅ 首次运行：从 RPC 获取并保存（约 2-3 秒）");
     println!("✅ 后续运行：从缓存加载（约 0.01 秒）");
     println!("✅ 速度提升：约 100-200 倍！");
 }
+
 
 /// 测试：使用 Auto Mock 加速 get_pool_by_mint 和 list_pools_by_mint（加速版）
 ///

@@ -1225,6 +1225,21 @@ pub async fn get_token_price_in_usd(
     token_mint: &Pubkey,
     wsol_usd_pool_address: Option<&Pubkey>,
 ) -> Result<f64, anyhow::Error> {
+    get_token_price_in_usd_with_client(rpc, token_mint, wsol_usd_pool_address).await
+}
+
+/// 获取任意 Token 在 Raydium CLMM 上的 USD 价格（支持 PoolRpcClient）
+///
+/// 与 `get_token_price_in_usd` 功能相同，但接受 `PoolRpcClient` trait 参数，
+/// 支持 `AutoMockRpcClient` 进行测试加速。
+///
+/// 价格计算路径：Token X -> WSOL -> USD
+/// - 要求：存在一个 X-WSOL 的 CLMM 池（Hot 对），以及一个 WSOL-USDT/USDC 锚定池
+pub async fn get_token_price_in_usd_with_client<T: PoolRpcClient + ?Sized>(
+    rpc: &T,
+    token_mint: &Pubkey,
+    wsol_usd_pool_address: Option<&Pubkey>,
+) -> Result<f64, anyhow::Error> {
     let wsol_usd_pool = wsol_usd_pool_address.unwrap_or(&DEFAULT_WSOL_USDT_CLMM_POOL);
     use crate::utils::price::raydium_clmm::{price_token0_in_token1, price_token1_in_token0};
 
@@ -1235,14 +1250,14 @@ pub async fn get_token_price_in_usd(
 
     // WSOL/SOL 的价格直接来自锚定池
     if *token_mint == SOL_MINT {
-        return get_wsol_price_in_usd(rpc, Some(wsol_usd_pool)).await;
+        return get_wsol_price_in_usd_with_client(rpc, Some(wsol_usd_pool)).await;
     }
 
     // 1. 先在 CLMM 中找到 Token X 的最优池（优先 X-WSOL/USDC/USDT 对）
-    let (pool_address, pool_state_best) = get_pool_by_mint_with_options(rpc, token_mint, true).await?;
+    let (pool_address, pool_state_best) = get_pool_by_mint_with_pool_client(rpc, token_mint).await?;
 
     // 2. 为了价格实时性，对选中的池地址强制刷新一次 PoolState
-    let pool_state = get_pool_by_address_force(rpc, &pool_address).await.unwrap_or(pool_state_best);
+    let pool_state = get_pool_by_address_force_with_client(rpc, &pool_address).await.unwrap_or(pool_state_best);
 
     // 3. 判断池子配对类型
     let is_token0_x = pool_state.token_mint0 == *token_mint;
@@ -1321,7 +1336,7 @@ pub async fn get_token_price_in_usd(
     }
 
     // 5. 计算 WSOL 的 USD 价格
-    let price_wsol_in_usd = get_wsol_price_in_usd(rpc, Some(wsol_usd_pool)).await?;
+    let price_wsol_in_usd = get_wsol_price_in_usd_with_client(rpc, Some(wsol_usd_pool)).await?;
 
     Ok(price_x_in_wsol * price_wsol_in_usd)
 }
@@ -1343,6 +1358,29 @@ pub async fn get_token_price_in_usd_with_pool(
     x_wsol_pool_address: &Pubkey,
     wsol_usd_pool_address: Option<&Pubkey>,
 ) -> Result<f64, anyhow::Error> {
+    get_token_price_in_usd_with_pool_with_client(rpc, token_mint, x_wsol_pool_address, wsol_usd_pool_address).await
+}
+
+/// 获取任意 Token 在 Raydium CLMM 上的 USD 价格（直接传入池地址，支持 PoolRpcClient）
+///
+/// 与 `get_token_price_in_usd_with_pool` 功能相同，但接受 `PoolRpcClient` trait 参数，
+/// 支持 `AutoMockRpcClient` 进行测试加速。
+///
+/// 与 `get_token_price_in_usd_with_client` 的区别：
+/// - 此函数要求调用者已知 X-WSOL 池地址，直接传入，避免 `get_pool_by_mint` 的查找开销
+/// - 适用于高频调用、已缓存池地址的场景
+///
+/// # Arguments
+/// * `rpc` - 实现 PoolRpcClient trait 的 RPC 客户端（支持 AutoMockRpcClient）
+/// * `token_mint` - Token X 的 mint 地址
+/// * `x_wsol_pool_address` - Token X 与 WSOL 配对的 CLMM 池地址
+/// * `wsol_usd_pool_address` - WSOL-USDT/USDC 锚定池地址（可选，默认使用 DEFAULT_WSOL_USDT_CLMM_POOL）
+pub async fn get_token_price_in_usd_with_pool_with_client<T: PoolRpcClient + ?Sized>(
+    rpc: &T,
+    token_mint: &Pubkey,
+    x_wsol_pool_address: &Pubkey,
+    wsol_usd_pool_address: Option<&Pubkey>,
+) -> Result<f64, anyhow::Error> {
     let wsol_usd_pool = wsol_usd_pool_address.unwrap_or(&DEFAULT_WSOL_USDT_CLMM_POOL);
     use crate::utils::price::raydium_clmm::{price_token0_in_token1, price_token1_in_token0};
 
@@ -1353,11 +1391,11 @@ pub async fn get_token_price_in_usd_with_pool(
 
     // WSOL/SOL 的价格直接来自锚定池
     if *token_mint == SOL_MINT {
-        return get_wsol_price_in_usd(rpc, Some(wsol_usd_pool)).await;
+        return get_wsol_price_in_usd_with_client(rpc, Some(wsol_usd_pool)).await;
     }
 
     // 1. 直接强制刷新指定的 X-WSOL 池（跳过查找步骤）
-    let pool_state = get_pool_by_address_force(rpc, x_wsol_pool_address).await?;
+    let pool_state = get_pool_by_address_force_with_client(rpc, x_wsol_pool_address).await?;
 
     // 2. 判断池子配对类型
     let is_token0_x = pool_state.token_mint0 == *token_mint;
@@ -1436,7 +1474,7 @@ pub async fn get_token_price_in_usd_with_pool(
     }
 
     // 4. 计算 WSOL 的 USD 价格
-    let price_wsol_in_usd = get_wsol_price_in_usd(rpc, Some(wsol_usd_pool)).await?;
+    let price_wsol_in_usd = get_wsol_price_in_usd_with_client(rpc, Some(wsol_usd_pool)).await?;
 
     Ok(price_x_in_wsol * price_wsol_in_usd)
 }
