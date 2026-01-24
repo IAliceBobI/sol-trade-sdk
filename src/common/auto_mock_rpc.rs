@@ -120,6 +120,33 @@ impl PoolRpcClient for Arc<NonblockingRpcClient> {
     }
 }
 
+/// 为 Arc<dyn PoolRpcClient + Send + Sync> 实现 PoolRpcClient
+///
+/// 这允许 `Arc<dyn PoolRpcClient>` 在泛型函数中使用
+#[async_trait::async_trait]
+impl PoolRpcClient for Arc<dyn PoolRpcClient + Send + Sync> {
+    async fn get_account(&self, pubkey: &Pubkey) -> Result<Account, String> {
+        self.as_ref().get_account(pubkey).await
+    }
+
+    async fn get_program_ui_accounts_with_config(
+        &self,
+        program_id: &Pubkey,
+        config: RpcProgramAccountsConfig,
+    ) -> Result<Vec<(String, UiAccount)>, String> {
+        self.as_ref()
+            .get_program_ui_accounts_with_config(program_id, config)
+            .await
+    }
+
+    async fn get_token_account_balance(
+        &self,
+        pubkey: &Pubkey,
+    ) -> Result<UiTokenAmount, String> {
+        self.as_ref().get_token_account_balance(pubkey).await
+    }
+}
+
 /// Auto Mock RPC 客户端
 ///
 /// 智能 Auto 模式：
