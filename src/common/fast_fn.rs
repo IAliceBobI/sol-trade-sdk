@@ -117,7 +117,7 @@ fn _create_associated_token_account_idempotent_fast(
         // Use cache to get instruction
         get_cached_instructions(cache_key, || {
             super::seed::create_associated_token_account_use_seed(payer, owner, mint, token_program)
-                .unwrap()
+                .expect("Failed to create ATA with seed: ensure payer, owner, mint and token_program are valid")
         })
     } else {
         // Use cache to get instruction

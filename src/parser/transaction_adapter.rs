@@ -10,6 +10,7 @@ use solana_transaction_status::{
 };
 use std::collections::HashMap;
 use std::str::FromStr;
+use tracing::warn;
 
 /// 交易适配器错误
 #[derive(Debug, thiserror::Error)]
@@ -409,7 +410,9 @@ impl TransactionAdapter {
 
                 // 解析 data
                 let data = if let Some(data_str) = ix_value["data"].as_str() {
-                    bs58::decode(data_str).into_vec().unwrap_or_default()
+                    bs58::decode(data_str).into_vec()
+                        .inspect_err(|e| warn!("指令数据 base58 解析失败 (指令索引 {}): {}", idx, e))
+                        .unwrap_or_default()
                 } else {
                     Vec::new()
                 };
@@ -475,7 +478,9 @@ impl TransactionAdapter {
 
                         // 解析 data
                         let data = if let Some(data_str) = ix_json["data"].as_str() {
-                            bs58::decode(data_str).into_vec().unwrap_or_default()
+                            bs58::decode(data_str).into_vec()
+                                .inspect_err(|e| warn!("内部指令数据 base58 解析失败 (外部索引 {}, 内部索引 {}): {}", outer_index, inner_idx, e))
+                                .unwrap_or_default()
                         } else {
                             Vec::new()
                         };

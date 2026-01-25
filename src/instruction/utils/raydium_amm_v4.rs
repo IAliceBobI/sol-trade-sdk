@@ -190,13 +190,13 @@ fn calculate_effective_volume(amm: &AmmInfo) -> u128 {
 /// - 如果池子包含 WSOL/USDC/USDT，只计算这些稳定资产侧的累计交易量
 /// - 否则计算两侧的总交易量
 /// - 交易量越大，说明池子被实际使用越多，深度越可靠
-fn select_best_pool_by_volume(pools: &[(Pubkey, AmmInfo)]) -> (Pubkey, AmmInfo) {
+fn select_best_pool_by_volume(pools: &[(Pubkey, AmmInfo)]) -> Option<(Pubkey, AmmInfo)> {
     if pools.is_empty() {
-        panic!("Cannot select best pool from empty list");
+        return None;
     }
 
     if pools.len() == 1 {
-        return pools[0].clone();
+        return Some(pools[0].clone());
     }
 
     // 优先选择活跃状态的池
@@ -216,7 +216,7 @@ fn select_best_pool_by_volume(pools: &[(Pubkey, AmmInfo)]) -> (Pubkey, AmmInfo) 
         // 计算有效交易量（优先只看WSOL/USDC/USDT侧）
         let volume_a = calculate_effective_volume(amm_a);
         let volume_b = calculate_effective_volume(amm_b);
-        
+
         // 按交易量降序排序
         match volume_b.cmp(&volume_a) {
             std::cmp::Ordering::Equal => {
@@ -228,7 +228,7 @@ fn select_best_pool_by_volume(pools: &[(Pubkey, AmmInfo)]) -> (Pubkey, AmmInfo) 
     });
 
     // 返回交易量最高的池
-    active_pools.into_iter().next().unwrap()
+    active_pools.into_iter().next()
 }
 
 // ==================== Pool 状态检查函数 ====================
@@ -471,7 +471,7 @@ async fn find_pool_by_mint_impl(
         select_best_pool_by_volume(&other_pools)
     };
 
-    Ok(best_pool)
+    best_pool.ok_or_else(|| anyhow::anyhow!("未找到 {} 的可用 Raydium AMM V4 池", mint))
 }
 
 // ==================== 基于 Mint 的公共查询 API ====================
@@ -536,7 +536,7 @@ pub async fn get_pool_by_mint<T: PoolRpcClient + ?Sized>(
         select_best_pool_by_volume(&other_pools)
     };
 
-    Ok(best_pool)
+    best_pool.ok_or_else(|| anyhow::anyhow!("未找到 {} 的可用 Raydium AMM V4 池", mint))
 }
 
 /// 强制刷新：强制重新查询指定 mint 对应的最优 Pool

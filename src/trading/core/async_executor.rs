@@ -298,7 +298,10 @@ pub async fn execute_parallel(
         let middleware_manager = middleware_manager.clone();
         let swqos_type = swqos_client.get_swqos_type();
         let tip_account_str = swqos_client.get_tip_account()?;
-        let tip_account = Arc::new(Pubkey::from_str(&tip_account_str).unwrap_or_default());
+        let tip_account = Arc::new(
+            Pubkey::from_str(&tip_account_str)
+                .map_err(|e| anyhow::anyhow!("无效的小费接收地址 '{}': {}", tip_account_str, e))?
+        );
         let collector = collector.clone();
         let on_transaction_signed = on_transaction_signed.clone();
 

@@ -541,7 +541,7 @@ impl SystemCallBypassManager {
         // 回退到标准时间获取
         SystemTime::now()
             .duration_since(UNIX_EPOCH)
-            .unwrap_or_default()
+            .unwrap_or_else(|_| Duration::from_secs(0))
             .as_nanos() as u64
     }
     

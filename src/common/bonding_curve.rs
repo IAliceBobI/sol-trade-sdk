@@ -28,6 +28,7 @@
 use borsh::BorshDeserialize;
 use serde::{Deserialize, Serialize};
 use solana_sdk::pubkey::Pubkey;
+use anyhow::{Result, anyhow};
 
 use crate::instruction::utils::pumpfun::global_constants::{
     INITIAL_REAL_TOKEN_RESERVES, INITIAL_VIRTUAL_SOL_RESERVES, INITIAL_VIRTUAL_TOKEN_RESERVES,
@@ -70,13 +71,14 @@ impl BondingCurveAccount {
         dev_sol_amount: u64,
         creator: Pubkey,
         is_mayhem_mode: bool,
-    ) -> Self {
+    ) -> Result<Self> {
         let account = if bonding_curve != Pubkey::default() {
             bonding_curve
         } else {
-            get_bonding_curve_pda(mint).unwrap()
+            get_bonding_curve_pda(mint)
+                .ok_or_else(|| anyhow!("无法派生 bonding curve PDA，mint 地址: {}", mint))?
         };
-        Self {
+        Ok(Self {
             discriminator: 0,
             account,
             virtual_token_reserves: INITIAL_VIRTUAL_TOKEN_RESERVES - dev_token_amount,
@@ -87,7 +89,7 @@ impl BondingCurveAccount {
             complete: false,
             creator,
             is_mayhem_mode,
-        }
+        })
     }
 
     pub fn from_trade(
@@ -99,13 +101,14 @@ impl BondingCurveAccount {
         real_token_reserves: u64,
         real_sol_reserves: u64,
         is_mayhem_mode: bool,
-    ) -> Self {
+    ) -> Result<Self> {
         let account = if bonding_curve != Pubkey::default() {
             bonding_curve
         } else {
-            get_bonding_curve_pda(&mint).unwrap()
+            get_bonding_curve_pda(&mint)
+                .ok_or_else(|| anyhow!("无法派生 bonding curve PDA，mint 地址: {}", mint))?
         };
-        Self {
+        Ok(Self {
             discriminator: 0,
             account,
             virtual_token_reserves,
@@ -116,11 +119,12 @@ impl BondingCurveAccount {
             complete: false,
             creator,
             is_mayhem_mode,
-        }
+        })
     }
 
-    pub fn get_creator_vault_pda(&self) -> Pubkey {
-        get_creator_vault_pda(&self.creator).unwrap()
+    pub fn get_creator_vault_pda(&self) -> Result<Pubkey> {
+        get_creator_vault_pda(&self.creator)
+            .ok_or_else(|| anyhow!("无法派生 creator vault PDA，creator 地址: {}", self.creator))
     }
 
     /// Calculates the amount of tokens received for a given SOL amount

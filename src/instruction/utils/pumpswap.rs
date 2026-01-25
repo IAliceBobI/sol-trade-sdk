@@ -154,16 +154,16 @@ fn is_hot_mint(mint: &Pubkey) -> bool {
 }
 
 /// 按 LP 供应量选择最佳池（PumpSwap 池没有交易量字段，使用 lp_supply 作为流动性指标）
-/// 
+///
 /// 策略：
 /// - LP 供应量越大，说明流动性越好
-fn select_best_pool_by_liquidity(pools: &[(Pubkey, Pool)]) -> (Pubkey, Pool) {
+fn select_best_pool_by_liquidity(pools: &[(Pubkey, Pool)]) -> Option<(Pubkey, Pool)> {
     if pools.is_empty() {
-        panic!("Cannot select best pool from empty list");
+        return None;
     }
 
     if pools.len() == 1 {
-        return pools[0].clone();
+        return Some(pools[0].clone());
     }
 
     // 按 LP 供应量排序
@@ -174,7 +174,7 @@ fn select_best_pool_by_liquidity(pools: &[(Pubkey, Pool)]) -> (Pubkey, Pool) {
     });
 
     // 返回 LP 供应量最高的池
-    sorted_pools.into_iter().next().unwrap()
+    sorted_pools.into_iter().next()
 }
 
 /// Find a pool for a specific mint
@@ -550,7 +550,7 @@ async fn find_pool_by_mint_impl<T: PoolRpcClient + ?Sized>(
         select_best_pool_by_liquidity(&other_pools)
     };
 
-    Ok(best_pool)
+    best_pool.ok_or_else(|| anyhow::anyhow!("未找到 {} 的可用池", mint))
 }
 
 /// List all PumpSwap pools for a mint (as base or quote).

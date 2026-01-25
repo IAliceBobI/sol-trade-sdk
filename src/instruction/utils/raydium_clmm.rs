@@ -362,7 +362,7 @@ pub async fn get_pool_by_mint<T: PoolRpcClient + ?Sized>(
         select_best_pool_by_volume(&other_pools)
     };
 
-    Ok(best_pool)
+    best_pool.ok_or_else(|| anyhow::anyhow!("未找到 {} 的可用 Raydium CLMM 池", mint))
 }
 
 pub fn clear_pool_cache() {
@@ -450,13 +450,13 @@ async fn find_pools_by_mint_offset_collect<T: PoolRpcClient + ?Sized>(
 
 /// 通用选池逻辑（降级使用）
 /// 基于 status、liquidity、open_time、tick_spacing 选择
-fn select_best_pool(pools: &[(Pubkey, PoolState)]) -> (Pubkey, PoolState) {
+fn select_best_pool(pools: &[(Pubkey, PoolState)]) -> Option<(Pubkey, PoolState)> {
     if pools.is_empty() {
-        panic!("Cannot select best pool from empty list");
+        return None;
     }
 
     if pools.len() == 1 {
-        return pools[0].clone();
+        return Some(pools[0].clone());
     }
 
     // 1. 优先选择「已激活且有流动性」的池
@@ -492,25 +492,24 @@ fn select_best_pool(pools: &[(Pubkey, PoolState)]) -> (Pubkey, PoolState) {
                 },
                 other => other,
             }
-        })
-        .expect("No pools to select from");
+        });
 
-    best.clone()
+    best.cloned()
 }
 
 /// 按累计交易量选择最佳池（零网络开销）
-/// 
+///
 /// 策略：
 /// - 如果池子包含 WSOL/USDC/USDT，只计算这些稳定资产侧的累计交易量
 /// - 否则计算两侧的总交易量
 /// 交易量越大，说明池子被实际使用越多，深度越可靠
-fn select_best_pool_by_volume(pools: &[(Pubkey, PoolState)]) -> (Pubkey, PoolState) {
+fn select_best_pool_by_volume(pools: &[(Pubkey, PoolState)]) -> Option<(Pubkey, PoolState)> {
     if pools.is_empty() {
-        panic!("Cannot select best pool from empty list");
+        return None;
     }
 
     if pools.len() == 1 {
-        return pools[0].clone();
+        return Some(pools[0].clone());
     }
 
     // 过滤掉流动性为0的池
@@ -530,7 +529,7 @@ fn select_best_pool_by_volume(pools: &[(Pubkey, PoolState)]) -> (Pubkey, PoolSta
         // 计算有效交易量（优先只看WSOL/USDC/USDT侧）
         let volume_a = calculate_effective_volume(pool_a);
         let volume_b = calculate_effective_volume(pool_b);
-        
+
         // 按交易量降序排序
         match volume_b.cmp(&volume_a) {
             std::cmp::Ordering::Equal => {
@@ -548,7 +547,7 @@ fn select_best_pool_by_volume(pools: &[(Pubkey, PoolState)]) -> (Pubkey, PoolSta
     });
 
     // 返回交易量最高的池
-    valid_pools.into_iter().next().unwrap()
+    valid_pools.into_iter().next()
 }
 
 /// 计算池子的有效交易量
@@ -641,13 +640,13 @@ async fn pick_best_by_vault_balance_concurrent(
 async fn select_best_hot_pool_by_vault_balance(
     rpc: &SolanaRpcClient,
     pools: &[(Pubkey, PoolState)],
-) -> (Pubkey, PoolState) {
+) -> Option<(Pubkey, PoolState)> {
     if pools.is_empty() {
-        panic!("Cannot select best hot pool from empty list");
+        return None;
     }
 
     if pools.len() == 1 {
-        return pools[0].clone();
+        return Some(pools[0].clone());
     }
 
     let mut stable_candidates: Vec<PoolCandidate> = Vec::new();
@@ -694,14 +693,14 @@ async fn select_best_hot_pool_by_vault_balance(
     // 1. 优先在稳定币相关池中按金库余额择优（并发读取）
     if !stable_candidates.is_empty() {
         if let Some(best) = pick_best_by_vault_balance_concurrent(rpc, stable_candidates).await {
-            return best;
+            return Some(best);
         }
     }
 
     // 2. 否则在 WSOL 相关池中按 WSOL 金库余额择优（并发读取）
     if !wsol_candidates.is_empty() {
         if let Some(best) = pick_best_by_vault_balance_concurrent(rpc, wsol_candidates).await {
-            return best;
+            return Some(best);
         }
     }
 
@@ -788,7 +787,7 @@ async fn find_pool_by_mint_impl(
         if use_vault_balance {
             // 在所有包含 WSOL 的池中按 WSOL 金库余额择优
             if let Some(best) = select_best_wsol_pool_by_vault_balance(rpc, &other_pools).await {
-                best
+                Some(best)
             } else {
                 select_best_pool_by_volume(&other_pools)
             }
@@ -801,7 +800,7 @@ async fn find_pool_by_mint_impl(
         select_best_pool_by_volume(&other_pools)
     };
 
-    Ok(best_pool)
+    best_pool.ok_or_else(|| anyhow::anyhow!("未找到 {} 的可用 Raydium CLMM 池", mint))
 }
 
 /// 使用 PoolRpcClient 列出所有包含指定 mint 的 Raydium CLMM Pool（支持 Auto Mock）

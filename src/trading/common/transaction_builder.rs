@@ -44,10 +44,12 @@ pub async fn build_transaction(
 
     // Add tip transfer instruction
     if with_tip && tip_amount > 0.0 {
+        let tip_lamports = sol_str_to_lamports(&tip_amount.to_string())
+            .ok_or_else(|| anyhow::anyhow!("无效的小费金额 '{}': 转换失败", tip_amount))?;
         instructions.push(transfer(
             &payer.pubkey(),
             tip_account,
-            sol_str_to_lamports(tip_amount.to_string().as_str()).unwrap_or(0),
+            tip_lamports,
         ));
     }
 

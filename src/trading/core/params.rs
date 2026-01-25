@@ -13,6 +13,7 @@ use solana_hash::Hash;
 use solana_sdk::message::AddressLookupTableAccount;
 use solana_sdk::{pubkey::Pubkey, signature::Keypair};
 use std::sync::Arc;
+use anyhow::Result;
 
 /// DEX 参数枚举 - 零开销抽象替代 Box<dyn ProtocolParams>
 #[derive(Clone)]
@@ -125,7 +126,7 @@ impl PumpFunParams {
         close_token_account_when_sell: Option<bool>,
         fee_recipient: Pubkey,
         token_program: Pubkey,
-    ) -> Self {
+    ) -> Result<Self> {
         let is_mayhem_mode = fee_recipient == MAYHEM_FEE_RECIPIENT;
         let bonding_curve_account = BondingCurveAccount::from_dev_trade(
             bonding_curve,
@@ -134,14 +135,14 @@ impl PumpFunParams {
             max_sol_cost,
             creator,
             is_mayhem_mode,
-        );
-        Self {
+        )?;
+        Ok(Self {
             bonding_curve: Arc::new(bonding_curve_account),
             associated_bonding_curve,
             creator_vault,
             close_token_account_when_sell,
             token_program,
-        }
+        })
     }
 
     pub fn from_trade(
@@ -157,7 +158,7 @@ impl PumpFunParams {
         close_token_account_when_sell: Option<bool>,
         fee_recipient: Pubkey,
         token_program: Pubkey,
-    ) -> Self {
+    ) -> Result<Self> {
         let is_mayhem_mode = fee_recipient == MAYHEM_FEE_RECIPIENT;
         let bonding_curve = BondingCurveAccount::from_trade(
             bonding_curve,
@@ -168,14 +169,14 @@ impl PumpFunParams {
             real_token_reserves,
             real_sol_reserves,
             is_mayhem_mode,
-        );
-        Self {
+        )?;
+        Ok(Self {
             bonding_curve: Arc::new(bonding_curve),
             associated_bonding_curve,
             creator_vault,
             close_token_account_when_sell,
             token_program,
-        }
+        })
     }
 
     pub async fn from_mint_by_rpc(

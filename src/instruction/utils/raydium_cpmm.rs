@@ -207,9 +207,12 @@ pub async fn get_pool_by_mint<T: PoolRpcClient + ?Sized>(
     };
 
     // 3. 写入缓存
-    raydium_cpmm_cache::cache_pool_address_by_mint(mint, &best_pool.0);
-    raydium_cpmm_cache::cache_pool_by_address(&best_pool.0, &best_pool.1);
-    Ok(best_pool)
+    if let Some((pool_addr, pool_state)) = best_pool.as_ref() {
+        raydium_cpmm_cache::cache_pool_address_by_mint(mint, pool_addr);
+        raydium_cpmm_cache::cache_pool_by_address(pool_addr, pool_state);
+    }
+
+    best_pool.ok_or_else(|| anyhow::anyhow!("未找到 {} 的可用 Raydium CPMM 池", mint))
 }
 
 /// 强制刷新并获取指定地址的 CPMM 池（支持 Auto Mock）
@@ -468,13 +471,13 @@ async fn find_pools_by_mint_offset_collect<T: PoolRpcClient + ?Sized>(
 /// 策略：
 /// - 优先选择已激活且有流动性的池
 /// - LP 供应量越大，说明流动性越好
-fn select_best_pool_by_liquidity(pools: &[(Pubkey, PoolState)]) -> (Pubkey, PoolState) {
+fn select_best_pool_by_liquidity(pools: &[(Pubkey, PoolState)]) -> Option<(Pubkey, PoolState)> {
     if pools.is_empty() {
-        panic!("Cannot select best pool from empty list");
+        return None;
     }
 
     if pools.len() == 1 {
-        return pools[0].clone();
+        return Some(pools[0].clone());
     }
 
     // 优先选择已激活且有流动性的池
@@ -502,7 +505,7 @@ fn select_best_pool_by_liquidity(pools: &[(Pubkey, PoolState)]) -> (Pubkey, Pool
     });
 
     // 返回 LP 供应量最高的池
-    active_pools.into_iter().next().unwrap()
+    active_pools.into_iter().next()
 }
 
 /// 内部实现：查找指定 mint 的所有 Raydium CPMM Pool
@@ -616,7 +619,7 @@ async fn find_pool_by_mint_impl<T: PoolRpcClient + ?Sized>(
         select_best_pool_by_liquidity(&other_pools)
     };
 
-    Ok(best_pool)
+    best_pool.ok_or_else(|| anyhow::anyhow!("未找到 {} 的可用 Raydium CPMM 池", mint))
 }
 
 /// List all CPMM pools that contain the given mint as token0 or token1.
