@@ -456,7 +456,7 @@ fn select_best_pool(pools: &[(Pubkey, PoolState)]) -> Option<(Pubkey, PoolState)
     }
 
     if pools.len() == 1 {
-        return Some(pools[0].clone());
+        return pools.first().cloned();
     }
 
     // 1. 优先选择「已激活且有流动性」的池
@@ -509,7 +509,7 @@ fn select_best_pool_by_volume(pools: &[(Pubkey, PoolState)]) -> Option<(Pubkey, 
     }
 
     if pools.len() == 1 {
-        return Some(pools[0].clone());
+        return pools.first().cloned();
     }
 
     // 过滤掉流动性为0的池
@@ -646,7 +646,7 @@ async fn select_best_hot_pool_by_vault_balance(
     }
 
     if pools.len() == 1 {
-        return Some(pools[0].clone());
+        return pools.first().cloned();
     }
 
     let mut stable_candidates: Vec<PoolCandidate> = Vec::new();

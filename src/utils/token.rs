@@ -437,6 +437,6 @@ trait PubkeyExt {
 
 impl PubkeyExt for Pubkey {
     fn from_str_const(s: &str) -> Self {
-        Pubkey::from_str(s).expect("Invalid pubkey")
+        Pubkey::from_str(s).expect(&format!("无效的 Pubkey 常量: '{}'", s))
     }
 }

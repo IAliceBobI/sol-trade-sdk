@@ -477,7 +477,7 @@ fn select_best_pool_by_liquidity(pools: &[(Pubkey, PoolState)]) -> Option<(Pubke
     }
 
     if pools.len() == 1 {
-        return Some(pools[0].clone());
+        return pools.first().cloned();
     }
 
     // 优先选择已激活且有流动性的池

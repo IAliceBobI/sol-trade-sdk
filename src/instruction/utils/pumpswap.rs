@@ -163,7 +163,7 @@ fn select_best_pool_by_liquidity(pools: &[(Pubkey, Pool)]) -> Option<(Pubkey, Po
     }
 
     if pools.len() == 1 {
-        return Some(pools[0].clone());
+        return pools.first().cloned();
     }
 
     // 按 LP 供应量排序

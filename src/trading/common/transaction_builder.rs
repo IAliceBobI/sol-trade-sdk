@@ -109,7 +109,8 @@ async fn build_versioned_transaction(
     );
 
     let msg_bytes = versioned_msg.serialize();
-    let signature = payer.try_sign_message(&msg_bytes).expect("sign failed");
+    let signature = payer.try_sign_message(&msg_bytes)
+        .expect("交易签名失败：payer 密钥无效或消息序列化错误");
     let tx = VersionedTransaction { signatures: vec![signature], message: versioned_msg };
 
     // 归还构建器到池

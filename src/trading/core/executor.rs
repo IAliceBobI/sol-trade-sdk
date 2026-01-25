@@ -24,7 +24,7 @@ use super::{params::SwapParams, traits::InstructionBuilder};
 static SYSCALL_BYPASS: Lazy<SystemCallBypassManager> = Lazy::new(|| {
     use crate::perf::syscall_bypass::SyscallBypassConfig;
     SystemCallBypassManager::new(SyscallBypassConfig::default())
-        .expect("Failed to create SystemCallBypassManager")
+        .expect("创建 SystemCallBypassManager 失败：配置无效或系统资源不足")
 });
 
 /// Generic trade executor implementation

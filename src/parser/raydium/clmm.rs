@@ -326,7 +326,9 @@ impl DexParserTrait for RaydiumClmmParser {
     /// 重写 can_parse 方法，检查外层指令和内部指令
     fn can_parse(&self, adapter: &TransactionAdapter) -> bool {
         let program_id = self.protocol().program_id();
-        let program_pubkey: solana_sdk::pubkey::Pubkey = program_id.parse().unwrap();
+        let program_pubkey: solana_sdk::pubkey::Pubkey = program_id
+            .parse()
+            .expect(&format!("无效的程序 ID 常量 '{}': 解析失败", program_id));
 
         // 检查 inner instructions 中是否有 CLMM 程序的指令
         let has_inner = !adapter.get_inner_instructions_by_program(&program_pubkey).is_empty();

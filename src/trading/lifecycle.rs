@@ -7,6 +7,7 @@ use solana_sdk::transaction::VersionedTransaction;
 use crate::swqos::{SwqosType, TradeType};
 use base64::Engine;
 use std::sync::Arc;
+use tracing::warn;
 
 /// 交易生命周期回调 Trait
 ///
@@ -69,11 +70,17 @@ impl CallbackContext {
             .signatures
             .first()
             .map(|sig| sig.to_string())
-            .unwrap_or_default();
+            .unwrap_or_else(|| {
+                warn!("交易没有签名，使用空字符串作为默认签名");
+                String::new()
+            });
 
         let timestamp_ns = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
-            .unwrap_or_default()
+            .unwrap_or_else(|e| {
+                warn!("获取系统时间失败: {}，使用 0 作为默认时间戳", e);
+                std::time::Duration::from_secs(0)
+            })
             .as_nanos() as u64;
 
         Self {
@@ -92,8 +99,11 @@ impl CallbackContext {
         use bincode::serialize;
         serialize(&self.transaction)
             .ok()
-            .map(|bytes| base64::engine::general_purpose::STANDARD.encode(&bytes))
-            .unwrap_or_default()
+            .and_then(|bytes| base64::engine::general_purpose::STANDARD.encode(&bytes).into())
+            .unwrap_or_else(|| {
+                warn!("交易序列化为 Base64 失败，返回空字符串");
+                String::new()
+            })
     }
 
     /// 获取交易的 JSON 表示（用于日志）

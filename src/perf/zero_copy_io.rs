@@ -598,20 +598,20 @@ impl ZeroCopyMemoryManager {
     #[inline(always)]
     pub fn allocate(&self, size: usize) -> Option<ZeroCopyBlock> {
         // 根据大小选择合适的内存池
-        let pool = if size <= 64 * 1024 {
-            &self.shared_pools[0] // 小块池
+        let pool_index = if size <= 64 * 1024 {
+            0 // 小块池
         } else if size <= 1024 * 1024 {
-            &self.shared_pools[1] // 中块池
+            1 // 中块池
         } else {
-            &self.shared_pools[2] // 大块池
+            2 // 大块池
         };
-        
-        if let Some(block) = pool.allocate_block() {
-            self.stats.blocks_allocated.fetch_add(1, Ordering::Relaxed);
-            Some(block)
-        } else {
-            None
-        }
+
+        self.shared_pools.get(pool_index)
+            .and_then(|pool| pool.allocate_block())
+            .map(|block| {
+                self.stats.blocks_allocated.fetch_add(1, Ordering::Relaxed);
+                block
+            })
     }
     
     /// 🚀 释放零拷贝内存块
