@@ -55,6 +55,19 @@ pub trait PoolRpcClient: Send + Sync {
         &self,
         transaction: &solana_sdk::transaction::Transaction,
     ) -> Result<solana_sdk::signature::Signature, String>;
+
+    /// 请求空投（仅测试网络）
+    async fn request_airdrop(
+        &self,
+        pubkey: &Pubkey,
+        lamports: u64,
+    ) -> Result<solana_sdk::signature::Signature, String>;
+
+    /// 确认交易
+    async fn confirm_transaction(
+        &self,
+        signature: &solana_sdk::signature::Signature,
+    ) -> Result<bool, String>;
 }
 
 /// 为标准的非阻塞 RpcClient 实现 PoolRpcClient
@@ -111,6 +124,30 @@ impl PoolRpcClient for NonblockingRpcClient {
         self.send_and_confirm_transaction(transaction)
             .await
             .map_err(|e| format!("RPC 调用失败: {}", e))
+    }
+
+    async fn request_airdrop(
+        &self,
+        pubkey: &Pubkey,
+        lamports: u64,
+    ) -> Result<solana_sdk::signature::Signature, String> {
+        self.request_airdrop(pubkey, lamports)
+            .await
+            .map_err(|e| format!("RPC 调用失败: {}", e))
+    }
+
+    async fn confirm_transaction(
+        &self,
+        signature: &solana_sdk::signature::Signature,
+    ) -> Result<bool, String> {
+        let response = self
+            .confirm_transaction_with_commitment(
+                signature,
+                solana_commitment_config::CommitmentConfig::confirmed(),
+            )
+            .await
+            .map_err(|e| format!("RPC 调用失败: {}", e))?;
+        Ok(response.value)
     }
 }
 
@@ -175,6 +212,32 @@ impl PoolRpcClient for Arc<NonblockingRpcClient> {
             .await
             .map_err(|e| format!("RPC 调用失败: {}", e))
     }
+
+    async fn request_airdrop(
+        &self,
+        pubkey: &Pubkey,
+        lamports: u64,
+    ) -> Result<solana_sdk::signature::Signature, String> {
+        self.as_ref()
+            .request_airdrop(pubkey, lamports)
+            .await
+            .map_err(|e| format!("RPC 调用失败: {}", e))
+    }
+
+    async fn confirm_transaction(
+        &self,
+        signature: &solana_sdk::signature::Signature,
+    ) -> Result<bool, String> {
+        let response = self
+            .as_ref()
+            .confirm_transaction_with_commitment(
+                signature,
+                solana_commitment_config::CommitmentConfig::confirmed(),
+            )
+            .await
+            .map_err(|e| format!("RPC 调用失败: {}", e))?;
+        Ok(response.value)
+    }
 }
 
 /// 为 Arc<dyn PoolRpcClient + Send + Sync> 实现 PoolRpcClient
@@ -216,6 +279,21 @@ impl PoolRpcClient for Arc<dyn PoolRpcClient + Send + Sync> {
         transaction: &solana_sdk::transaction::Transaction,
     ) -> Result<solana_sdk::signature::Signature, String> {
         self.as_ref().send_and_confirm_transaction(transaction).await
+    }
+
+    async fn request_airdrop(
+        &self,
+        pubkey: &Pubkey,
+        lamports: u64,
+    ) -> Result<solana_sdk::signature::Signature, String> {
+        self.as_ref().request_airdrop(pubkey, lamports).await
+    }
+
+    async fn confirm_transaction(
+        &self,
+        signature: &solana_sdk::signature::Signature,
+    ) -> Result<bool, String> {
+        self.as_ref().confirm_transaction(signature).await
     }
 }
 
@@ -665,5 +743,40 @@ impl PoolRpcClient for AutoMockRpcClient {
         })
         .await
         .map_err(|e| format!("任务执行失败: {}", e))?
+    }
+
+    async fn request_airdrop(
+        &self,
+        pubkey: &Pubkey,
+        lamports: u64,
+    ) -> Result<solana_sdk::signature::Signature, String> {
+        // 空投操作不适合使用 Mock，直接调用底层 RPC
+        let inner = self.inner.clone();
+        let pk = *pubkey;
+        tokio::task::spawn_blocking(move || {
+            inner.request_airdrop(&pk, lamports)
+                .map_err(|e| format!("RPC 调用失败: {}", e))
+        })
+        .await
+        .map_err(|e| format!("任务执行失败: {}", e))?
+    }
+
+    async fn confirm_transaction(
+        &self,
+        signature: &solana_sdk::signature::Signature,
+    ) -> Result<bool, String> {
+        // 交易确认不适合使用 Mock，直接调用底层 RPC
+        let inner = self.inner.clone();
+        let sig = *signature;
+        let response = tokio::task::spawn_blocking(move || {
+            inner.confirm_transaction_with_commitment(
+                &sig,
+                solana_commitment_config::CommitmentConfig::confirmed(),
+            )
+            .map_err(|e| format!("RPC 调用失败: {}", e))
+        })
+        .await
+        .map_err(|e| format!("任务执行失败: {}", e))??;
+        Ok(response.value)
     }
 }
