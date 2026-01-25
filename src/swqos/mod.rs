@@ -106,6 +106,27 @@ pub enum SwqosType {
     Default,
 }
 
+impl std::fmt::Display for SwqosType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            SwqosType::Jito => write!(f, "Jito"),
+            SwqosType::NextBlock => write!(f, "NextBlock"),
+            SwqosType::ZeroSlot => write!(f, "ZeroSlot"),
+            SwqosType::Temporal => write!(f, "Temporal"),
+            SwqosType::Bloxroute => write!(f, "Bloxroute"),
+            SwqosType::Node1 => write!(f, "Node1"),
+            SwqosType::FlashBlock => write!(f, "FlashBlock"),
+            SwqosType::BlockRazor => write!(f, "BlockRazor"),
+            SwqosType::Astralane => write!(f, "Astralane"),
+            SwqosType::Stellium => write!(f, "Stellium"),
+            SwqosType::Lightspeed => write!(f, "Lightspeed"),
+            SwqosType::Soyas => write!(f, "Soyas"),
+            SwqosType::Speedlanding => write!(f, "Speedlanding"),
+            SwqosType::Default => write!(f, "Default"),
+        }
+    }
+}
+
 impl SwqosType {
     pub fn values() -> Vec<Self> {
         vec![

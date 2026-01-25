@@ -297,11 +297,33 @@ pub async fn execute_parallel(
         let instructions = instructions.clone();
         let middleware_manager = middleware_manager.clone();
         let swqos_type = swqos_client.get_swqos_type();
+
+        // 获取小费地址，优雅处理不支持小费的客户端
         let tip_account_str = swqos_client.get_tip_account()?;
-        let tip_account = Arc::new(
-            Pubkey::from_str(&tip_account_str)
-                .map_err(|e| anyhow::anyhow!("无效的小费接收地址 '{}': {}", tip_account_str, e))?
-        );
+        let (tip_account, should_use_tip) = if tip_account_str.is_empty() {
+            // 空字符串表示客户端不支持小费（如 Default RPC）
+            // 使用一个默认地址，但后续会通过 should_use_tip 禁用小费
+            (Pubkey::default(), false)
+        } else {
+            // 非空字符串，尝试转换为 Pubkey
+            match Pubkey::from_str(&tip_account_str) {
+                Ok(pubkey) => (pubkey, true),
+                Err(e) => {
+                    // 转换失败，记录错误并跳过此 SWQOS
+                    eprintln!("⚠️  [{}] 跳过：无效的小费接收地址 '{}': {}",
+                        swqos_type, tip_account_str, e);
+                    collector.submit(TaskResult {
+                        success: false,
+                        signature: Signature::default(),
+                        error: Some(anyhow::anyhow!("无效的小费接收地址: {}", e)),
+                        _swqos_type: swqos_type,
+                        landed_on_chain: false,
+                    });
+                    continue;
+                }
+            }
+        };
+
         let collector = collector.clone();
         let on_transaction_signed = on_transaction_signed.clone();
 
@@ -316,7 +338,9 @@ pub async fn execute_parallel(
             let _task_start = Instant::now();
             core_affinity::set_for_current(core_id);
 
-            let tip_amount = if with_tip { tip } else { 0.0 };
+            // 判断是否使用小费：需要同时满足用户配置、SWQOS支持、地址有效
+            let use_tip = with_tip && should_use_tip && swqos_type != SwqosType::Default;
+            let tip_amount = if use_tip { tip } else { 0.0 };
 
             let _build_start = Instant::now();
             let transaction = match build_transaction(
@@ -330,7 +354,7 @@ pub async fn execute_parallel(
                 middleware_manager,
                 protocol_name,
                 is_buy,
-                swqos_type != SwqosType::Default,
+                use_tip,
                 &tip_account,
                 tip_amount,
                 durable_nonce,

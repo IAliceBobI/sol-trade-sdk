@@ -107,7 +107,7 @@ async fn main() -> AnyResult<()> {
         None,               // close_token_account_when_sell
         Pubkey::default(),  // fee_recipient
         sol_trade_sdk::constants::TOKEN_PROGRAM,  // token_program
-    );
+    )?;
 
     let buy_params = TradeBuyParams {
         dex_type: DexType::PumpFun,

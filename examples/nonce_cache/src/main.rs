@@ -150,7 +150,7 @@ async fn pumpfun_copy_trade_with_grpc(trade_info: PumpFunTradeEvent) -> AnyResul
             None,
             trade_info.fee_recipient,
             trade_info.token_program,
-        )),
+        )?),
         address_lookup_table_account: None,
         wait_transaction_confirmed: true,
         create_input_token_ata: false,

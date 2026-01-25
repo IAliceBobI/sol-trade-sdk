@@ -112,7 +112,7 @@ async fn pumpfun_sniper_trade_with_shreds(trade_info: PumpFunTradeEvent) -> AnyR
             None,
             trade_info.fee_recipient,
             trade_info.token_program,
-        )),
+        )?),
         address_lookup_table_account: None,
         wait_transaction_confirmed: true,
         create_input_token_ata: true,
