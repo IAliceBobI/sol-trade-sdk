@@ -186,6 +186,23 @@ pub async fn get_token_decimals_with_client<T: PoolRpcClient + ?Sized>(
     Ok(info.decimals)
 }
 
+/// 获取代币 Symbol（支持泛型 RPC 客户端）
+///
+/// 使用全局缓存减少 RPC 调用
+pub async fn get_token_symbol_with_client<T: PoolRpcClient + ?Sized>(
+    rpc: &T,
+    mint: &Pubkey,
+) -> Result<String> {
+    // Fast path: 检查缓存
+    if let Some(info) = get_cached_mint_info(mint) {
+        return Ok(info.symbol);
+    }
+
+    // 缓存未命中，获取完整 MintInfo
+    let info = get_mint_info_with_client(rpc, mint).await?;
+    Ok(info.symbol)
+}
+
 /// 获取代币 Symbol（支持 Token 和 Token2022 Metadata Extension）
 ///
 /// 使用全局缓存减少 RPC 调用

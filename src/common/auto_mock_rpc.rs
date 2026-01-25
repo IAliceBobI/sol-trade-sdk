@@ -46,6 +46,15 @@ pub trait PoolRpcClient: Send + Sync {
 
     /// 获取 SOL 余额
     async fn get_balance(&self, pubkey: &Pubkey) -> Result<u64, String>;
+
+    /// 获取最新区块哈希
+    async fn get_latest_blockhash(&self) -> Result<solana_sdk::hash::Hash, String>;
+
+    /// 发送并确认交易
+    async fn send_and_confirm_transaction(
+        &self,
+        transaction: &solana_sdk::transaction::Transaction,
+    ) -> Result<solana_sdk::signature::Signature, String>;
 }
 
 /// 为标准的非阻塞 RpcClient 实现 PoolRpcClient
@@ -85,6 +94,21 @@ impl PoolRpcClient for NonblockingRpcClient {
 
     async fn get_balance(&self, pubkey: &Pubkey) -> Result<u64, String> {
         self.get_balance(pubkey)
+            .await
+            .map_err(|e| format!("RPC 调用失败: {}", e))
+    }
+
+    async fn get_latest_blockhash(&self) -> Result<solana_sdk::hash::Hash, String> {
+        self.get_latest_blockhash()
+            .await
+            .map_err(|e| format!("RPC 调用失败: {}", e))
+    }
+
+    async fn send_and_confirm_transaction(
+        &self,
+        transaction: &solana_sdk::transaction::Transaction,
+    ) -> Result<solana_sdk::signature::Signature, String> {
+        self.send_and_confirm_transaction(transaction)
             .await
             .map_err(|e| format!("RPC 调用失败: {}", e))
     }
@@ -134,6 +158,23 @@ impl PoolRpcClient for Arc<NonblockingRpcClient> {
             .await
             .map_err(|e| format!("RPC 调用失败: {}", e))
     }
+
+    async fn get_latest_blockhash(&self) -> Result<solana_sdk::hash::Hash, String> {
+        self.as_ref()
+            .get_latest_blockhash()
+            .await
+            .map_err(|e| format!("RPC 调用失败: {}", e))
+    }
+
+    async fn send_and_confirm_transaction(
+        &self,
+        transaction: &solana_sdk::transaction::Transaction,
+    ) -> Result<solana_sdk::signature::Signature, String> {
+        self.as_ref()
+            .send_and_confirm_transaction(transaction)
+            .await
+            .map_err(|e| format!("RPC 调用失败: {}", e))
+    }
 }
 
 /// 为 Arc<dyn PoolRpcClient + Send + Sync> 实现 PoolRpcClient
@@ -164,6 +205,17 @@ impl PoolRpcClient for Arc<dyn PoolRpcClient + Send + Sync> {
 
     async fn get_balance(&self, pubkey: &Pubkey) -> Result<u64, String> {
         self.as_ref().get_balance(pubkey).await
+    }
+
+    async fn get_latest_blockhash(&self) -> Result<solana_sdk::hash::Hash, String> {
+        self.as_ref().get_latest_blockhash().await
+    }
+
+    async fn send_and_confirm_transaction(
+        &self,
+        transaction: &solana_sdk::transaction::Transaction,
+    ) -> Result<solana_sdk::signature::Signature, String> {
+        self.as_ref().send_and_confirm_transaction(transaction).await
     }
 }
 
@@ -589,5 +641,29 @@ impl PoolRpcClient for AutoMockRpcClient {
 
     async fn get_balance(&self, pubkey: &Pubkey) -> Result<u64, String> {
         self.get_balance(pubkey).await
+    }
+
+    async fn get_latest_blockhash(&self) -> Result<solana_sdk::hash::Hash, String> {
+        // 交易操作不适合使用 Mock，直接调用底层 RPC
+        self.inner
+            .get_latest_blockhash()
+            .map_err(|e| format!("RPC 调用失败: {}", e))
+    }
+
+    async fn send_and_confirm_transaction(
+        &self,
+        transaction: &solana_sdk::transaction::Transaction,
+    ) -> Result<solana_sdk::signature::Signature, String> {
+        // 交易操作不适合使用 Mock，直接调用底层 RPC
+        tokio::task::spawn_blocking({
+            let inner = self.inner.clone();
+            let tx = transaction.clone();
+            move || {
+                inner.send_and_confirm_transaction(&tx)
+                    .map_err(|e| format!("RPC 调用失败: {}", e))
+            }
+        })
+        .await
+        .map_err(|e| format!("任务执行失败: {}", e))?
     }
 }
