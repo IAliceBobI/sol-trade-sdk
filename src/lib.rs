@@ -16,7 +16,7 @@ use crate::constants::USD1_TOKEN_ACCOUNT;
 use crate::constants::USDC_TOKEN_ACCOUNT;
 use crate::constants::WSOL_TOKEN_ACCOUNT;
 #[cfg(feature = "perf-trace")]
-use crate::constants::trade::trade::DEFAULT_SLIPPAGE;
+use crate::constants::trade_consts::DEFAULT_SLIPPAGE;
 use crate::swqos::SwqosClient;
 use crate::swqos::SwqosConfig;
 use crate::swqos::TradeType;
