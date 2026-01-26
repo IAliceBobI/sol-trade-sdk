@@ -7,7 +7,7 @@ use once_cell::sync::Lazy;
 use std::time::{Duration, Instant};
 
 /// 全局快速时间提供器
-static FAST_TIMER: Lazy<FastTimer> = Lazy::new(|| FastTimer::new());
+static FAST_TIMER: Lazy<FastTimer> = Lazy::new(FastTimer::new);
 
 /// 快速计时器 - 减少系统调用开销
 pub struct FastTimer {

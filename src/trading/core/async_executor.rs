@@ -204,10 +204,8 @@ pub async fn execute_parallel(
     }
 
     if !with_tip
-        && swqos_clients
-            .iter()
-            .find(|swqos| matches!(swqos.get_swqos_type(), SwqosType::Default))
-            .is_none()
+        && !swqos_clients
+            .iter().any(|swqos| matches!(swqos.get_swqos_type(), SwqosType::Default))
     {
         return Err(anyhow!("No Rpc Default Swqos configured."));
     }

@@ -428,7 +428,7 @@ impl AutoMockRpcClient {
 
         let json = serde_json::to_string_pretty(&mock_data).unwrap_or_else(|e| {
             eprintln!("⚠️  序列化失败: {}", e);
-            return String::new();
+            String::new()
         });
 
         fs::write(&file_path, json).unwrap_or_else(|e| {
@@ -499,8 +499,8 @@ impl AutoMockRpcClient {
         let params_json = serde_json::json!((
             signature.to_string(),
             RpcTransactionConfig {
-                encoding: config.encoding.clone(),
-                commitment: config.commitment.clone(),
+                encoding: config.encoding,
+                commitment: config.commitment,
                 max_supported_transaction_version: config.max_supported_transaction_version,
             }
         ));
@@ -658,7 +658,7 @@ impl AutoMockRpcClient {
 
         // 保存到文件
         let result_json =
-            serde_json::to_value(&balance).map_err(|e| format!("序列化结果失败: {}", e))?;
+            serde_json::to_value(balance).map_err(|e| format!("序列化结果失败: {}", e))?;
         self.save_mock_data("get_balance", &params_json, &result_json);
 
         Ok(balance)

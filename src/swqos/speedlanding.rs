@@ -114,7 +114,7 @@ impl SwqosClientTrait for SpeedlandingClient {
             let connection = self.connection.load_full();
             if let Err(e) = Self::try_send_bytes(&connection, &serialized_tx).await {
                 eprintln!(" [speedlanding] {} submission failed: {:?}", trade_type, e);
-                return Err(e.into());
+                return Err(e);
             }
         }
         match poll_transaction_confirmation(&self.rpc_client, *signature, wait_confirmation).await {

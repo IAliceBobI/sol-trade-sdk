@@ -36,7 +36,7 @@ pub fn compute_swap_step(
     if is_base_input {
         // round up amount_in
         // In exact input case, amount_remaining is positive
-        let amount_remaining_less_fee = (amount_remaining as u64)
+        let amount_remaining_less_fee = amount_remaining
             .mul_div_floor(
                 (FEE_RATE_DENOMINATOR_VALUE - fee_rate).into(),
                 u64::from(FEE_RATE_DENOMINATOR_VALUE),
@@ -142,7 +142,7 @@ pub fn compute_swap_step(
         if is_base_input && swap_step.sqrt_price_next_x64 != sqrt_price_target_x64 {
             // we didn't reach the target, so take the remainder of the maximum input as fee
             // swap dust is granted as fee
-            u64::from(amount_remaining).checked_sub(swap_step.amount_in).unwrap()
+            amount_remaining.checked_sub(swap_step.amount_in).unwrap()
         } else {
             // take pip percentage as fee
             swap_step
@@ -183,13 +183,11 @@ fn calculate_amount_in_range(
         };
 
         if result.is_ok() {
-            return Ok(Some(result.unwrap()));
+            Ok(Some(result.unwrap()))
+        } else if result.err().unwrap() == "MaxTokenOverflow" {
+            Ok(None)
         } else {
-            if result.err().unwrap() == "MaxTokenOverflow" {
-                return Ok(None);
-            } else {
-                return Err("SqrtPriceLimitOverflow");
-            }
+            Err("SqrtPriceLimitOverflow")
         }
     } else {
         let result = if zero_for_one {
@@ -208,13 +206,11 @@ fn calculate_amount_in_range(
             )
         };
         if result.is_ok() {
-            return Ok(Some(result.unwrap()));
+            Ok(Some(result.unwrap()))
+        } else if result.err().unwrap() == "MaxTokenOverflow" {
+            Ok(None)
         } else {
-            if result.err().unwrap() == "MaxTokenOverflow" {
-                return Ok(None);
-            } else {
-                return Err("SqrtPriceLimitOverflow");
-            }
+            Err("SqrtPriceLimitOverflow")
         }
     }
 }

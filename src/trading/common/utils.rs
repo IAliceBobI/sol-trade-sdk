@@ -17,11 +17,11 @@ pub async fn get_multi_token_balances_with_client<T: PoolRpcClient + ?Sized>(
     token1_vault: &Pubkey,
 ) -> Result<(u64, u64), anyhow::Error> {
     let token0_balance = rpc
-        .get_token_account_balance(&token0_vault)
+        .get_token_account_balance(token0_vault)
         .await
         .map_err(|e| anyhow!("Failed to get token0 balance: {}", e))?;
     let token1_balance = rpc
-        .get_token_account_balance(&token1_vault)
+        .get_token_account_balance(token1_vault)
         .await
         .map_err(|e| anyhow!("Failed to get token1 balance: {}", e))?;
     // Parse balance string to u64

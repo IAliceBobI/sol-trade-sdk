@@ -614,11 +614,10 @@ impl SystemCallBypassManager {
             loop {
                 interval.tick().await;
 
-                if let Ok(processed) = processor.execute_batch().await {
-                    if processed > 0 {
+                if let Ok(processed) = processor.execute_batch().await
+                    && processed > 0 {
                         stats.syscalls_bypassed.fetch_add(processed as u64, Ordering::Relaxed);
                     }
-                }
             }
         });
 
@@ -685,12 +684,12 @@ impl SyscallBypassStatsSnapshot {
 macro_rules! bypass_syscall {
     (time) => {
         // 使用快速时间而不是系统调用
-        crate::performance::syscall_bypass::GLOBAL_TIME_PROVIDER.fast_now_nanos()
+        $crate::performance::syscall_bypass::GLOBAL_TIME_PROVIDER.fast_now_nanos()
     };
 
     (batch_io $ops:expr) => {
         // 批量提交I/O操作
-        crate::performance::syscall_bypass::GLOBAL_BYPASS_MANAGER
+        $crate::performance::syscall_bypass::GLOBAL_BYPASS_MANAGER
             .submit_batch_io($ops)
             .await
     };

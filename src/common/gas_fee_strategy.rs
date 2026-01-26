@@ -29,6 +29,12 @@ pub struct GasFeeStrategy {
         Arc<ArcSwap<HashMap<(SwqosType, TradeType, GasFeeStrategyType), GasFeeStrategyValue>>>,
 }
 
+impl Default for GasFeeStrategy {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl GasFeeStrategy {
     pub fn new() -> Self {
         Self { strategies: Arc::new(ArcSwap::from_pointee(HashMap::new())) }

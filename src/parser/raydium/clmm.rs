@@ -27,6 +27,12 @@ struct TransferRecord {
 /// Raydium CLMM 解析器
 pub struct RaydiumClmmParser;
 
+impl Default for RaydiumClmmParser {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl RaydiumClmmParser {
     pub fn new() -> Self {
         Self
@@ -328,7 +334,7 @@ impl DexParserTrait for RaydiumClmmParser {
         let program_id = self.protocol().program_id();
         let program_pubkey: solana_sdk::pubkey::Pubkey = program_id
             .parse()
-            .expect(&format!("无效的程序 ID 常量 '{}': 解析失败", program_id));
+            .unwrap_or_else(|_| panic!("无效的程序 ID 常量 '{}': 解析失败", program_id));
 
         // 检查 inner instructions 中是否有 CLMM 程序的指令
         let has_inner = !adapter.get_inner_instructions_by_program(&program_pubkey).is_empty();

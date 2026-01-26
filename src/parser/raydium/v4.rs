@@ -27,6 +27,12 @@ struct TransferRecord {
 /// Raydium V4 解析器
 pub struct RaydiumV4Parser;
 
+impl Default for RaydiumV4Parser {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl RaydiumV4Parser {
     pub fn new() -> Self {
         Self

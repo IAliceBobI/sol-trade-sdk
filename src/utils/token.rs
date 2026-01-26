@@ -45,8 +45,8 @@ pub async fn get_mint_info(
     let is_token2022 = account.owner == spl_token_2022::ID;
 
     // 尝试解析为传统 Token 程序的 Mint
-    if !is_token2022 {
-        if let Ok(mint_account) = Mint::unpack(&account.data) {
+    if !is_token2022
+        && let Ok(mint_account) = Mint::unpack(&account.data) {
             let info = MintInfo {
                 decimals: mint_account.decimals,
                 symbol: get_known_token_symbol(mint),
@@ -55,7 +55,6 @@ pub async fn get_mint_info(
             MINT_INFO_CACHE.insert(*mint, info.clone());
             return Ok(info);
         }
-    }
 
     // 尝试解析为 Token2022 的 Mint
     if is_token2022 {
@@ -102,8 +101,8 @@ pub async fn get_mint_info_with_client<T: PoolRpcClient + ?Sized>(
     let is_token2022 = account.owner == spl_token_2022::ID;
 
     // 尝试解析为传统 Token 程序的 Mint
-    if !is_token2022 {
-        if let Ok(mint_account) = Mint::unpack(&account.data) {
+    if !is_token2022
+        && let Ok(mint_account) = Mint::unpack(&account.data) {
             let info = MintInfo {
                 decimals: mint_account.decimals,
                 symbol: get_known_token_symbol(mint),
@@ -112,7 +111,6 @@ pub async fn get_mint_info_with_client<T: PoolRpcClient + ?Sized>(
             MINT_INFO_CACHE.insert(*mint, info.clone());
             return Ok(info);
         }
-    }
 
     // 尝试解析为 Token2022 的 Mint
     if is_token2022 {
@@ -420,6 +418,6 @@ trait PubkeyExt {
 
 impl PubkeyExt for Pubkey {
     fn from_str_const(s: &str) -> Self {
-        Pubkey::from_str(s).expect(&format!("无效的 Pubkey 常量: '{}'", s))
+        Pubkey::from_str(s).unwrap_or_else(|_| panic!("无效的 Pubkey 常量: '{}'", s))
     }
 }

@@ -27,6 +27,12 @@ struct TransferRecord {
 /// Raydium CPMM 解析器
 pub struct RaydiumCpmmParser;
 
+impl Default for RaydiumCpmmParser {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl RaydiumCpmmParser {
     pub fn new() -> Self {
         Self

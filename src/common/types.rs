@@ -25,7 +25,7 @@ impl InfrastructureConfig {
         Self {
             rpc_url: config.rpc_url.clone(),
             swqos_configs: config.swqos_configs.clone(),
-            commitment: config.commitment.clone(),
+            commitment: config.commitment,
         }
     }
 
@@ -62,6 +62,7 @@ impl Eq for InfrastructureConfig {}
 ///
 /// 控制交易生命周期回调的执行方式
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Default)]
 pub enum CallbackExecutionMode {
     /// 异步模式：不阻塞交易发送（默认）
     ///
@@ -73,6 +74,7 @@ pub enum CallbackExecutionMode {
     /// # 性能
     /// - 交易延迟：0ms（不阻塞）
     /// - 失败影响：不影响交易
+    #[default]
     Async,
 
     /// 同步模式：等待回调完成后再发送交易
@@ -88,11 +90,6 @@ pub enum CallbackExecutionMode {
     Sync,
 }
 
-impl Default for CallbackExecutionMode {
-    fn default() -> Self {
-        Self::Async
-    }
-}
 
 #[derive(Debug, Clone)]
 pub struct TradeConfig {

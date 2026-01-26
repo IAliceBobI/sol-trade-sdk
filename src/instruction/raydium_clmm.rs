@@ -298,7 +298,7 @@ impl InstructionBuilder for RaydiumClmmInstructionBuilder {
                                 is_token0_in,
                                 input_decimals,
                                 output_decimals,
-                                &protocol_params,
+                                protocol_params,
                             )
                         },
                     }
@@ -315,7 +315,7 @@ impl InstructionBuilder for RaydiumClmmInstructionBuilder {
                         is_token0_in,
                         input_decimals,
                         output_decimals,
-                        &protocol_params,
+                        protocol_params,
                     )
                 },
             }
@@ -331,7 +331,7 @@ impl InstructionBuilder for RaydiumClmmInstructionBuilder {
                 is_token0_in,
                 input_decimals,
                 output_decimals,
-                &protocol_params,
+                protocol_params,
             )
         };
 
@@ -737,7 +737,7 @@ impl InstructionBuilder for RaydiumClmmInstructionBuilder {
                                 is_token0_in,
                                 input_decimals,
                                 output_decimals,
-                                &protocol_params,
+                                protocol_params,
                             )
                         },
                     }
@@ -754,7 +754,7 @@ impl InstructionBuilder for RaydiumClmmInstructionBuilder {
                         is_token0_in,
                         input_decimals,
                         output_decimals,
-                        &protocol_params,
+                        protocol_params,
                     )
                 },
             }
@@ -770,7 +770,7 @@ impl InstructionBuilder for RaydiumClmmInstructionBuilder {
                 is_token0_in,
                 input_decimals,
                 output_decimals,
-                &protocol_params,
+                protocol_params,
             )
         };
 

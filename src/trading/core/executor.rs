@@ -253,11 +253,10 @@ async fn simulate_transaction(
         )
         .await?;
 
-    let signature = transaction
+    let signature = *transaction
         .signatures
         .first()
-        .ok_or_else(|| anyhow::anyhow!("Transaction has no signatures"))?
-        .clone();
+        .ok_or_else(|| anyhow::anyhow!("Transaction has no signatures"))?;
 
     if let Some(err) = simulate_result.value.err {
         eprintln!("\n[Simulation Failed] error={:?} signature={:?}", err, signature);

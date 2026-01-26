@@ -21,8 +21,8 @@ pub fn handle_wsol(payer: &Pubkey, amount_in: u64) -> SmallVec<[Instruction; 3]>
 
     let mut insts = SmallVec::<[Instruction; 3]>::new();
     insts.extend(create_associated_token_account_idempotent_fast(
-        &payer,
-        &payer,
+        payer,
+        payer,
         &crate::constants::WSOL_TOKEN_ACCOUNT,
         &crate::constants::TOKEN_PROGRAM,
     ));
@@ -44,7 +44,7 @@ pub fn close_wsol(payer: &Pubkey) -> Vec<Instruction> {
 
     let wsol_token_account =
         crate::common::fast_fn::get_associated_token_address_with_program_id_fast(
-            &payer,
+            payer,
             &crate::constants::WSOL_TOKEN_ACCOUNT,
             &crate::constants::TOKEN_PROGRAM,
         );
@@ -58,8 +58,8 @@ pub fn close_wsol(payer: &Pubkey) -> Vec<Instruction> {
                 close_account(
                     &crate::constants::TOKEN_PROGRAM,
                     &wsol_token_account,
-                    &payer,
-                    &payer,
+                    payer,
+                    payer,
                     &[],
                 )
                 .unwrap(),
@@ -74,8 +74,8 @@ pub fn close_wsol(payer: &Pubkey) -> Vec<Instruction> {
 #[inline]
 pub fn create_wsol_ata(payer: &Pubkey) -> Vec<Instruction> {
     create_associated_token_account_idempotent_fast(
-        &payer,
-        &payer,
+        payer,
+        payer,
         &crate::constants::WSOL_TOKEN_ACCOUNT,
         &crate::constants::TOKEN_PROGRAM,
     )
@@ -86,14 +86,14 @@ pub fn create_wsol_ata(payer: &Pubkey) -> Vec<Instruction> {
 pub fn wrap_sol_only(payer: &Pubkey, amount_in: u64) -> SmallVec<[Instruction; 2]> {
     let wsol_token_account =
         crate::common::fast_fn::get_associated_token_address_with_program_id_fast(
-            &payer,
+            payer,
             &crate::constants::WSOL_TOKEN_ACCOUNT,
             &crate::constants::TOKEN_PROGRAM,
         );
 
     let mut insts = SmallVec::<[Instruction; 2]>::new();
     insts.extend([
-        transfer(&payer, &wsol_token_account, amount_in),
+        transfer(payer, &wsol_token_account, amount_in),
         // sync_native
         Instruction {
             program_id: crate::constants::TOKEN_PROGRAM,
@@ -127,7 +127,7 @@ pub fn wrap_wsol_to_sol(payer: &Pubkey, amount: u64) -> Result<Vec<Instruction>,
 
     // 3. 获取用户的 WSOL ATA 地址
     let user_wsol_ata = crate::common::fast_fn::get_associated_token_address_with_program_id_fast(
-        &payer,
+        payer,
         &crate::constants::WSOL_TOKEN_ACCOUNT,
         &crate::constants::TOKEN_PROGRAM,
     );
@@ -137,7 +137,7 @@ pub fn wrap_wsol_to_sol(payer: &Pubkey, amount: u64) -> Result<Vec<Instruction>,
         &crate::constants::TOKEN_PROGRAM,
         &user_wsol_ata,
         &seed_ata_address,
-        &payer,
+        payer,
         amount,
         &[],
     )?;
@@ -145,7 +145,7 @@ pub fn wrap_wsol_to_sol(payer: &Pubkey, amount: u64) -> Result<Vec<Instruction>,
 
     // 5. 添加关闭 WSOL seed 账户的指令
     let close_instruction =
-        close_account(&crate::constants::TOKEN_PROGRAM, &seed_ata_address, &payer, &payer, &[])?;
+        close_account(&crate::constants::TOKEN_PROGRAM, &seed_ata_address, payer, payer, &[])?;
     instructions.push(close_instruction);
 
     Ok(instructions)
@@ -168,7 +168,7 @@ pub fn wrap_wsol_to_sol_without_create(
 
     // 2. 获取用户的 WSOL ATA 地址
     let user_wsol_ata = crate::common::fast_fn::get_associated_token_address_with_program_id_fast(
-        &payer,
+        payer,
         &crate::constants::WSOL_TOKEN_ACCOUNT,
         &crate::constants::TOKEN_PROGRAM,
     );
@@ -186,7 +186,7 @@ pub fn wrap_wsol_to_sol_without_create(
 
     // 4. 添加关闭 WSOL seed 账户的指令
     let close_instruction =
-        close_account(&crate::constants::TOKEN_PROGRAM, &seed_ata_address, &payer, &payer, &[])?;
+        close_account(&crate::constants::TOKEN_PROGRAM, &seed_ata_address, payer, payer, &[])?;
     instructions.push(close_instruction);
 
     Ok(instructions)

@@ -9,17 +9,14 @@
 use uint::construct_uint;
 
 // Allow clippy::reversed_empty_ranges - triggered by construct_uint! macro from uint crate
-#[allow(clippy::reversed_empty_ranges)]
 construct_uint! {
     pub struct U128(2);
 }
 
-#[allow(clippy::reversed_empty_ranges)]
 construct_uint! {
     pub struct U256(4);
 }
 
-#[allow(clippy::reversed_empty_ranges)]
 construct_uint! {
     pub struct U512(8);
 }

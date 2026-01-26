@@ -16,6 +16,12 @@ use crate::parser::{
 /// PumpSwap 解析器
 pub struct PumpswapParser;
 
+impl Default for PumpswapParser {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl PumpswapParser {
     pub fn new() -> Self {
         Self

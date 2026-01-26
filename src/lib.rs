@@ -75,17 +75,16 @@ impl TradingInfrastructure {
     /// - Initializes rent cache and starts background updater
     pub async fn new(config: InfrastructureConfig) -> Self {
         // Install crypto provider (idempotent)
-        if CryptoProvider::get_default().is_none() {
-            if let Err(e) = default_provider().install_default() {
+        if CryptoProvider::get_default().is_none()
+            && let Err(e) = default_provider().install_default() {
                 eprintln!("⚠️  Failed to install crypto provider: {e:?}");
                 eprintln!("    Crypto operations may fail. Continuing anyway...");
             }
-        }
 
         // Create RPC client
         let rpc = Arc::new(SolanaRpcClient::new_with_commitment(
             config.rpc_url.clone(),
-            config.commitment.clone(),
+            config.commitment,
         ));
 
         // Initialize rent cache and start background updater
@@ -107,7 +106,7 @@ impl TradingInfrastructure {
             }
             match SwqosConfig::get_swqos_client(
                 config.rpc_url.clone(),
-                config.commitment.clone(),
+                config.commitment,
                 swqos.clone(),
             )
             .await
@@ -290,20 +289,19 @@ impl TradingClient {
             .expect("Failed to get pubkey from keypair - this should never happen");
         crate::common::fast_fn::fast_init(&pubkey);
 
-        if CryptoProvider::get_default().is_none() {
-            if let Err(e) = default_provider().install_default() {
+        if CryptoProvider::get_default().is_none()
+            && let Err(e) = default_provider().install_default() {
                 eprintln!("⚠️  Failed to install crypto provider: {e:?}");
                 eprintln!("    Crypto operations may fail. Continuing anyway...");
             }
-        }
 
         let rpc_url = trade_config.rpc_url.clone();
         let swqos_configs = trade_config.swqos_configs.clone();
-        let commitment = trade_config.commitment.clone();
+        let commitment = trade_config.commitment;
         let mut swqos_clients: Vec<Arc<SwqosClient>> = vec![];
 
         for swqos in swqos_configs {
-            match SwqosConfig::get_swqos_client(rpc_url.clone(), commitment.clone(), swqos.clone())
+            match SwqosConfig::get_swqos_client(rpc_url.clone(), commitment, swqos.clone())
                 .await
             {
                 Ok(client) => swqos_clients.push(client),
@@ -314,7 +312,7 @@ impl TradingClient {
         }
 
         let rpc =
-            Arc::new(SolanaRpcClient::new_with_commitment(rpc_url.clone(), commitment.clone()));
+            Arc::new(SolanaRpcClient::new_with_commitment(rpc_url.clone(), commitment));
         common::seed::update_rents(&rpc)
             .await
             .expect("Failed to initialize rent cache - this is required for trading operations");
@@ -556,9 +554,8 @@ impl TradingClient {
         }
 
         let swap_result = executor.swap(buy_params).await;
-        let result =
-            swap_result.map(|(success, sigs, err)| (success, sigs, err.map(TradeError::from)));
-        return result;
+        
+        swap_result.map(|(success, sigs, err)| (success, sigs, err.map(TradeError::from)))
     }
 
     /// Execute a sell order for a specified token
@@ -673,9 +670,8 @@ impl TradingClient {
 
         // Execute sell based on tip preference
         let swap_result = executor.swap(sell_params).await;
-        let result =
-            swap_result.map(|(success, sigs, err)| (success, sigs, err.map(TradeError::from)));
-        return result;
+        
+        swap_result.map(|(success, sigs, err)| (success, sigs, err.map(TradeError::from)))
     }
 
     /// Execute a sell order for a percentage of the specified token amount

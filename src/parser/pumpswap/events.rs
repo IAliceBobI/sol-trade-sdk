@@ -67,11 +67,11 @@ pub fn parse_pumpswap_event(data: &[u8]) -> Option<(PumpswapEventType, EventData
     let discriminator = &data[0..16];
 
     // 匹配事件类型
-    if discriminator == &pumpswap::BUY_EVENT {
+    if discriminator == pumpswap::BUY_EVENT {
         parse_buy_event(&data[16..]).map(|evt| (PumpswapEventType::Buy, EventData::Buy(evt)))
-    } else if discriminator == &pumpswap::SELL_EVENT {
+    } else if discriminator == pumpswap::SELL_EVENT {
         parse_sell_event(&data[16..]).map(|evt| (PumpswapEventType::Sell, EventData::Sell(evt)))
-    } else if discriminator == &pumpswap::CREATE_POOL_EVENT {
+    } else if discriminator == pumpswap::CREATE_POOL_EVENT {
         parse_create_event(&data[16..])
             .map(|_| (PumpswapEventType::Create, EventData::Buy(create_dummy_buy())))
     } else {

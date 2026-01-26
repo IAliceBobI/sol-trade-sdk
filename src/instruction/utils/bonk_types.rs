@@ -300,7 +300,7 @@ pub struct OldPoolState {
 pub const BONK_POOL_STATE_SIZE: usize = 345;
 
 /// Size of old PoolState
-pub const OLD_POOL_STATE_SIZE: usize = 8 + 1 * 5 + 8 * 10 + 32 * 7 + 8 * 8 + 8 * 5;
+pub const OLD_POOL_STATE_SIZE: usize = 8 + 5 + 8 * 10 + 32 * 7 + 8 * 8 + 8 * 5;
 
 /// Try to decode pool state, supporting both BONKswap and old formats
 pub fn pool_state_decode(data: &[u8]) -> Option<PoolState> {

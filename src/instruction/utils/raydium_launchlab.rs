@@ -763,18 +763,14 @@ pub async fn find_global_config(
                     // If quote_mint is USD1, try known USD1 global config
                     // USD1 mint: USD1ttGY1N17NEEHLmELoaybftRBUSErhqYiQzvEmuB
                     let usd1_mint = pubkey!("USD1ttGY1N17NEEHLmELoaybftRBUSErhqYiQzvEmuB");
-                    if quote_mint == &usd1_mint {
-                        match rpc.get_account(&accounts::USD1_GLOBAL_CONFIG).await {
-                            Ok(_) => {
-                                println!(
-                                    "   ℹ️  使用已知的 USD1 global_config: {}",
-                                    accounts::USD1_GLOBAL_CONFIG
-                                );
-                                return Ok(accounts::USD1_GLOBAL_CONFIG);
-                            },
-                            Err(_) => {},
+                    if quote_mint == &usd1_mint
+                        && let Ok(_) = rpc.get_account(&accounts::USD1_GLOBAL_CONFIG).await {
+                            println!(
+                                "   ℹ️  使用已知的 USD1 global_config: {}",
+                                accounts::USD1_GLOBAL_CONFIG
+                            );
+                            return Ok(accounts::USD1_GLOBAL_CONFIG);
                         }
-                    }
 
                     // If quote_mint is WSOL, we could add known WSOL global config here if available
                     if quote_mint == &WSOL_TOKEN_ACCOUNT {
@@ -1123,16 +1119,14 @@ async fn query_all_amm_configs(
             },
             _ => continue,
         };
-        if data_bytes.len() >= 8 + AMM_CONFIG_SIZE {
-            if let Some(amm_config) = amm_config_decode(&data_bytes[8..8 + AMM_CONFIG_SIZE]) {
+        if data_bytes.len() >= 8 + AMM_CONFIG_SIZE
+            && let Some(amm_config) = amm_config_decode(&data_bytes[8..8 + AMM_CONFIG_SIZE]) {
                 // Verify owner is CPMM program (owner is a string in UiAccount, convert to Pubkey for comparison)
-                if let Ok(owner_pubkey) = acc.owner.parse::<Pubkey>() {
-                    if owner_pubkey == *cpmm_program {
+                if let Ok(owner_pubkey) = acc.owner.parse::<Pubkey>()
+                    && owner_pubkey == *cpmm_program {
                         configs.push((addr, amm_config));
                     }
-                }
             }
-        }
     }
 
     Ok(configs)
@@ -1142,27 +1136,19 @@ async fn query_all_amm_configs(
 async fn try_known_config_address(rpc: &SolanaRpcClient) -> Option<(Pubkey, Pubkey)> {
     // Try mainnet config first
     let mainnet_config = accounts::CPMM_CONFIG_MAINNET;
-    match rpc.get_account(&mainnet_config).await {
-        Ok(account) => {
-            if account.owner == accounts::CPMM_PROGRAM {
-                println!("   ✅ 使用已知的 CPMM config 地址: {} (主网)", mainnet_config);
-                return Some((mainnet_config, accounts::CPMM_CREATE_POOL_FEE));
-            }
-        },
-        Err(_) => {},
-    }
+    if let Ok(account) = rpc.get_account(&mainnet_config).await
+        && account.owner == accounts::CPMM_PROGRAM {
+            println!("   ✅ 使用已知的 CPMM config 地址: {} (主网)", mainnet_config);
+            return Some((mainnet_config, accounts::CPMM_CREATE_POOL_FEE));
+        }
 
     // Try devnet config
     let devnet_config = accounts::CPMM_CONFIG_DEVNET;
-    match rpc.get_account(&devnet_config).await {
-        Ok(account) => {
-            if account.owner == accounts::CPMM_PROGRAM_DEVNET {
-                println!("   ✅ 使用已知的 CPMM config 地址: {} (Devnet)", devnet_config);
-                return Some((devnet_config, accounts::CPMM_CREATE_POOL_FEE));
-            }
-        },
-        Err(_) => {},
-    }
+    if let Ok(account) = rpc.get_account(&devnet_config).await
+        && account.owner == accounts::CPMM_PROGRAM_DEVNET {
+            println!("   ✅ 使用已知的 CPMM config 地址: {} (Devnet)", devnet_config);
+            return Some((devnet_config, accounts::CPMM_CREATE_POOL_FEE));
+        }
 
     None
 }
@@ -1237,8 +1223,8 @@ pub async fn find_cpswap_config(rpc: &SolanaRpcClient) -> Result<(Pubkey, Pubkey
                             },
                             _ => continue,
                         };
-                        if data_bytes.len() > 8 {
-                            if let Some(pool_state) = pool_state_decode(&data_bytes[8..]) {
+                        if data_bytes.len() > 8
+                            && let Some(pool_state) = pool_state_decode(&data_bytes[8..]) {
                                 let cpswap_config = pool_state.amm_config;
                                 let cpswap_create_pool_fee = accounts::CPMM_CREATE_POOL_FEE;
 
@@ -1253,7 +1239,6 @@ pub async fn find_cpswap_config(rpc: &SolanaRpcClient) -> Result<(Pubkey, Pubkey
 
                                 return Ok((cpswap_config, cpswap_create_pool_fee));
                             }
-                        }
                     }
                 }
             },

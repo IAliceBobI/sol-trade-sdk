@@ -376,7 +376,7 @@ pub fn calculate_swap_amount_with_tick_arrays(
         // 如果当前 tick array 已经用完，移动到下一个
         if needs_next_tick_array(
             state.tick,
-            &tick_arrays,
+            tick_arrays,
             tick_array_idx,
             tick_spacing,
             zero_for_one,
@@ -406,10 +406,8 @@ fn find_next_initialized_tick(
                 if tick <= current_tick && is_initialized {
                     return Some((tick, is_initialized, liquidity_net));
                 }
-            } else {
-                if tick > current_tick && is_initialized {
-                    return Some((tick, is_initialized, liquidity_net));
-                }
+            } else if tick > current_tick && is_initialized {
+                return Some((tick, is_initialized, liquidity_net));
             }
         }
     }

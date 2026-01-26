@@ -36,9 +36,9 @@ impl SIMDMemory {
     /// 使用通用方法拷贝内存（非x86_64架构）
     #[cfg(not(target_arch = "x86_64"))]
     #[inline(always)]
-    pub unsafe fn copy_avx2(dst: *mut u8, src: *const u8, len: usize) {
+    pub unsafe fn copy_avx2(dst: *mut u8, src: *const u8, len: usize) { unsafe {
         std::ptr::copy_nonoverlapping(src, dst, len);
-    }
+    }}
 
     /// 使用 SIMD 加速内存比较
     #[cfg(target_arch = "x86_64")]
@@ -73,9 +73,9 @@ impl SIMDMemory {
     /// 使用通用方法比较内存（非x86_64架构）
     #[cfg(not(target_arch = "x86_64"))]
     #[inline(always)]
-    pub unsafe fn compare_avx2(a: *const u8, b: *const u8, len: usize) -> bool {
+    pub unsafe fn compare_avx2(a: *const u8, b: *const u8, len: usize) -> bool { unsafe {
         std::slice::from_raw_parts(a, len) == std::slice::from_raw_parts(b, len)
-    }
+    }}
 
     /// 使用 SIMD 清零内存
     #[cfg(target_arch = "x86_64")]
@@ -100,9 +100,9 @@ impl SIMDMemory {
     /// 使用通用方法清零内存（非x86_64架构）
     #[cfg(not(target_arch = "x86_64"))]
     #[inline(always)]
-    pub unsafe fn zero_avx2(ptr: *mut u8, len: usize) {
+    pub unsafe fn zero_avx2(ptr: *mut u8, len: usize) { unsafe {
         std::ptr::write_bytes(ptr, 0, len);
-    }
+    }}
 }
 
 /// SIMD 数学运算

@@ -172,13 +172,11 @@ impl TransactionAdapter {
         let tx_value =
             serde_json::to_value(tx).map_err(|e| AdapterError::JsonError(e.to_string()))?;
 
-        if let Some(signatures) = tx_value["transaction"]["signatures"].as_array() {
-            if let Some(first_sig) = signatures.first() {
-                if let Some(sig_str) = first_sig.as_str() {
+        if let Some(signatures) = tx_value["transaction"]["signatures"].as_array()
+            && let Some(first_sig) = signatures.first()
+                && let Some(sig_str) = first_sig.as_str() {
                     return Ok(sig_str.to_string());
                 }
-            }
-        }
 
         // 备选方案：尝试直接访问
         Ok(String::new())
@@ -205,43 +203,38 @@ impl TransactionAdapter {
                     }
                 }
                 // 尝试作为对象 (有 pubkey 字段)
-                else if let Some(key_str) = key_value["pubkey"].as_str() {
-                    if let Ok(pubkey) = Pubkey::from_str(key_str) {
+                else if let Some(key_str) = key_value["pubkey"].as_str()
+                    && let Ok(pubkey) = Pubkey::from_str(key_str) {
                         keys.push(pubkey);
                     }
-                }
             }
         }
 
         // 2. transaction.message.staticAccountKeys (备用)
-        if keys.is_empty() {
-            if let Some(account_keys) =
+        if keys.is_empty()
+            && let Some(account_keys) =
                 tx_value["transaction"]["message"]["staticAccountKeys"].as_array()
             {
                 for key_value in account_keys {
-                    if let Some(key_str) = key_value.as_str() {
-                        if let Ok(pubkey) = Pubkey::from_str(key_str) {
+                    if let Some(key_str) = key_value.as_str()
+                        && let Ok(pubkey) = Pubkey::from_str(key_str) {
                             keys.push(pubkey);
                         }
-                    }
                 }
             }
-        }
 
         // 3. accountKeys (在 message 级别)
-        if keys.is_empty() {
-            if let Some(account_keys) =
+        if keys.is_empty()
+            && let Some(account_keys) =
                 tx_value["transaction"]["message"]["accountKeys"]["accountKeys"].as_array()
             {
                 for key_value in account_keys {
-                    if let Some(key_str) = key_value.as_str() {
-                        if let Ok(pubkey) = Pubkey::from_str(key_str) {
+                    if let Some(key_str) = key_value.as_str()
+                        && let Ok(pubkey) = Pubkey::from_str(key_str) {
                             keys.push(pubkey);
                         }
-                    }
                 }
             }
-        }
 
         Ok(keys)
     }
@@ -282,8 +275,8 @@ impl TransactionAdapter {
                 if account_index < account_keys.len() {
                     let account = account_keys[account_index];
 
-                    if let Some(mint_str) = balance["mint"].as_str() {
-                        if let Ok(mint) = Pubkey::from_str(mint_str) {
+                    if let Some(mint_str) = balance["mint"].as_str()
+                        && let Ok(mint) = Pubkey::from_str(mint_str) {
                             spl_token_map.insert(account, mint);
 
                             // 解析 UiTokenAmount
@@ -307,7 +300,6 @@ impl TransactionAdapter {
                                     .0 = Some(token_amount.clone());
                             }
                         }
-                    }
                 }
             }
         }
@@ -326,8 +318,8 @@ impl TransactionAdapter {
                 if account_index < account_keys.len() {
                     let account = account_keys[account_index];
 
-                    if let Some(mint_str) = balance["mint"].as_str() {
-                        if let Ok(mint) = Pubkey::from_str(mint_str) {
+                    if let Some(mint_str) = balance["mint"].as_str()
+                        && let Ok(mint) = Pubkey::from_str(mint_str) {
                             spl_token_map.insert(account, mint);
 
                             if let Some(ui_amount) = balance.get("uiTokenAmount") {
@@ -350,7 +342,6 @@ impl TransactionAdapter {
                                     .1 = Some(token_amount.clone());
                             }
                         }
-                    }
                 }
             }
         }
@@ -596,8 +587,8 @@ impl TransactionAdapter {
                 }
 
                 // 尝试从 parsed 字段判断
-                if let Some(json) = &ix.instruction.parsed_json {
-                    if let Some(t) = json["parsed"]["type"].as_str() {
+                if let Some(json) = &ix.instruction.parsed_json
+                    && let Some(t) = json["parsed"]["type"].as_str() {
                         return matches!(
                             t,
                             "transfer"
@@ -608,7 +599,6 @@ impl TransactionAdapter {
                                 | "burnChecked"
                         );
                     }
-                }
 
                 // 如果没有 parsed 字段，尝试从指令数据判断
                 // Token Program 指令的 discriminator:
@@ -633,13 +623,12 @@ impl TransactionAdapter {
         let mut transfers = Vec::new();
 
         for ix in self.get_all_transfer_instructions() {
-            if let Some(json) = &ix.instruction.parsed_json {
-                if let Ok(transfer_data) =
+            if let Some(json) = &ix.instruction.parsed_json
+                && let Ok(transfer_data) =
                     self.parse_transfer_instruction(json, ix.outer_index, ix.inner_index)
                 {
                     transfers.push(transfer_data);
                 }
-            }
         }
 
         transfers
@@ -728,9 +717,7 @@ impl TransactionAdapter {
                 .or_else(|| self.spl_token_map.get(&destination))
                 .copied()
                 .ok_or_else(|| {
-                    AdapterError::InstructionParseError(format!(
-                        "无法从 source/destination 推断 mint"
-                    ))
+                    AdapterError::InstructionParseError("无法从 source/destination 推断 mint".to_string())
                 })?
         };
 
