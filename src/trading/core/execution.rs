@@ -57,7 +57,9 @@ impl MemoryOps {
     #[inline(always)]
     pub unsafe fn copy(dst: *mut u8, src: *const u8, len: usize) {
         // 优先使用 AVX2 SIMD 加速
-        unsafe { SIMDMemory::copy_avx2(dst, src, len); }
+        unsafe {
+            SIMDMemory::copy_avx2(dst, src, len);
+        }
     }
 
     #[inline(always)]
@@ -69,7 +71,9 @@ impl MemoryOps {
     #[inline(always)]
     pub unsafe fn zero(ptr: *mut u8, len: usize) {
         // 优先使用 AVX2 SIMD 清零
-        unsafe { SIMDMemory::zero_avx2(ptr, len); }
+        unsafe {
+            SIMDMemory::zero_avx2(ptr, len);
+        }
     }
 }
 
