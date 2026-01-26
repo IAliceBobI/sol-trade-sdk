@@ -76,10 +76,11 @@ impl TradingInfrastructure {
     pub async fn new(config: InfrastructureConfig) -> Self {
         // Install crypto provider (idempotent)
         if CryptoProvider::get_default().is_none()
-            && let Err(e) = default_provider().install_default() {
-                eprintln!("⚠️  Failed to install crypto provider: {e:?}");
-                eprintln!("    Crypto operations may fail. Continuing anyway...");
-            }
+            && let Err(e) = default_provider().install_default()
+        {
+            eprintln!("⚠️  Failed to install crypto provider: {e:?}");
+            eprintln!("    Crypto operations may fail. Continuing anyway...");
+        }
 
         // Create RPC client
         let rpc = Arc::new(SolanaRpcClient::new_with_commitment(
@@ -290,10 +291,11 @@ impl TradingClient {
         crate::common::fast_fn::fast_init(&pubkey);
 
         if CryptoProvider::get_default().is_none()
-            && let Err(e) = default_provider().install_default() {
-                eprintln!("⚠️  Failed to install crypto provider: {e:?}");
-                eprintln!("    Crypto operations may fail. Continuing anyway...");
-            }
+            && let Err(e) = default_provider().install_default()
+        {
+            eprintln!("⚠️  Failed to install crypto provider: {e:?}");
+            eprintln!("    Crypto operations may fail. Continuing anyway...");
+        }
 
         let rpc_url = trade_config.rpc_url.clone();
         let swqos_configs = trade_config.swqos_configs.clone();
@@ -301,9 +303,7 @@ impl TradingClient {
         let mut swqos_clients: Vec<Arc<SwqosClient>> = vec![];
 
         for swqos in swqos_configs {
-            match SwqosConfig::get_swqos_client(rpc_url.clone(), commitment, swqos.clone())
-                .await
-            {
+            match SwqosConfig::get_swqos_client(rpc_url.clone(), commitment, swqos.clone()).await {
                 Ok(client) => swqos_clients.push(client),
                 Err(e) => {
                     eprintln!("Failed to create SWQOS client {:?}: {}", swqos, e);
@@ -311,8 +311,7 @@ impl TradingClient {
             }
         }
 
-        let rpc =
-            Arc::new(SolanaRpcClient::new_with_commitment(rpc_url.clone(), commitment));
+        let rpc = Arc::new(SolanaRpcClient::new_with_commitment(rpc_url.clone(), commitment));
         common::seed::update_rents(&rpc)
             .await
             .expect("Failed to initialize rent cache - this is required for trading operations");
@@ -554,7 +553,7 @@ impl TradingClient {
         }
 
         let swap_result = executor.swap(buy_params).await;
-        
+
         swap_result.map(|(success, sigs, err)| (success, sigs, err.map(TradeError::from)))
     }
 
@@ -670,7 +669,7 @@ impl TradingClient {
 
         // Execute sell based on tip preference
         let swap_result = executor.swap(sell_params).await;
-        
+
         swap_result.map(|(success, sigs, err)| (success, sigs, err.map(TradeError::from)))
     }
 
