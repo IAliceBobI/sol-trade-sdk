@@ -234,12 +234,9 @@ fn complex_feature(input: Input) -> Result<Output, Error> {
 
 def should_skip_file(file_path: Path) -> bool:
     """判断文件是否应该跳过"""
-    # 跳过测试文件（可选，根据需求调整）
-    # if "test" in file_path.parts or file_path.name.startswith("test_"):
-    #     return True
-
-    # 跳过 target 目录
-    if "target" in file_path.parts:
+    # 跳过不需要检查的目录
+    skip_dirs = {"target", "examples", "temp"}
+    if any(dir in file_path.parts for dir in skip_dirs):
         return True
 
     return False
