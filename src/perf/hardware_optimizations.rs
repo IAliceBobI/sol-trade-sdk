@@ -34,11 +34,11 @@ impl SIMDMemoryOps {
         match len {
             // 针对不同数据大小使用不同优化策略
             0 => return,
-            1..=8 => Self::memcpy_small(dst, src, len),
-            9..=16 => Self::memcpy_sse(dst, src, len),
-            17..=32 => Self::memcpy_avx(dst, src, len),
-            33..=64 => Self::memcpy_avx2(dst, src, len),
-            _ => Self::memcpy_avx512_or_fallback(dst, src, len),
+            1..=8 => unsafe { Self::memcpy_small(dst, src, len) },
+            9..=16 => unsafe { Self::memcpy_sse(dst, src, len) },
+            17..=32 => unsafe { Self::memcpy_avx(dst, src, len) },
+            33..=64 => unsafe { Self::memcpy_avx2(dst, src, len) },
+            _ => unsafe { Self::memcpy_avx512_or_fallback(dst, src, len) },
         }
     }
 
@@ -51,14 +51,14 @@ impl SIMDMemoryOps {
             3 => {
                 *(dst as *mut u16) = *(src as *const u16);
                 *dst.add(2) = *src.add(2);
-            }
+            },
             4 => *(dst as *mut u32) = *(src as *const u32),
             5..=8 => {
                 *(dst as *mut u64) = *(src as *const u64);
                 if len > 8 {
                     ptr::copy_nonoverlapping(src.add(8), dst.add(8), len - 8);
                 }
-            }
+            },
             _ => unreachable!(),
         }
     }
@@ -192,22 +192,22 @@ impl SIMDMemoryOps {
                 let a_val = (a as *const u16).read_unaligned();
                 let b_val = (b as *const u16).read_unaligned();
                 a_val == b_val
-            }
+            },
             3 => {
                 let a_val = (a as *const u16).read_unaligned();
                 let b_val = (b as *const u16).read_unaligned();
                 a_val == b_val && *a.add(2) == *b.add(2)
-            }
+            },
             4 => {
                 let a_val = (a as *const u32).read_unaligned();
                 let b_val = (b as *const u32).read_unaligned();
                 a_val == b_val
-            }
+            },
             5..=8 => {
                 let a_val = (a as *const u64).read_unaligned();
                 let b_val = (b as *const u64).read_unaligned();
                 a_val == b_val
-            }
+            },
             _ => unreachable!(),
         }
     }
@@ -348,8 +348,8 @@ impl CacheLineAligned for CacheAlignedCounter {
     fn prefetch_data(&self) {
         #[cfg(target_arch = "x86_64")]
         unsafe {
-            use std::arch::x86_64::_mm_prefetch;
             use std::arch::x86_64::_MM_HINT_T0;
+            use std::arch::x86_64::_mm_prefetch;
             _mm_prefetch(self as *const Self as *const i8, _MM_HINT_T0);
         }
     }
@@ -458,8 +458,8 @@ impl<T> CacheLineAligned for CacheOptimizedRingBuffer<T> {
     fn prefetch_data(&self) {
         #[cfg(target_arch = "x86_64")]
         unsafe {
-            use std::arch::x86_64::_mm_prefetch;
             use std::arch::x86_64::_MM_HINT_T0;
+            use std::arch::x86_64::_mm_prefetch;
 
             // 预取头指针
             _mm_prefetch(self.producer_head.as_ptr() as *const i8, _MM_HINT_T0);
@@ -506,8 +506,8 @@ impl BranchOptimizer {
     pub unsafe fn prefetch_read_data<T>(_ptr: *const T) {
         #[cfg(target_arch = "x86_64")]
         {
-            use std::arch::x86_64::_mm_prefetch;
             use std::arch::x86_64::_MM_HINT_T0;
+            use std::arch::x86_64::_mm_prefetch;
             _mm_prefetch(_ptr as *const i8, _MM_HINT_T0);
         }
     }
@@ -517,8 +517,8 @@ impl BranchOptimizer {
     pub unsafe fn prefetch_write_data<T>(_ptr: *const T) {
         #[cfg(target_arch = "x86_64")]
         {
-            use std::arch::x86_64::_mm_prefetch;
             use std::arch::x86_64::_MM_HINT_T1;
+            use std::arch::x86_64::_mm_prefetch;
             _mm_prefetch(_ptr as *const i8, _MM_HINT_T1);
         }
     }

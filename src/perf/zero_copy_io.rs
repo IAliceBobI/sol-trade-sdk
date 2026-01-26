@@ -7,8 +7,8 @@
 //! - 零拷贝网络数据传输
 //! - 内存池预分配与重用
 
-use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 // use std::mem::{size_of, MaybeUninit};
 use anyhow::{Context, Result};
 use crossbeam_utils::CachePadded;
@@ -140,11 +140,11 @@ impl SharedMemoryPool {
                             pool_id: self.pool_id,
                             block_index,
                         });
-                    }
+                    },
                     Err(new_current) => {
                         current = new_current;
                         continue;
-                    }
+                    },
                 }
             }
         }
@@ -224,11 +224,13 @@ impl ZeroCopyBlock {
         }
 
         // 使用硬件优化的内存拷贝
-        super::hardware_optimizations::SIMDMemoryOps::memcpy_simd_optimized(
-            self.ptr.as_ptr(),
-            data.as_ptr(),
-            data.len(),
-        );
+        unsafe {
+            super::hardware_optimizations::SIMDMemoryOps::memcpy_simd_optimized(
+                self.ptr.as_ptr(),
+                data.as_ptr(),
+                data.len(),
+            );
+        }
 
         Ok(())
     }
@@ -240,7 +242,7 @@ impl ZeroCopyBlock {
             return Err(anyhow::anyhow!("Read length exceeds block size"));
         }
 
-        Ok(slice::from_raw_parts(self.ptr.as_ptr(), len))
+        Ok(unsafe { slice::from_raw_parts(self.ptr.as_ptr(), len) })
     }
 }
 
@@ -460,7 +462,9 @@ impl DirectMemoryAccessManager {
         let transferred = channel.transfer(src, dst).await?;
 
         // 更新统计
-        self.dma_stats.bytes_transferred.fetch_add(transferred as u64, Ordering::Relaxed);
+        self.dma_stats
+            .bytes_transferred
+            .fetch_add(transferred as u64, Ordering::Relaxed);
         self.dma_stats.transfers_completed.fetch_add(1, Ordering::Relaxed);
 
         Ok(transferred)
@@ -623,10 +627,13 @@ impl ZeroCopyMemoryManager {
             2 // 大块池
         };
 
-        self.shared_pools.get(pool_index).and_then(|pool| pool.allocate_block()).map(|block| {
-            self.stats.blocks_allocated.fetch_add(1, Ordering::Relaxed);
-            block
-        })
+        self.shared_pools
+            .get(pool_index)
+            .and_then(|pool| pool.allocate_block())
+            .map(|block| {
+                self.stats.blocks_allocated.fetch_add(1, Ordering::Relaxed);
+                block
+            })
     }
 
     /// 🚀 释放零拷贝内存块

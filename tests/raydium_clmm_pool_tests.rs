@@ -184,8 +184,9 @@ async fn test_raydium_clmm_get_jup_price_in_usd_with_pool() {
         Pubkey::from_str(JUP_MINT).unwrap_or_else(|_| panic!("Invalid JUP mint: {}", JUP_MINT));
 
     // 1. 先用 Auto Mock 接口找到 JUP-WSOL 池地址（模拟：你已经缓存了这个池地址）
-    let (jup_wsol_pool, _) =
-        get_pool_by_mint(&auto_mock_client, &jup_mint).await.expect("Failed to find JUP-WSOL pool");
+    let (jup_wsol_pool, _) = get_pool_by_mint(&auto_mock_client, &jup_mint)
+        .await
+        .expect("Failed to find JUP-WSOL pool");
     println!("找到的 JUP-WSOL 池地址: {}", jup_wsol_pool);
 
     // 2. 使用 get_token_price_in_usd_with_pool 直接传入池地址，避免重复查找
@@ -220,7 +221,7 @@ async fn test_raydium_clmm_get_pool_by_mint_with_auto_mock() {
     println!("=== 测试：使用 Auto Mock 加速 get_pool_by_mint ===");
 
     // 设置环境变量，限制扫描的 Pool 数量（测试环境优化）
-    std::env::set_var("CLMM_POOL_SCAN_LIMIT", "10");
+    unsafe { std::env::set_var("CLMM_POOL_SCAN_LIMIT", "10"); }
 
     let wsol_mint =
         Pubkey::from_str(WSOL_MINT).unwrap_or_else(|_| panic!("Invalid WSOL mint: {}", WSOL_MINT));
@@ -239,8 +240,9 @@ async fn test_raydium_clmm_get_pool_by_mint_with_auto_mock() {
 
     // 使用 Auto Mock 的 get_pool_by_mint（核心使用场景）
     println!("\n使用 get_pool_by_mint 查询最优 Pool...");
-    let (pool_addr, pool_state) =
-        get_pool_by_mint(&auto_mock_client, &wsol_mint).await.expect("get_pool_by_mint failed");
+    let (pool_addr, pool_state) = get_pool_by_mint(&auto_mock_client, &wsol_mint)
+        .await
+        .expect("get_pool_by_mint failed");
 
     println!("✅ 找到最优 Pool: {}", pool_addr);
     println!("  token0_mint: {}", pool_state.token_mint0);
@@ -260,7 +262,7 @@ async fn test_raydium_clmm_get_pool_by_mint_with_auto_mock() {
     println!("✅ 基本字段验证通过");
 
     // 清理环境变量
-    std::env::remove_var("CLMM_POOL_SCAN_LIMIT");
+    unsafe { std::env::remove_var("CLMM_POOL_SCAN_LIMIT"); }
 
     println!("\n=== Auto Mock 测试通过 ===");
     println!("✅ 测试覆盖：");

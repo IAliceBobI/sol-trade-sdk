@@ -57,19 +57,19 @@ impl MemoryOps {
     #[inline(always)]
     pub unsafe fn copy(dst: *mut u8, src: *const u8, len: usize) {
         // 优先使用 AVX2 SIMD 加速
-        SIMDMemory::copy_avx2(dst, src, len);
+        unsafe { SIMDMemory::copy_avx2(dst, src, len); }
     }
 
     #[inline(always)]
     pub unsafe fn compare(a: *const u8, b: *const u8, len: usize) -> bool {
         // 优先使用 AVX2 SIMD 比较
-        SIMDMemory::compare_avx2(a, b, len)
+        unsafe { SIMDMemory::compare_avx2(a, b, len) }
     }
 
     #[inline(always)]
     pub unsafe fn zero(ptr: *mut u8, len: usize) {
         // 优先使用 AVX2 SIMD 清零
-        SIMDMemory::zero_avx2(ptr, len);
+        unsafe { SIMDMemory::zero_avx2(ptr, len); }
     }
 }
 
@@ -140,10 +140,6 @@ impl ExecutionPath {
         fast_path: impl FnOnce() -> T,
         slow_path: impl FnOnce() -> T,
     ) -> T {
-        if BranchOptimizer::likely(condition) {
-            fast_path()
-        } else {
-            slow_path()
-        }
+        if BranchOptimizer::likely(condition) { fast_path() } else { slow_path() }
     }
 }
