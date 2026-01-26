@@ -178,5 +178,4 @@ fn test_auto_mock_check_data_exists() {
     }
 
     // 此测试总是成功，只是用于提示状态
-    assert!(true);
 }

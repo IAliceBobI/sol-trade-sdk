@@ -141,10 +141,10 @@ async fn test_raydium_cpmm_buy_sell_complete() {
     let (success_buy, buy_sigs, _error_buy) =
         client.buy(buy_params).await.expect("Raydium CPMM 买入交易执行失败");
     assert!(success_buy, "买入交易应成功");
-    println!("✅ 买入成功，签名: {:?}", buy_sigs.get(0));
+    println!("✅ 买入成功，签名: {:?}", buy_sigs.first());
 
     // 解析买入交易
-    if let Some(buy_sig) = buy_sigs.get(0) {
+    if let Some(buy_sig) = buy_sigs.first() {
         println!("\n📋 解析买入交易...");
         let parser = DexParser::default();
         let buy_sig_str = buy_sig.to_string();
@@ -218,10 +218,10 @@ async fn test_raydium_cpmm_buy_sell_complete() {
     let (success_sell, sell_sigs, _error_sell) =
         client.sell(sell_params).await.expect("Raydium CPMM 卖出交易执行失败");
     assert!(success_sell, "卖出交易应成功");
-    println!("✅ 卖出成功，签名: {:?}", sell_sigs.get(0));
+    println!("✅ 卖出成功，签名: {:?}", sell_sigs.first());
 
     // 解析卖出交易
-    if let Some(sell_sig) = sell_sigs.get(0) {
+    if let Some(sell_sig) = sell_sigs.first() {
         println!("\n📋 解析卖出交易...");
         let parser = DexParser::default();
         let sell_sig_str = sell_sig.to_string();

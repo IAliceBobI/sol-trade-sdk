@@ -236,8 +236,7 @@ async fn test_raydium_amm_v4_slippage_protection() {
     let result = client.buy(buy_params).await;
 
     // 在正常市场条件下，0.01% 的滑点应该导致交易失败
-    if result.is_ok() {
-        let (success, _, error) = result.unwrap();
+    if let Ok((success, _, error)) = result {
         if !success {
             println!("✅ 滑点保护生效，交易被拒绝: {:?}", error);
         } else {
