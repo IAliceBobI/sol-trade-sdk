@@ -118,9 +118,29 @@ fn _create_associated_token_account_idempotent_fast(
             || token_program.eq(&crate::constants::TOKEN_PROGRAM_2022))
     {
         // Use cache to get instruction
-        get_cached_instructions(cache_key, || {
-            super::seed::create_associated_token_account_use_seed(payer, owner, mint, token_program)
-                .expect("Failed to create ATA with seed: ensure payer, owner, mint and token_program are valid")
+        // 🔧 修复：添加降级逻辑，如果 seed 方式失败则回退到标准方式
+        get_cached_instructions(cache_key.clone(), || {
+            match super::seed::create_associated_token_account_use_seed(payer, owner, mint, token_program) {
+                Ok(instructions) => instructions,
+                Err(e) => {
+                    // 降级到非 seed 方式
+                    log::debug!("Seed ATA creation failed, using fallback: {}", e);
+                    let associated_token_address =
+                        get_associated_token_address_with_program_id_fast(owner, mint, token_program);
+                    vec![Instruction {
+                        program_id: crate::constants::ASSOCIATED_TOKEN_PROGRAM_ID,
+                        accounts: vec![
+                            AccountMeta::new(*payer, true),
+                            AccountMeta::new(associated_token_address, false),
+                            AccountMeta::new_readonly(*owner, false),
+                            AccountMeta::new_readonly(*mint, false),
+                            crate::constants::SYSTEM_PROGRAM_META,
+                            AccountMeta::new_readonly(*token_program, false),
+                        ],
+                        data: vec![1],
+                    }]
+                }
+            }
         })
     } else {
         // Use cache to get instruction
@@ -259,12 +279,12 @@ fn _get_associated_token_address_with_program_id_fast(
         && (token_program_id.eq(&crate::constants::TOKEN_PROGRAM)
             || token_program_id.eq(&crate::constants::TOKEN_PROGRAM_2022))
     {
+        // 🔧 修复：使用 expect 并提供详细的安全性说明
         super::seed::get_associated_token_address_with_program_id_use_seed(
             wallet_address,
             token_mint_address,
             token_program_id,
-        )
-        .unwrap()
+        ).expect("Seed-based address calculation should never fail for valid Pubkey values; this indicates a bug in seed derivation logic")
     } else {
         get_associated_token_address_with_program_id(
             wallet_address,
@@ -299,6 +319,7 @@ pub fn fast_init(payer: &Pubkey) {
             wsol_token_account,
         },
         || {
+            // 🔧 修复：使用 expect 并提供详细的错误信息
             vec![
                 close_account(
                     &crate::constants::TOKEN_PROGRAM,
@@ -307,7 +328,7 @@ pub fn fast_init(payer: &Pubkey) {
                     payer,
                     &[],
                 )
-                .unwrap(),
+                .expect("Failed to create close account instruction: all parameters are valid Pubkeys")
             ]
         },
     );

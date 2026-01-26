@@ -10,8 +10,9 @@ use std::time::{Duration, Instant};
 static FAST_TIMER: Lazy<FastTimer> = Lazy::new(FastTimer::new);
 
 /// 快速计时器 - 减少系统调用开销
+/// 🔧 修复：bypass_manager 改为 Option 以支持降级
 pub struct FastTimer {
-    bypass_manager: SystemCallBypassManager,
+    bypass_manager: Option<SystemCallBypassManager>,
     _base_instant: Instant,
     _base_nanos: u64,
 }
@@ -20,11 +21,26 @@ impl FastTimer {
     fn new() -> Self {
         use crate::perf::syscall_bypass::SyscallBypassConfig;
 
-        let bypass_manager = SystemCallBypassManager::new(SyscallBypassConfig::default())
-            .expect("Failed to create SystemCallBypassManager");
+        // 🔧 修复：添加降级逻辑，如果 syscall_bypass 初始化失败则回退到标准计时器
+        let bypass_manager = match SystemCallBypassManager::new(SyscallBypassConfig::default()) {
+            Ok(manager) => {
+                log::debug!("FastTimer initialized with syscall bypass");
+                Some(manager)
+            },
+            Err(e) => {
+                log::warn!("Failed to create SystemCallBypassManager, falling back to standard timing: {}", e);
+                None
+            }
+        };
 
         let base_instant = Instant::now();
-        let base_nanos = bypass_manager.fast_timestamp_nanos();
+        let base_nanos = bypass_manager
+            .as_ref()
+            .map(|m| m.fast_timestamp_nanos())
+            .unwrap_or_else(|| {
+                // 如果没有 bypass_manager，使用标准 Instant
+                base_instant.elapsed().as_nanos() as u64
+            });
 
         Self {
             bypass_manager,
@@ -34,9 +50,15 @@ impl FastTimer {
     }
 
     /// 🚀 获取当前时间戳（纳秒） - 使用快速系统调用绕过
+    /// 🔧 修复：支持降级到标准 Instant
     #[inline(always)]
     pub fn now_nanos(&self) -> u64 {
-        self.bypass_manager.fast_timestamp_nanos()
+        if let Some(manager) = &self.bypass_manager {
+            manager.fast_timestamp_nanos()
+        } else {
+            // 降级到标准计时器
+            self._base_instant.elapsed().as_nanos() as u64 + self._base_nanos
+        }
     }
 
     /// 🚀 获取当前时间戳（微秒）
