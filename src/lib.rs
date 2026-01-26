@@ -76,9 +76,10 @@ impl TradingInfrastructure {
     pub async fn new(config: InfrastructureConfig) -> Self {
         // Install crypto provider (idempotent)
         if CryptoProvider::get_default().is_none() {
-            let _ = default_provider()
-                .install_default()
-                .map_err(|e| anyhow::anyhow!("Failed to install crypto provider: {:?}", e));
+            if let Err(e) = default_provider().install_default() {
+                eprintln!("⚠️  Failed to install crypto provider: {e:?}");
+                eprintln!("    Crypto operations may fail. Continuing anyway...");
+            }
         }
 
         // Create RPC client
@@ -290,9 +291,10 @@ impl TradingClient {
         crate::common::fast_fn::fast_init(&pubkey);
 
         if CryptoProvider::get_default().is_none() {
-            let _ = default_provider()
-                .install_default()
-                .map_err(|e| anyhow::anyhow!("Failed to install crypto provider: {:?}", e));
+            if let Err(e) = default_provider().install_default() {
+                eprintln!("⚠️  Failed to install crypto provider: {e:?}");
+                eprintln!("    Crypto operations may fail. Continuing anyway...");
+            }
         }
 
         let rpc_url = trade_config.rpc_url.clone();
