@@ -129,10 +129,7 @@ pub async fn poll_transaction_confirmation(
         };
 
         let meta = tx_details.transaction.meta;
-        if meta.is_none() {
-            sleep(interval).await;
-        } else {
-            let meta = meta.unwrap();
+        if let Some(meta) = meta {
             if meta.err.is_none() {
                 return Ok(txt_sig);
             } else {
@@ -190,6 +187,8 @@ pub async fn poll_transaction_confirmation(
                     instruction: index,
                 }));
             }
+        } else {
+            sleep(interval).await;
         }
     }
 }
