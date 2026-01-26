@@ -183,7 +183,7 @@ type_complexity = "allow"
 # === 低优先级警告（不影响代码正确性） ===
 
 # Default 实现建议 - 不是所有类型都需要 Default
-missing_trait_impl = "allow"
+# 注意: missing_trait_impl 在当前 Rust 版本不存在，改用 should_implement_trait
 should_implement_trait = "allow"
 
 # 文档相关 - 文档格式优化建议
@@ -202,8 +202,7 @@ deprecated_cfg_attr = "allow"
 range_plus_one = "allow"
 redundant_else = "allow"
 uninit_assumed_init = "allow"
-late_initialization = "allow"
-init_numbered_ranges = "allow"
+# 注意: late_initialization 和 init_numbered_ranges 在当前 Rust 版本不存在
 
 # 命名和组织建议
 module_name_repetitions = "allow"
@@ -235,7 +234,7 @@ explicit_into_iter_loop = "allow"
 
 # 代码简洁性
 redundant_pattern_matching = "allow"
-matched_wildcard = "allow"
+# 注意: matched_wildcard 在当前 Rust 版本不存在
 wildcard_enum_match_arm = "allow"
 
 # 其他
