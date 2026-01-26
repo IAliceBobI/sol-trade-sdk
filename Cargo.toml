@@ -163,3 +163,8 @@ opt-level = 3
 
 [profile.release.package.bincode]
 opt-level = 3
+
+# Lint 配置
+[lints.clippy]
+# 允许 construct_uint! 宏触发的问题（来自第三方库）
+reversed-empty-ranges = "allow"
