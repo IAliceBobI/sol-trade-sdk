@@ -192,10 +192,11 @@ pub fn get_creator(creator_vault_pda: &Pubkey) -> Pubkey {
         // Fast check against cached default creator vault
         static DEFAULT_CREATOR_VAULT: std::sync::LazyLock<Option<Pubkey>> =
             std::sync::LazyLock::new(|| get_creator_vault_pda(&Pubkey::default()));
-        if creator_vault_pda.eq(&DEFAULT_CREATOR_VAULT.unwrap()) {
-            Pubkey::default()
-        } else {
-            *creator_vault_pda
+        match *DEFAULT_CREATOR_VAULT {
+            Some(ref default_vault) if creator_vault_pda.eq(default_vault) => {
+                Pubkey::default()
+            }
+            _ => *creator_vault_pda
         }
     }
 }

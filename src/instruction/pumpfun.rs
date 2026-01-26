@@ -65,7 +65,8 @@ impl InstructionBuilder for PumpFunInstructionBuilder {
         );
 
         let bonding_curve_addr = if bonding_curve.account == Pubkey::default() {
-            get_bonding_curve_pda(&params.output_mint).unwrap()
+            get_bonding_curve_pda(&params.output_mint)
+                .ok_or_else(|| anyhow!("Bonding curve PDA not found for mint"))?
         } else {
             bonding_curve.account
         };
@@ -98,8 +99,8 @@ impl InstructionBuilder for PumpFunInstructionBuilder {
                 params.open_seed_optimize,
             );
 
-        let user_volume_accumulator =
-            get_user_volume_accumulator_pda(&params.payer.pubkey()).unwrap();
+        let user_volume_accumulator = get_user_volume_accumulator_pda(&params.payer.pubkey())
+            .ok_or_else(|| anyhow!("User volume accumulator PDA not found"))?;
 
         // ========================================
         // Build instructions
@@ -201,7 +202,8 @@ impl InstructionBuilder for PumpFunInstructionBuilder {
         };
 
         let bonding_curve_addr = if bonding_curve.account == Pubkey::default() {
-            get_bonding_curve_pda(&params.input_mint).unwrap()
+            get_bonding_curve_pda(&params.input_mint)
+                .ok_or_else(|| anyhow!("Bonding curve PDA not found for mint"))?
         } else {
             bonding_curve.account
         };
