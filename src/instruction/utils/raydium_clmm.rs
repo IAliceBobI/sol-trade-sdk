@@ -845,7 +845,7 @@ pub async fn list_pools_by_mint<T: PoolRpcClient + ?Sized>(
     // 检测是否都失败，如果都失败则返回第一个错误（通常包含 RPC 限制信息）
     match (&result0, &result1) {
         (Err(e), Err(_)) => return Err(anyhow::anyhow!("{}", e)),
-        _ => {}
+        _ => {},
     }
 
     let mut all_pools: Vec<(Pubkey, PoolState)> = Vec::new();

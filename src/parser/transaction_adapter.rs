@@ -302,7 +302,8 @@ impl TransactionAdapter {
                         if let Some(ui_amount) = balance.get("uiTokenAmount") {
                             let decimals = ui_amount["decimals"]
                                 .as_u64()
-                                .ok_or_else(|| anyhow::anyhow!("Missing decimals field"))? as u8;
+                                .ok_or_else(|| anyhow::anyhow!("Missing decimals field"))?
+                                as u8;
                             spl_decimals_map.insert(mint, decimals);
 
                             let token_amount = UiTokenAmount {
@@ -347,7 +348,8 @@ impl TransactionAdapter {
                         if let Some(ui_amount) = balance.get("uiTokenAmount") {
                             let decimals = ui_amount["decimals"]
                                 .as_u64()
-                                .ok_or_else(|| anyhow::anyhow!("Missing decimals field"))? as u8;
+                                .ok_or_else(|| anyhow::anyhow!("Missing decimals field"))?
+                                as u8;
                             spl_decimals_map.insert(mint, decimals);
 
                             let token_amount = UiTokenAmount {
@@ -468,7 +470,8 @@ impl TransactionAdapter {
 
                 let outer_index = inner_set["index"]
                     .as_u64()
-                    .ok_or_else(|| anyhow::anyhow!("Missing inner instruction index"))? as usize;
+                    .ok_or_else(|| anyhow::anyhow!("Missing inner instruction index"))?
+                    as usize;
 
                 if let Some(instructions_arr) = inner_set["instructions"].as_array() {
                     for (inner_idx, ix_json) in instructions_arr.iter().enumerate() {
