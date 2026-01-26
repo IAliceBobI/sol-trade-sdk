@@ -523,7 +523,7 @@ fn select_best_pool_by_liquidity(pools: &[(Pubkey, PoolState)]) -> Option<(Pubke
 /// 策略：
 /// 1. 并行查询 token0_mint 与 token1_mint 包含该 mint 的所有池
 /// 2. 合并并去重
-/// 查找指定 mint 的所有 Raydium CPMM Pool（支持 PoolRpcClient）
+///    查找指定 mint 的所有 Raydium CPMM Pool（支持 PoolRpcClient）
 ///
 /// 策略：
 /// 1. 并行查询 token0_mint 与 token1_mint 包含该 mint 的所有池
@@ -638,7 +638,7 @@ async fn find_pool_by_mint_impl<T: PoolRpcClient + ?Sized>(
 /// 1. 稳定币对（USDC/USDT）优先
 /// 2. WSOL 对次之
 /// 3. 其他对最后
-/// Helper function to get token vault account address
+///    Helper function to get token vault account address
 ///
 /// # Parameters
 /// - `pool_state`: Pool state account address

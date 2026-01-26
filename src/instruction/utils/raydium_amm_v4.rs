@@ -294,7 +294,7 @@ pub fn is_pool_tradeable(amm_info: &AmmInfo) -> bool {
 /// - OutPutData (10 个 u64 与 4 个 u128, 共 144 字节)
 /// - token_coin (Pubkey, 32 字节)
 /// - token_pc (Pubkey, 32 字节)
-/// 因此 coin_mint 起始偏移量为 128 + 64 + 144 + 32 + 32 = 400 字节。
+///   因此 coin_mint 起始偏移量为 128 + 64 + 144 + 32 + 32 = 400 字节。
 const COIN_MINT_OFFSET: usize = 400;
 
 /// pc_mint 在 AmmInfo 结构中的偏移量

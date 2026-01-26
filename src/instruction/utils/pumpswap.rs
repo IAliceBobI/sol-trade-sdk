@@ -1,6 +1,3 @@
-// 允许文件操作的当前写法
-#![allow(clippy::permissions_preference_field)]
-
 use crate::{
     common::{
         SolanaRpcClient, auto_mock_rpc::PoolRpcClient,

@@ -517,7 +517,7 @@ fn select_best_pool(pools: &[(Pubkey, PoolState)]) -> Option<(Pubkey, PoolState)
 /// 策略：
 /// - 如果池子包含 WSOL/USDC/USDT，只计算这些稳定资产侧的累计交易量
 /// - 否则计算两侧的总交易量
-/// 交易量越大，说明池子被实际使用越多，深度越可靠
+///   交易量越大，说明池子被实际使用越多，深度越可靠
 fn select_best_pool_by_volume(pools: &[(Pubkey, PoolState)]) -> Option<(Pubkey, PoolState)> {
     if pools.is_empty() {
         return None;
