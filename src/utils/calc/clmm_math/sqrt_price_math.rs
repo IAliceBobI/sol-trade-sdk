@@ -11,10 +11,10 @@ use super::{U256, fixed_point_64};
 ///
 /// Always round up because
 /// 1. In the exact output case, token 0 supply decreases leading to price increase.
-/// Move price up so that exact output is met.
+///    Move price up so that exact output is met.
 /// 2. In the exact input case, token 0 supply increases leading to price decrease.
-/// Do not round down to minimize price impact. We only need to meet input
-/// change and not guarantee exact output.
+///    Do not round down to minimize price impact. We only need to meet input
+///    change and not guarantee exact output.
 ///
 /// Use function for exact input or exact output swaps for token 0
 ///
@@ -75,10 +75,10 @@ pub fn get_next_sqrt_price_from_amount_0_rounding_up(
 ///
 /// Always round down because
 /// 1. In the exact output case, token 1 supply decreases leading to price decrease.
-/// Move price down by rounding down so that exact output of token 0 is met.
+///    Move price down by rounding down so that exact output of token 0 is met.
 /// 2. In the exact input case, token 1 supply increases leading to price increase.
-/// Do not round down to minimize price impact. We only need to meet input
-/// change and not gurantee exact output for token 0.
+///    Do not round down to minimize price impact. We only need to meet input
+///    change and not gurantee exact output for token 0.
 ///
 ///
 /// # Formula
