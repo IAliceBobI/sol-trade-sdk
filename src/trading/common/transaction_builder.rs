@@ -41,10 +41,7 @@ pub async fn build_transaction(
     let mut instructions = Vec::with_capacity(business_instructions.len() + 5);
 
     // Add nonce instruction
-    if let Err(e) = add_nonce_instruction(&mut instructions, payer.as_ref(), durable_nonce.clone())
-    {
-        return Err(e);
-    }
+    add_nonce_instruction(&mut instructions, payer.as_ref(), durable_nonce.clone())?;
 
     // Add tip transfer instruction
     if with_tip && tip_amount > 0.0 {
@@ -60,7 +57,7 @@ pub async fn build_transaction(
     instructions.extend(business_instructions);
 
     // Get blockhash for transaction
-    let blockhash = get_transaction_blockhash(recent_blockhash, durable_nonce.clone());
+    let blockhash = get_transaction_blockhash(recent_blockhash, durable_nonce.clone())?;
 
     // Build transaction
     build_versioned_transaction(

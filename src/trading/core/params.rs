@@ -200,11 +200,12 @@ impl PumpFunParams {
         };
         let associated_bonding_curve = calculate_ata(rpc, &bonding_curve.account, mint).await?;
         let creator_vault =
-            crate::instruction::utils::pumpfun::get_creator_vault_pda(&bonding_curve.creator);
+            crate::instruction::utils::pumpfun::get_creator_vault_pda(&bonding_curve.creator)
+                .ok_or_else(|| anyhow::anyhow!("Creator vault PDA not found for creator"))?;
         Ok(Self {
             bonding_curve: Arc::new(bonding_curve),
             associated_bonding_curve,
-            creator_vault: creator_vault.unwrap(),
+            creator_vault,
             close_token_account_when_sell: None,
             token_program: mint_account.owner,
         })
@@ -307,18 +308,18 @@ impl PumpSwapParams {
             crate::instruction::utils::pumpswap::coin_creator_vault_authority(creator);
 
         let base_token_program_ata = get_associated_token_address_with_program_id(
-            &pool_address,
+            pool_address,
             &pool_data.base_mint,
             &crate::constants::TOKEN_PROGRAM,
         );
         let quote_token_program_ata = get_associated_token_address_with_program_id(
-            &pool_address,
+            pool_address,
             &pool_data.quote_mint,
             &crate::constants::TOKEN_PROGRAM,
         );
 
         Ok(Self {
-            pool: pool_address.clone(),
+            pool: *pool_address,
             base_mint: pool_data.base_mint,
             quote_mint: pool_data.quote_mint,
             pool_base_token_account: pool_data.pool_base_token_account,
@@ -489,18 +490,18 @@ impl BonkParams {
                 &crate::constants::WSOL_TOKEN_ACCOUNT
             },
         )
-        .unwrap();
+        .ok_or_else(|| anyhow::anyhow!("Bonk pool PDA not found for mint"))?;
         let pool_data =
             crate::instruction::utils::bonk::get_pool_by_address(rpc, &pool_address).await?;
         let token_account = rpc.get_account(&pool_data.base_mint).await?;
         let platform_associated_account =
             crate::instruction::utils::bonk::get_platform_associated_account(
                 &pool_data.platform_config,
-            );
+            )
+            .ok_or_else(|| anyhow::anyhow!("Platform associated account not found"))?;
         let creator_associated_account =
-            crate::instruction::utils::bonk::get_creator_associated_account(&pool_data.creator);
-        let platform_associated_account = platform_associated_account.unwrap();
-        let creator_associated_account = creator_associated_account.unwrap();
+            crate::instruction::utils::bonk::get_creator_associated_account(&pool_data.creator)
+                .ok_or_else(|| anyhow::anyhow!("Creator associated account not found"))?;
         Ok(Self {
             virtual_base: pool_data.virtual_base as u128,
             virtual_quote: pool_data.virtual_quote as u128,
@@ -590,7 +591,7 @@ impl RaydiumCpmmParams {
             )
             .await?;
         Ok(Self {
-            pool_state: pool_address.clone(),
+            pool_state: *pool_address,
             amm_config: pool.amm_config,
             base_mint: pool.token0_mint,
             quote_mint: pool.token1_mint,
@@ -758,7 +759,7 @@ impl RaydiumClmmParams {
         // Observation state is stored in pool_state.observation_key
 
         Ok(Self {
-            pool_state: pool_address.clone(),
+            pool_state: *pool_address,
             amm_config: pool_state.amm_config,
             token0_mint: pool_state.token_mint0,
             token1_mint: pool_state.token_mint1,
@@ -815,7 +816,7 @@ impl MeteoraDammV2Params {
             crate::instruction::utils::meteora_damm_v2::get_pool_by_address(rpc, pool_address)
                 .await?;
         Ok(Self {
-            pool: pool_address.clone(),
+            pool: *pool_address,
             token_a_vault: pool_data.token_a_vault,
             token_b_vault: pool_data.token_b_vault,
             token_a_mint: pool_data.token_a_mint,

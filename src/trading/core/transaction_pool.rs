@@ -98,7 +98,7 @@ static TX_BUILDER_POOL: Lazy<Arc<ArrayQueue<PreallocatedTxBuilder>>> = Lazy::new
 /// 🚀 从池中获取构建器
 #[inline(always)]
 pub fn acquire_builder() -> PreallocatedTxBuilder {
-    TX_BUILDER_POOL.pop().unwrap_or_else(|| PreallocatedTxBuilder::new())
+    TX_BUILDER_POOL.pop().unwrap_or_else(PreallocatedTxBuilder::new)
 }
 
 /// 🚀 归还构建器到池
@@ -118,13 +118,21 @@ pub struct TxBuilderGuard {
     builder: Option<PreallocatedTxBuilder>,
 }
 
+impl Default for TxBuilderGuard {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl TxBuilderGuard {
     pub fn new() -> Self {
         Self { builder: Some(acquire_builder()) }
     }
 
     pub fn get_mut(&mut self) -> &mut PreallocatedTxBuilder {
-        self.builder.as_mut().unwrap()
+        self.builder
+            .as_mut()
+            .expect("TxBuilderGuard::get_mut called with None builder (this is a bug)")
     }
 }
 

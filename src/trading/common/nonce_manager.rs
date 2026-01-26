@@ -16,9 +16,12 @@ pub fn add_nonce_instruction(
     // current_nonce: Option<Hash>,
     durable_nonce: Option<DurableNonceInfo>,
 ) -> Result<(), anyhow::Error> {
-    if let Some(durable_nonce) = durable_nonce {
-        let nonce_advance_ix =
-            advance_nonce_account(&durable_nonce.nonce_account.unwrap(), &payer.pubkey());
+    if let Some(ref durable_nonce) = durable_nonce {
+        let nonce_account = durable_nonce
+            .nonce_account
+            .as_ref()
+            .ok_or_else(|| anyhow::anyhow!("Nonce account not set in DurableNonceInfo"))?;
+        let nonce_advance_ix = advance_nonce_account(nonce_account, &payer.pubkey());
         instructions.push(nonce_advance_ix);
     }
 
@@ -32,10 +35,12 @@ pub fn get_transaction_blockhash(
     durable_nonce: Option<DurableNonceInfo>,
     // nonce_account: Option<Pubkey>,
     // current_nonce: Option<Hash>,
-) -> Hash {
-    if let Some(durable_nonce) = durable_nonce {
-        durable_nonce.current_nonce.unwrap()
+) -> Result<Hash, anyhow::Error> {
+    if let Some(ref durable_nonce) = durable_nonce {
+        durable_nonce
+            .current_nonce
+            .ok_or_else(|| anyhow::anyhow!("Current nonce not set in DurableNonceInfo"))
     } else {
-        recent_blockhash.unwrap()
+        recent_blockhash.ok_or_else(|| anyhow::anyhow!("Recent blockhash not provided"))
     }
 }
