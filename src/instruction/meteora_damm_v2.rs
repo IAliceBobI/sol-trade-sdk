@@ -21,7 +21,8 @@ impl InstructionBuilder for MeteoraDammV2InstructionBuilder {
         // Parameter validation and basic data preparation
         // ========================================
         // 🔧 修复：显式检查 Option 以提高代码清晰度
-        let input_amount = params.input_amount.ok_or_else(|| anyhow!("Input amount is required"))?;
+        let input_amount =
+            params.input_amount.ok_or_else(|| anyhow!("Input amount is required"))?;
         if input_amount == 0 {
             return Err(anyhow!("Amount cannot be zero"));
         }

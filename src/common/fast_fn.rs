@@ -120,13 +120,22 @@ fn _create_associated_token_account_idempotent_fast(
         // Use cache to get instruction
         // 🔧 修复：添加降级逻辑，如果 seed 方式失败则回退到标准方式
         get_cached_instructions(cache_key.clone(), || {
-            match super::seed::create_associated_token_account_use_seed(payer, owner, mint, token_program) {
+            match super::seed::create_associated_token_account_use_seed(
+                payer,
+                owner,
+                mint,
+                token_program,
+            ) {
                 Ok(instructions) => instructions,
                 Err(e) => {
                     // 降级到非 seed 方式
                     log::debug!("Seed ATA creation failed, using fallback: {}", e);
                     let associated_token_address =
-                        get_associated_token_address_with_program_id_fast(owner, mint, token_program);
+                        get_associated_token_address_with_program_id_fast(
+                            owner,
+                            mint,
+                            token_program,
+                        );
                     vec![Instruction {
                         program_id: crate::constants::ASSOCIATED_TOKEN_PROGRAM_ID,
                         accounts: vec![
@@ -139,7 +148,7 @@ fn _create_associated_token_account_idempotent_fast(
                         ],
                         data: vec![1],
                     }]
-                }
+                },
             }
         })
     } else {
@@ -328,7 +337,9 @@ pub fn fast_init(payer: &Pubkey) {
                     payer,
                     &[],
                 )
-                .expect("Failed to create close account instruction: all parameters are valid Pubkeys")
+                .expect(
+                    "Failed to create close account instruction: all parameters are valid Pubkeys",
+                ),
             ]
         },
     );

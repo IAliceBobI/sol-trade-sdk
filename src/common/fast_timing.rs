@@ -28,16 +28,17 @@ impl FastTimer {
                 Some(manager)
             },
             Err(e) => {
-                log::warn!("Failed to create SystemCallBypassManager, falling back to standard timing: {}", e);
+                log::warn!(
+                    "Failed to create SystemCallBypassManager, falling back to standard timing: {}",
+                    e
+                );
                 None
-            }
+            },
         };
 
         let base_instant = Instant::now();
-        let base_nanos = bypass_manager
-            .as_ref()
-            .map(|m| m.fast_timestamp_nanos())
-            .unwrap_or_else(|| {
+        let base_nanos =
+            bypass_manager.as_ref().map(|m| m.fast_timestamp_nanos()).unwrap_or_else(|| {
                 // 如果没有 bypass_manager，使用标准 Instant
                 base_instant.elapsed().as_nanos() as u64
             });
