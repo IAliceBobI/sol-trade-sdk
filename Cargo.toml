@@ -168,3 +168,14 @@ opt-level = 3
 [lints.clippy]
 # 允许 construct_uint! 宏触发的问题（来自第三方库）
 reversed-empty-ranges = "allow"
+
+# 在数学计算中允许使用 unwrap/expect（经过 checked_* 操作后的 unwrap 是合理的）
+# 这些用于溢出检查，如果失败表示数据不一致，应该 panic
+unwrap_in_result = "allow"
+expect_used = "allow"
+
+# 允许多参数函数（有些函数确实需要多个参数，重构反而降低可读性）
+too_many_arguments = "allow"
+
+# 允许复杂类型（一些复杂的泛型类型是必要的）
+type_complexity = "allow"

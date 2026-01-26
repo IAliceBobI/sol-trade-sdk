@@ -1,7 +1,18 @@
-# Clippy 配置
-# 允许测试中使用 unwrap 和 expect
+# Clippy 配置文件
+# 用于细粒度控制 Clippy linter 的行为
+
+# 允许在测试中使用 unwrap 和 expect（测试代码中 panic 是可以接受的）
 allow-expect-in-tests = true
 allow-unwrap-in-tests = true
 
-# 禁用的方法（可以在这里添加不应该使用的方法）
+# 禁用的方法 - 这里的方法将被警告
+# 注意：我们在 Cargo.toml 中已经配置了 unwrap_in_result 和 expect_used 为 "allow"
+# 所以这里不需要额外配置
 disallowed-methods = []
+
+# 注意： unwrap_used 和 expect_used 的配置在 Cargo.toml 中
+# [lints.clippy]
+# unwrap_in_result = "allow"
+# expect_used = "allow"
+# too_many_arguments = "allow"
+# type_complexity = "allow"
