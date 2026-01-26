@@ -130,6 +130,12 @@ pub struct CompilerOptimizationStats {
     pub loop_optimizations: AtomicU64,
 }
 
+impl Default for CompilerOptimizer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl CompilerOptimizer {
     /// 创建编译器优化器
     pub fn new() -> Self {
@@ -410,6 +416,12 @@ pub struct CompileTimeOptimizedEventProcessor {
     hash_table: [u64; 256],
     /// 预计算的路由表
     route_table: [u32; 1024],
+}
+
+impl Default for CompileTimeOptimizedEventProcessor {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl CompileTimeOptimizedEventProcessor {

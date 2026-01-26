@@ -72,6 +72,12 @@ pub struct GlobalAccount {
     pub fee_recipients: [Pubkey; 7],
 }
 
+impl Default for GlobalAccount {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl GlobalAccount {
     /// Creates a new global account instance
     pub fn new() -> Self {
