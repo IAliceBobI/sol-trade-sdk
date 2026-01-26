@@ -1,6 +1,6 @@
 //! 并行执行器
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use crossbeam_queue::ArrayQueue;
 use solana_hash::Hash;
 use solana_sdk::message::AddressLookupTableAccount;
@@ -21,7 +21,7 @@ use crate::{
         SWQOS_MIN_TIP_TEMPORAL, SWQOS_MIN_TIP_ZERO_SLOT,
     },
     swqos::{SwqosClient, SwqosType, TradeType},
-    trading::{common::build_transaction, MiddlewareManager},
+    trading::{MiddlewareManager, common::build_transaction},
 };
 
 #[repr(align(64))]
@@ -175,11 +175,7 @@ impl ResultCollector {
             }
         }
 
-        if !signatures.is_empty() {
-            Some((has_success, signatures, last_error))
-        } else {
-            None
-        }
+        if !signatures.is_empty() { Some((has_success, signatures, last_error)) } else { None }
     }
 }
 
@@ -313,7 +309,7 @@ pub async fn execute_parallel(
                         landed_on_chain: false,
                     });
                     continue;
-                }
+                },
             }
         };
 
@@ -365,7 +361,7 @@ pub async fn execute_parallel(
                         landed_on_chain: false,  // Build failed, tx never sent
                     });
                     return;
-                }
+                },
             };
 
             // 🎯 调用交易签名回调（在发送前）
@@ -405,15 +401,18 @@ pub async fn execute_parallel(
                             });
                             return;
                         }
-                    }
+                    },
                     crate::common::CallbackExecutionMode::Async => {
                         // 异步模式：不阻塞交易发送
                         tokio::spawn(async move {
                             if let Err(e) = callback_clone.on_transaction_signed(context).await {
-                                eprintln!("[Callback Error] on_transaction_signed failed (Async mode): {:?}", e);
+                                eprintln!(
+                                    "[Callback Error] on_transaction_signed failed (Async mode): {:?}",
+                                    e
+                                );
                             }
                         });
-                    }
+                    },
                 }
             }
 
@@ -433,14 +432,14 @@ pub async fn execute_parallel(
                 Ok(()) => {
                     landed_on_chain = true; // Success means tx confirmed on-chain
                     true
-                }
+                },
                 Err(e) => {
                     // Check if this error indicates the tx landed but failed (e.g., ExceededSlippage)
                     landed_on_chain = is_landed_error(&e);
                     err = Some(e);
                     // Send transaction failed
                     false
-                }
+                },
             };
 
             // Transaction sent

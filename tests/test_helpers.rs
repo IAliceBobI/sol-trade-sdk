@@ -3,6 +3,7 @@
 //! 提供测试用的辅助函数，包括 SOL 空投和测试客户端创建
 
 use sol_trade_sdk::{
+    SolanaTrade, TradeBuyParams, TradeTokenType,
     common::fast_fn::{
         get_associated_token_address_with_program_id_fast,
         get_associated_token_address_with_program_id_fast_use_seed,
@@ -11,7 +12,6 @@ use sol_trade_sdk::{
     constants::{TOKEN_PROGRAM, TOKEN_PROGRAM_2022, WSOL_TOKEN_ACCOUNT},
     swqos::SwqosConfig,
     trading::core::params::{DexParamEnum, PumpSwapParams},
-    SolanaTrade, TradeBuyParams, TradeTokenType,
 };
 use solana_commitment_config::CommitmentConfig;
 use solana_rpc_client::nonblocking::rpc_client::RpcClient;
@@ -112,7 +112,7 @@ pub async fn print_balances(
         Err(e) => {
             println!("⚠️  get_balance 查询 WSOL 账户失败: {}，视为余额 0", e);
             0
-        }
+        },
     };
 
     // 方式2: 使用 get_token_account_balance 获取 WSOL 余额（账户不存在时返回 0）
@@ -127,11 +127,11 @@ pub async fn print_balances(
                     0
                 });
                 (amount, token.decimals, token.ui_amount_string)
-            }
+            },
             Err(e) => {
                 println!("⚠️  get_token_account_balance 查询 WSOL 账户失败: {}，视为余额 0", e);
                 (0, 9, "0".to_string())
-            }
+            },
         };
 
     println!("\n========== 账户余额 ==========");
@@ -283,19 +283,19 @@ pub async fn print_seed_optimize_balances(
         match client.get_token_account_balance(address).await {
             Ok(token) => {
                 println!("  {:<30} {} ({})", format!("{}:", name), token.ui_amount_string, address);
-            }
+            },
             Err(_) => {
                 // 尝试用 get_balance
                 match client.get_balance(address).await {
                     Ok(lamports) => {
                         let sol = lamports as f64 / LAMPORTS_PER_SOL as f64;
                         println!("  {:<30} {:.4} UNIT ({})", format!("{}:", name), sol, address);
-                    }
+                    },
                     Err(_) => {
                         println!("  {:<30} N/A ({})", format!("{}:", name), address);
-                    }
+                    },
                 }
-            }
+            },
         }
     }
 
@@ -351,8 +351,9 @@ pub async fn buy_pump_with_sol(
     }
 
     // 1. 从 RPC 获取池信息
-    let pump_swap_params =
-        PumpSwapParams::from_pool_address_by_rpc(&client.rpc, &pool).await.unwrap_or_else(|e| {
+    let pump_swap_params = PumpSwapParams::from_pool_address_by_rpc(&client.rpc, &pool)
+        .await
+        .unwrap_or_else(|e| {
             panic!(
                 "从 RPC 获取 PumpSwap Pool 信息失败: {}\n  Pool: {}\n  RPC: {}",
                 e,
@@ -405,11 +406,11 @@ pub async fn buy_pump_with_sol(
                 println!("❌ 买入失败: {:?}", error);
             }
             Ok((success, signatures, error))
-        }
+        },
         Err(e) => {
             println!("❌ 交易错误: {}", e);
             Err(e)
-        }
+        },
     }
 }
 
@@ -448,8 +449,9 @@ pub async fn buy_pump_with_fixed_output(
     }
 
     // 1. 从 RPC 获取池信息
-    let pump_swap_params =
-        PumpSwapParams::from_pool_address_by_rpc(&client.rpc, &pool).await.unwrap_or_else(|e| {
+    let pump_swap_params = PumpSwapParams::from_pool_address_by_rpc(&client.rpc, &pool)
+        .await
+        .unwrap_or_else(|e| {
             panic!(
                 "从 RPC 获取 PumpSwap Pool 信息失败: {}\n  Pool: {}\n  RPC: {}",
                 e,
@@ -502,10 +504,10 @@ pub async fn buy_pump_with_fixed_output(
                 println!("❌ 买入失败: {:?}", error);
             }
             Ok((success, signatures, error))
-        }
+        },
         Err(e) => {
             println!("❌ 交易错误: {}", e);
             Err(e)
-        }
+        },
     }
 }

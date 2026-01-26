@@ -4,8 +4,8 @@
 //!
 //! 测试数据来源: docs/plans/task.md
 
-use sol_trade_sdk::parser::types::ParserConfig;
 use sol_trade_sdk::parser::DexParser;
+use sol_trade_sdk::parser::types::ParserConfig;
 
 /// 测试所有 4 个 DEX 的交易解析
 ///
@@ -154,8 +154,10 @@ async fn test_parser_config() {
     assert!(!default_config.verbose, "默认不应该开启详细日志");
 
     // 测试自定义配置
-    let custom_config =
-        ParserConfig { verbose: true, rpc_url: "https://api.mainnet-beta.solana.com".to_string() };
+    let custom_config = ParserConfig {
+        verbose: true,
+        rpc_url: "https://api.mainnet-beta.solana.com".to_string(),
+    };
     assert!(custom_config.verbose, "自定义配置应该启用详细日志");
     assert_eq!(
         custom_config.rpc_url, "https://api.mainnet-beta.solana.com",

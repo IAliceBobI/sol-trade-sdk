@@ -1,14 +1,14 @@
 use crate::{
-    common::{auto_mock_rpc::PoolRpcClient, SolanaRpcClient},
+    common::{SolanaRpcClient, auto_mock_rpc::PoolRpcClient},
     constants::{SOL_MINT, USDC_MINT, USDT_MINT},
     instruction::utils::raydium_clmm_types::{
-        amm_config_decode, pool_state_decode, tick_array_state_decode, AmmConfig, PoolState,
-        TickArrayState,
+        AmmConfig, PoolState, TickArrayState, amm_config_decode, pool_state_decode,
+        tick_array_state_decode,
     },
 };
 use anyhow::anyhow;
-use base64::engine::general_purpose::STANDARD;
 use base64::Engine;
+use base64::engine::general_purpose::STANDARD;
 use solana_account_decoder::UiAccountData;
 use solana_sdk::{pubkey, pubkey::Pubkey};
 
@@ -198,8 +198,10 @@ pub async fn get_pool_by_address<T: PoolRpcClient + ?Sized>(
         return Ok(pool);
     }
     // 2. RPC 查询
-    let account =
-        rpc.get_account(pool_address).await.map_err(|e| anyhow!("RPC 调用失败: {}", e))?;
+    let account = rpc
+        .get_account(pool_address)
+        .await
+        .map_err(|e| anyhow!("RPC 调用失败: {}", e))?;
     if account.owner != accounts::RAYDIUM_CLMM {
         return Err(anyhow!("Account is not owned by Raydium CLMM program"));
     }
@@ -244,11 +246,11 @@ pub async fn get_tick_arrays(
                 if let Some(tick_array) = tick_array_state_decode(&account.data) {
                     result.push((start_index, tick_array));
                 }
-            }
+            },
             Err(_) => {
                 // Tick array 可能不存在，跳过
                 continue;
-            }
+            },
         }
     }
 
@@ -413,7 +415,7 @@ async fn find_pools_by_mint_offset_collect<T: PoolRpcClient + ?Sized>(
                         limit_str
                     );
                     usize::MAX
-                }
+                },
             };
             // 测试环境：限制返回数量，避免超时
             accounts
@@ -466,8 +468,10 @@ fn select_best_pool(pools: &[(Pubkey, PoolState)]) -> Option<(Pubkey, PoolState)
     }
 
     // 1. 优先选择「已激活且有流动性」的池
-    let tradeable_pools: Vec<_> =
-        pools.iter().filter(|(_, pool)| pool.status != 0 && pool.liquidity > 0).collect();
+    let tradeable_pools: Vec<_> = pools
+        .iter()
+        .filter(|(_, pool)| pool.status != 0 && pool.liquidity > 0)
+        .collect();
 
     let fallback_liquid_pools: Vec<_> =
         pools.iter().filter(|(_, pool)| pool.liquidity > 0).collect();
@@ -491,7 +495,7 @@ fn select_best_pool(pools: &[(Pubkey, PoolState)]) -> Option<(Pubkey, PoolState)
                 Ordering::Equal => {
                     // Tick spacing 越小，价格粒度越细，优先级越高
                     pool_b.tick_spacing.cmp(&pool_a.tick_spacing)
-                }
+                },
                 other => other,
             },
             other => other,
@@ -542,10 +546,10 @@ fn select_best_pool_by_volume(pools: &[(Pubkey, PoolState)]) -> Option<(Pubkey, 
                     std::cmp::Ordering::Equal => {
                         // 流动性也相同时，按开池时间排序（更早的池更成熟）
                         pool_b.open_time.cmp(&pool_a.open_time)
-                    }
+                    },
                     other => other,
                 }
-            }
+            },
             other => other,
         }
     });

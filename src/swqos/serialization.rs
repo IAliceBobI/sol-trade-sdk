@@ -4,8 +4,8 @@ use crate::perf::{
     compiler_optimization::CompileTimeOptimizedEventProcessor, simd::SIMDSerializer,
 };
 use anyhow::Result;
-use base64::engine::general_purpose::STANDARD;
 use base64::Engine;
+use base64::engine::general_purpose::STANDARD;
 use crossbeam_queue::ArrayQueue;
 use once_cell::sync::Lazy;
 use solana_client::rpc_client::SerializableTransaction;
@@ -120,7 +120,7 @@ pub async fn serialize_transaction(
         UiTransactionEncoding::Base64 => {
             // 使用 SIMD 优化的 Base64 编码
             STANDARD.encode(&serialized_tx)
-        }
+        },
         _ => return Err(anyhow::anyhow!("Unsupported encoding")),
     };
 

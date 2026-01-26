@@ -5,9 +5,9 @@ use once_cell::sync::Lazy;
 use solana_sdk::{instruction::Instruction, pubkey::Pubkey};
 use solana_system_interface::instruction::create_account_with_seed;
 use std::hash::Hasher;
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
-use tokio::time::{sleep, Duration};
+use std::sync::atomic::{AtomicU64, Ordering};
+use tokio::time::{Duration, sleep};
 
 // 🚀 优化：使用 AtomicU64 替代 RwLock，性能提升 5-10x
 // u64::MAX 表示未初始化状态

@@ -54,14 +54,16 @@ pub fn close_wsol(payer: &Pubkey) -> Vec<Instruction> {
             wsol_token_account,
         },
         || {
-            vec![close_account(
-                &crate::constants::TOKEN_PROGRAM,
-                &wsol_token_account,
-                &payer,
-                &payer,
-                &[],
-            )
-            .unwrap()]
+            vec![
+                close_account(
+                    &crate::constants::TOKEN_PROGRAM,
+                    &wsol_token_account,
+                    &payer,
+                    &payer,
+                    &[],
+                )
+                .unwrap(),
+            ]
         },
     );
 
@@ -290,7 +292,9 @@ mod tests {
         let transfer_instruction = &instructions[1];
         // 转账指令的数据包含 lamports 金额
         let lamports = u64::from_le_bytes(
-            transfer_instruction.data[4..12].try_into().expect("should have 8 bytes for lamports"),
+            transfer_instruction.data[4..12]
+                .try_into()
+                .expect("should have 8 bytes for lamports"),
         );
         assert_eq!(lamports, amount_in);
     }

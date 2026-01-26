@@ -10,9 +10,9 @@
 //! - 后续运行会从 tests/mock_data/ 目录加载缓存（速度提升 100 倍）
 //! - 如需重新录制，删除 tests/mock_data/ 目录中的对应文件即可
 
+use sol_trade_sdk::parser::DexParser;
 use sol_trade_sdk::parser::discriminators::DiscriminatorRegistry;
 use sol_trade_sdk::parser::types::ParserConfig;
-use sol_trade_sdk::parser::DexParser;
 
 /// 使用真实交易测试 CLMM Swap 解析
 #[tokio::test]

@@ -1,6 +1,6 @@
 use crate::{
     common::SolanaRpcClient,
-    instruction::utils::bonk_types::{pool_state_decode, PoolState},
+    instruction::utils::bonk_types::{PoolState, pool_state_decode},
 };
 use anyhow::anyhow;
 use solana_sdk::pubkey::Pubkey;

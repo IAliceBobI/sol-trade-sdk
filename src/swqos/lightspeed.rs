@@ -73,7 +73,12 @@ impl LightspeedClient {
             .connect_timeout(Duration::from_millis(2000))
             .build()
             .unwrap();
-        Self { rpc_client: Arc::new(rpc_client), endpoint, auth_token, http_client }
+        Self {
+            rpc_client: Arc::new(rpc_client),
+            endpoint,
+            auth_token,
+            http_client,
+        }
     }
 
     pub async fn send_transaction(
@@ -133,7 +138,7 @@ impl LightspeedClient {
                     start_time.elapsed()
                 );
                 return Err(e);
-            }
+            },
         }
         if wait_confirmation {
             println!(" signature: {:?}", signature);

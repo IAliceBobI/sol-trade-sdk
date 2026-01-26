@@ -25,7 +25,7 @@
 //! - `get_final_market_cap_sol`: Calculates the final market cap in SOL after all tokens are sold
 //! - `get_buy_out_price`: Calculates the price to buy out all remaining tokens
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use borsh::BorshDeserialize;
 use serde::{Deserialize, Serialize};
 use solana_sdk::pubkey::Pubkey;

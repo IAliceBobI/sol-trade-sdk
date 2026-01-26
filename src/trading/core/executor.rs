@@ -9,14 +9,14 @@ use std::{sync::Arc, time::Instant};
 use super::{params::SwapParams, traits::InstructionBuilder};
 use crate::swqos::TradeType;
 use crate::{
-    common::{nonce_cache::DurableNonceInfo, GasFeeStrategy, SolanaRpcClient},
+    common::{GasFeeStrategy, SolanaRpcClient, nonce_cache::DurableNonceInfo},
     perf::syscall_bypass::SystemCallBypassManager,
+    trading::MiddlewareManager,
     trading::core::{
         async_executor::execute_parallel,
         execution::{InstructionProcessor, Prefetch},
         traits::TradeExecutor,
     },
-    trading::MiddlewareManager,
 };
 use once_cell::sync::Lazy;
 

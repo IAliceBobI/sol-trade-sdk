@@ -299,10 +299,10 @@ async fn test_public_rpc_limitations() {
                 println!("   3. 使用已知池子地址");
                 println!("   4. 使用 Raydium API");
             }
-        }
+        },
         Err(e) => {
             println!("✗ 查询失败: {}", e);
-        }
+        },
     }
 }
 
@@ -382,8 +382,9 @@ async fn test_raydium_amm_v4_get_pool_by_mint_with_auto_mock() {
 
     // 2. 使用 Auto Mock 的 get_pool_by_mint（无缓存版本）
     println!("\n步骤 2: 使用 get_pool_by_mint 查询最优 Pool...");
-    let (pool_addr_1, amm_info_1) =
-        get_pool_by_mint(&auto_mock_client, &wsol_mint).await.expect("get_pool_by_mint failed");
+    let (pool_addr_1, amm_info_1) = get_pool_by_mint(&auto_mock_client, &wsol_mint)
+        .await
+        .expect("get_pool_by_mint failed");
     println!("✅ 找到最优 Pool: {}", pool_addr_1);
 
     // 验证基本字段

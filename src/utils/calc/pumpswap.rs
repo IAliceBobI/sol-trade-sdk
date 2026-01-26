@@ -271,5 +271,9 @@ pub fn sell_quote_input_internal(
     // Calculate min quote with slippage
     let min_quote = calculate_with_slippage_sell(quote, slippage_basis_points);
 
-    Ok(SellQuoteInputResult { internal_raw_quote: raw_quote, base: base_amount_in, min_quote })
+    Ok(SellQuoteInputResult {
+        internal_raw_quote: raw_quote,
+        base: base_amount_in,
+        min_quote,
+    })
 }

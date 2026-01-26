@@ -6,28 +6,21 @@ pub mod perf;
 pub mod swqos;
 pub mod trading;
 pub mod utils;
-use crate::common::nonce_cache::DurableNonceInfo;
 use crate::common::CallbackExecutionMode;
 use crate::common::GasFeeStrategy;
 use crate::common::InfrastructureConfig;
 use crate::common::TradeConfig;
-#[cfg(feature = "perf-trace")]
-use crate::constants::trade::trade::DEFAULT_SLIPPAGE;
+use crate::common::nonce_cache::DurableNonceInfo;
 use crate::constants::SOL_TOKEN_ACCOUNT;
 use crate::constants::USD1_TOKEN_ACCOUNT;
 use crate::constants::USDC_TOKEN_ACCOUNT;
 use crate::constants::WSOL_TOKEN_ACCOUNT;
-use crate::swqos::common::TradeError;
+#[cfg(feature = "perf-trace")]
+use crate::constants::trade::trade::DEFAULT_SLIPPAGE;
 use crate::swqos::SwqosClient;
 use crate::swqos::SwqosConfig;
 use crate::swqos::TradeType;
-use crate::trading::core::params::BonkParams;
-use crate::trading::core::params::DexParamEnum;
-use crate::trading::core::params::MeteoraDammV2Params;
-use crate::trading::core::params::PumpFunParams;
-use crate::trading::core::params::PumpSwapParams;
-use crate::trading::core::params::{RaydiumAmmV4Params, RaydiumClmmParams, RaydiumCpmmParams};
-pub use crate::trading::factory::DexType;
+use crate::swqos::common::TradeError;
 pub use crate::trading::CallbackContext;
 pub use crate::trading::CallbackRef;
 use crate::trading::MiddlewareManager;
@@ -35,9 +28,16 @@ pub use crate::trading::NoopCallback;
 use crate::trading::SwapParams;
 use crate::trading::TradeFactory;
 pub use crate::trading::TransactionLifecycleCallback;
+use crate::trading::core::params::BonkParams;
+use crate::trading::core::params::DexParamEnum;
+use crate::trading::core::params::MeteoraDammV2Params;
+use crate::trading::core::params::PumpFunParams;
+use crate::trading::core::params::PumpSwapParams;
+use crate::trading::core::params::{RaydiumAmmV4Params, RaydiumClmmParams, RaydiumCpmmParams};
+pub use crate::trading::factory::DexType;
 use common::SolanaRpcClient;
 use parking_lot::Mutex;
-use rustls::crypto::{ring::default_provider, CryptoProvider};
+use rustls::crypto::{CryptoProvider, ring::default_provider};
 use solana_sdk::hash::Hash;
 use solana_sdk::message::AddressLookupTableAccount;
 use solana_sdk::signer::Signer;
@@ -309,7 +309,7 @@ impl TradingClient {
                 Ok(client) => swqos_clients.push(client),
                 Err(e) => {
                     eprintln!("Failed to create SWQOS client {:?}: {}", swqos, e);
-                }
+                },
             }
         }
 
@@ -335,7 +335,7 @@ impl TradingClient {
                 Ok(_) => {
                     // WSOL ATA已存在
                     println!("✅ WSOL ATA已存在: {}", wsol_ata);
-                }
+                },
                 Err(_) => {
                     // WSOL ATA不存在，创建它
                     println!("🔨 创建WSOL ATA: {}", wsol_ata);
@@ -346,10 +346,9 @@ impl TradingClient {
                     if !create_ata_ixs.is_empty() {
                         // 构建并发送交易
                         use solana_sdk::transaction::Transaction;
-                        let recent_blockhash = rpc
-                            .get_latest_blockhash()
-                            .await
-                            .expect("Failed to get recent blockhash - cannot create WSOL ATA without it");
+                        let recent_blockhash = rpc.get_latest_blockhash().await.expect(
+                            "Failed to get recent blockhash - cannot create WSOL ATA without it",
+                        );
                         let tx = Transaction::new_signed_with_payer(
                             &create_ata_ixs,
                             Some(&payer.pubkey()),
@@ -360,7 +359,7 @@ impl TradingClient {
                         match rpc.send_and_confirm_transaction(&tx).await {
                             Ok(signature) => {
                                 println!("✅ WSOL ATA创建成功: {}", signature);
-                            }
+                            },
                             Err(e) => {
                                 // 创建失败，检查是否是因为已存在
                                 match rpc.get_account(&wsol_ata).await {
@@ -369,21 +368,21 @@ impl TradingClient {
                                             "✅ WSOL ATA已存在（交易失败但账户存在）: {}",
                                             wsol_ata
                                         );
-                                    }
+                                    },
                                     Err(_) => {
                                         // 账户不存在且创建失败 - 这是严重错误，应该让启动失败
                                         panic!(
                                             "❌ WSOL ATA创建失败且账户不存在: {}. 错误: {}",
                                             wsol_ata, e
                                         );
-                                    }
+                                    },
                                 }
-                            }
+                            },
                         }
                     } else {
                         println!("ℹ️ WSOL ATA已存在（无需创建）");
                     }
-                }
+                },
             }
         }
 
@@ -536,20 +535,20 @@ impl TradingClient {
             DexType::PumpFun => protocol_params.as_any().downcast_ref::<PumpFunParams>().is_some(),
             DexType::PumpSwap => {
                 protocol_params.as_any().downcast_ref::<PumpSwapParams>().is_some()
-            }
+            },
             DexType::Bonk => protocol_params.as_any().downcast_ref::<BonkParams>().is_some(),
             DexType::RaydiumCpmm => {
                 protocol_params.as_any().downcast_ref::<RaydiumCpmmParams>().is_some()
-            }
+            },
             DexType::RaydiumAmmV4 => {
                 protocol_params.as_any().downcast_ref::<RaydiumAmmV4Params>().is_some()
-            }
+            },
             DexType::RaydiumClmm => {
                 protocol_params.as_any().downcast_ref::<RaydiumClmmParams>().is_some()
-            }
+            },
             DexType::MeteoraDammV2 => {
                 protocol_params.as_any().downcast_ref::<MeteoraDammV2Params>().is_some()
-            }
+            },
         };
 
         if !is_valid_params {
@@ -652,20 +651,20 @@ impl TradingClient {
             DexType::PumpFun => protocol_params.as_any().downcast_ref::<PumpFunParams>().is_some(),
             DexType::PumpSwap => {
                 protocol_params.as_any().downcast_ref::<PumpSwapParams>().is_some()
-            }
+            },
             DexType::Bonk => protocol_params.as_any().downcast_ref::<BonkParams>().is_some(),
             DexType::RaydiumCpmm => {
                 protocol_params.as_any().downcast_ref::<RaydiumCpmmParams>().is_some()
-            }
+            },
             DexType::RaydiumAmmV4 => {
                 protocol_params.as_any().downcast_ref::<RaydiumAmmV4Params>().is_some()
-            }
+            },
             DexType::RaydiumClmm => {
                 protocol_params.as_any().downcast_ref::<RaydiumClmmParams>().is_some()
-            }
+            },
             DexType::MeteoraDammV2 => {
                 protocol_params.as_any().downcast_ref::<MeteoraDammV2Params>().is_some()
-            }
+            },
         };
 
         if !is_valid_params {

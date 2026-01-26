@@ -58,15 +58,18 @@ where
         InstructionCacheKey::CreateAssociatedTokenAccount { payer, .. } => {
             let bytes = payer.to_bytes();
             COMPILE_TIME_HASH.hash_lookup_optimized(bytes[0])
-        }
+        },
         InstructionCacheKey::CloseWsolAccount { payer, .. } => {
             let bytes = payer.to_bytes();
             COMPILE_TIME_HASH.hash_lookup_optimized(bytes[0])
-        }
+        },
     };
 
     // Lock-free cache lookup with entry API
-    INSTRUCTION_CACHE.entry(cache_key).or_insert_with(|| Arc::new(compute_fn())).clone()
+    INSTRUCTION_CACHE
+        .entry(cache_key)
+        .or_insert_with(|| Arc::new(compute_fn()))
+        .clone()
 }
 
 // --------------------- Associated Token Account ---------------------
@@ -296,14 +299,16 @@ pub fn fast_init(payer: &Pubkey) {
             wsol_token_account,
         },
         || {
-            vec![close_account(
-                &crate::constants::TOKEN_PROGRAM,
-                &wsol_token_account,
-                &payer,
-                &payer,
-                &[],
-            )
-            .unwrap()]
+            vec![
+                close_account(
+                    &crate::constants::TOKEN_PROGRAM,
+                    &wsol_token_account,
+                    &payer,
+                    &payer,
+                    &[],
+                )
+                .unwrap(),
+            ]
         },
     );
 }

@@ -1,8 +1,8 @@
 use crate::swqos::common::{poll_transaction_confirmation, serialize_transaction_and_encode};
 use rand::seq::IndexedRandom;
 use reqwest::{
-    header::{HeaderMap, HeaderValue, CONTENT_TYPE},
     Client,
+    header::{CONTENT_TYPE, HeaderMap, HeaderValue},
 };
 use serde_json::json;
 use std::{sync::Arc, time::Instant};
@@ -221,7 +221,7 @@ impl BlockRazorClient {
                     start_time.elapsed()
                 );
                 return Err(e);
-            }
+            },
         }
         if wait_confirmation {
             println!(" signature: {:?}", signature);

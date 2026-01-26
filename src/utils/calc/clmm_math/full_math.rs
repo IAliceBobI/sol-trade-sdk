@@ -70,21 +70,13 @@ impl MulDiv for u64 {
     fn mul_div_floor(self, num: Self, denom: Self) -> Option<Self::Output> {
         assert_ne!(denom, 0);
         let r = (U128::from(self) * U128::from(num)) / U128::from(denom);
-        if r > U128::from(u64::MAX) {
-            None
-        } else {
-            Some(r.as_u64())
-        }
+        if r > U128::from(u64::MAX) { None } else { Some(r.as_u64()) }
     }
 
     fn mul_div_ceil(self, num: Self, denom: Self) -> Option<Self::Output> {
         assert_ne!(denom, 0);
         let r = (U128::from(self) * U128::from(num) + U128::from(denom - 1)) / U128::from(denom);
-        if r > U128::from(u64::MAX) {
-            None
-        } else {
-            Some(r.as_u64())
-        }
+        if r > U128::from(u64::MAX) { None } else { Some(r.as_u64()) }
     }
 
     fn to_underflow_u64(self) -> u64 {
@@ -98,29 +90,17 @@ impl MulDiv for U128 {
     fn mul_div_floor(self, num: Self, denom: Self) -> Option<Self::Output> {
         assert_ne!(denom, U128::default());
         let r = ((self.as_u256()) * (num.as_u256())) / (denom.as_u256());
-        if r > U128::MAX.as_u256() {
-            None
-        } else {
-            Some(r.as_u128())
-        }
+        if r > U128::MAX.as_u256() { None } else { Some(r.as_u128()) }
     }
 
     fn mul_div_ceil(self, num: Self, denom: Self) -> Option<Self::Output> {
         assert_ne!(denom, U128::default());
         let r = (self.as_u256() * num.as_u256() + (denom - 1).as_u256()) / denom.as_u256();
-        if r > U128::MAX.as_u256() {
-            None
-        } else {
-            Some(r.as_u128())
-        }
+        if r > U128::MAX.as_u256() { None } else { Some(r.as_u128()) }
     }
 
     fn to_underflow_u64(self) -> u64 {
-        if self < U128::from(u64::MAX) {
-            self.as_u64()
-        } else {
-            0
-        }
+        if self < U128::from(u64::MAX) { self.as_u64() } else { 0 }
     }
 }
 
@@ -130,28 +110,16 @@ impl MulDiv for U256 {
     fn mul_div_floor(self, num: Self, denom: Self) -> Option<Self::Output> {
         assert_ne!(denom, U256::default());
         let r = (self.as_u512() * num.as_u512()) / denom.as_u512();
-        if r > U256::MAX.as_u512() {
-            None
-        } else {
-            Some(r.as_u256())
-        }
+        if r > U256::MAX.as_u512() { None } else { Some(r.as_u256()) }
     }
 
     fn mul_div_ceil(self, num: Self, denom: Self) -> Option<Self::Output> {
         assert_ne!(denom, U256::default());
         let r = (self.as_u512() * num.as_u512() + (denom - 1).as_u512()) / denom.as_u512();
-        if r > U256::MAX.as_u512() {
-            None
-        } else {
-            Some(r.as_u256())
-        }
+        if r > U256::MAX.as_u512() { None } else { Some(r.as_u256()) }
     }
 
     fn to_underflow_u64(self) -> u64 {
-        if self < U256::from(u64::MAX) {
-            self.as_u64()
-        } else {
-            0
-        }
+        if self < U256::from(u64::MAX) { self.as_u64() } else { 0 }
     }
 }

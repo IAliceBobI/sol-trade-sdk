@@ -754,14 +754,20 @@ impl TransactionAdapter {
         };
 
         // 解析 authority
-        let authority =
-            info.get("authority").and_then(|v| v.as_str()).and_then(|s| Pubkey::from_str(s).ok());
+        let authority = info
+            .get("authority")
+            .and_then(|v| v.as_str())
+            .and_then(|s| Pubkey::from_str(s).ok());
 
         // 获取余额信息
-        let source_balance =
-            self.token_balance_changes.get(&source).and_then(|(pre, _)| pre.as_ref().cloned());
-        let source_pre_balance =
-            self.token_balance_changes.get(&source).and_then(|(pre, _)| pre.as_ref().cloned());
+        let source_balance = self
+            .token_balance_changes
+            .get(&source)
+            .and_then(|(pre, _)| pre.as_ref().cloned());
+        let source_pre_balance = self
+            .token_balance_changes
+            .get(&source)
+            .and_then(|(pre, _)| pre.as_ref().cloned());
         let destination_balance = self
             .token_balance_changes
             .get(&destination)
@@ -843,7 +849,7 @@ impl TransactionAdapter {
                     })?;
 
                 (source, mint, destination, authority)
-            }
+            },
             12 => {
                 // TransferChecked
                 if accounts.len() < 4 {
@@ -857,13 +863,13 @@ impl TransactionAdapter {
                 let authority = Some(accounts[3]);
 
                 (source, mint, destination, authority)
-            }
+            },
             _ => {
                 return Err(AdapterError::InstructionParseError(format!(
                     "未知的指令 discriminator: {}",
                     discriminator
                 )));
-            }
+            },
         };
 
         // 解析 amount (从偏移 1 开始，8 字节)
@@ -890,10 +896,14 @@ impl TransactionAdapter {
         };
 
         // 获取余额信息
-        let source_balance =
-            self.token_balance_changes.get(&source).and_then(|(pre, _)| pre.as_ref().cloned());
-        let source_pre_balance =
-            self.token_balance_changes.get(&source).and_then(|(pre, _)| pre.as_ref().cloned());
+        let source_balance = self
+            .token_balance_changes
+            .get(&source)
+            .and_then(|(pre, _)| pre.as_ref().cloned());
+        let source_pre_balance = self
+            .token_balance_changes
+            .get(&source)
+            .and_then(|(pre, _)| pre.as_ref().cloned());
         let destination_balance = self
             .token_balance_changes
             .get(&destination)
@@ -936,7 +946,10 @@ impl TransactionAdapter {
     /// # 返回
     /// 该外部指令内的所有 Transfer 记录
     pub fn get_transfers_for_instruction(&self, outer_index: usize) -> Vec<TransferData> {
-        self.get_transfer_actions().into_iter().filter(|t| t.outer_index == outer_index).collect()
+        self.get_transfer_actions()
+            .into_iter()
+            .filter(|t| t.outer_index == outer_index)
+            .collect()
     }
 }
 

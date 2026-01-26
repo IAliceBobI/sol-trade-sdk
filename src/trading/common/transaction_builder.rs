@@ -12,10 +12,10 @@ use super::{
     nonce_manager::{add_nonce_instruction, get_transaction_blockhash},
 };
 use crate::{
-    common::{nonce_cache::DurableNonceInfo, SolanaRpcClient},
+    common::{SolanaRpcClient, nonce_cache::DurableNonceInfo},
     trading::{
-        core::transaction_pool::{acquire_builder, release_builder},
         MiddlewareManager,
+        core::transaction_pool::{acquire_builder, release_builder},
     },
 };
 
@@ -106,8 +106,9 @@ async fn build_versioned_transaction(
     );
 
     let msg_bytes = versioned_msg.serialize();
-    let signature =
-        payer.try_sign_message(&msg_bytes).expect("交易签名失败：payer 密钥无效或消息序列化错误");
+    let signature = payer
+        .try_sign_message(&msg_bytes)
+        .expect("交易签名失败：payer 密钥无效或消息序列化错误");
     let tx = VersionedTransaction { signatures: vec![signature], message: versioned_msg };
 
     // 归还构建器到池

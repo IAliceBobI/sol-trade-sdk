@@ -2,8 +2,8 @@ use crate::{
     common::fast_fn::get_associated_token_address_with_program_id_fast_use_seed,
     constants::trade::trade::DEFAULT_SLIPPAGE,
     instruction::utils::raydium_cpmm::{
-        accounts, get_observation_state_pda, get_pool_pda, get_vault_account,
-        SWAP_BASE_IN_DISCRIMINATOR,
+        SWAP_BASE_IN_DISCRIMINATOR, accounts, get_observation_state_pda, get_pool_pda,
+        get_vault_account,
     },
     trading::core::{
         params::{RaydiumCpmmParams, SwapParams},
@@ -11,7 +11,7 @@ use crate::{
     },
     utils::calc::raydium_cpmm::compute_swap_amount,
 };
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use solana_sdk::{
     instruction::{AccountMeta, Instruction},
     pubkey::Pubkey,
@@ -236,7 +236,7 @@ impl InstructionBuilder for RaydiumCpmmInstructionBuilder {
                     params.slippage_basis_points.unwrap_or(DEFAULT_SLIPPAGE),
                 )
                 .min_amount_out
-            }
+            },
         };
 
         let output_token_account = get_associated_token_address_with_program_id_fast_use_seed(

@@ -1,7 +1,7 @@
 use crate::common::types::SolanaRpcClient;
 use anyhow::Result;
-use base64::engine::general_purpose::{self, STANDARD};
 use base64::Engine;
+use base64::engine::general_purpose::{self, STANDARD};
 use bincode::serialize;
 use reqwest::Client;
 use serde_json;
@@ -90,12 +90,12 @@ pub async fn poll_transaction_confirmation(
                 if status.err.is_some() {
                     // 直接跳转到获取交易详情
                 }
-            }
+            },
             None => {
                 // 交易还未上链，继续等待，不调用 getTransaction
                 sleep(interval).await;
                 continue;
-            }
+            },
         }
 
         // 优化：只在以下情况调用 getTransaction
@@ -125,7 +125,7 @@ pub async fn poll_transaction_confirmation(
                 // 交易可能还未上链，继续等待
                 sleep(interval).await;
                 continue;
-            }
+            },
         };
 
         let meta = tx_details.transaction.meta;
@@ -183,8 +183,8 @@ pub async fn poll_transaction_confirmation(
                             _ => 999, // 其他未知错误
                         };
                         index = Some(*i);
-                    }
-                    _ => {}
+                    },
+                    _ => {},
                 }
 
                 return Err(anyhow::Error::new(TradeError {

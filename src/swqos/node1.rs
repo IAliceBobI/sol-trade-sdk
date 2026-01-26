@@ -206,7 +206,7 @@ impl Node1Client {
                 println!(" signature: {:?}", signature);
                 println!(" [node1] {} confirmation failed: {:?}", trade_type, start_time.elapsed());
                 return Err(e);
-            }
+            },
         }
         if wait_confirmation {
             println!(" signature: {:?}", signature);

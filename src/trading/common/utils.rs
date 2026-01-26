@@ -2,8 +2,8 @@ use solana_sdk::{pubkey::Pubkey, signature::Keypair, signer::Signer, transaction
 use solana_system_interface::instruction::transfer;
 
 use crate::common::{
-    auto_mock_rpc::PoolRpcClient, fast_fn::get_associated_token_address_with_program_id_fast,
-    spl_token::close_account, SolanaRpcClient,
+    SolanaRpcClient, auto_mock_rpc::PoolRpcClient,
+    fast_fn::get_associated_token_address_with_program_id_fast, spl_token::close_account,
 };
 use anyhow::anyhow;
 
@@ -60,8 +60,10 @@ pub async fn get_token_balance(
         &crate::constants::TOKEN_PROGRAM,
     );
     let balance = rpc.get_token_account_balance(&ata).await?;
-    let balance_u64 =
-        balance.amount.parse::<u64>().map_err(|_| anyhow!("Failed to parse token balance"))?;
+    let balance_u64 = balance
+        .amount
+        .parse::<u64>()
+        .map_err(|_| anyhow!("Failed to parse token balance"))?;
     Ok(balance_u64)
 }
 

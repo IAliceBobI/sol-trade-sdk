@@ -1,6 +1,6 @@
-use crate::common::{bonding_curve::BondingCurveAccount, SolanaRpcClient};
-use base64::engine::general_purpose::STANDARD;
+use crate::common::{SolanaRpcClient, bonding_curve::BondingCurveAccount};
 use base64::Engine;
+use base64::engine::general_purpose::STANDARD;
 use solana_account_decoder::UiAccountData;
 use solana_sdk::{
     instruction::{AccountMeta, Instruction},
@@ -771,8 +771,8 @@ pub async fn find_global_config(
                                     accounts::USD1_GLOBAL_CONFIG
                                 );
                                 return Ok(accounts::USD1_GLOBAL_CONFIG);
-                            }
-                            Err(_) => {}
+                            },
+                            Err(_) => {},
                         }
                     }
 
@@ -784,9 +784,9 @@ pub async fn find_global_config(
                     Err(anyhow::anyhow!(
                         "Could not find global_config. Please provide it explicitly. Tried PDA derivation and known addresses."
                     ))
-                }
+                },
             }
-        }
+        },
     }
 }
 
@@ -919,7 +919,7 @@ fn serialize_curve_params(params: &CurveParams) -> Vec<u8> {
             data.extend_from_slice(&total_base_sell.to_le_bytes());
             data.extend_from_slice(&total_quote_fund_raising.to_le_bytes());
             data.push(*migrate_type);
-        }
+        },
         CurveParams::Fixed { supply, total_quote_fund_raising, migrate_type } => {
             // Variant discriminator: 1 for Fixed
             data.push(1);
@@ -927,7 +927,7 @@ fn serialize_curve_params(params: &CurveParams) -> Vec<u8> {
             data.extend_from_slice(&supply.to_le_bytes());
             data.extend_from_slice(&total_quote_fund_raising.to_le_bytes());
             data.push(*migrate_type);
-        }
+        },
         CurveParams::Linear { supply, total_quote_fund_raising, migrate_type } => {
             // Variant discriminator: 2 for Linear
             data.push(2);
@@ -935,7 +935,7 @@ fn serialize_curve_params(params: &CurveParams) -> Vec<u8> {
             data.extend_from_slice(&supply.to_le_bytes());
             data.extend_from_slice(&total_quote_fund_raising.to_le_bytes());
             data.push(*migrate_type);
-        }
+        },
     }
 
     data
@@ -1091,7 +1091,7 @@ async fn query_all_amm_configs(
     cpmm_program: &Pubkey,
 ) -> Result<Vec<(Pubkey, crate::instruction::utils::raydium_cpmm_types::AmmConfig)>, anyhow::Error>
 {
-    use crate::instruction::utils::raydium_cpmm_types::{amm_config_decode, AMM_CONFIG_SIZE};
+    use crate::instruction::utils::raydium_cpmm_types::{AMM_CONFIG_SIZE, amm_config_decode};
     use solana_account_decoder::UiAccountEncoding;
     use solana_rpc_client_api::config::RpcProgramAccountsConfig;
     use solana_rpc_client_api::filter::RpcFilterType;
@@ -1148,8 +1148,8 @@ async fn try_known_config_address(rpc: &SolanaRpcClient) -> Option<(Pubkey, Pubk
                 println!("   ✅ 使用已知的 CPMM config 地址: {} (主网)", mainnet_config);
                 return Some((mainnet_config, accounts::CPMM_CREATE_POOL_FEE));
             }
-        }
-        Err(_) => {}
+        },
+        Err(_) => {},
     }
 
     // Try devnet config
@@ -1160,8 +1160,8 @@ async fn try_known_config_address(rpc: &SolanaRpcClient) -> Option<(Pubkey, Pubk
                 println!("   ✅ 使用已知的 CPMM config 地址: {} (Devnet)", devnet_config);
                 return Some((devnet_config, accounts::CPMM_CREATE_POOL_FEE));
             }
-        }
-        Err(_) => {}
+        },
+        Err(_) => {},
     }
 
     None
@@ -1191,10 +1191,10 @@ pub async fn find_cpswap_config(rpc: &SolanaRpcClient) -> Result<(Pubkey, Pubkey
             println!("   ℹ️  使用 CPMM Create Pool Fee: {}", cpswap_create_pool_fee);
 
             return Ok((cpswap_config, cpswap_create_pool_fee));
-        }
+        },
         Err(e) => {
             println!("   ⚠️  通过 WSOL 查找 CPMM pool 失败: {}", e);
-        }
+        },
     }
 
     // Method 3: Try to query program accounts directly to find any CPMM pool
@@ -1234,7 +1234,7 @@ pub async fn find_cpswap_config(rpc: &SolanaRpcClient) -> Result<(Pubkey, Pubkey
                                     Ok(bytes) => bytes,
                                     Err(_) => continue,
                                 }
-                            }
+                            },
                             _ => continue,
                         };
                         if data_bytes.len() > 8 {
@@ -1256,10 +1256,10 @@ pub async fn find_cpswap_config(rpc: &SolanaRpcClient) -> Result<(Pubkey, Pubkey
                         }
                     }
                 }
-            }
+            },
             Err(e) => {
                 println!("   ⚠️  通过程序账户查询失败 (程序: {}): {}", cpmm_program, e);
-            }
+            },
         }
     }
 
@@ -1281,10 +1281,10 @@ pub async fn find_cpswap_config(rpc: &SolanaRpcClient) -> Result<(Pubkey, Pubkey
 
                     return Ok((*config_address, cpswap_create_pool_fee));
                 }
-            }
+            },
             Err(e) => {
                 println!("   ⚠️  查询所有 AmmConfig 账户失败 (程序: {}): {}", cpmm_program, e);
-            }
+            },
         }
     }
 

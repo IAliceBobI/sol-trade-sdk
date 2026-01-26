@@ -30,12 +30,12 @@ pub async fn fetch_nonce_info(
                         current_nonce: Some(*blockhash),
                     });
                 }
-            }
+            },
             _ => (),
         },
         Err(e) => {
             error!("Failed to get nonce account information: {:?}", e);
-        }
+        },
     }
     None
 }

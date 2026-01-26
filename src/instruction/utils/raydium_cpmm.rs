@@ -1,12 +1,12 @@
 use crate::{
-    common::{auto_mock_rpc::PoolRpcClient, SolanaRpcClient},
+    common::{SolanaRpcClient, auto_mock_rpc::PoolRpcClient},
     constants::{USDC_MINT, USDT_MINT, WSOL_TOKEN_ACCOUNT},
-    instruction::utils::raydium_cpmm_types::{pool_state_decode, PoolState},
+    instruction::utils::raydium_cpmm_types::{PoolState, pool_state_decode},
     trading::core::params::RaydiumCpmmParams,
 };
 use anyhow::anyhow;
-use base64::engine::general_purpose::STANDARD;
 use base64::Engine;
+use base64::engine::general_purpose::STANDARD;
 use solana_account_decoder::UiAccountData;
 use solana_sdk::{pubkey, pubkey::Pubkey};
 
@@ -128,8 +128,10 @@ pub async fn get_pool_by_address<T: PoolRpcClient + ?Sized>(
         return Ok(pool);
     }
     // 2. RPC 查询
-    let account =
-        rpc.get_account(pool_address).await.map_err(|e| anyhow!("RPC 调用失败: {}", e))?;
+    let account = rpc
+        .get_account(pool_address)
+        .await
+        .map_err(|e| anyhow!("RPC 调用失败: {}", e))?;
     if account.owner != accounts::RAYDIUM_CPMM {
         return Err(anyhow!("Account is not owned by Raydium Cpmm program"));
     }
@@ -502,7 +504,7 @@ fn select_best_pool_by_liquidity(pools: &[(Pubkey, PoolState)]) -> Option<(Pubke
             std::cmp::Ordering::Equal => {
                 // LP 供应量相同时，按开池时间排序（更早的池更成熟）
                 pool_b.open_time.cmp(&pool_a.open_time)
-            }
+            },
             other => other,
         }
     });

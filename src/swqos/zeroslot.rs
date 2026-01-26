@@ -71,7 +71,12 @@ impl ZeroSlotClient {
             .connect_timeout(Duration::from_millis(2000)) // Reduced from 5s to 2s
             .build()
             .unwrap();
-        Self { rpc_client: Arc::new(rpc_client), endpoint, auth_token, http_client }
+        Self {
+            rpc_client: Arc::new(rpc_client),
+            endpoint,
+            auth_token,
+            http_client,
+        }
     }
 
     pub async fn send_transaction(
@@ -128,7 +133,7 @@ impl ZeroSlotClient {
                 println!(" signature: {:?}", signature);
                 println!(" [0slot] {} confirmation failed: {:?}", trade_type, start_time.elapsed());
                 return Err(e);
-            }
+            },
         }
         if wait_confirmation {
             println!(" signature: {:?}", signature);

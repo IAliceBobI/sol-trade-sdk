@@ -69,11 +69,7 @@ pub async fn get_mint_info(
                 .get_variable_len_extension::<spl_token_metadata_interface::state::TokenMetadata>(
             ) {
                 let s = metadata.symbol.to_string();
-                if s.is_empty() {
-                    get_known_token_symbol(mint)
-                } else {
-                    s
-                }
+                if s.is_empty() { get_known_token_symbol(mint) } else { s }
             } else {
                 get_known_token_symbol(mint)
             };
@@ -99,8 +95,10 @@ pub async fn get_mint_info_with_client<T: PoolRpcClient + ?Sized>(
     rpc: &T,
     mint: &Pubkey,
 ) -> Result<MintInfo> {
-    let account =
-        rpc.get_account(mint).await.map_err(|e| anyhow::anyhow!("RPC 调用失败: {}", e))?;
+    let account = rpc
+        .get_account(mint)
+        .await
+        .map_err(|e| anyhow::anyhow!("RPC 调用失败: {}", e))?;
     let is_token2022 = account.owner == spl_token_2022::ID;
 
     // 尝试解析为传统 Token 程序的 Mint
@@ -128,11 +126,7 @@ pub async fn get_mint_info_with_client<T: PoolRpcClient + ?Sized>(
                 .get_variable_len_extension::<spl_token_metadata_interface::state::TokenMetadata>(
             ) {
                 let s = metadata.symbol.to_string();
-                if s.is_empty() {
-                    get_known_token_symbol(mint)
-                } else {
-                    s
-                }
+                if s.is_empty() { get_known_token_symbol(mint) } else { s }
             } else {
                 get_known_token_symbol(mint)
             };

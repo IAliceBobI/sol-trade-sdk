@@ -14,14 +14,14 @@
 //!     cargo test --test raydium_cpmm_buy_sell_tests -- --nocapture
 
 use sol_trade_sdk::{
-    common::{auto_mock_rpc::AutoMockRpcClient, GasFeeStrategy},
+    DexType, TradeBuyParams, TradeSellParams, TradeTokenType,
+    common::{GasFeeStrategy, auto_mock_rpc::AutoMockRpcClient},
     instruction::utils::raydium_cpmm::{
         clear_pool_cache, get_pool_by_address, get_pool_by_mint, get_token_price_in_usd_with_pool,
         list_pools_by_mint,
     },
     parser::DexParser,
     trading::core::params::{DexParamEnum, RaydiumCpmmParams},
-    DexType, TradeBuyParams, TradeSellParams, TradeTokenType,
 };
 use solana_sdk::{pubkey::Pubkey, signer::Signer};
 use std::str::FromStr;
@@ -58,8 +58,9 @@ async fn test_raydium_cpmm_buy_sell_complete() {
     println!("测试钱包: {}", payer_pubkey);
 
     // 记录初始 SOL 余额
-    let (initial_sol, _) =
-        print_balances(rpc_url, &payer_pubkey).await.expect("Failed to fetch initial balances");
+    let (initial_sol, _) = print_balances(rpc_url, &payer_pubkey)
+        .await
+        .expect("Failed to fetch initial balances");
 
     // ===== 1. 使用指定的 CPMM Pool (PIPE-WSOL) =====
     let pool_address = Pubkey::from_str("BnYsRpYvJpz6biY3hV6U9smChVePCJ6YyupVDfcnXpTp")
@@ -186,8 +187,11 @@ async fn test_raydium_cpmm_buy_sell_complete() {
         .await
         .expect("Failed to build RaydiumCpmmParams for sell");
 
-    let recent_blockhash_sell =
-        client.rpc.get_latest_blockhash().await.expect("Failed to get latest blockhash for sell");
+    let recent_blockhash_sell = client
+        .rpc
+        .get_latest_blockhash()
+        .await
+        .expect("Failed to get latest blockhash for sell");
 
     let sell_params = TradeSellParams {
         dex_type: DexType::RaydiumCpmm,
@@ -251,8 +255,9 @@ async fn test_raydium_cpmm_buy_sell_complete() {
     tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
 
     // ===== 5. 验证最终余额 =====
-    let (final_sol, _) =
-        print_balances(rpc_url, &payer_pubkey).await.expect("Failed to fetch final balances");
+    let (final_sol, _) = print_balances(rpc_url, &payer_pubkey)
+        .await
+        .expect("Failed to fetch final balances");
     let final_token_balance = print_token_balance(rpc_url, &payer_pubkey, &target_mint, "Target")
         .await
         .expect("Failed to fetch final token balance");
@@ -345,7 +350,9 @@ async fn test_raydium_cpmm_get_pool_by_mint_with_auto_mock() {
     // 1. 使用 Auto Mock 的 list_pools_by_mint
     println!("\n步骤 1: 使用 list_pools_by_mint 查询所有 WSOL Pool...");
     let pools: Vec<(Pubkey, sol_trade_sdk::instruction::utils::raydium_cpmm_types::PoolState)> =
-        list_pools_by_mint(&auto_mock_client, &wsol_mint).await.expect("list_pools_by_mint failed");
+        list_pools_by_mint(&auto_mock_client, &wsol_mint)
+            .await
+            .expect("list_pools_by_mint failed");
     println!("✅ 查询到 {} 个 Pool", pools.len());
     assert!(!pools.is_empty(), "WSOL 相关的 CPMM Pool 列表不应为空");
 
@@ -365,7 +372,9 @@ async fn test_raydium_cpmm_get_pool_by_mint_with_auto_mock() {
     let (pool_addr, pool_state): (
         Pubkey,
         sol_trade_sdk::instruction::utils::raydium_cpmm_types::PoolState,
-    ) = get_pool_by_mint(&auto_mock_client, &wsol_mint).await.expect("get_pool_by_mint failed");
+    ) = get_pool_by_mint(&auto_mock_client, &wsol_mint)
+        .await
+        .expect("get_pool_by_mint failed");
     println!("✅ 找到最优 Pool: {}", pool_addr);
 
     // 验证基本字段

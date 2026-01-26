@@ -35,7 +35,7 @@ pub trait DexParserTrait: Send + Sync {
     /// # 返回
     /// 解析后的交易信息列表
     async fn parse(&self, adapter: &TransactionAdapter)
-        -> Result<Vec<ParsedTradeInfo>, ParseError>;
+    -> Result<Vec<ParsedTradeInfo>, ParseError>;
 
     /// 获取解析器支持的协议
     fn protocol(&self) -> DexProtocol;
@@ -49,7 +49,10 @@ pub trait DexParserTrait: Send + Sync {
     /// 如果可以解析返回 true
     fn can_parse(&self, adapter: &TransactionAdapter) -> bool {
         let program_id = self.protocol().program_id();
-        adapter.instructions.iter().any(|instr| instr.program_id.to_string() == program_id)
+        adapter
+            .instructions
+            .iter()
+            .any(|instr| instr.program_id.to_string() == program_id)
     }
 }
 

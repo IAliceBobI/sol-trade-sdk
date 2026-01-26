@@ -1,8 +1,8 @@
 use sol_trade_sdk::{
+    DexType, TradeBuyParams, TradeSellParams, TradeTokenType,
     common::GasFeeStrategy,
     parser::DexParser,
     trading::core::params::{DexParamEnum, RaydiumClmmParams},
-    DexType, TradeBuyParams, TradeSellParams, TradeTokenType,
 };
 use solana_sdk::{pubkey::Pubkey, signer::Signer};
 use std::str::FromStr;
@@ -41,8 +41,9 @@ async fn test_raydium_clmm_buy_and_sell_jup() {
     println!("交易 Token: JUP ({})", jup_mint);
 
     // 记录初始 JUP 代币余额
-    let initial_jup_balance =
-        print_token_balance(rpc_url, &payer_pubkey, &jup_mint, "JUP").await.unwrap_or_else(|e| {
+    let initial_jup_balance = print_token_balance(rpc_url, &payer_pubkey, &jup_mint, "JUP")
+        .await
+        .unwrap_or_else(|e| {
             panic!(
                 "获取初始 JUP 余额失败: {}\n  钱包: {}\n  JUP Mint: {}",
                 e, payer_pubkey, jup_mint

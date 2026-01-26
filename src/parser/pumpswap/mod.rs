@@ -6,7 +6,7 @@ pub mod events;
 
 use async_trait::async_trait;
 
-use crate::parser::pumpswap::events::{parse_pumpswap_event, EventData, PumpswapEventType};
+use crate::parser::pumpswap::events::{EventData, PumpswapEventType, parse_pumpswap_event};
 use crate::parser::{
     base_parser::{DexParserTrait, ParseError},
     transaction_adapter::TransactionAdapter,
@@ -231,14 +231,14 @@ impl DexParserTrait for PumpswapParser {
                         } else {
                             continue;
                         }
-                    }
+                    },
                     PumpswapEventType::Sell => {
                         if let EventData::Sell(ref sell_event) = event_data {
                             self.parse_sell_event(sell_event, adapter)?
                         } else {
                             continue;
                         }
-                    }
+                    },
                     _ => continue, // 跳过其他事件类型
                 };
                 trades.push(trade);

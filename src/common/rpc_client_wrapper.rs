@@ -37,7 +37,7 @@ impl RpcClientWrapper {
                 })
                 .await
                 .map_err(|e| format!("任务执行失败: {}", e))?
-            }
+            },
             RpcClientWrapper::AutoMock(client) => client.get_transaction(sig, config).await,
         }
     }

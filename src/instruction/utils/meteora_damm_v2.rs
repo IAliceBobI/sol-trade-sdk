@@ -1,6 +1,6 @@
 use crate::{
     common::SolanaRpcClient,
-    instruction::utils::meteora_damm_v2_types::{pool_decode, Pool},
+    instruction::utils::meteora_damm_v2_types::{Pool, pool_decode},
 };
 use anyhow::anyhow;
 use solana_sdk::pubkey::Pubkey;

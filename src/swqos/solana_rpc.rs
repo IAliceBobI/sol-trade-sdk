@@ -8,7 +8,7 @@ use solana_transaction_status::UiTransactionEncoding;
 use crate::swqos::SwqosClientTrait;
 use crate::{
     common::SolanaRpcClient,
-    swqos::{common::poll_transaction_confirmation, SwqosType, TradeType},
+    swqos::{SwqosType, TradeType, common::poll_transaction_confirmation},
 };
 use anyhow::Result;
 
@@ -46,7 +46,7 @@ impl SwqosClientTrait for SolRpcClient {
                 println!(" signature: {:?}", signature);
                 println!(" [rpc] {} confirmation failed: {:?}", trade_type, start_time.elapsed());
                 return Err(e);
-            }
+            },
         }
         if wait_confirmation {
             println!(" signature: {:?}", signature);

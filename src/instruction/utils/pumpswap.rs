@@ -1,15 +1,14 @@
 use crate::{
     common::{
-        auto_mock_rpc::PoolRpcClient,
+        SolanaRpcClient, auto_mock_rpc::PoolRpcClient,
         spl_associated_token_account::get_associated_token_address_with_program_id,
-        SolanaRpcClient,
     },
     constants::{TOKEN_PROGRAM, USDC_MINT, USDT_MINT, WSOL_TOKEN_ACCOUNT},
-    instruction::utils::pumpswap_types::{pool_decode, Pool},
+    instruction::utils::pumpswap_types::{Pool, pool_decode},
 };
 use anyhow::anyhow;
-use base64::engine::general_purpose::STANDARD;
 use base64::Engine;
+use base64::engine::general_purpose::STANDARD;
 use solana_account_decoder::{UiAccountData, UiAccountEncoding};
 use solana_sdk::{pubkey, pubkey::Pubkey};
 
@@ -247,8 +246,10 @@ pub async fn get_pool_by_address<T: PoolRpcClient + ?Sized>(
         return Ok(pool);
     }
     // 2. RPC 查询
-    let account =
-        rpc.get_account(pool_address).await.map_err(|e| anyhow!("RPC 调用失败: {}", e))?;
+    let account = rpc
+        .get_account(pool_address)
+        .await
+        .map_err(|e| anyhow!("RPC 调用失败: {}", e))?;
     if account.owner != accounts::AMM_PROGRAM {
         return Err(anyhow!("Account is not owned by PumpSwap program"));
     }
@@ -885,10 +886,12 @@ mod tests {
         let rpc = RpcClient::new("http://127.0.0.1:8899".to_string());
         let dummy_anchor_pool = Pubkey::new_unique();
 
-        let usdc_price =
-            get_token_price_in_usd(&rpc, &USDC_MINT, Some(&dummy_anchor_pool)).await.unwrap();
-        let usdt_price =
-            get_token_price_in_usd(&rpc, &USDT_MINT, Some(&dummy_anchor_pool)).await.unwrap();
+        let usdc_price = get_token_price_in_usd(&rpc, &USDC_MINT, Some(&dummy_anchor_pool))
+            .await
+            .unwrap();
+        let usdt_price = get_token_price_in_usd(&rpc, &USDT_MINT, Some(&dummy_anchor_pool))
+            .await
+            .unwrap();
 
         assert_eq!(usdc_price, 1.0);
         assert_eq!(usdt_price, 1.0);

@@ -11,8 +11,8 @@
 
 #[allow(unused_imports)]
 use std::fs::OpenOptions;
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use anyhow::Result;
@@ -285,7 +285,9 @@ impl IOOptimizer {
             // 然后等待完成，避免多次系统调用
 
             results.push(data.len()); // 模拟写入成功
-            self.async_io_stats.bytes_transferred.fetch_add(data.len() as u64, Ordering::Relaxed);
+            self.async_io_stats
+                .bytes_transferred
+                .fetch_add(data.len() as u64, Ordering::Relaxed);
             self.async_io_stats.operations_completed.fetch_add(1, Ordering::Relaxed);
         }
 
@@ -305,7 +307,9 @@ impl IOOptimizer {
         for (_fd, data) in requests {
             // 模拟写入操作
             results.push(data.len());
-            self.async_io_stats.bytes_transferred.fetch_add(data.len() as u64, Ordering::Relaxed);
+            self.async_io_stats
+                .bytes_transferred
+                .fetch_add(data.len() as u64, Ordering::Relaxed);
         }
 
         Ok(results)
@@ -401,7 +405,9 @@ impl SyscallBatchProcessor {
     /// 🚀 提交系统调用请求到批处理队列
     #[inline(always)]
     pub fn submit_request(&self, request: SyscallRequest) -> Result<()> {
-        self.pending_calls.push(request).map_err(|_| anyhow::anyhow!("Batch queue full"))?;
+        self.pending_calls
+            .push(request)
+            .map_err(|_| anyhow::anyhow!("Batch queue full"))?;
 
         Ok(())
     }
@@ -432,16 +438,16 @@ impl SyscallBatchProcessor {
             match request {
                 SyscallRequest::Write { fd, data } => {
                     write_requests.push((fd, data));
-                }
+                },
                 SyscallRequest::Read { fd, size } => {
                     read_requests.push((fd, size));
-                }
+                },
                 SyscallRequest::Send { socket, data } => {
                     network_requests.push((socket, data));
-                }
+                },
                 _ => {
                     // 其他类型的请求单独处理
-                }
+                },
             }
         }
 
@@ -519,7 +525,13 @@ impl SystemCallBypassManager {
         log::info!("   🚀 vDSO: {}", config.enable_vdso);
         log::info!("   📁 io_uring: {}", config.enable_io_uring);
 
-        Ok(Self { config, batch_processor, fast_time_provider, _io_optimizer: io_optimizer, stats })
+        Ok(Self {
+            config,
+            batch_processor,
+            fast_time_provider,
+            _io_optimizer: io_optimizer,
+            stats,
+        })
     }
 
     /// 🚀 快速获取当前时间戳 - 绕过系统调用
@@ -563,11 +575,7 @@ impl SystemCallBypassManager {
         let layout = std::alloc::Layout::from_size_align(size, 8)?;
         let ptr = unsafe { std::alloc::alloc(layout) };
 
-        if ptr.is_null() {
-            Err(anyhow::anyhow!("Allocation failed"))
-        } else {
-            Ok(ptr)
-        }
+        if ptr.is_null() { Err(anyhow::anyhow!("Allocation failed")) } else { Ok(ptr) }
     }
 
     /// 用户空间内存分配
@@ -682,7 +690,9 @@ macro_rules! bypass_syscall {
 
     (batch_io $ops:expr) => {
         // 批量提交I/O操作
-        crate::performance::syscall_bypass::GLOBAL_BYPASS_MANAGER.submit_batch_io($ops).await
+        crate::performance::syscall_bypass::GLOBAL_BYPASS_MANAGER
+            .submit_batch_io($ops)
+            .await
     };
 }
 

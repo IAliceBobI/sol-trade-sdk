@@ -48,8 +48,11 @@ pub fn get_buy_token_amount_from_sol_amount(
 
     let denominator = virtual_sol_reserves + input_amount;
 
-    let mut tokens_received =
-        input_amount.checked_mul(virtual_token_reserves).unwrap().checked_div(denominator).unwrap();
+    let mut tokens_received = input_amount
+        .checked_mul(virtual_token_reserves)
+        .unwrap()
+        .checked_div(denominator)
+        .unwrap();
 
     tokens_received = tokens_received.min(real_token_reserves);
 

@@ -240,7 +240,7 @@ impl TemporalClient {
                     start_time.elapsed()
                 );
                 return Err(e);
-            }
+            },
         }
         if wait_confirmation {
             println!(" signature: {:?}", signature);

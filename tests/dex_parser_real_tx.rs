@@ -1,4 +1,4 @@
-use sol_trade_sdk::parser::{types::ParserConfig, types::TradeType, DexParser};
+use sol_trade_sdk::parser::{DexParser, types::ParserConfig, types::TradeType};
 
 /// Pumpswap 买入交易测试
 ///

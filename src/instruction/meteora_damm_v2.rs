@@ -1,11 +1,11 @@
 use crate::{
-    instruction::utils::meteora_damm_v2::{accounts, get_event_authority_pda, SWAP_DISCRIMINATOR},
+    instruction::utils::meteora_damm_v2::{SWAP_DISCRIMINATOR, accounts, get_event_authority_pda},
     trading::core::{
         params::{MeteoraDammV2Params, SwapParams},
         traits::InstructionBuilder,
     },
 };
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use solana_sdk::{
     instruction::{AccountMeta, Instruction},
     signer::Signer,

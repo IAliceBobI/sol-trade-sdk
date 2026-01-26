@@ -1,13 +1,13 @@
 use crate::common::bonding_curve::BondingCurveAccount;
 use crate::common::nonce_cache::DurableNonceInfo;
 use crate::common::spl_associated_token_account::get_associated_token_address_with_program_id;
-use crate::common::{auto_mock_rpc::PoolRpcClient, GasFeeStrategy, SolanaRpcClient};
+use crate::common::{GasFeeStrategy, SolanaRpcClient, auto_mock_rpc::PoolRpcClient};
 use crate::constants::TOKEN_PROGRAM;
 use crate::instruction::utils::pumpfun::global_constants::MAYHEM_FEE_RECIPIENT;
 use crate::instruction::utils::pumpswap::accounts::MAYHEM_FEE_RECIPIENT as MAYHEM_FEE_RECIPIENT_SWAP;
 use crate::swqos::{SwqosClient, TradeType};
-use crate::trading::common::get_multi_token_balances_with_client;
 use crate::trading::MiddlewareManager;
+use crate::trading::common::get_multi_token_balances_with_client;
 use crate::utils::token::calculate_ata;
 use anyhow::Result;
 use solana_hash::Hash;
@@ -635,7 +635,15 @@ impl RaydiumAmmV4Params {
         coin_reserve: u64,
         pc_reserve: u64,
     ) -> Self {
-        Self { amm, coin_mint, pc_mint, token_coin, token_pc, coin_reserve, pc_reserve }
+        Self {
+            amm,
+            coin_mint,
+            pc_mint,
+            token_coin,
+            token_pc,
+            coin_reserve,
+            pc_reserve,
+        }
     }
 
     /// 从 AMM 地址通过 RPC 获取参数（泛型版本，支持 Auto Mock）

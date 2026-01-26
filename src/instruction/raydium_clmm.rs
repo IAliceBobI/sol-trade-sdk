@@ -11,7 +11,7 @@ use crate::{
         price::raydium_clmm::{price_token0_in_token1, price_token1_in_token0},
     },
 };
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use solana_sdk::{
     instruction::{AccountMeta, Instruction},
     signer::Signer,
@@ -85,7 +85,7 @@ fn fallback_simple_calculation(
             let input_amount_f64 = amount_in as f64 / 10f64.powi(input_decimals as i32);
             let output_amount_f64 = input_amount_f64 * price;
             (output_amount_f64 * 10f64.powi(output_decimals as i32)) as u64
-        }
+        },
     }
 }
 
@@ -285,7 +285,7 @@ impl InstructionBuilder for RaydiumClmmInstructionBuilder {
                         Ok(amount) => {
                             // 现在使用官方的 uint 库实现，精度与链上完全一致
                             amount
-                        }
+                        },
                         Err(_e) => {
                             // 降级到简化算法
                             fallback_simple_calculation(
@@ -300,9 +300,9 @@ impl InstructionBuilder for RaydiumClmmInstructionBuilder {
                                 output_decimals,
                                 &protocol_params,
                             )
-                        }
+                        },
                     }
-                }
+                },
                 _ => {
                     // 降级到简化算法
                     fallback_simple_calculation(
@@ -317,7 +317,7 @@ impl InstructionBuilder for RaydiumClmmInstructionBuilder {
                         output_decimals,
                         &protocol_params,
                     )
-                }
+                },
             }
         } else {
             // 降级到价格计算
@@ -344,7 +344,7 @@ impl InstructionBuilder for RaydiumClmmInstructionBuilder {
                 // 使用官方的 amount_with_slippage 函数
                 // is_base_input=true: 计算 min out，round_up=false
                 amount_with_slippage(expected_output, slippage as u16, false)
-            }
+            },
         };
 
         let input_token_account = get_associated_token_address_with_program_id_fast_use_seed(
@@ -724,7 +724,7 @@ impl InstructionBuilder for RaydiumClmmInstructionBuilder {
                         Ok(amount) => {
                             // 使用官方的精确计算
                             amount
-                        }
+                        },
                         Err(_e) => {
                             // 降级到简化算法
                             fallback_simple_calculation(
@@ -739,9 +739,9 @@ impl InstructionBuilder for RaydiumClmmInstructionBuilder {
                                 output_decimals,
                                 &protocol_params,
                             )
-                        }
+                        },
                     }
-                }
+                },
                 _ => {
                     // 降级到简化算法
                     fallback_simple_calculation(
@@ -756,7 +756,7 @@ impl InstructionBuilder for RaydiumClmmInstructionBuilder {
                         output_decimals,
                         &protocol_params,
                     )
-                }
+                },
             }
         } else {
             // 降级到简化算法

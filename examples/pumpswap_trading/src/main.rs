@@ -63,8 +63,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let account_filter = AccountFilter { account: vec![], owner: vec![], filters: vec![] };
 
     // listen to specific event type
-    let event_type_filter =
-        EventTypeFilter { include: vec![EventType::PumpSwapBuy, EventType::PumpSwapSell] };
+    let event_type_filter = EventTypeFilter {
+        include: vec![EventType::PumpSwapBuy, EventType::PumpSwapSell],
+    };
 
     grpc.subscribe_events_immediate(
         protocols,

@@ -26,7 +26,11 @@ impl FastTimer {
         let base_instant = Instant::now();
         let base_nanos = bypass_manager.fast_timestamp_nanos();
 
-        Self { bypass_manager, _base_instant: base_instant, _base_nanos: base_nanos }
+        Self {
+            bypass_manager,
+            _base_instant: base_instant,
+            _base_nanos: base_nanos,
+        }
     }
 
     /// 🚀 获取当前时间戳（纳秒） - 使用快速系统调用绕过

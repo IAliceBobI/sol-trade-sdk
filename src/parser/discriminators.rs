@@ -121,7 +121,8 @@ impl DiscriminatorRegistry {
         self.discriminators.insert((DexProtocol::PumpSwap, add_liquidity), AddLiquidity);
 
         let remove_liquidity = [183, 18, 70, 156, 148, 109, 161, 34];
-        self.discriminators.insert((DexProtocol::PumpSwap, remove_liquidity), RemoveLiquidity);
+        self.discriminators
+            .insert((DexProtocol::PumpSwap, remove_liquidity), RemoveLiquidity);
     }
 
     /// 注册 Raydium CPMM 的 discriminators
@@ -137,10 +138,12 @@ impl DiscriminatorRegistry {
         self.discriminators.insert((DexProtocol::RaydiumCpmm, create_pool), CreatePool);
 
         let add_liquidity = [242, 35, 198, 137, 82, 225, 242, 182];
-        self.discriminators.insert((DexProtocol::RaydiumCpmm, add_liquidity), AddLiquidity);
+        self.discriminators
+            .insert((DexProtocol::RaydiumCpmm, add_liquidity), AddLiquidity);
 
         let remove_liquidity = [183, 18, 70, 156, 148, 109, 161, 34];
-        self.discriminators.insert((DexProtocol::RaydiumCpmm, remove_liquidity), RemoveLiquidity);
+        self.discriminators
+            .insert((DexProtocol::RaydiumCpmm, remove_liquidity), RemoveLiquidity);
     }
 
     /// 注册 Raydium V4 的 discriminators
@@ -154,10 +157,12 @@ impl DiscriminatorRegistry {
 
         // 流动性操作
         let add_liquidity = [1, 0, 0, 0, 0, 0, 0, 0];
-        self.discriminators.insert((DexProtocol::RaydiumV4, add_liquidity), AddLiquidity);
+        self.discriminators
+            .insert((DexProtocol::RaydiumV4, add_liquidity), AddLiquidity);
 
         let remove_liquidity = [2, 0, 0, 0, 0, 0, 0, 0];
-        self.discriminators.insert((DexProtocol::RaydiumV4, remove_liquidity), RemoveLiquidity);
+        self.discriminators
+            .insert((DexProtocol::RaydiumV4, remove_liquidity), RemoveLiquidity);
 
         let create_pool = [0, 0, 0, 0, 0, 0, 0, 0];
         self.discriminators.insert((DexProtocol::RaydiumV4, create_pool), CreatePool);
@@ -176,7 +181,10 @@ impl DiscriminatorRegistry {
         let copy_len = std::cmp::min(data.len(), 8);
         key[0..copy_len].copy_from_slice(&data[0..copy_len]);
 
-        self.discriminators.get(&(protocol, key)).copied().unwrap_or(InstructionType::Unknown)
+        self.discriminators
+            .get(&(protocol, key))
+            .copied()
+            .unwrap_or(InstructionType::Unknown)
     }
 
     /// 判断是否是流动性操作（应该被 Swap 解析器排除）

@@ -43,7 +43,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         ],
     };
     println!("Starting to listen for events, press Ctrl+C to stop...");
-    shred_stream.shredstream_subscribe(protocols, None, Some(event_type_filter), callback).await?;
+    shred_stream
+        .shredstream_subscribe(protocols, None, Some(event_type_filter), callback)
+        .await?;
     tokio::signal::ctrl_c().await?;
     Ok(())
 }

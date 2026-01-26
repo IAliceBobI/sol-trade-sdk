@@ -1,4 +1,4 @@
-use crate::common::{bonding_curve::BondingCurveAccount, SolanaRpcClient};
+use crate::common::{SolanaRpcClient, bonding_curve::BondingCurveAccount};
 use anyhow::anyhow;
 use solana_sdk::pubkey::Pubkey;
 use std::sync::Arc;

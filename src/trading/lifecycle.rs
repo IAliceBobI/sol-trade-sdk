@@ -83,7 +83,15 @@ impl CallbackContext {
             })
             .as_nanos() as u64;
 
-        Self { transaction, swqos_type, trade_type, signature, timestamp_ns, with_tip, tip_amount }
+        Self {
+            transaction,
+            swqos_type,
+            trade_type,
+            signature,
+            timestamp_ns,
+            with_tip,
+            tip_amount,
+        }
     }
 
     /// 获取交易的 Base64 编码

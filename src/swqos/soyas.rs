@@ -2,13 +2,13 @@ use anyhow::Context as _;
 use anyhow::Result;
 use arc_swap::ArcSwap;
 use quinn::{
-    crypto::rustls::QuicClientConfig, ClientConfig, Connection, Endpoint, IdleTimeout,
-    TransportConfig,
+    ClientConfig, Connection, Endpoint, IdleTimeout, TransportConfig,
+    crypto::rustls::QuicClientConfig,
 };
 use rand::seq::IndexedRandom as _;
 use solana_client::rpc_client::SerializableTransaction;
 use solana_sdk::{signature::Keypair, transaction::VersionedTransaction};
-use solana_tls_utils::{new_dummy_x509_certificate, SkipServerVerification};
+use solana_tls_utils::{SkipServerVerification, new_dummy_x509_certificate};
 use std::time::Instant;
 use std::{
     net::{SocketAddr, ToSocketAddrs as _},
@@ -18,8 +18,8 @@ use std::{
 use tokio::sync::Mutex;
 
 use crate::common::SolanaRpcClient;
-use crate::swqos::common::poll_transaction_confirmation;
 use crate::swqos::SwqosClientTrait;
+use crate::swqos::common::poll_transaction_confirmation;
 use crate::{
     constants::swqos::SOYAS_TIP_ACCOUNTS,
     swqos::{SwqosType, TradeType},
@@ -123,7 +123,7 @@ impl SwqosClientTrait for SoyasClient {
                 println!(" signature: {:?}", signature);
                 println!(" [soyas] {} confirmation failed: {:?}", trade_type, start_time.elapsed());
                 return Err(e);
-            }
+            },
         }
         if wait_confirmation {
             println!(" signature: {:?}", signature);

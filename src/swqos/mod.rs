@@ -254,85 +254,85 @@ impl SwqosConfig {
                 let endpoint = SwqosConfig::get_endpoint(SwqosType::Jito, region, url);
                 let jito_client = JitoClient::new(rpc_url.clone(), endpoint, auth_token);
                 Ok(Arc::new(jito_client))
-            }
+            },
             SwqosConfig::NextBlock(auth_token, region, url) => {
                 let endpoint = SwqosConfig::get_endpoint(SwqosType::NextBlock, region, url);
                 let nextblock_client =
                     NextBlockClient::new(rpc_url.clone(), endpoint.to_string(), auth_token);
                 Ok(Arc::new(nextblock_client))
-            }
+            },
             SwqosConfig::ZeroSlot(auth_token, region, url) => {
                 let endpoint = SwqosConfig::get_endpoint(SwqosType::ZeroSlot, region, url);
                 let zeroslot_client =
                     ZeroSlotClient::new(rpc_url.clone(), endpoint.to_string(), auth_token);
                 Ok(Arc::new(zeroslot_client))
-            }
+            },
             SwqosConfig::Temporal(auth_token, region, url) => {
                 let endpoint = SwqosConfig::get_endpoint(SwqosType::Temporal, region, url);
                 let temporal_client =
                     TemporalClient::new(rpc_url.clone(), endpoint.to_string(), auth_token);
                 Ok(Arc::new(temporal_client))
-            }
+            },
             SwqosConfig::Bloxroute(auth_token, region, url) => {
                 let endpoint = SwqosConfig::get_endpoint(SwqosType::Bloxroute, region, url);
                 let bloxroute_client =
                     BloxrouteClient::new(rpc_url.clone(), endpoint.to_string(), auth_token);
                 Ok(Arc::new(bloxroute_client))
-            }
+            },
             SwqosConfig::Node1(auth_token, region, url) => {
                 let endpoint = SwqosConfig::get_endpoint(SwqosType::Node1, region, url);
                 let node1_client =
                     Node1Client::new(rpc_url.clone(), endpoint.to_string(), auth_token);
                 Ok(Arc::new(node1_client))
-            }
+            },
             SwqosConfig::FlashBlock(auth_token, region, url) => {
                 let endpoint = SwqosConfig::get_endpoint(SwqosType::FlashBlock, region, url);
                 let flashblock_client =
                     FlashBlockClient::new(rpc_url.clone(), endpoint.to_string(), auth_token);
                 Ok(Arc::new(flashblock_client))
-            }
+            },
             SwqosConfig::BlockRazor(auth_token, region, url) => {
                 let endpoint = SwqosConfig::get_endpoint(SwqosType::BlockRazor, region, url);
                 let blockrazor_client =
                     BlockRazorClient::new(rpc_url.clone(), endpoint.to_string(), auth_token);
                 Ok(Arc::new(blockrazor_client))
-            }
+            },
             SwqosConfig::Astralane(auth_token, region, url) => {
                 let endpoint = SwqosConfig::get_endpoint(SwqosType::Astralane, region, url);
                 let astralane_client =
                     AstralaneClient::new(rpc_url.clone(), endpoint.to_string(), auth_token);
                 Ok(Arc::new(astralane_client))
-            }
+            },
             SwqosConfig::Stellium(auth_token, region, url) => {
                 let endpoint = SwqosConfig::get_endpoint(SwqosType::Stellium, region, url);
                 let stellium_client =
                     StelliumClient::new(rpc_url.clone(), endpoint.to_string(), auth_token);
                 Ok(Arc::new(stellium_client))
-            }
+            },
             SwqosConfig::Lightspeed(auth_token, region, url) => {
                 let endpoint = SwqosConfig::get_endpoint(SwqosType::Lightspeed, region, url);
                 let lightspeed_client =
                     LightspeedClient::new(rpc_url.clone(), endpoint.to_string(), auth_token);
                 Ok(Arc::new(lightspeed_client))
-            }
+            },
             SwqosConfig::Soyas(auth_token, region, url) => {
                 let endpoint = SwqosConfig::get_endpoint(SwqosType::Soyas, region, url);
                 let soyas_client =
                     SoyasClient::new(rpc_url.clone(), endpoint.to_string(), auth_token).await?;
                 Ok(Arc::new(soyas_client))
-            }
+            },
             SwqosConfig::Speedlanding(auth_token, region, url) => {
                 let endpoint = SwqosConfig::get_endpoint(SwqosType::Speedlanding, region, url);
                 let speedlanding_client =
                     SpeedlandingClient::new(rpc_url.clone(), endpoint.to_string(), auth_token)
                         .await?;
                 Ok(Arc::new(speedlanding_client))
-            }
+            },
             SwqosConfig::Default(endpoint) => {
                 let rpc = SolanaRpcClient::new_with_commitment(endpoint, commitment);
                 let rpc_client = SolRpcClient::new(Arc::new(rpc));
                 Ok(Arc::new(rpc_client))
-            }
+            },
         }
     }
 }

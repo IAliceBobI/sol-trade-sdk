@@ -1,8 +1,8 @@
 use crate::{
     constants::trade::trade::DEFAULT_SLIPPAGE,
     instruction::utils::pumpswap::{
-        accounts, fee_recipient_ata, get_user_volume_accumulator_pda, BUY_DISCRIMINATOR,
-        SELL_DISCRIMINATOR,
+        BUY_DISCRIMINATOR, SELL_DISCRIMINATOR, accounts, fee_recipient_ata,
+        get_user_volume_accumulator_pda,
     },
     trading::{
         common::wsol_manager,
@@ -15,7 +15,7 @@ use crate::{
         buy_base_input_internal, buy_quote_input_internal, sell_base_input_internal,
     },
 };
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use solana_sdk::{
     instruction::{AccountMeta, Instruction},
     pubkey::Pubkey,

@@ -1,6 +1,6 @@
 use crate::{
     common::spl_token::close_account,
-    constants::{trade::trade::DEFAULT_SLIPPAGE, TOKEN_PROGRAM_2022},
+    constants::{TOKEN_PROGRAM_2022, trade::trade::DEFAULT_SLIPPAGE},
     trading::core::{
         params::{PumpFunParams, SwapParams},
         traits::InstructionBuilder,
@@ -16,7 +16,7 @@ use crate::{
         pumpfun::{get_buy_token_amount_from_sol_amount, get_sell_sol_amount_from_token_amount},
     },
 };
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use solana_sdk::instruction::AccountMeta;
 use solana_sdk::signature::Keypair;
 use solana_sdk::{instruction::Instruction, pubkey::Pubkey, signer::Signer};

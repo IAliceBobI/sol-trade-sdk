@@ -29,8 +29,10 @@ async fn test_wsol_wrap_complete_flow() {
     let client = create_test_client().await;
     let wrap_amount = 100_000_000; // 0.1 SOL in lamports
     let rpc_url = "http://127.0.0.1:8899".to_string();
-    let payer_pubkey =
-        client.payer.try_pubkey().expect("Failed to get payer pubkey from TradingClient");
+    let payer_pubkey = client
+        .payer
+        .try_pubkey()
+        .expect("Failed to get payer pubkey from TradingClient");
 
     println!("=== 测试 WSOL 完整流程 ===");
     println!("包装 {} lamports (0.1 SOL) 到 WSOL...", wrap_amount);
@@ -45,14 +47,18 @@ async fn test_wsol_wrap_complete_flow() {
     match client.wrap_sol_to_wsol(wrap_amount).await {
         Ok(signature) => {
             println!("✅ SOL -> WSOL 成功: {}", signature);
-        }
+        },
         Err(e) => {
             println!("❌ SOL -> WSOL 失败: {}", e);
             panic!(
                 "SOL -> WSOL 包装失败: {}\n  钱包: {}\n  包装金额: {} lamports ({:.4} SOL)\n  RPC: {}",
-                e, payer_pubkey, wrap_amount, wrap_amount as f64 / 1e9, rpc_url
+                e,
+                payer_pubkey,
+                wrap_amount,
+                wrap_amount as f64 / 1e9,
+                rpc_url
             );
-        }
+        },
     }
 
     // 打印包装后余额
@@ -68,7 +74,7 @@ async fn test_wsol_wrap_complete_flow() {
     match client.wrap_wsol_to_sol(wrap_amount).await {
         Ok(signature) => {
             println!("✅ WSOL -> SOL 成功: {}", signature);
-        }
+        },
         Err(e) => {
             println!("❌ WSOL -> SOL 失败: {}", e);
             panic!(
@@ -78,7 +84,7 @@ async fn test_wsol_wrap_complete_flow() {
                 wrap_amount,
                 wrap_amount as f64 / 1e9
             );
-        }
+        },
     }
 
     // 打印解包装后余额
@@ -93,7 +99,7 @@ async fn test_wsol_wrap_complete_flow() {
     match client.close_wsol().await {
         Ok(signature) => {
             println!("✅ 关闭 WSOL 账户成功: {}", signature);
-        }
+        },
         Err(e) => {
             println!("❌ 关闭 WSOL 账户失败: {}", e);
             panic!(
@@ -102,7 +108,7 @@ async fn test_wsol_wrap_complete_flow() {
                 payer_pubkey,
                 test_helpers::get_wsol_ata_address(&payer_pubkey)
             );
-        }
+        },
     }
 
     // 打印关闭后余额
@@ -130,7 +136,7 @@ async fn test_wsol_multiple_wraps() {
         match client.wrap_sol_to_wsol(wrap_amount).await {
             Ok(signature) => {
                 println!("  ✅ 第 {} 次包装成功: {}", i, signature);
-            }
+            },
             Err(e) => {
                 println!("  ❌ 第 {} 次包装失败: {}", i, e);
                 panic!(
@@ -140,7 +146,7 @@ async fn test_wsol_multiple_wraps() {
                     client.payer.pubkey(),
                     wrap_amount
                 );
-            }
+            },
         }
 
         tokio::time::sleep(std::time::Duration::from_secs(1)).await;
@@ -249,8 +255,10 @@ async fn test_trade_with_fixed_output_token_amount() {
     let mint = Pubkey::from_str("pumpCmXqMfrsAkQ5r49WcJnRayYRqmXz6ae8H7H9Dfn")
         .expect("Failed to parse Pump mint address: pumpCmXqMfrsAkQ5r49WcJnRayYRqmXz6ae8H7H9Dfn");
     let rpc_url = "http://127.0.0.1:8899".to_string();
-    let payer_pubkey =
-        client.payer.try_pubkey().expect("Failed to get payer pubkey from TradingClient");
+    let payer_pubkey = client
+        .payer
+        .try_pubkey()
+        .expect("Failed to get payer pubkey from TradingClient");
 
     // 要购买的代币数量
     let target_token_amount = 10_000u64;
@@ -311,13 +319,13 @@ async fn test_trade_with_fixed_output_token_amount() {
                 "  ✅ 验证通过：实际买入 {} 个代币 (目标: {})",
                 actual_amount, target_token_amount
             );
-        }
+        },
         Err(e) => {
             panic!(
                 "固定输出数量交易执行失败: {}\n  Pool: {}\n  Mint: {}\n  目标数量: {} 个代币",
                 e, pool, mint, target_token_amount
             );
-        }
+        },
     }
 
     println!("=== fixed_output_token_amount 测试通过 ===");

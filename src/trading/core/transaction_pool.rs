@@ -11,7 +11,7 @@ use once_cell::sync::Lazy;
 use solana_sdk::{
     hash::Hash,
     instruction::Instruction,
-    message::{v0, AddressLookupTableAccount, Message, VersionedMessage},
+    message::{AddressLookupTableAccount, Message, VersionedMessage, v0},
     pubkey::Pubkey,
 };
 use std::sync::Arc;

@@ -2,11 +2,11 @@
 //!
 //! 验证 DiscriminatorRegistry 能正确识别 PumpSwap 的操作类型
 
+use sol_trade_sdk::parser::DexParser;
 use sol_trade_sdk::parser::discriminators::{
     DexProtocol as ParserDexProtocol, DiscriminatorRegistry,
 };
 use sol_trade_sdk::parser::types::TradeType;
-use sol_trade_sdk::parser::DexParser;
 
 #[tokio::test]
 #[serial_test::serial(global_dex_cache)]

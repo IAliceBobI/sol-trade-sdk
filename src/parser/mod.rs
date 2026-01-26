@@ -15,7 +15,7 @@ pub mod raydium;
 pub use dex_parser::DexParser;
 pub use discriminators::{DexProtocol, DiscriminatorRegistry, InstructionType};
 pub use instruction_data_parser::{
-    format_token_amount, parse_u128_from_offset, parse_u64_from_offset,
+    format_token_amount, parse_u64_from_offset, parse_u128_from_offset,
 };
 pub use types::*;
 pub use utils::BinaryReader;

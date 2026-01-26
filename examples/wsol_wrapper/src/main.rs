@@ -24,11 +24,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             println!("✅ Successfully wrapped SOL to WSOL!");
             println!("Transaction signature: {}", signature);
             println!("Explorer: https://solscan.io/tx/{}", signature);
-        }
+        },
         Err(e) => {
             println!("❌ Failed to wrap SOL to WSOL: {}", e);
             return Ok(());
-        }
+        },
     }
 
     // Wait a moment before partial unwrapping
@@ -48,10 +48,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             println!("✅ Successfully unwrapped half of WSOL back to SOL using seed account!");
             println!("Transaction signature: {}", signature);
             println!("Explorer: https://solscan.io/tx/{}", signature);
-        }
+        },
         Err(e) => {
             println!("❌ Failed to unwrap WSOL to SOL: {}", e);
-        }
+        },
     }
 
     // Wait a moment before final unwrapping
@@ -67,10 +67,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             println!("✅ Successfully closed WSOL account and unwrapped remaining balance!");
             println!("Transaction signature: {}", signature);
             println!("Explorer: https://solscan.io/tx/{}", signature);
-        }
+        },
         Err(e) => {
             println!("❌ Failed to close WSOL account: {}", e);
-        }
+        },
     }
 
     println!("\n🎉 WSOL Wrapper example completed!");

@@ -1,11 +1,11 @@
 use crate::{
-    common::{auto_mock_rpc::PoolRpcClient, SolanaRpcClient},
+    common::{SolanaRpcClient, auto_mock_rpc::PoolRpcClient},
     constants::{SOL_MINT, USDC_MINT, USDT_MINT},
-    instruction::utils::raydium_amm_v4_types::{amm_info_decode, AmmInfo, AMM_INFO_SIZE},
+    instruction::utils::raydium_amm_v4_types::{AMM_INFO_SIZE, AmmInfo, amm_info_decode},
 };
 use anyhow::anyhow;
-use base64::engine::general_purpose::STANDARD;
 use base64::Engine;
+use base64::engine::general_purpose::STANDARD;
 use dashmap::DashMap;
 use once_cell::sync::Lazy;
 use solana_sdk::{pubkey, pubkey::Pubkey};
@@ -117,8 +117,10 @@ pub async fn get_pool_by_address<T: PoolRpcClient + ?Sized>(
     }
 
     // 2. RPC 查询
-    let account =
-        rpc.get_account(pool_address).await.map_err(|e| anyhow!("RPC 调用失败: {}", e))?;
+    let account = rpc
+        .get_account(pool_address)
+        .await
+        .map_err(|e| anyhow!("RPC 调用失败: {}", e))?;
     if account.owner != accounts::RAYDIUM_AMM_V4 {
         return Err(anyhow!("Account is not owned by Raydium AMM V4 program"));
     }
@@ -222,7 +224,7 @@ fn select_best_pool_by_volume(pools: &[(Pubkey, AmmInfo)]) -> Option<(Pubkey, Am
             std::cmp::Ordering::Equal => {
                 // 交易量相同时，按流动性排序
                 amm_b.lp_amount.cmp(&amm_a.lp_amount)
-            }
+            },
             other => other,
         }
     });
@@ -346,7 +348,7 @@ async fn find_pools_by_mint_offset_collect<T: PoolRpcClient + ?Sized>(
             let data_bytes = match &acc.data {
                 solana_account_decoder::UiAccountData::Binary(base64_str, _) => {
                     STANDARD.decode(base64_str).ok()?
-                }
+                },
                 _ => return None,
             };
             amm_info_decode(&data_bytes).map(|amm| (addr_pubkey, amm))

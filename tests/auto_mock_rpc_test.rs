@@ -97,10 +97,10 @@ async fn test_auto_mode_first_call() {
                 "maxSupportedTransactionVersion": 0
             }]);
             assert!(client.has_mock_data("getTransaction", &params));
-        }
+        },
         Err(e) => {
             eprintln!("❌ 调用失败: {}", e);
             panic!("测试失败: {}", e);
-        }
+        },
     }
 }

@@ -110,13 +110,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         Some(command) => {
             // Handle direct command line usage
             handle_command(command).await?
-        }
+        },
         None => {
             // No command provided, run interactive mode
             println!("🚀 SOL Trade CLI - Interactive Mode");
             println!("═══════════════════════════════════\n");
             run_interactive_mode().await?
-        }
+        },
     }
 
     Ok(())
@@ -131,15 +131,15 @@ async fn handle_command(command: Command) -> Result<(), Box<dyn std::error::Erro
                     if let Some(amm_addr) = amm {
                         handle_buy_rv4(&mint, &amm_addr, amount, slippage).await?
                     }
-                }
+                },
                 "raydium_cpmm" => {
                     if let Some(pool_addr) = pool {
                         handle_buy_rcpmm(&mint, &pool_addr, amount, slippage).await?
                     }
-                }
+                },
                 _ => handle_buy(&mint, &dex, amount, slippage).await?,
             }
-        }
+        },
         Command::Sell { mint, dex, amount, slippage, amm, pool } => {
             validate_dex_params(&dex, &amm, &pool)?;
             match dex.as_str() {
@@ -147,15 +147,15 @@ async fn handle_command(command: Command) -> Result<(), Box<dyn std::error::Erro
                     if let Some(amm_addr) = amm {
                         handle_sell_rv4(&mint, &amm_addr, amount, slippage).await?
                     }
-                }
+                },
                 "raydium_cpmm" => {
                     if let Some(pool_addr) = pool {
                         handle_sell_rcpmm(&mint, &pool_addr, amount, slippage).await?
                     }
-                }
+                },
                 _ => handle_sell(&mint, &dex, amount, slippage).await?,
             }
-        }
+        },
         Command::WrapSol { amount } => handle_wrap_sol(amount).await?,
         Command::CloseWsol => handle_close_wsol().await?,
         Command::Wallet => handle_wallet().await?,
@@ -163,7 +163,7 @@ async fn handle_command(command: Command) -> Result<(), Box<dyn std::error::Erro
             println!("🚀 SOL Trade CLI - Interactive Mode");
             println!("═══════════════════════════════════\n");
             run_interactive_mode().await?
-        }
+        },
     }
     Ok(())
 }
@@ -182,13 +182,13 @@ fn validate_dex_params(
             if amm.is_none() {
                 return Err("AMM address is required for Raydium V4. Use --amm flag.".into());
             }
-        }
+        },
         "raydium_cpmm" => {
             if pool.is_none() {
                 return Err("Pool address is required for Raydium CPMM. Use --pool flag.".into());
             }
-        }
-        _ => {}
+        },
+        _ => {},
     }
     Ok(())
 }
@@ -208,12 +208,12 @@ async fn show_startup_info() {
             match client.get_payer_sol_balance().await {
                 Ok(balance) => {
                     println!("💰 SOL Balance: {:.6} SOL", balance as f64 / 1_000_000_000.0);
-                }
+                },
                 Err(_) => {
                     println!("💰 SOL Balance: Unable to fetch (network issue)");
-                }
+                },
             }
-        }
+        },
         Err(_) => {
             // Generate a temporary keypair to show the format
             let temp_keypair = solana_sdk::signature::Keypair::new();
@@ -222,7 +222,7 @@ async fn show_startup_info() {
                 temp_keypair.pubkey()
             );
             println!("💰 SOL Balance: Unable to fetch (no valid RPC connection)");
-        }
+        },
     }
 
     println!("⚡ Network: Mainnet-beta");
@@ -257,16 +257,16 @@ async fn run_interactive_mode() -> Result<(), Box<dyn std::error::Error>> {
             "quit" | "exit" | "q" => {
                 println!("👋 Goodbye!");
                 break;
-            }
+            },
             "help" | "h" => {
                 show_help();
-            }
+            },
             "wallet" | "status" => {
                 handle_wallet().await?;
-            }
+            },
             "close_wsol" | "close-wsol" => {
                 handle_close_wsol().await?;
-            }
+            },
             _ => {
                 if input.starts_with("raydium_cpmm_buy ") {
                     handle_interactive_raydium_cpmm_buy(&input[16..]).await?;
@@ -294,7 +294,7 @@ async fn run_interactive_mode() -> Result<(), Box<dyn std::error::Error>> {
                         input
                     );
                 }
-            }
+            },
         }
         println!(); // Add blank line after each command
     }
@@ -339,7 +339,7 @@ async fn handle_interactive_buy(args: &str) -> Result<(), Box<dyn std::error::Er
         Err(_) => {
             println!("❌ Invalid SOL amount: {}", parts[2]);
             return Ok(());
-        }
+        },
     };
     let slippage = if parts.len() > 3 { parts[3].parse::<u64>().ok() } else { None };
 
@@ -361,7 +361,7 @@ async fn handle_interactive_sell(args: &str) -> Result<(), Box<dyn std::error::E
             Err(_) => {
                 println!("❌ Invalid token amount: {}", parts[2]);
                 return Ok(());
-            }
+            },
         }
     } else {
         None
@@ -385,7 +385,7 @@ async fn handle_interactive_raydium_v4_buy(args: &str) -> Result<(), Box<dyn std
         Err(_) => {
             println!("❌ Invalid SOL amount: {}", parts[2]);
             return Ok(());
-        }
+        },
     };
     let slippage = if parts.len() > 3 { parts[3].parse::<u64>().ok() } else { None };
 
@@ -407,7 +407,7 @@ async fn handle_interactive_raydium_v4_sell(args: &str) -> Result<(), Box<dyn st
             Err(_) => {
                 println!("❌ Invalid token amount: {}", parts[2]);
                 return Ok(());
-            }
+            },
         }
     } else {
         None
@@ -431,7 +431,7 @@ async fn handle_interactive_raydium_cpmm_buy(args: &str) -> Result<(), Box<dyn s
         Err(_) => {
             println!("❌ Invalid SOL amount: {}", parts[2]);
             return Ok(());
-        }
+        },
     };
     let slippage = if parts.len() > 3 { parts[3].parse::<u64>().ok() } else { None };
 
@@ -455,7 +455,7 @@ async fn handle_interactive_raydium_cpmm_sell(
             Err(_) => {
                 println!("❌ Invalid token amount: {}", parts[2]);
                 return Ok(());
-            }
+            },
         }
     } else {
         None
@@ -492,8 +492,8 @@ async fn check_mint_ata(
 
                 create_mint_ata = false;
                 use_seed = false;
-            }
-            Err(_) => {}
+            },
+            Err(_) => {},
         }
         if !create_mint_ata {
             return Ok((create_mint_ata, use_seed, owner_pubkey, amount_f64, decimals));
@@ -509,8 +509,8 @@ async fn check_mint_ata(
             Ok(_) => {
                 create_mint_ata = false;
                 use_seed = true;
-            }
-            Err(_) => {}
+            },
+            Err(_) => {},
         }
         return Ok((create_mint_ata, use_seed, owner_pubkey, amount_f64, decimals));
     }
@@ -546,7 +546,7 @@ async fn handle_buy(
                 _owner_pubkey,
             )
             .await?;
-        }
+        },
         "pumpswap" => {
             handle_buy_pumpswap(
                 mint,
@@ -557,12 +557,12 @@ async fn handle_buy(
                 _owner_pubkey,
             )
             .await?;
-        }
+        },
         "bonk" => {
             handle_buy_bonk(mint, sol_amount, slippage, create_mint_ata, _use_seed, _owner_pubkey)
                 .await?;
-        }
-        _ => {}
+        },
+        _ => {},
     }
     Ok(())
 }
@@ -657,10 +657,10 @@ async fn handle_buy_pumpfun(
         Ok((_, signature, _)) => {
             println!("   ✅ Successfully bought tokens from PumpFun!");
             println!("   ✅ Transaction Signature: {:?}", signature);
-        }
+        },
         Err(e) => {
             println!("   ❌ Failed to buy tokens from PumpFun: {}", e);
-        }
+        },
     }
 
     Ok(())
@@ -713,10 +713,10 @@ async fn handle_buy_pumpswap(
         Ok((_, signature, _)) => {
             println!("   ✅ Successfully bought tokens from PumpSwap!");
             println!("   ✅ Transaction Signature: {:?}", signature);
-        }
+        },
         Err(e) => {
             println!("   ❌ Failed to buy tokens from PumpSwap: {}", e);
-        }
+        },
     }
     Ok(())
 }
@@ -768,10 +768,10 @@ async fn handle_buy_bonk(
         Ok((_, signature, _)) => {
             println!("   ✅ Successfully bought tokens from Bonk!");
             println!("   ✅ Transaction Signature: {:?}", signature);
-        }
+        },
         Err(e) => {
             println!("   ❌ Failed to buy tokens from Bonk: {}", e);
-        }
+        },
     }
     Ok(())
 }
@@ -827,10 +827,10 @@ async fn handle_buy_raydium_v4(
         Ok((_, signature, _)) => {
             println!("   ✅ Successfully bought tokens from Raydium V4!");
             println!("   ✅ Transaction Signature: {:?}", signature);
-        }
+        },
         Err(e) => {
             println!("   ❌ Failed to buy tokens from Raydium V4: {}", e);
-        }
+        },
     }
     Ok(())
 }
@@ -886,10 +886,10 @@ async fn handle_buy_raydium_cpmm(
         Ok((_, signature, _)) => {
             println!("   ✅ Successfully bought tokens from Raydium CPMM!");
             println!("   ✅ Transaction Signature: {:?}", signature);
-        }
+        },
         Err(e) => {
             println!("   ❌ Failed to buy tokens from Raydium CPMM: {}", e);
-        }
+        },
     }
     Ok(())
 }
@@ -923,7 +923,7 @@ async fn handle_sell(
                 decimals,
             )
             .await?;
-        }
+        },
         "pumpswap" => {
             handle_sell_pumpswap(
                 mint,
@@ -936,7 +936,7 @@ async fn handle_sell(
                 decimals,
             )
             .await?;
-        }
+        },
         "bonk" => {
             handle_sell_bonk(
                 mint,
@@ -949,8 +949,8 @@ async fn handle_sell(
                 decimals,
             )
             .await?;
-        }
-        _ => {}
+        },
+        _ => {},
     }
 
     Ok(())
@@ -1057,10 +1057,10 @@ async fn handle_sell_pumpfun(
         Ok((_, signature, _)) => {
             println!("   ✅ Successfully sold tokens from PumpFun!");
             println!("   ✅ Transaction Signature: {:?}", signature);
-        }
+        },
         Err(e) => {
             println!("   ❌ Failed to sell tokens from PumpFun: {}", e);
-        }
+        },
     }
 
     Ok(())
@@ -1116,10 +1116,10 @@ async fn handle_sell_pumpswap(
         Ok((_, signature, _)) => {
             println!("   ✅ Successfully sold tokens from PumpSwap!");
             println!("   ✅ Transaction Signature: {:?}", signature);
-        }
+        },
         Err(e) => {
             println!("   ❌ Failed to sell tokens from PumpSwap: {}", e);
-        }
+        },
     }
 
     Ok(())
@@ -1175,10 +1175,10 @@ async fn handle_sell_bonk(
         Ok((_, signature, _)) => {
             println!("   ✅ Successfully sold tokens from Bonk!");
             println!("   ✅ Transaction Signature: {:?}", signature);
-        }
+        },
         Err(e) => {
             println!("   ❌ Failed to sell tokens from Bonk: {}", e);
-        }
+        },
     }
 
     Ok(())
@@ -1237,10 +1237,10 @@ async fn handle_sell_raydium_v4(
         Ok((_, signature, _)) => {
             println!("   ✅ Successfully sold tokens from Raydium V4!");
             println!("   ✅ Transaction Signature: {:?}", signature);
-        }
+        },
         Err(e) => {
             println!("   ❌ Failed to sell tokens from Raydium V4: {}", e);
-        }
+        },
     }
 
     Ok(())
@@ -1299,10 +1299,10 @@ async fn handle_sell_raydium_cpmm(
         Ok((_, signature, _)) => {
             println!("   ✅ Successfully sold tokens from Raydium CPMM!");
             println!("   ✅ Transaction Signature: {:?}", signature);
-        }
+        },
         Err(e) => {
             println!("   ❌ Failed to sell tokens from Raydium CPMM: {}", e);
-        }
+        },
     }
 
     Ok(())
@@ -1319,15 +1319,15 @@ async fn handle_wrap_sol(amount: f64) -> Result<(), Box<dyn std::error::Error>> 
             match wrap_sol_real(&client, amount_lamports).await {
                 Ok(_) => {
                     println!("   ✅ Successfully wrapped {} SOL to WSOL!", amount);
-                }
+                },
                 Err(e) => {
                     println!("   ❌ Failed to wrap SOL: {}", e);
-                }
+                },
             }
-        }
+        },
         Err(_) => {
             println!("   ⚠️ Cannot connect to Solana network");
-        }
+        },
     }
 
     Ok(())
@@ -1359,20 +1359,20 @@ async fn handle_close_wsol() -> Result<(), Box<dyn std::error::Error>> {
                                 "   ✅ Successfully closed WSOL account and recovered {:.6} SOL",
                                 wsol_balance as f64 / 1_000_000_000.0
                             );
-                        }
+                        },
                         Err(e) => {
                             println!("   ❌ Failed to close WSOL account: {}", e);
-                        }
+                        },
                     }
-                }
+                },
                 Err(_) => {
                     println!("   ⚠️ No WSOL account found");
-                }
+                },
             }
-        }
+        },
         Err(_) => {
             println!("   ⚠️ Cannot connect to Solana network");
-        }
+        },
     }
 
     Ok(())
@@ -1383,14 +1383,14 @@ async fn handle_wallet() -> Result<(), Box<dyn std::error::Error>> {
 
     match initialize_real_client().await {
         Ok(client) => match get_wallet_real(&client).await {
-            Ok(_) => {}
+            Ok(_) => {},
             Err(e) => {
                 println!("   ❌ Failed to get wallet status: {}", e);
-            }
+            },
         },
         Err(_) => {
             println!("   ⚠️ Cannot connect to Solana network");
-        }
+        },
     }
 
     Ok(())
