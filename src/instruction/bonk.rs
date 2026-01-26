@@ -1,5 +1,5 @@
 use crate::{
-    constants::trade::trade::DEFAULT_SLIPPAGE,
+    constants::trade_consts::DEFAULT_SLIPPAGE,
     instruction::utils::bonk::{
         BUY_EXECT_IN_DISCRIMINATOR, SELL_EXECT_IN_DISCRIMINATOR, accounts, get_pool_pda,
         get_vault_pda,

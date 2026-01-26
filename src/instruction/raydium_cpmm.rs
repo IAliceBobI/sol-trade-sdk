@@ -1,6 +1,6 @@
 use crate::{
     common::fast_fn::get_associated_token_address_with_program_id_fast_use_seed,
-    constants::trade::trade::DEFAULT_SLIPPAGE,
+    constants::trade_consts::DEFAULT_SLIPPAGE,
     instruction::utils::raydium_cpmm::{
         SWAP_BASE_IN_DISCRIMINATOR, accounts, get_observation_state_pda, get_pool_pda,
         get_vault_account,
