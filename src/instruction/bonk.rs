@@ -31,9 +31,12 @@ impl InstructionBuilder for BonkInstructionBuilder {
         // ========================================
         // Parameter validation and basic data preparation
         // ========================================
-        if params.input_amount.unwrap_or(0) == 0 {
+        // 🔧 修复：显式检查 Option 以提高代码清晰度
+        let input_amount = params.input_amount.ok_or_else(|| anyhow!("Input amount is required"))?;
+        if input_amount == 0 {
             return Err(anyhow!("Amount cannot be zero"));
         }
+
         let protocol_params = params
             .protocol_params
             .as_any()
@@ -67,7 +70,8 @@ impl InstructionBuilder for BonkInstructionBuilder {
         // ========================================
         // Trade calculation and account address preparation
         // ========================================
-        let amount_in: u64 = params.input_amount.unwrap_or(0);
+        // 🔧 修复：使用已经解包的 input_amount
+        let amount_in: u64 = input_amount;
         let share_fee_rate: u64 = 0;
         let minimum_amount_out: u64 = match params.fixed_output_amount {
             Some(fixed_amount) => fixed_amount,
@@ -191,13 +195,14 @@ impl InstructionBuilder for BonkInstructionBuilder {
 
         let rpc = params.rpc.as_ref().unwrap().clone();
 
+        // 🔧 修复：改进 Option 检查的清晰度
         let mut amount = params.input_amount;
-        if params.input_amount.is_none() || params.input_amount.unwrap_or(0) == 0 {
+        if amount.map_or(true, |a| a == 0) {
             let balance_u64 =
                 get_token_balance(rpc.as_ref(), &params.payer.pubkey(), &params.input_mint).await?;
             amount = Some(balance_u64);
         }
-        let amount = amount.unwrap_or(0);
+        let amount = amount.ok_or_else(|| anyhow!("Amount is required"))?;
 
         if amount == 0 {
             return Err(anyhow!("Amount cannot be zero"));

@@ -95,7 +95,9 @@ impl InstructionBuilder for RaydiumClmmInstructionBuilder {
         // ========================================
         // Parameter validation and basic data preparation
         // ========================================
-        if params.input_amount.unwrap_or(0) == 0 {
+        // 🔧 修复：显式检查 Option 以提高代码清晰度
+        let input_amount = params.input_amount.ok_or_else(|| anyhow!("Input amount is required"))?;
+        if input_amount == 0 {
             return Err(anyhow!("Amount cannot be zero"));
         }
 
@@ -193,7 +195,8 @@ impl InstructionBuilder for RaydiumClmmInstructionBuilder {
         // Note: Raydium CLMM swap instruction requires both TOKEN_PROGRAM_ID and TOKEN_2022_PROGRAM_ID
         // The program will use the appropriate one based on the token accounts
 
-        let amount_in: u64 = params.input_amount.unwrap_or(0);
+        // 🔧 修复：使用已经解包的 input_amount
+        let amount_in: u64 = input_amount;
 
         // ========================================
         // 使用官方 CLMM 算法计算精确输出量
@@ -540,9 +543,13 @@ impl InstructionBuilder for RaydiumClmmInstructionBuilder {
             .downcast_ref::<RaydiumClmmParams>()
             .ok_or_else(|| anyhow!("Invalid protocol params for RaydiumClmm"))?;
 
-        if params.input_amount.is_none() || params.input_amount.unwrap_or(0) == 0 {
+        // 🔧 修复：改进 Option 检查的清晰度
+        if params.input_amount.map_or(true, |a| a == 0) {
             return Err(anyhow!("Token amount is not set"));
         }
+
+        // 🔧 修复：提前解包 input_amount
+        let input_amount = params.input_amount.unwrap();
 
         // Fetch pool state to get current price
         let pool_state = get_pool_by_address(
@@ -634,7 +641,8 @@ impl InstructionBuilder for RaydiumClmmInstructionBuilder {
         // Note: Raydium CLMM swap instruction requires both TOKEN_PROGRAM_ID and TOKEN_2022_PROGRAM_ID
         // The program will use the appropriate one based on the token accounts
 
-        let amount_in: u64 = params.input_amount.unwrap_or(0);
+        // 🔧 修复：使用已经解包的 input_amount
+        let amount_in: u64 = input_amount;
 
         // 获取 decimals（用于简化计算降级）
         let input_decimals = if input_mint == protocol_params.token0_mint {

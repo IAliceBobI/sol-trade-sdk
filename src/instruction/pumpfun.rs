@@ -37,7 +37,9 @@ impl InstructionBuilder for PumpFunInstructionBuilder {
             .downcast_ref::<PumpFunParams>()
             .ok_or_else(|| anyhow!("Invalid protocol params for PumpFun"))?;
 
-        if params.input_amount.unwrap_or(0) == 0 {
+        // 🔧 修复：显式检查 Option 以提高代码清晰度
+        let input_amount = params.input_amount.ok_or_else(|| anyhow!("Input amount is required"))?;
+        if input_amount == 0 {
             return Err(anyhow!("Amount cannot be zero"));
         }
 
@@ -55,12 +57,12 @@ impl InstructionBuilder for PumpFunInstructionBuilder {
                 bonding_curve.virtual_sol_reserves as u128,
                 bonding_curve.real_token_reserves as u128,
                 creator,
-                params.input_amount.unwrap_or(0),
+                input_amount,
             ),
         };
 
         let max_sol_cost = calculate_with_slippage_buy(
-            params.input_amount.unwrap_or(0),
+            input_amount,
             params.slippage_basis_points.unwrap_or(DEFAULT_SLIPPAGE),
         );
 

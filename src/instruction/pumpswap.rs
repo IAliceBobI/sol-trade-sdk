@@ -37,10 +37,11 @@ impl InstructionBuilder for PumpSwapInstructionBuilder {
             .downcast_ref::<PumpSwapParams>()
             .ok_or_else(|| anyhow!("Invalid protocol params for PumpSwap"))?;
 
+        // 🔧 修复：改进 Option 检查的清晰度
         // 如果设置了 fixed_output_amount，则跳过 input_amount 为 0 的检查
         // 并使用 fixed_output_amount 进行逆向计算
         let has_fixed_output = params.fixed_output_amount.is_some();
-        if params.input_amount.unwrap_or(0) == 0 && !has_fixed_output {
+        if !has_fixed_output && params.input_amount.map_or(true, |a| a == 0) {
             return Err(anyhow!("Amount cannot be zero"));
         }
 

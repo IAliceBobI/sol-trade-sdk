@@ -27,7 +27,9 @@ impl InstructionBuilder for RaydiumCpmmInstructionBuilder {
         // ========================================
         // Parameter validation and basic data preparation
         // ========================================
-        if params.input_amount.unwrap_or(0) == 0 {
+        // 🔧 修复：显式检查 Option 以提高代码清晰度
+        let input_amount = params.input_amount.ok_or_else(|| anyhow!("Input amount is required"))?;
+        if input_amount == 0 {
             return Err(anyhow!("Amount cannot be zero"));
         }
 
@@ -69,7 +71,8 @@ impl InstructionBuilder for RaydiumCpmmInstructionBuilder {
             protocol_params.base_token_program
         };
 
-        let amount_in: u64 = params.input_amount.unwrap_or(0);
+        // 🔧 修复：使用已经解包的 input_amount
+        let amount_in: u64 = input_amount;
         let result = compute_swap_amount(
             protocol_params.base_reserve,
             protocol_params.quote_reserve,
@@ -189,7 +192,8 @@ impl InstructionBuilder for RaydiumCpmmInstructionBuilder {
             .downcast_ref::<RaydiumCpmmParams>()
             .ok_or_else(|| anyhow!("Invalid protocol params for RaydiumCpmm"))?;
 
-        if params.input_amount.is_none() || params.input_amount.unwrap_or(0) == 0 {
+        // 🔧 修复：改进 Option 检查的清晰度
+        if params.input_amount.map_or(true, |a| a == 0) {
             return Err(anyhow!("Token amount is not set"));
         }
 
