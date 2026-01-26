@@ -38,7 +38,7 @@ impl SwqosClientTrait for JitoClient {
     async fn send_transactions(
         &self,
         trade_type: TradeType,
-        transactions: &Vec<VersionedTransaction>,
+        transactions: &[VersionedTransaction],
         wait_confirmation: bool,
     ) -> Result<()> {
         self.send_transactions_impl(trade_type, transactions, wait_confirmation).await
@@ -151,7 +151,7 @@ impl JitoClient {
     pub async fn send_transactions_impl(
         &self,
         trade_type: TradeType,
-        transactions: &Vec<VersionedTransaction>,
+        transactions: &[VersionedTransaction],
         _wait_confirmation: bool,
     ) -> Result<()> {
         let start_time = Instant::now();

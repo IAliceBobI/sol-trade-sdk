@@ -36,7 +36,7 @@ impl SwqosClientTrait for NextBlockClient {
     async fn send_transactions(
         &self,
         trade_type: TradeType,
-        transactions: &Vec<VersionedTransaction>,
+        transactions: &[VersionedTransaction],
         wait_confirmation: bool,
     ) -> Result<()> {
         self.send_transactions(trade_type, transactions, wait_confirmation).await
@@ -147,7 +147,7 @@ impl NextBlockClient {
     pub async fn send_transactions(
         &self,
         trade_type: TradeType,
-        transactions: &Vec<VersionedTransaction>,
+        transactions: &[VersionedTransaction],
         wait_confirmation: bool,
     ) -> Result<()> {
         for transaction in transactions {

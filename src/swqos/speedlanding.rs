@@ -139,7 +139,7 @@ impl SwqosClientTrait for SpeedlandingClient {
     async fn send_transactions(
         &self,
         trade_type: TradeType,
-        transactions: &Vec<VersionedTransaction>,
+        transactions: &[VersionedTransaction],
         wait_confirmation: bool,
     ) -> Result<()> {
         for transaction in transactions {

@@ -38,7 +38,7 @@ impl SwqosClientTrait for BloxrouteClient {
     async fn send_transactions(
         &self,
         trade_type: TradeType,
-        transactions: &Vec<VersionedTransaction>,
+        transactions: &[VersionedTransaction],
         wait_confirmation: bool,
     ) -> Result<()> {
         self.send_transactions(trade_type, transactions, wait_confirmation).await
@@ -146,7 +146,7 @@ impl BloxrouteClient {
     pub async fn send_transactions(
         &self,
         trade_type: TradeType,
-        transactions: &Vec<VersionedTransaction>,
+        transactions: &[VersionedTransaction],
         _wait_confirmation: bool,
     ) -> Result<()> {
         let start_time = Instant::now();
