@@ -193,10 +193,8 @@ pub fn get_creator(creator_vault_pda: &Pubkey) -> Pubkey {
         static DEFAULT_CREATOR_VAULT: std::sync::LazyLock<Option<Pubkey>> =
             std::sync::LazyLock::new(|| get_creator_vault_pda(&Pubkey::default()));
         match *DEFAULT_CREATOR_VAULT {
-            Some(ref default_vault) if creator_vault_pda.eq(default_vault) => {
-                Pubkey::default()
-            }
-            _ => *creator_vault_pda
+            Some(ref default_vault) if creator_vault_pda.eq(default_vault) => Pubkey::default(),
+            _ => *creator_vault_pda,
         }
     }
 }

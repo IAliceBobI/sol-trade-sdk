@@ -159,9 +159,10 @@ pub async fn get_pool_by_mint<T: PoolRpcClient + ?Sized>(
 ) -> Result<(Pubkey, PoolState), anyhow::Error> {
     // 1. 检查缓存
     if let Some(pool_address) = raydium_cpmm_cache::get_cached_pool_address_by_mint(mint)
-        && let Some(pool) = raydium_cpmm_cache::get_cached_pool_by_address(&pool_address) {
-            return Ok((pool_address, pool));
-        }
+        && let Some(pool) = raydium_cpmm_cache::get_cached_pool_by_address(&pool_address)
+    {
+        return Ok((pool_address, pool));
+    }
     // 2. RPC 查询 - 使用 find_all_pools_by_mint_impl 获取所有池
     let all_pools = find_all_pools_by_mint_impl(rpc, mint).await?;
 

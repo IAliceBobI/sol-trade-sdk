@@ -764,13 +764,14 @@ pub async fn find_global_config(
                     // USD1 mint: USD1ttGY1N17NEEHLmELoaybftRBUSErhqYiQzvEmuB
                     let usd1_mint = pubkey!("USD1ttGY1N17NEEHLmELoaybftRBUSErhqYiQzvEmuB");
                     if quote_mint == &usd1_mint
-                        && let Ok(_) = rpc.get_account(&accounts::USD1_GLOBAL_CONFIG).await {
-                            println!(
-                                "   ℹ️  使用已知的 USD1 global_config: {}",
-                                accounts::USD1_GLOBAL_CONFIG
-                            );
-                            return Ok(accounts::USD1_GLOBAL_CONFIG);
-                        }
+                        && let Ok(_) = rpc.get_account(&accounts::USD1_GLOBAL_CONFIG).await
+                    {
+                        println!(
+                            "   ℹ️  使用已知的 USD1 global_config: {}",
+                            accounts::USD1_GLOBAL_CONFIG
+                        );
+                        return Ok(accounts::USD1_GLOBAL_CONFIG);
+                    }
 
                     // If quote_mint is WSOL, we could add known WSOL global config here if available
                     if quote_mint == &WSOL_TOKEN_ACCOUNT {
@@ -1120,13 +1121,15 @@ async fn query_all_amm_configs(
             _ => continue,
         };
         if data_bytes.len() >= 8 + AMM_CONFIG_SIZE
-            && let Some(amm_config) = amm_config_decode(&data_bytes[8..8 + AMM_CONFIG_SIZE]) {
-                // Verify owner is CPMM program (owner is a string in UiAccount, convert to Pubkey for comparison)
-                if let Ok(owner_pubkey) = acc.owner.parse::<Pubkey>()
-                    && owner_pubkey == *cpmm_program {
-                        configs.push((addr, amm_config));
-                    }
+            && let Some(amm_config) = amm_config_decode(&data_bytes[8..8 + AMM_CONFIG_SIZE])
+        {
+            // Verify owner is CPMM program (owner is a string in UiAccount, convert to Pubkey for comparison)
+            if let Ok(owner_pubkey) = acc.owner.parse::<Pubkey>()
+                && owner_pubkey == *cpmm_program
+            {
+                configs.push((addr, amm_config));
             }
+        }
     }
 
     Ok(configs)
@@ -1137,18 +1140,20 @@ async fn try_known_config_address(rpc: &SolanaRpcClient) -> Option<(Pubkey, Pubk
     // Try mainnet config first
     let mainnet_config = accounts::CPMM_CONFIG_MAINNET;
     if let Ok(account) = rpc.get_account(&mainnet_config).await
-        && account.owner == accounts::CPMM_PROGRAM {
-            println!("   ✅ 使用已知的 CPMM config 地址: {} (主网)", mainnet_config);
-            return Some((mainnet_config, accounts::CPMM_CREATE_POOL_FEE));
-        }
+        && account.owner == accounts::CPMM_PROGRAM
+    {
+        println!("   ✅ 使用已知的 CPMM config 地址: {} (主网)", mainnet_config);
+        return Some((mainnet_config, accounts::CPMM_CREATE_POOL_FEE));
+    }
 
     // Try devnet config
     let devnet_config = accounts::CPMM_CONFIG_DEVNET;
     if let Ok(account) = rpc.get_account(&devnet_config).await
-        && account.owner == accounts::CPMM_PROGRAM_DEVNET {
-            println!("   ✅ 使用已知的 CPMM config 地址: {} (Devnet)", devnet_config);
-            return Some((devnet_config, accounts::CPMM_CREATE_POOL_FEE));
-        }
+        && account.owner == accounts::CPMM_PROGRAM_DEVNET
+    {
+        println!("   ✅ 使用已知的 CPMM config 地址: {} (Devnet)", devnet_config);
+        return Some((devnet_config, accounts::CPMM_CREATE_POOL_FEE));
+    }
 
     None
 }
@@ -1224,21 +1229,19 @@ pub async fn find_cpswap_config(rpc: &SolanaRpcClient) -> Result<(Pubkey, Pubkey
                             _ => continue,
                         };
                         if data_bytes.len() > 8
-                            && let Some(pool_state) = pool_state_decode(&data_bytes[8..]) {
-                                let cpswap_config = pool_state.amm_config;
-                                let cpswap_create_pool_fee = accounts::CPMM_CREATE_POOL_FEE;
+                            && let Some(pool_state) = pool_state_decode(&data_bytes[8..])
+                        {
+                            let cpswap_config = pool_state.amm_config;
+                            let cpswap_create_pool_fee = accounts::CPMM_CREATE_POOL_FEE;
 
-                                println!(
-                                    "   ℹ️  通过程序账户查询找到 CPMM config: {}",
-                                    cpswap_config
-                                );
-                                println!(
-                                    "   ℹ️  使用 CPMM Create Pool Fee: {}",
-                                    cpswap_create_pool_fee
-                                );
+                            println!("   ℹ️  通过程序账户查询找到 CPMM config: {}", cpswap_config);
+                            println!(
+                                "   ℹ️  使用 CPMM Create Pool Fee: {}",
+                                cpswap_create_pool_fee
+                            );
 
-                                return Ok((cpswap_config, cpswap_create_pool_fee));
-                            }
+                            return Ok((cpswap_config, cpswap_create_pool_fee));
+                        }
                     }
                 }
             },

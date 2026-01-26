@@ -270,9 +270,10 @@ pub async fn get_pool_by_mint_with_options(
 ) -> Result<(Pubkey, PoolState), anyhow::Error> {
     // 1. 检查缓存
     if let Some(pool_address) = raydium_clmm_cache::get_cached_pool_address_by_mint(mint)
-        && let Some(pool) = raydium_clmm_cache::get_cached_pool_by_address(&pool_address) {
-            return Ok((pool_address, pool));
-        }
+        && let Some(pool) = raydium_clmm_cache::get_cached_pool_by_address(&pool_address)
+    {
+        return Ok((pool_address, pool));
+    }
 
     // 2. RPC 查询 - 复用 get_pool_by_mint 的逻辑
     // 注意：当 use_vault_balance=true 时，仍使用旧的 find_pool_by_mint_impl
@@ -697,15 +698,17 @@ async fn select_best_hot_pool_by_vault_balance(
 
     // 1. 优先在稳定币相关池中按金库余额择优（并发读取）
     if !stable_candidates.is_empty()
-        && let Some(best) = pick_best_by_vault_balance_concurrent(rpc, stable_candidates).await {
-            return Some(best);
-        }
+        && let Some(best) = pick_best_by_vault_balance_concurrent(rpc, stable_candidates).await
+    {
+        return Some(best);
+    }
 
     // 2. 否则在 WSOL 相关池中按 WSOL 金库余额择优（并发读取）
     if !wsol_candidates.is_empty()
-        && let Some(best) = pick_best_by_vault_balance_concurrent(rpc, wsol_candidates).await {
-            return Some(best);
-        }
+        && let Some(best) = pick_best_by_vault_balance_concurrent(rpc, wsol_candidates).await
+    {
+        return Some(best);
+    }
 
     // 3. 都无法区分时退化为原有通用规则
     select_best_pool(pools)

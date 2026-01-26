@@ -269,9 +269,10 @@ pub async fn get_pool_by_mint<T: PoolRpcClient + ?Sized>(
 ) -> Result<(Pubkey, Pool), anyhow::Error> {
     // 1. 检查缓存
     if let Some(pool_address) = pump_swap_cache::get_cached_pool_address_by_mint(mint)
-        && let Some(pool) = pump_swap_cache::get_cached_pool_by_address(&pool_address) {
-            return Ok((pool_address, pool));
-        }
+        && let Some(pool) = pump_swap_cache::get_cached_pool_by_address(&pool_address)
+    {
+        return Ok((pool_address, pool));
+    }
     // 2. RPC 查询
     let (pool_address, pool) = find_pool_by_mint_impl(rpc, mint).await?;
     // 3. 写入缓存
@@ -492,14 +493,15 @@ async fn find_pool_by_mint_impl<T: PoolRpcClient + ?Sized>(
     // Priority 1: Try to find canonical pool (mint/WSOL pair) first
     // This is the most common case for PumpFun migrated tokens
     if let Some((pool_address, _)) = calculate_canonical_pool_pda(mint)
-        && let Ok(pool) = get_pool_by_address(rpc, &pool_address).await {
-            // Verify it's actually a mint/WSOL pool
-            if (pool.base_mint == *mint && pool.quote_mint == WSOL_TOKEN_ACCOUNT)
-                || (pool.base_mint == WSOL_TOKEN_ACCOUNT && pool.quote_mint == *mint)
-            {
-                return Ok((pool_address, pool));
-            }
+        && let Ok(pool) = get_pool_by_address(rpc, &pool_address).await
+    {
+        // Verify it's actually a mint/WSOL pool
+        if (pool.base_mint == *mint && pool.quote_mint == WSOL_TOKEN_ACCOUNT)
+            || (pool.base_mint == WSOL_TOKEN_ACCOUNT && pool.quote_mint == *mint)
+        {
+            return Ok((pool_address, pool));
         }
+    }
 
     // Priority 2 & 3: 获取所有池子
     let all_pools = find_all_pools_by_mint_impl(rpc, mint).await?;
