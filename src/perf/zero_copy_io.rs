@@ -58,12 +58,12 @@ impl SharedMemoryPool {
             .context("Failed to create memory mapped region")?;
 
         // 初始化空闲块位图 (每个u64可以管理64个块)
-        let bitmap_size = (total_blocks + 63) / 64;
+        let bitmap_size = total_blocks.div_ceil(64);
         let mut free_blocks = Vec::with_capacity(bitmap_size);
 
         // 将所有块标记为空闲(全1)
         for i in 0..bitmap_size {
-            let bits = if i == bitmap_size - 1 && total_blocks % 64 != 0 {
+            let bits = if i == bitmap_size - 1 && !total_blocks.is_multiple_of(64) {
                 // 最后一个u64可能不满64位
                 let valid_bits = total_blocks % 64;
                 (1u64 << valid_bits) - 1
@@ -200,15 +200,15 @@ impl ZeroCopyBlock {
 
     /// 获取只读切片
     #[inline(always)]
-    pub unsafe fn as_slice(&self) -> &[u8] {
+    pub unsafe fn as_slice(&self) -> &[u8] { unsafe {
         slice::from_raw_parts(self.ptr.as_ptr(), self.size)
-    }
+    }}
 
     /// 获取可变切片
     #[inline(always)]
-    pub unsafe fn as_mut_slice(&mut self) -> &mut [u8] {
+    pub unsafe fn as_mut_slice(&mut self) -> &mut [u8] { unsafe {
         slice::from_raw_parts_mut(self.ptr.as_ptr(), self.size)
-    }
+    }}
 
     /// 获取块大小
     #[inline(always)]
@@ -525,6 +525,12 @@ pub struct DMAStats {
     pub transfer_errors: AtomicU64,
 }
 
+impl Default for DMAStats {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl DMAStats {
     pub fn new() -> Self {
         Self {
@@ -545,6 +551,12 @@ pub struct ZeroCopyStats {
     pub bytes_transferred: AtomicU64,
     /// 内存映射缓冲区使用量
     pub mmap_buffer_usage: AtomicU64,
+}
+
+impl Default for ZeroCopyStats {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl ZeroCopyStats {
@@ -630,9 +642,8 @@ impl ZeroCopyMemoryManager {
         self.shared_pools
             .get(pool_index)
             .and_then(|pool| pool.allocate_block())
-            .map(|block| {
+            .inspect(|_block| {
                 self.stats.blocks_allocated.fetch_add(1, Ordering::Relaxed);
-                block
             })
     }
 

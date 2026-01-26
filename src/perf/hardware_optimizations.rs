@@ -33,7 +33,7 @@ impl SIMDMemoryOps {
     pub unsafe fn memcpy_simd_optimized(dst: *mut u8, src: *const u8, len: usize) {
         match len {
             // 针对不同数据大小使用不同优化策略
-            0 => return,
+            0 => (),
             1..=8 => unsafe { Self::memcpy_small(dst, src, len) },
             9..=16 => unsafe { Self::memcpy_sse(dst, src, len) },
             17..=32 => unsafe { Self::memcpy_avx(dst, src, len) },
@@ -44,7 +44,7 @@ impl SIMDMemoryOps {
 
     /// 小数据拷贝优化 (1-8字节)
     #[inline(always)]
-    unsafe fn memcpy_small(dst: *mut u8, src: *const u8, len: usize) {
+    unsafe fn memcpy_small(dst: *mut u8, src: *const u8, len: usize) { unsafe {
         match len {
             1 => *dst = *src,
             2 => *(dst as *mut u16) = *(src as *const u16),
@@ -61,11 +61,11 @@ impl SIMDMemoryOps {
             },
             _ => unreachable!(),
         }
-    }
+    }}
 
     /// SSE优化拷贝 (9-16字节)
     #[inline(always)]
-    unsafe fn memcpy_sse(dst: *mut u8, src: *const u8, len: usize) {
+    unsafe fn memcpy_sse(dst: *mut u8, src: *const u8, len: usize) { unsafe {
         #[cfg(target_arch = "x86_64")]
         {
             use std::arch::x86_64::{__m128i, _mm_loadu_si128, _mm_storeu_si128};
@@ -80,11 +80,11 @@ impl SIMDMemoryOps {
         {
             ptr::copy_nonoverlapping(src, dst, len);
         }
-    }
+    }}
 
     /// AVX优化拷贝 (17-32字节)
     #[inline(always)]
-    unsafe fn memcpy_avx(dst: *mut u8, src: *const u8, len: usize) {
+    unsafe fn memcpy_avx(dst: *mut u8, src: *const u8, len: usize) { unsafe {
         #[cfg(target_arch = "x86_64")]
         {
             use std::arch::x86_64::{__m256i, _mm256_loadu_si256, _mm256_storeu_si256};
@@ -99,11 +99,11 @@ impl SIMDMemoryOps {
         {
             ptr::copy_nonoverlapping(src, dst, len);
         }
-    }
+    }}
 
     /// AVX2优化拷贝 (33-64字节)
     #[inline(always)]
-    unsafe fn memcpy_avx2(dst: *mut u8, src: *const u8, len: usize) {
+    unsafe fn memcpy_avx2(dst: *mut u8, src: *const u8, len: usize) { unsafe {
         #[cfg(target_arch = "x86_64")]
         {
             use std::arch::x86_64::{__m256i, _mm256_loadu_si256, _mm256_storeu_si256};
@@ -126,11 +126,11 @@ impl SIMDMemoryOps {
         {
             ptr::copy_nonoverlapping(src, dst, len);
         }
-    }
+    }}
 
     /// AVX512或回退拷贝 (>64字节)
     #[inline(always)]
-    unsafe fn memcpy_avx512_or_fallback(dst: *mut u8, src: *const u8, len: usize) {
+    unsafe fn memcpy_avx512_or_fallback(dst: *mut u8, src: *const u8, len: usize) { unsafe {
         #[cfg(all(target_arch = "x86_64", target_feature = "avx512f"))]
         {
             use std::arch::x86_64::{__m512i, _mm512_loadu_si512, _mm512_storeu_si512};
@@ -168,11 +168,11 @@ impl SIMDMemoryOps {
                 Self::memcpy_avx(dst.add(offset), src.add(offset), remaining);
             }
         }
-    }
+    }}
 
     /// 🚀 SIMD加速的内存比较
     #[inline(always)]
-    pub unsafe fn memcmp_simd_optimized(a: *const u8, b: *const u8, len: usize) -> bool {
+    pub unsafe fn memcmp_simd_optimized(a: *const u8, b: *const u8, len: usize) -> bool { unsafe {
         match len {
             0 => true,
             1..=8 => Self::memcmp_small(a, b, len),
@@ -180,11 +180,11 @@ impl SIMDMemoryOps {
             17..=32 => Self::memcmp_avx2(a, b, len),
             _ => Self::memcmp_large(a, b, len),
         }
-    }
+    }}
 
     /// 小数据比较
     #[inline(always)]
-    unsafe fn memcmp_small(a: *const u8, b: *const u8, len: usize) -> bool {
+    unsafe fn memcmp_small(a: *const u8, b: *const u8, len: usize) -> bool { unsafe {
         match len {
             1 => *a == *b,
             2 => {
@@ -210,11 +210,11 @@ impl SIMDMemoryOps {
             },
             _ => unreachable!(),
         }
-    }
+    }}
 
     /// SSE比较
     #[inline(always)]
-    unsafe fn memcmp_sse(a: *const u8, b: *const u8, len: usize) -> bool {
+    unsafe fn memcmp_sse(a: *const u8, b: *const u8, len: usize) -> bool { unsafe {
         #[cfg(target_arch = "x86_64")]
         {
             use std::arch::x86_64::{__m128i, _mm_cmpeq_epi8, _mm_loadu_si128, _mm_movemask_epi8};
@@ -233,11 +233,11 @@ impl SIMDMemoryOps {
         {
             (0..len).all(|i| *a.add(i) == *b.add(i))
         }
-    }
+    }}
 
     /// AVX2比较
     #[inline(always)]
-    unsafe fn memcmp_avx2(a: *const u8, b: *const u8, len: usize) -> bool {
+    unsafe fn memcmp_avx2(a: *const u8, b: *const u8, len: usize) -> bool { unsafe {
         #[cfg(target_arch = "x86_64")]
         {
             use std::arch::x86_64::{
@@ -257,11 +257,11 @@ impl SIMDMemoryOps {
         {
             (0..len).all(|i| *a.add(i) == *b.add(i))
         }
-    }
+    }}
 
     /// 大数据比较
     #[inline(always)]
-    unsafe fn memcmp_large(a: *const u8, b: *const u8, len: usize) -> bool {
+    unsafe fn memcmp_large(a: *const u8, b: *const u8, len: usize) -> bool { unsafe {
         let chunks = len / 32;
 
         for i in 0..chunks {
@@ -277,11 +277,11 @@ impl SIMDMemoryOps {
         }
 
         true
-    }
+    }}
 
     /// 🚀 SIMD加速的内存清零
     #[inline(always)]
-    pub unsafe fn memzero_simd_optimized(ptr: *mut u8, len: usize) {
+    pub unsafe fn memzero_simd_optimized(ptr: *mut u8, len: usize) { unsafe {
         #[cfg(target_arch = "x86_64")]
         {
             use std::arch::x86_64::{__m256i, _mm256_setzero_si256, _mm256_storeu_si256};
@@ -306,7 +306,7 @@ impl SIMDMemoryOps {
         {
             ptr::write_bytes(ptr, 0, len);
         }
-    }
+    }}
 }
 
 /// 🚀 缓存行对齐的原子计数器
@@ -342,7 +342,7 @@ impl CacheAlignedCounter {
 
 impl CacheLineAligned for CacheAlignedCounter {
     fn ensure_cache_aligned(&self) -> bool {
-        (self as *const Self as usize) % CACHE_LINE_SIZE == 0
+        (self as *const Self as usize).is_multiple_of(CACHE_LINE_SIZE)
     }
 
     fn prefetch_data(&self) {
@@ -452,7 +452,7 @@ impl<T: Copy + Default> CacheOptimizedRingBuffer<T> {
 
 impl<T> CacheLineAligned for CacheOptimizedRingBuffer<T> {
     fn ensure_cache_aligned(&self) -> bool {
-        (self as *const Self as usize) % CACHE_LINE_SIZE == 0
+        (self as *const Self as usize).is_multiple_of(CACHE_LINE_SIZE)
     }
 
     fn prefetch_data(&self) {
