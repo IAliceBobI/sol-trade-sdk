@@ -1,7 +1,43 @@
+# 基础配置
 max_width = 100
 hard_tabs = false
 tab_spaces = 4
-edition = "2021"
+edition = "2024"  # 使用最新的 Rust 2024 Edition
 use_small_heuristics = "Max"
 newline_style = "Unix"
+
+# 导入优化 - 改善 git diff 可读性
+imports_granularity = "Item"  # 每个 import 单独一行，便于 diff
+imports_layout = "Vertical"    # 垂直布局，每行一个导入
+group_imports = "StdExternalCrate"  # 按标准库、外部、内部分组
+
+# 函数参数布局
+fn_params_layout = "Vertical"  # 函数参数垂直排列，提高可读性
+fn_params_width = 80           # 函数参数宽度限制
+
+# 结构体和枚举
+struct_lit_width = 60
+struct_variant_width = 60
+
+# 字符串格式化
+format_strings = true  # 使用字符串格式化宏
+
+# 代码块格式化
+brace_style = "SameLineWhere"
+control_brace_style = "AlwaysSameLine"
+
+# 注释
+comment_width = 100
+wrap_comments = false
+normalize_comments = true
+
+# 链式调用
+chain_width = 80
+
+# 空白行
+blank_lines_upper_bound = 1
+blank_lines_lower_bound = 0
+
+# Match 表达式
+match_block_trailing_comma = true
 
