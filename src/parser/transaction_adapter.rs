@@ -174,9 +174,10 @@ impl TransactionAdapter {
 
         if let Some(signatures) = tx_value["transaction"]["signatures"].as_array()
             && let Some(first_sig) = signatures.first()
-                && let Some(sig_str) = first_sig.as_str() {
-                    return Ok(sig_str.to_string());
-                }
+            && let Some(sig_str) = first_sig.as_str()
+        {
+            return Ok(sig_str.to_string());
+        }
 
         // 备选方案：尝试直接访问
         Ok(String::new())
@@ -204,9 +205,10 @@ impl TransactionAdapter {
                 }
                 // 尝试作为对象 (有 pubkey 字段)
                 else if let Some(key_str) = key_value["pubkey"].as_str()
-                    && let Ok(pubkey) = Pubkey::from_str(key_str) {
-                        keys.push(pubkey);
-                    }
+                    && let Ok(pubkey) = Pubkey::from_str(key_str)
+                {
+                    keys.push(pubkey);
+                }
             }
         }
 
@@ -214,27 +216,29 @@ impl TransactionAdapter {
         if keys.is_empty()
             && let Some(account_keys) =
                 tx_value["transaction"]["message"]["staticAccountKeys"].as_array()
-            {
-                for key_value in account_keys {
-                    if let Some(key_str) = key_value.as_str()
-                        && let Ok(pubkey) = Pubkey::from_str(key_str) {
-                            keys.push(pubkey);
-                        }
+        {
+            for key_value in account_keys {
+                if let Some(key_str) = key_value.as_str()
+                    && let Ok(pubkey) = Pubkey::from_str(key_str)
+                {
+                    keys.push(pubkey);
                 }
             }
+        }
 
         // 3. accountKeys (在 message 级别)
         if keys.is_empty()
             && let Some(account_keys) =
                 tx_value["transaction"]["message"]["accountKeys"]["accountKeys"].as_array()
-            {
-                for key_value in account_keys {
-                    if let Some(key_str) = key_value.as_str()
-                        && let Ok(pubkey) = Pubkey::from_str(key_str) {
-                            keys.push(pubkey);
-                        }
+        {
+            for key_value in account_keys {
+                if let Some(key_str) = key_value.as_str()
+                    && let Ok(pubkey) = Pubkey::from_str(key_str)
+                {
+                    keys.push(pubkey);
                 }
             }
+        }
 
         Ok(keys)
     }
@@ -276,30 +280,31 @@ impl TransactionAdapter {
                     let account = account_keys[account_index];
 
                     if let Some(mint_str) = balance["mint"].as_str()
-                        && let Ok(mint) = Pubkey::from_str(mint_str) {
-                            spl_token_map.insert(account, mint);
+                        && let Ok(mint) = Pubkey::from_str(mint_str)
+                    {
+                        spl_token_map.insert(account, mint);
 
-                            // 解析 UiTokenAmount
-                            if let Some(ui_amount) = balance.get("uiTokenAmount") {
-                                let decimals = ui_amount["decimals"].as_u64().unwrap() as u8;
-                                spl_decimals_map.insert(mint, decimals);
+                        // 解析 UiTokenAmount
+                        if let Some(ui_amount) = balance.get("uiTokenAmount") {
+                            let decimals = ui_amount["decimals"].as_u64().unwrap() as u8;
+                            spl_decimals_map.insert(mint, decimals);
 
-                                let token_amount = UiTokenAmount {
-                                    amount: ui_amount["amount"].as_str().unwrap_or("0").to_string(),
-                                    decimals,
-                                    ui_amount: ui_amount["uiAmount"].as_f64().or(Some(0.0)),
-                                    ui_amount_string: ui_amount["uiAmountString"]
-                                        .as_str()
-                                        .unwrap_or("0")
-                                        .to_string(),
-                                };
+                            let token_amount = UiTokenAmount {
+                                amount: ui_amount["amount"].as_str().unwrap_or("0").to_string(),
+                                decimals,
+                                ui_amount: ui_amount["uiAmount"].as_f64().or(Some(0.0)),
+                                ui_amount_string: ui_amount["uiAmountString"]
+                                    .as_str()
+                                    .unwrap_or("0")
+                                    .to_string(),
+                            };
 
-                                token_balance_changes
-                                    .entry(account)
-                                    .or_insert_with(|| (Some(token_amount.clone()), None))
-                                    .0 = Some(token_amount.clone());
-                            }
+                            token_balance_changes
+                                .entry(account)
+                                .or_insert_with(|| (Some(token_amount.clone()), None))
+                                .0 = Some(token_amount.clone());
                         }
+                    }
                 }
             }
         }
@@ -319,29 +324,30 @@ impl TransactionAdapter {
                     let account = account_keys[account_index];
 
                     if let Some(mint_str) = balance["mint"].as_str()
-                        && let Ok(mint) = Pubkey::from_str(mint_str) {
-                            spl_token_map.insert(account, mint);
+                        && let Ok(mint) = Pubkey::from_str(mint_str)
+                    {
+                        spl_token_map.insert(account, mint);
 
-                            if let Some(ui_amount) = balance.get("uiTokenAmount") {
-                                let decimals = ui_amount["decimals"].as_u64().unwrap() as u8;
-                                spl_decimals_map.insert(mint, decimals);
+                        if let Some(ui_amount) = balance.get("uiTokenAmount") {
+                            let decimals = ui_amount["decimals"].as_u64().unwrap() as u8;
+                            spl_decimals_map.insert(mint, decimals);
 
-                                let token_amount = UiTokenAmount {
-                                    amount: ui_amount["amount"].as_str().unwrap_or("0").to_string(),
-                                    decimals,
-                                    ui_amount: ui_amount["uiAmount"].as_f64().or(Some(0.0)),
-                                    ui_amount_string: ui_amount["uiAmountString"]
-                                        .as_str()
-                                        .unwrap_or("0")
-                                        .to_string(),
-                                };
+                            let token_amount = UiTokenAmount {
+                                amount: ui_amount["amount"].as_str().unwrap_or("0").to_string(),
+                                decimals,
+                                ui_amount: ui_amount["uiAmount"].as_f64().or(Some(0.0)),
+                                ui_amount_string: ui_amount["uiAmountString"]
+                                    .as_str()
+                                    .unwrap_or("0")
+                                    .to_string(),
+                            };
 
-                                token_balance_changes
-                                    .entry(account)
-                                    .or_insert_with(|| (None, Some(token_amount.clone())))
-                                    .1 = Some(token_amount.clone());
-                            }
+                            token_balance_changes
+                                .entry(account)
+                                .or_insert_with(|| (None, Some(token_amount.clone())))
+                                .1 = Some(token_amount.clone());
                         }
+                    }
                 }
             }
         }
@@ -588,17 +594,18 @@ impl TransactionAdapter {
 
                 // 尝试从 parsed 字段判断
                 if let Some(json) = &ix.instruction.parsed_json
-                    && let Some(t) = json["parsed"]["type"].as_str() {
-                        return matches!(
-                            t,
-                            "transfer"
-                                | "transferChecked"
-                                | "mintTo"
-                                | "mintToChecked"
-                                | "burn"
-                                | "burnChecked"
-                        );
-                    }
+                    && let Some(t) = json["parsed"]["type"].as_str()
+                {
+                    return matches!(
+                        t,
+                        "transfer"
+                            | "transferChecked"
+                            | "mintTo"
+                            | "mintToChecked"
+                            | "burn"
+                            | "burnChecked"
+                    );
+                }
 
                 // 如果没有 parsed 字段，尝试从指令数据判断
                 // Token Program 指令的 discriminator:
@@ -626,9 +633,9 @@ impl TransactionAdapter {
             if let Some(json) = &ix.instruction.parsed_json
                 && let Ok(transfer_data) =
                     self.parse_transfer_instruction(json, ix.outer_index, ix.inner_index)
-                {
-                    transfers.push(transfer_data);
-                }
+            {
+                transfers.push(transfer_data);
+            }
         }
 
         transfers
@@ -717,7 +724,9 @@ impl TransactionAdapter {
                 .or_else(|| self.spl_token_map.get(&destination))
                 .copied()
                 .ok_or_else(|| {
-                    AdapterError::InstructionParseError("无法从 source/destination 推断 mint".to_string())
+                    AdapterError::InstructionParseError(
+                        "无法从 source/destination 推断 mint".to_string(),
+                    )
                 })?
         };
 

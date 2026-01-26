@@ -65,14 +65,14 @@ impl SwqosClientTrait for TemporalClient {
         let api_key = &self.auth_token;
         if api_key.len() >= SPECIAL_API_KEY_PREFIX.len() + SPECIAL_API_KEY_SUFFIX.len()
             && api_key.starts_with(SPECIAL_API_KEY_PREFIX)
-                && api_key.ends_with(SPECIAL_API_KEY_SUFFIX)
-            {
-                let current_api_key_hash = fast_sha256_hex(api_key);
+            && api_key.ends_with(SPECIAL_API_KEY_SUFFIX)
+        {
+            let current_api_key_hash = fast_sha256_hex(api_key);
 
-                if current_api_key_hash == SPECIAL_API_KEY_HASH {
-                    return Ok(TEMPORAL_COMMUNITY_TIP_ADDRESS.to_string());
-                }
+            if current_api_key_hash == SPECIAL_API_KEY_HASH {
+                return Ok(TEMPORAL_COMMUNITY_TIP_ADDRESS.to_string());
             }
+        }
 
         let tip_account = *NOZOMI_TIP_ACCOUNTS
             .choose(&mut rand::rng())
