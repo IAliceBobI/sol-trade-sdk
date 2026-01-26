@@ -12,6 +12,18 @@ use std::collections::HashMap;
 use std::str::FromStr;
 use tracing::warn;
 
+/// Token Program ID
+fn token_program() -> Pubkey {
+    Pubkey::from_str("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA")
+        .expect("Invalid TOKEN_PROGRAM pubkey")
+}
+
+/// Token 2022 Program ID
+fn token_program_2022() -> Pubkey {
+    Pubkey::from_str("TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb")
+        .expect("Invalid TOKEN_PROGRAM_2022 pubkey")
+}
+
 /// 交易适配器错误
 #[derive(Debug, thiserror::Error)]
 pub enum AdapterError {
@@ -25,6 +37,8 @@ pub enum AdapterError {
     PubkeyParseError(String),
     #[error("JSON 解析失败: {0}")]
     JsonError(String),
+    #[error("数据解析错误: {0}")]
+    DataError(#[from] anyhow::Error),
 }
 
 /// 指令信息
@@ -286,7 +300,9 @@ impl TransactionAdapter {
 
                         // 解析 UiTokenAmount
                         if let Some(ui_amount) = balance.get("uiTokenAmount") {
-                            let decimals = ui_amount["decimals"].as_u64().unwrap() as u8;
+                            let decimals = ui_amount["decimals"]
+                                .as_u64()
+                                .ok_or_else(|| anyhow::anyhow!("Missing decimals field"))? as u8;
                             spl_decimals_map.insert(mint, decimals);
 
                             let token_amount = UiTokenAmount {
@@ -329,7 +345,9 @@ impl TransactionAdapter {
                         spl_token_map.insert(account, mint);
 
                         if let Some(ui_amount) = balance.get("uiTokenAmount") {
-                            let decimals = ui_amount["decimals"].as_u64().unwrap() as u8;
+                            let decimals = ui_amount["decimals"]
+                                .as_u64()
+                                .ok_or_else(|| anyhow::anyhow!("Missing decimals field"))? as u8;
                             spl_decimals_map.insert(mint, decimals);
 
                             let token_amount = UiTokenAmount {
@@ -448,7 +466,9 @@ impl TransactionAdapter {
             for inner_set in inner_instrs {
                 inner_instructions_json.push(inner_set.clone());
 
-                let outer_index = inner_set["index"].as_u64().unwrap() as usize;
+                let outer_index = inner_set["index"]
+                    .as_u64()
+                    .ok_or_else(|| anyhow::anyhow!("Missing inner instruction index"))? as usize;
 
                 if let Some(instructions_arr) = inner_set["instructions"].as_array() {
                     for (inner_idx, ix_json) in instructions_arr.iter().enumerate() {
@@ -576,11 +596,8 @@ impl TransactionAdapter {
 
     /// 获取所有转账类型的内部指令（扩展版）
     pub fn get_all_transfer_instructions(&self) -> Vec<&InnerInstructionInfo> {
-        let token_program_id =
-            "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA".parse::<Pubkey>().unwrap();
-
-        let token_2022_program_id =
-            "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb".parse::<Pubkey>().unwrap();
+        let token_program_id = token_program();
+        let token_2022_program_id = token_program_2022();
 
         self.inner_instructions
             .iter()
