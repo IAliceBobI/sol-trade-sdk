@@ -843,9 +843,9 @@ pub async fn list_pools_by_mint<T: PoolRpcClient + ?Sized>(
     );
 
     // 检测是否都失败，如果都失败则返回第一个错误（通常包含 RPC 限制信息）
-    if result0.is_err() && result1.is_err() {
-        // 返回 result0 的错误，它包含我们的自定义错误消息
-        return Err(result0.unwrap_err());
+    match (&result0, &result1) {
+        (Err(e), Err(_)) => return Err(anyhow::anyhow!("{}", e)),
+        _ => {}
     }
 
     let mut all_pools: Vec<(Pubkey, PoolState)> = Vec::new();
@@ -979,9 +979,8 @@ pub async fn quote_exact_in(
     const Q64: u128 = 1u128 << 64;
 
     let amount_in_u128 = amount_in as u128;
-    let amount_out_u128: u128;
 
-    if zero_for_one {
+    let amount_out_u128 = if zero_for_one {
         // token0 in, token1 out
         // sqrtP_next = 1 / (1/sqrtP + amount0_in/L)
         // 1/sqrtP in Q64.64: inv_sqrt = Q64^2 / sqrtP
@@ -991,7 +990,7 @@ pub async fn quote_exact_in(
         let inv_sqrt_next = inv_sqrt + delta;
         let sqrt_p_next = (Q64 * Q64) / inv_sqrt_next;
         // amount1_out = L * (sqrtP - sqrtP_next) / Q64
-        amount_out_u128 = (l * (sqrt_p.saturating_sub(sqrt_p_next))) / Q64;
+        (l * (sqrt_p.saturating_sub(sqrt_p_next))) / Q64
     } else {
         // token1 in, token0 out
         // sqrtP_next = sqrtP + amount1_in / L
@@ -1002,8 +1001,8 @@ pub async fn quote_exact_in(
         let inv_sqrt = (Q64 * Q64) / sqrt_p;
         let inv_sqrt_next = (Q64 * Q64) / sqrt_p_next;
         // result in token0 units: L * (inv_sqrt - inv_sqrt_next) / Q64
-        amount_out_u128 = (l * inv_sqrt.saturating_sub(inv_sqrt_next)) / Q64;
-    }
+        (l * inv_sqrt.saturating_sub(inv_sqrt_next)) / Q64
+    };
 
     let amount_out = u64::try_from(amount_out_u128).unwrap_or(u64::MAX);
     Ok(crate::utils::quote::QuoteExactInResult {
