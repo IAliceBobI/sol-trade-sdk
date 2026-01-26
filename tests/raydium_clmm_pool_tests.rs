@@ -221,7 +221,9 @@ async fn test_raydium_clmm_get_pool_by_mint_with_auto_mock() {
     println!("=== 测试：使用 Auto Mock 加速 get_pool_by_mint ===");
 
     // 设置环境变量，限制扫描的 Pool 数量（测试环境优化）
-    unsafe { std::env::set_var("CLMM_POOL_SCAN_LIMIT", "10"); }
+    unsafe {
+        std::env::set_var("CLMM_POOL_SCAN_LIMIT", "10");
+    }
 
     let wsol_mint =
         Pubkey::from_str(WSOL_MINT).unwrap_or_else(|_| panic!("Invalid WSOL mint: {}", WSOL_MINT));
@@ -262,7 +264,9 @@ async fn test_raydium_clmm_get_pool_by_mint_with_auto_mock() {
     println!("✅ 基本字段验证通过");
 
     // 清理环境变量
-    unsafe { std::env::remove_var("CLMM_POOL_SCAN_LIMIT"); }
+    unsafe {
+        std::env::remove_var("CLMM_POOL_SCAN_LIMIT");
+    }
 
     println!("\n=== Auto Mock 测试通过 ===");
     println!("✅ 测试覆盖：");
