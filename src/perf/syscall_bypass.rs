@@ -334,7 +334,7 @@ impl IOOptimizer {
             };
 
             #[cfg(not(target_os = "linux"))]
-            let file = OpenOptions::new().read(true).write(true).create(true).open(file_path)?;
+            let file = OpenOptions::new().read(true).write(true).create(true).truncate(true).open(file_path)?;
 
             let fd = file.as_raw_fd();
 
