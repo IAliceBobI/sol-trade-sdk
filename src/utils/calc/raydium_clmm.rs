@@ -177,73 +177,6 @@ pub fn calculate_swap_amount_simple(
     Ok(state.amount_calculated)
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_tick_conversion() {
-        let tick = 1000;
-        let sqrt_price = get_sqrt_price_at_tick(tick).unwrap();
-        let recovered_tick = get_tick_at_sqrt_price(sqrt_price).unwrap();
-
-        // 允许 ±1 误差（浮点精度）
-        assert!((recovered_tick - tick).abs() <= 1);
-    }
-
-    #[test]
-    fn test_liquidity_delta() {
-        let liquidity = 1000u128;
-
-        // 正增量
-        let result = add_delta(liquidity, 500).unwrap();
-        assert_eq!(result, 1500);
-
-        // 负增量
-        let result = add_delta(liquidity, -300).unwrap();
-        assert_eq!(result, 700);
-    }
-
-    #[test]
-    fn test_compute_swap_step() {
-        // 使用官方测试用例的参数
-        // 从 temp/raydium-clmm/client/src/instructions/utils.rs 中参考
-        let sqrt_price_current = 4295048016u128; // 更小的价格值
-        let sqrt_price_target = 4295148016u128; // 稍高一点
-        let liquidity = 10000000u128; // 适中的流动性
-        let amount_remaining = 1000u64; // 较小的输入
-        let fee_rate = 2500; // 0.25%
-
-        let result = compute_swap_step(
-            sqrt_price_current,
-            sqrt_price_target,
-            liquidity,
-            amount_remaining,
-            fee_rate,
-            true,  // is_base_input
-            false, // zero_for_one = false （价格上涨）
-        );
-
-        if let Err(e) = &result {
-            eprintln!("compute_swap_step error: {}", e);
-        }
-        assert!(result.is_ok(), "compute_swap_step should succeed: {:?}", result.err());
-        let step = result.unwrap();
-
-        // 检查输出结果
-        println!(
-            "amount_in: {}, amount_out: {}, fee_amount: {}, sqrt_price_next: {}",
-            step.amount_in, step.amount_out, step.fee_amount, step.sqrt_price_next_x64
-        );
-
-        // 应该有输出（算法成功执行）
-        assert!(step.sqrt_price_next_x64 > 0, "sqrt_price_next should be positive");
-
-        // 注意：由于流动性和价格范围的关系，amount_in/amount_out 可能为 0
-        // 这里只验证计算不出错
-    }
-}
-
 // ========================================
 // 完整的 tick-by-tick 遍历算法实现
 // ========================================
@@ -440,5 +373,72 @@ fn needs_next_tick_array(
         current_tick < start_index
     } else {
         current_tick >= start_index + ticks_in_array
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_tick_conversion() {
+        let tick = 1000;
+        let sqrt_price = get_sqrt_price_at_tick(tick).unwrap();
+        let recovered_tick = get_tick_at_sqrt_price(sqrt_price).unwrap();
+
+        // 允许 ±1 误差（浮点精度）
+        assert!((recovered_tick - tick).abs() <= 1);
+    }
+
+    #[test]
+    fn test_liquidity_delta() {
+        let liquidity = 1000u128;
+
+        // 正增量
+        let result = add_delta(liquidity, 500).unwrap();
+        assert_eq!(result, 1500);
+
+        // 负增量
+        let result = add_delta(liquidity, -300).unwrap();
+        assert_eq!(result, 700);
+    }
+
+    #[test]
+    fn test_compute_swap_step() {
+        // 使用官方测试用例的参数
+        // 从 temp/raydium-clmm/client/src/instructions/utils.rs 中参考
+        let sqrt_price_current = 4295048016u128; // 更小的价格值
+        let sqrt_price_target = 4295148016u128; // 稍高一点
+        let liquidity = 10000000u128; // 适中的流动性
+        let amount_remaining = 1000u64; // 较小的输入
+        let fee_rate = 2500; // 0.25%
+
+        let result = compute_swap_step(
+            sqrt_price_current,
+            sqrt_price_target,
+            liquidity,
+            amount_remaining,
+            fee_rate,
+            true,  // is_base_input
+            false, // zero_for_one = false （价格上涨）
+        );
+
+        if let Err(e) = &result {
+            eprintln!("compute_swap_step error: {}", e);
+        }
+        assert!(result.is_ok(), "compute_swap_step should succeed: {:?}", result.err());
+        let step = result.unwrap();
+
+        // 检查输出结果
+        println!(
+            "amount_in: {}, amount_out: {}, fee_amount: {}, sqrt_price_next: {}",
+            step.amount_in, step.amount_out, step.fee_amount, step.sqrt_price_next_x64
+        );
+
+        // 应该有输出（算法成功执行）
+        assert!(step.sqrt_price_next_x64 > 0, "sqrt_price_next should be positive");
+
+        // 注意：由于流动性和价格范围的关系，amount_in/amount_out 可能为 0
+        // 这里只验证计算不出错
     }
 }

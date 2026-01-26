@@ -252,6 +252,19 @@ pub fn get_known_token_symbol(mint: &Pubkey) -> String {
     }
 }
 
+use std::str::FromStr;
+
+#[allow(dead_code)]
+trait PubkeyExt {
+    fn from_str_const(s: &str) -> Self;
+}
+
+impl PubkeyExt for Pubkey {
+    fn from_str_const(s: &str) -> Self {
+        Pubkey::from_str(s).unwrap_or_else(|_| panic!("无效的 Pubkey 常量: '{}'", s))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -404,18 +417,5 @@ mod tests {
         assert_eq!(info1.decimals, info2.decimals);
         assert_eq!(info1.symbol, info2.symbol);
         assert_eq!(info1.is_token2022, info2.is_token2022);
-    }
-}
-
-use std::str::FromStr;
-
-#[allow(dead_code)]
-trait PubkeyExt {
-    fn from_str_const(s: &str) -> Self;
-}
-
-impl PubkeyExt for Pubkey {
-    fn from_str_const(s: &str) -> Self {
-        Pubkey::from_str(s).unwrap_or_else(|_| panic!("无效的 Pubkey 常量: '{}'", s))
     }
 }

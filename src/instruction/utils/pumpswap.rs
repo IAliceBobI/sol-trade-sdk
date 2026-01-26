@@ -873,6 +873,14 @@ pub async fn get_token_price_in_usd_with_pool<T: PoolRpcClient + ?Sized>(
     Ok(price_x_in_wsol * price_wsol_in_usd)
 }
 
+#[inline]
+pub fn get_fee_config_pda() -> Option<Pubkey> {
+    let seeds: &[&[u8]; 2] = &[seeds::FEE_CONFIG_SEED, accounts::AMM_PROGRAM.as_ref()];
+    let program_id: &Pubkey = &accounts::FEE_PROGRAM;
+    let pda: Option<(Pubkey, u8)> = Pubkey::try_find_program_address(seeds, program_id);
+    pda.map(|pubkey| pubkey.0)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -896,12 +904,4 @@ mod tests {
         assert_eq!(usdc_price, 1.0);
         assert_eq!(usdt_price, 1.0);
     }
-}
-
-#[inline]
-pub fn get_fee_config_pda() -> Option<Pubkey> {
-    let seeds: &[&[u8]; 2] = &[seeds::FEE_CONFIG_SEED, accounts::AMM_PROGRAM.as_ref()];
-    let program_id: &Pubkey = &accounts::FEE_PROGRAM;
-    let pda: Option<(Pubkey, u8)> = Pubkey::try_find_program_address(seeds, program_id);
-    pda.map(|pubkey| pubkey.0)
 }
