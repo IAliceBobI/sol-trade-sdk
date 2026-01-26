@@ -88,7 +88,9 @@ impl TradingInfrastructure {
         ));
 
         // Initialize rent cache and start background updater
-        common::seed::update_rents(&rpc).await.unwrap();
+        common::seed::update_rents(&rpc)
+            .await
+            .expect("Failed to initialize rent cache - this is required for trading operations");
         common::seed::start_rent_updater(rpc.clone());
 
         // Create SWQOS clients with blacklist checking
@@ -282,7 +284,10 @@ impl TradingClient {
     /// Returns a configured `SolTradingSDK` instance ready for trading operations
     #[inline]
     pub async fn new(payer: Arc<Keypair>, trade_config: TradeConfig) -> Self {
-        crate::common::fast_fn::fast_init(&payer.try_pubkey().unwrap());
+        let pubkey = payer
+            .try_pubkey()
+            .expect("Failed to get pubkey from keypair - this should never happen");
+        crate::common::fast_fn::fast_init(&pubkey);
 
         if CryptoProvider::get_default().is_none() {
             let _ = default_provider()
@@ -308,7 +313,9 @@ impl TradingClient {
 
         let rpc =
             Arc::new(SolanaRpcClient::new_with_commitment(rpc_url.clone(), commitment.clone()));
-        common::seed::update_rents(&rpc).await.unwrap();
+        common::seed::update_rents(&rpc)
+            .await
+            .expect("Failed to initialize rent cache - this is required for trading operations");
         common::seed::start_rent_updater(rpc.clone());
 
         // 🔧 初始化WSOL ATA：如果配置为启动时创建，则检查并创建
@@ -337,7 +344,10 @@ impl TradingClient {
                     if !create_ata_ixs.is_empty() {
                         // 构建并发送交易
                         use solana_sdk::transaction::Transaction;
-                        let recent_blockhash = rpc.get_latest_blockhash().await.unwrap();
+                        let recent_blockhash = rpc
+                            .get_latest_blockhash()
+                            .await
+                            .expect("Failed to get recent blockhash - cannot create WSOL ATA without it");
                         let tx = Transaction::new_signed_with_payer(
                             &create_ata_ixs,
                             Some(&payer.pubkey()),
