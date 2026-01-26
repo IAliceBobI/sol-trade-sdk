@@ -3,6 +3,25 @@ use arc_swap::ArcSwap;
 use std::collections::HashMap;
 use std::sync::Arc;
 
+/// Gas 策略的键类型：由 (SWQOS 类型, 交易类型, 策略类型) 组成
+type GasStrategyKey = (SwqosType, TradeType, GasFeeStrategyType);
+
+/// Gas 策略映射类型
+type GasStrategyMap = HashMap<GasStrategyKey, GasFeeStrategyValue>;
+
+/// 线程安全的 Gas 策略存储类型
+type GasStrategyStorage = Arc<ArcSwap<GasStrategyMap>>;
+
+/// 高低费率策略参数
+#[derive(Debug, Clone, Copy)]
+pub struct HighLowFeeParams {
+    pub cu_limit: u32,
+    pub low_cu_price: u64,
+    pub high_cu_price: u64,
+    pub low_tip: f64,
+    pub high_tip: f64,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum GasFeeStrategyType {
     Normal,
@@ -25,8 +44,7 @@ pub struct GasFeeStrategyValue {
 
 #[derive(Clone)]
 pub struct GasFeeStrategy {
-    strategies:
-        Arc<ArcSwap<HashMap<(SwqosType, TradeType, GasFeeStrategyType), GasFeeStrategyValue>>>,
+    strategies: GasStrategyStorage,
 }
 
 impl Default for GasFeeStrategy {
@@ -96,12 +114,16 @@ impl GasFeeStrategy {
         &self,
         swqos_types: &[SwqosType],
         trade_type: TradeType,
-        cu_limit: u32,
-        low_cu_price: u64,
-        high_cu_price: u64,
-        low_tip: f64,
-        high_tip: f64,
+        params: HighLowFeeParams,
     ) {
+        let HighLowFeeParams {
+            cu_limit,
+            low_cu_price,
+            high_cu_price,
+            low_tip,
+            high_tip,
+        } = params;
+
         for swqos_type in swqos_types {
             self.del(*swqos_type, trade_type, GasFeeStrategyType::Normal);
             self.set(
@@ -129,15 +151,19 @@ impl GasFeeStrategy {
         &self,
         swqos_type: SwqosType,
         trade_type: TradeType,
-        cu_limit: u32,
-        low_cu_price: u64,
-        high_cu_price: u64,
-        low_tip: f64,
-        high_tip: f64,
+        params: HighLowFeeParams,
     ) {
         if swqos_type.eq(&SwqosType::Default) {
             return;
         }
+        let HighLowFeeParams {
+            cu_limit,
+            low_cu_price,
+            high_cu_price,
+            low_tip,
+            high_tip,
+        } = params;
+
         self.del(swqos_type, trade_type, GasFeeStrategyType::Normal);
         self.set(
             swqos_type,

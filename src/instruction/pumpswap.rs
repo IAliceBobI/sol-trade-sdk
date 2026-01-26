@@ -41,7 +41,7 @@ impl InstructionBuilder for PumpSwapInstructionBuilder {
         // 如果设置了 fixed_output_amount，则跳过 input_amount 为 0 的检查
         // 并使用 fixed_output_amount 进行逆向计算
         let has_fixed_output = params.fixed_output_amount.is_some();
-        if !has_fixed_output && params.input_amount.map_or(true, |a| a == 0) {
+        if !has_fixed_output && params.input_amount.is_none_or(|a| a == 0) {
             return Err(anyhow!("Amount cannot be zero"));
         }
 

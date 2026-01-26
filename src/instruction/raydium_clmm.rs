@@ -545,7 +545,7 @@ impl InstructionBuilder for RaydiumClmmInstructionBuilder {
             .ok_or_else(|| anyhow!("Invalid protocol params for RaydiumClmm"))?;
 
         // 🔧 修复：改进 Option 检查的清晰度
-        if params.input_amount.map_or(true, |a| a == 0) {
+        if params.input_amount.is_none_or(|a| a == 0) {
             return Err(anyhow!("Token amount is not set"));
         }
 

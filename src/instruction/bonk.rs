@@ -198,7 +198,7 @@ impl InstructionBuilder for BonkInstructionBuilder {
 
         // 🔧 修复：改进 Option 检查的清晰度
         let mut amount = params.input_amount;
-        if amount.map_or(true, |a| a == 0) {
+        if amount.is_none_or(|a| a == 0) {
             let balance_u64 =
                 get_token_balance(rpc.as_ref(), &params.payer.pubkey(), &params.input_mint).await?;
             amount = Some(balance_u64);

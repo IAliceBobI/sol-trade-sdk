@@ -63,19 +63,45 @@ pub struct BondingCurveAccount {
     pub is_mayhem_mode: bool,
 }
 
+/// Dev 交易参数
+#[derive(Debug, Clone)]
+pub struct DevTradeParams {
+    pub bonding_curve: Pubkey,
+    pub mint: Pubkey,
+    pub dev_token_amount: u64,
+    pub dev_sol_amount: u64,
+    pub creator: Pubkey,
+    pub is_mayhem_mode: bool,
+}
+
+/// 交易参数
+#[derive(Debug, Clone)]
+pub struct TradeParams {
+    pub bonding_curve: Pubkey,
+    pub mint: Pubkey,
+    pub creator: Pubkey,
+    pub virtual_token_reserves: u64,
+    pub virtual_sol_reserves: u64,
+    pub real_token_reserves: u64,
+    pub real_sol_reserves: u64,
+    pub is_mayhem_mode: bool,
+}
+
 impl BondingCurveAccount {
-    pub fn from_dev_trade(
-        bonding_curve: Pubkey,
-        mint: &Pubkey,
-        dev_token_amount: u64,
-        dev_sol_amount: u64,
-        creator: Pubkey,
-        is_mayhem_mode: bool,
-    ) -> Result<Self> {
+    pub fn from_dev_trade(params: DevTradeParams) -> Result<Self> {
+        let DevTradeParams {
+            bonding_curve,
+            mint,
+            dev_token_amount,
+            dev_sol_amount,
+            creator,
+            is_mayhem_mode,
+        } = params;
+
         let account = if bonding_curve != Pubkey::default() {
             bonding_curve
         } else {
-            get_bonding_curve_pda(mint)
+            get_bonding_curve_pda(&mint)
                 .ok_or_else(|| anyhow!("无法派生 bonding curve PDA，mint 地址: {}", mint))?
         };
         Ok(Self {
@@ -92,16 +118,18 @@ impl BondingCurveAccount {
         })
     }
 
-    pub fn from_trade(
-        bonding_curve: Pubkey,
-        mint: Pubkey,
-        creator: Pubkey,
-        virtual_token_reserves: u64,
-        virtual_sol_reserves: u64,
-        real_token_reserves: u64,
-        real_sol_reserves: u64,
-        is_mayhem_mode: bool,
-    ) -> Result<Self> {
+    pub fn from_trade(params: TradeParams) -> Result<Self> {
+        let TradeParams {
+            bonding_curve,
+            mint,
+            creator,
+            virtual_token_reserves,
+            virtual_sol_reserves,
+            real_token_reserves,
+            real_sol_reserves,
+            is_mayhem_mode,
+        } = params;
+
         let account = if bonding_curve != Pubkey::default() {
             bonding_curve
         } else {

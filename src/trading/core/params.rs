@@ -129,12 +129,14 @@ impl PumpFunParams {
     ) -> Result<Self> {
         let is_mayhem_mode = fee_recipient == MAYHEM_FEE_RECIPIENT;
         let bonding_curve_account = BondingCurveAccount::from_dev_trade(
-            bonding_curve,
-            &mint,
-            token_amount,
-            max_sol_cost,
-            creator,
-            is_mayhem_mode,
+            crate::common::bonding_curve::DevTradeParams {
+                bonding_curve,
+                mint,
+                dev_token_amount: token_amount,
+                dev_sol_amount: max_sol_cost,
+                creator,
+                is_mayhem_mode,
+            }
         )?;
         Ok(Self {
             bonding_curve: Arc::new(bonding_curve_account),
@@ -161,14 +163,16 @@ impl PumpFunParams {
     ) -> Result<Self> {
         let is_mayhem_mode = fee_recipient == MAYHEM_FEE_RECIPIENT;
         let bonding_curve = BondingCurveAccount::from_trade(
-            bonding_curve,
-            mint,
-            creator,
-            virtual_token_reserves,
-            virtual_sol_reserves,
-            real_token_reserves,
-            real_sol_reserves,
-            is_mayhem_mode,
+            crate::common::bonding_curve::TradeParams {
+                bonding_curve,
+                mint,
+                creator,
+                virtual_token_reserves,
+                virtual_sol_reserves,
+                real_token_reserves,
+                real_sol_reserves,
+                is_mayhem_mode,
+            }
         )?;
         Ok(Self {
             bonding_curve: Arc::new(bonding_curve),

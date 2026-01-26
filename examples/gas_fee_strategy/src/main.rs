@@ -1,5 +1,5 @@
 use sol_trade_sdk::{
-    common::gas_fee_strategy::GasFeeStrategy,
+    common::gas_fee_strategy::{GasFeeStrategy, HighLowFeeParams},
     swqos::{SwqosType, TradeType},
 };
 
@@ -37,11 +37,13 @@ async fn main() {
     gas_fee_strategy.set_high_low_fee_strategy(
         SwqosType::Jito,
         TradeType::Buy,
-        150000,         // cu_limit
-        100,            // low cu_price
-        10 * 1_000_000, // high cu_price
-        0.001,          // low tip
-        0.1,            // high tip
+        HighLowFeeParams {
+            cu_limit: 150000,
+            low_cu_price: 100,
+            high_cu_price: 10 * 1_000_000,
+            low_tip: 0.001,
+            high_tip: 0.1,
+        },
     );
 
     // Print all strategies
