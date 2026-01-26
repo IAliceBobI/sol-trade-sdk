@@ -200,15 +200,15 @@ impl ZeroCopyBlock {
 
     /// 获取只读切片
     #[inline(always)]
-    pub unsafe fn as_slice(&self) -> &[u8] { unsafe {
-        slice::from_raw_parts(self.ptr.as_ptr(), self.size)
-    }}
+    pub unsafe fn as_slice(&self) -> &[u8] {
+        unsafe { slice::from_raw_parts(self.ptr.as_ptr(), self.size) }
+    }
 
     /// 获取可变切片
     #[inline(always)]
-    pub unsafe fn as_mut_slice(&mut self) -> &mut [u8] { unsafe {
-        slice::from_raw_parts_mut(self.ptr.as_ptr(), self.size)
-    }}
+    pub unsafe fn as_mut_slice(&mut self) -> &mut [u8] {
+        unsafe { slice::from_raw_parts_mut(self.ptr.as_ptr(), self.size) }
+    }
 
     /// 获取块大小
     #[inline(always)]

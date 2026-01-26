@@ -44,269 +44,293 @@ impl SIMDMemoryOps {
 
     /// 小数据拷贝优化 (1-8字节)
     #[inline(always)]
-    unsafe fn memcpy_small(dst: *mut u8, src: *const u8, len: usize) { unsafe {
-        match len {
-            1 => *dst = *src,
-            2 => *(dst as *mut u16) = *(src as *const u16),
-            3 => {
-                *(dst as *mut u16) = *(src as *const u16);
-                *dst.add(2) = *src.add(2);
-            },
-            4 => *(dst as *mut u32) = *(src as *const u32),
-            5..=8 => {
-                *(dst as *mut u64) = *(src as *const u64);
-                if len > 8 {
-                    ptr::copy_nonoverlapping(src.add(8), dst.add(8), len - 8);
-                }
-            },
-            _ => unreachable!(),
+    unsafe fn memcpy_small(dst: *mut u8, src: *const u8, len: usize) {
+        unsafe {
+            match len {
+                1 => *dst = *src,
+                2 => *(dst as *mut u16) = *(src as *const u16),
+                3 => {
+                    *(dst as *mut u16) = *(src as *const u16);
+                    *dst.add(2) = *src.add(2);
+                },
+                4 => *(dst as *mut u32) = *(src as *const u32),
+                5..=8 => {
+                    *(dst as *mut u64) = *(src as *const u64);
+                    if len > 8 {
+                        ptr::copy_nonoverlapping(src.add(8), dst.add(8), len - 8);
+                    }
+                },
+                _ => unreachable!(),
+            }
         }
-    }}
+    }
 
     /// SSE优化拷贝 (9-16字节)
     #[inline(always)]
-    unsafe fn memcpy_sse(dst: *mut u8, src: *const u8, len: usize) { unsafe {
-        #[cfg(target_arch = "x86_64")]
-        {
-            use std::arch::x86_64::{__m128i, _mm_loadu_si128, _mm_storeu_si128};
+    unsafe fn memcpy_sse(dst: *mut u8, src: *const u8, len: usize) {
+        unsafe {
+            #[cfg(target_arch = "x86_64")]
+            {
+                use std::arch::x86_64::{__m128i, _mm_loadu_si128, _mm_storeu_si128};
 
-            if len <= 16 {
-                let chunk = _mm_loadu_si128(src as *const __m128i);
-                _mm_storeu_si128(dst as *mut __m128i, chunk);
+                if len <= 16 {
+                    let chunk = _mm_loadu_si128(src as *const __m128i);
+                    _mm_storeu_si128(dst as *mut __m128i, chunk);
+                }
+            }
+
+            #[cfg(not(target_arch = "x86_64"))]
+            {
+                ptr::copy_nonoverlapping(src, dst, len);
             }
         }
-
-        #[cfg(not(target_arch = "x86_64"))]
-        {
-            ptr::copy_nonoverlapping(src, dst, len);
-        }
-    }}
+    }
 
     /// AVX优化拷贝 (17-32字节)
     #[inline(always)]
-    unsafe fn memcpy_avx(dst: *mut u8, src: *const u8, len: usize) { unsafe {
-        #[cfg(target_arch = "x86_64")]
-        {
-            use std::arch::x86_64::{__m256i, _mm256_loadu_si256, _mm256_storeu_si256};
+    unsafe fn memcpy_avx(dst: *mut u8, src: *const u8, len: usize) {
+        unsafe {
+            #[cfg(target_arch = "x86_64")]
+            {
+                use std::arch::x86_64::{__m256i, _mm256_loadu_si256, _mm256_storeu_si256};
 
-            if len <= 32 {
-                let chunk = _mm256_loadu_si256(src as *const __m256i);
-                _mm256_storeu_si256(dst as *mut __m256i, chunk);
+                if len <= 32 {
+                    let chunk = _mm256_loadu_si256(src as *const __m256i);
+                    _mm256_storeu_si256(dst as *mut __m256i, chunk);
+                }
+            }
+
+            #[cfg(not(target_arch = "x86_64"))]
+            {
+                ptr::copy_nonoverlapping(src, dst, len);
             }
         }
-
-        #[cfg(not(target_arch = "x86_64"))]
-        {
-            ptr::copy_nonoverlapping(src, dst, len);
-        }
-    }}
+    }
 
     /// AVX2优化拷贝 (33-64字节)
     #[inline(always)]
-    unsafe fn memcpy_avx2(dst: *mut u8, src: *const u8, len: usize) { unsafe {
-        #[cfg(target_arch = "x86_64")]
-        {
-            use std::arch::x86_64::{__m256i, _mm256_loadu_si256, _mm256_storeu_si256};
+    unsafe fn memcpy_avx2(dst: *mut u8, src: *const u8, len: usize) {
+        unsafe {
+            #[cfg(target_arch = "x86_64")]
+            {
+                use std::arch::x86_64::{__m256i, _mm256_loadu_si256, _mm256_storeu_si256};
 
-            // 拷贝前32字节
-            let chunk1 = _mm256_loadu_si256(src as *const __m256i);
-            _mm256_storeu_si256(dst as *mut __m256i, chunk1);
+                // 拷贝前32字节
+                let chunk1 = _mm256_loadu_si256(src as *const __m256i);
+                _mm256_storeu_si256(dst as *mut __m256i, chunk1);
 
-            if len > 32 {
-                // 拷贝剩余字节
-                let remaining = len - 32;
-                if remaining <= 32 {
-                    let chunk2 = _mm256_loadu_si256(src.add(32) as *const __m256i);
-                    _mm256_storeu_si256(dst.add(32) as *mut __m256i, chunk2);
+                if len > 32 {
+                    // 拷贝剩余字节
+                    let remaining = len - 32;
+                    if remaining <= 32 {
+                        let chunk2 = _mm256_loadu_si256(src.add(32) as *const __m256i);
+                        _mm256_storeu_si256(dst.add(32) as *mut __m256i, chunk2);
+                    }
                 }
             }
-        }
 
-        #[cfg(not(target_arch = "x86_64"))]
-        {
-            ptr::copy_nonoverlapping(src, dst, len);
+            #[cfg(not(target_arch = "x86_64"))]
+            {
+                ptr::copy_nonoverlapping(src, dst, len);
+            }
         }
-    }}
+    }
 
     /// AVX512或回退拷贝 (>64字节)
     #[inline(always)]
-    unsafe fn memcpy_avx512_or_fallback(dst: *mut u8, src: *const u8, len: usize) { unsafe {
-        #[cfg(all(target_arch = "x86_64", target_feature = "avx512f"))]
-        {
-            use std::arch::x86_64::{__m512i, _mm512_loadu_si512, _mm512_storeu_si512};
+    unsafe fn memcpy_avx512_or_fallback(dst: *mut u8, src: *const u8, len: usize) {
+        unsafe {
+            #[cfg(all(target_arch = "x86_64", target_feature = "avx512f"))]
+            {
+                use std::arch::x86_64::{__m512i, _mm512_loadu_si512, _mm512_storeu_si512};
 
-            let chunks = len / 64;
-            let mut offset = 0;
+                let chunks = len / 64;
+                let mut offset = 0;
 
-            // 使用AVX512处理64字节块
-            for _ in 0..chunks {
-                let chunk = _mm512_loadu_si512(src.add(offset) as *const __m512i);
-                _mm512_storeu_si512(dst.add(offset) as *mut __m512i, chunk);
-                offset += 64;
+                // 使用AVX512处理64字节块
+                for _ in 0..chunks {
+                    let chunk = _mm512_loadu_si512(src.add(offset) as *const __m512i);
+                    _mm512_storeu_si512(dst.add(offset) as *mut __m512i, chunk);
+                    offset += 64;
+                }
+
+                // 处理剩余字节
+                let remaining = len % 64;
+                if remaining > 0 {
+                    Self::memcpy_avx2(dst.add(offset), src.add(offset), remaining);
+                }
             }
 
-            // 处理剩余字节
-            let remaining = len % 64;
-            if remaining > 0 {
-                Self::memcpy_avx2(dst.add(offset), src.add(offset), remaining);
+            #[cfg(not(all(target_arch = "x86_64", target_feature = "avx512f")))]
+            {
+                // 回退到AVX2分块处理
+                let chunks = len / 32;
+                let mut offset = 0;
+
+                for _ in 0..chunks {
+                    Self::memcpy_avx2(dst.add(offset), src.add(offset), 32);
+                    offset += 32;
+                }
+
+                let remaining = len % 32;
+                if remaining > 0 {
+                    Self::memcpy_avx(dst.add(offset), src.add(offset), remaining);
+                }
             }
         }
-
-        #[cfg(not(all(target_arch = "x86_64", target_feature = "avx512f")))]
-        {
-            // 回退到AVX2分块处理
-            let chunks = len / 32;
-            let mut offset = 0;
-
-            for _ in 0..chunks {
-                Self::memcpy_avx2(dst.add(offset), src.add(offset), 32);
-                offset += 32;
-            }
-
-            let remaining = len % 32;
-            if remaining > 0 {
-                Self::memcpy_avx(dst.add(offset), src.add(offset), remaining);
-            }
-        }
-    }}
+    }
 
     /// 🚀 SIMD加速的内存比较
     #[inline(always)]
-    pub unsafe fn memcmp_simd_optimized(a: *const u8, b: *const u8, len: usize) -> bool { unsafe {
-        match len {
-            0 => true,
-            1..=8 => Self::memcmp_small(a, b, len),
-            9..=16 => Self::memcmp_sse(a, b, len),
-            17..=32 => Self::memcmp_avx2(a, b, len),
-            _ => Self::memcmp_large(a, b, len),
+    pub unsafe fn memcmp_simd_optimized(a: *const u8, b: *const u8, len: usize) -> bool {
+        unsafe {
+            match len {
+                0 => true,
+                1..=8 => Self::memcmp_small(a, b, len),
+                9..=16 => Self::memcmp_sse(a, b, len),
+                17..=32 => Self::memcmp_avx2(a, b, len),
+                _ => Self::memcmp_large(a, b, len),
+            }
         }
-    }}
+    }
 
     /// 小数据比较
     #[inline(always)]
-    unsafe fn memcmp_small(a: *const u8, b: *const u8, len: usize) -> bool { unsafe {
-        match len {
-            1 => *a == *b,
-            2 => {
-                // 使用 unaligned read 避免对齐问题
-                let a_val = (a as *const u16).read_unaligned();
-                let b_val = (b as *const u16).read_unaligned();
-                a_val == b_val
-            },
-            3 => {
-                let a_val = (a as *const u16).read_unaligned();
-                let b_val = (b as *const u16).read_unaligned();
-                a_val == b_val && *a.add(2) == *b.add(2)
-            },
-            4 => {
-                let a_val = (a as *const u32).read_unaligned();
-                let b_val = (b as *const u32).read_unaligned();
-                a_val == b_val
-            },
-            5..=8 => {
-                let a_val = (a as *const u64).read_unaligned();
-                let b_val = (b as *const u64).read_unaligned();
-                a_val == b_val
-            },
-            _ => unreachable!(),
+    unsafe fn memcmp_small(a: *const u8, b: *const u8, len: usize) -> bool {
+        unsafe {
+            match len {
+                1 => *a == *b,
+                2 => {
+                    // 使用 unaligned read 避免对齐问题
+                    let a_val = (a as *const u16).read_unaligned();
+                    let b_val = (b as *const u16).read_unaligned();
+                    a_val == b_val
+                },
+                3 => {
+                    let a_val = (a as *const u16).read_unaligned();
+                    let b_val = (b as *const u16).read_unaligned();
+                    a_val == b_val && *a.add(2) == *b.add(2)
+                },
+                4 => {
+                    let a_val = (a as *const u32).read_unaligned();
+                    let b_val = (b as *const u32).read_unaligned();
+                    a_val == b_val
+                },
+                5..=8 => {
+                    let a_val = (a as *const u64).read_unaligned();
+                    let b_val = (b as *const u64).read_unaligned();
+                    a_val == b_val
+                },
+                _ => unreachable!(),
+            }
         }
-    }}
+    }
 
     /// SSE比较
     #[inline(always)]
-    unsafe fn memcmp_sse(a: *const u8, b: *const u8, len: usize) -> bool { unsafe {
-        #[cfg(target_arch = "x86_64")]
-        {
-            use std::arch::x86_64::{__m128i, _mm_cmpeq_epi8, _mm_loadu_si128, _mm_movemask_epi8};
+    unsafe fn memcmp_sse(a: *const u8, b: *const u8, len: usize) -> bool {
+        unsafe {
+            #[cfg(target_arch = "x86_64")]
+            {
+                use std::arch::x86_64::{
+                    __m128i, _mm_cmpeq_epi8, _mm_loadu_si128, _mm_movemask_epi8,
+                };
 
-            let chunk_a = _mm_loadu_si128(a as *const __m128i);
-            let chunk_b = _mm_loadu_si128(b as *const __m128i);
-            let cmp_result = _mm_cmpeq_epi8(chunk_a, chunk_b);
-            let mask = _mm_movemask_epi8(cmp_result) as u32;
+                let chunk_a = _mm_loadu_si128(a as *const __m128i);
+                let chunk_b = _mm_loadu_si128(b as *const __m128i);
+                let cmp_result = _mm_cmpeq_epi8(chunk_a, chunk_b);
+                let mask = _mm_movemask_epi8(cmp_result) as u32;
 
-            // 检查前len字节是否相等
-            let valid_mask = if len >= 16 { 0xFFFF } else { (1u32 << len) - 1 };
-            (mask & valid_mask) == valid_mask
+                // 检查前len字节是否相等
+                let valid_mask = if len >= 16 { 0xFFFF } else { (1u32 << len) - 1 };
+                (mask & valid_mask) == valid_mask
+            }
+
+            #[cfg(not(target_arch = "x86_64"))]
+            {
+                (0..len).all(|i| *a.add(i) == *b.add(i))
+            }
         }
-
-        #[cfg(not(target_arch = "x86_64"))]
-        {
-            (0..len).all(|i| *a.add(i) == *b.add(i))
-        }
-    }}
+    }
 
     /// AVX2比较
     #[inline(always)]
-    unsafe fn memcmp_avx2(a: *const u8, b: *const u8, len: usize) -> bool { unsafe {
-        #[cfg(target_arch = "x86_64")]
-        {
-            use std::arch::x86_64::{
-                __m256i, _mm256_cmpeq_epi8, _mm256_loadu_si256, _mm256_movemask_epi8,
-            };
+    unsafe fn memcmp_avx2(a: *const u8, b: *const u8, len: usize) -> bool {
+        unsafe {
+            #[cfg(target_arch = "x86_64")]
+            {
+                use std::arch::x86_64::{
+                    __m256i, _mm256_cmpeq_epi8, _mm256_loadu_si256, _mm256_movemask_epi8,
+                };
 
-            let chunk_a = _mm256_loadu_si256(a as *const __m256i);
-            let chunk_b = _mm256_loadu_si256(b as *const __m256i);
-            let cmp_result = _mm256_cmpeq_epi8(chunk_a, chunk_b);
-            let mask = _mm256_movemask_epi8(cmp_result) as u32;
+                let chunk_a = _mm256_loadu_si256(a as *const __m256i);
+                let chunk_b = _mm256_loadu_si256(b as *const __m256i);
+                let cmp_result = _mm256_cmpeq_epi8(chunk_a, chunk_b);
+                let mask = _mm256_movemask_epi8(cmp_result) as u32;
 
-            let valid_mask = if len >= 32 { 0xFFFFFFFF } else { (1u32 << len) - 1 };
-            (mask & valid_mask) == valid_mask
+                let valid_mask = if len >= 32 { 0xFFFFFFFF } else { (1u32 << len) - 1 };
+                (mask & valid_mask) == valid_mask
+            }
+
+            #[cfg(not(target_arch = "x86_64"))]
+            {
+                (0..len).all(|i| *a.add(i) == *b.add(i))
+            }
         }
-
-        #[cfg(not(target_arch = "x86_64"))]
-        {
-            (0..len).all(|i| *a.add(i) == *b.add(i))
-        }
-    }}
+    }
 
     /// 大数据比较
     #[inline(always)]
-    unsafe fn memcmp_large(a: *const u8, b: *const u8, len: usize) -> bool { unsafe {
-        let chunks = len / 32;
+    unsafe fn memcmp_large(a: *const u8, b: *const u8, len: usize) -> bool {
+        unsafe {
+            let chunks = len / 32;
 
-        for i in 0..chunks {
-            let offset = i * 32;
-            if !Self::memcmp_avx2(a.add(offset), b.add(offset), 32) {
-                return false;
+            for i in 0..chunks {
+                let offset = i * 32;
+                if !Self::memcmp_avx2(a.add(offset), b.add(offset), 32) {
+                    return false;
+                }
             }
-        }
 
-        let remaining = len % 32;
-        if remaining > 0 {
-            return Self::memcmp_avx2(a.add(chunks * 32), b.add(chunks * 32), remaining);
-        }
+            let remaining = len % 32;
+            if remaining > 0 {
+                return Self::memcmp_avx2(a.add(chunks * 32), b.add(chunks * 32), remaining);
+            }
 
-        true
-    }}
+            true
+        }
+    }
 
     /// 🚀 SIMD加速的内存清零
     #[inline(always)]
-    pub unsafe fn memzero_simd_optimized(ptr: *mut u8, len: usize) { unsafe {
-        #[cfg(target_arch = "x86_64")]
-        {
-            use std::arch::x86_64::{__m256i, _mm256_setzero_si256, _mm256_storeu_si256};
+    pub unsafe fn memzero_simd_optimized(ptr: *mut u8, len: usize) {
+        unsafe {
+            #[cfg(target_arch = "x86_64")]
+            {
+                use std::arch::x86_64::{__m256i, _mm256_setzero_si256, _mm256_storeu_si256};
 
-            let zero = _mm256_setzero_si256();
-            let chunks = len / 32;
-            let mut offset = 0;
+                let zero = _mm256_setzero_si256();
+                let chunks = len / 32;
+                let mut offset = 0;
 
-            for _ in 0..chunks {
-                _mm256_storeu_si256(ptr.add(offset) as *mut __m256i, zero);
-                offset += 32;
+                for _ in 0..chunks {
+                    _mm256_storeu_si256(ptr.add(offset) as *mut __m256i, zero);
+                    offset += 32;
+                }
+
+                // 处理剩余字节
+                let remaining = len % 32;
+                for i in 0..remaining {
+                    *ptr.add(offset + i) = 0;
+                }
             }
 
-            // 处理剩余字节
-            let remaining = len % 32;
-            for i in 0..remaining {
-                *ptr.add(offset + i) = 0;
+            #[cfg(not(target_arch = "x86_64"))]
+            {
+                ptr::write_bytes(ptr, 0, len);
             }
         }
-
-        #[cfg(not(target_arch = "x86_64"))]
-        {
-            ptr::write_bytes(ptr, 0, len);
-        }
-    }}
+    }
 }
 
 /// 🚀 缓存行对齐的原子计数器

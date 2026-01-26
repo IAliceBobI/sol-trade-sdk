@@ -615,9 +615,10 @@ impl SystemCallBypassManager {
                 interval.tick().await;
 
                 if let Ok(processed) = processor.execute_batch().await
-                    && processed > 0 {
-                        stats.syscalls_bypassed.fetch_add(processed as u64, Ordering::Relaxed);
-                    }
+                    && processed > 0
+                {
+                    stats.syscalls_bypassed.fetch_add(processed as u64, Ordering::Relaxed);
+                }
             }
         });
 
