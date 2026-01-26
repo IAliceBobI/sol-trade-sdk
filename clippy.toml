@@ -1,0 +1,7 @@
+# Clippy 配置
+# 允许测试中使用 unwrap 和 expect
+allow-expect-in-tests = true
+allow-unwrap-in-tests = true
+
+# 禁用的方法（可以在这里添加不应该使用的方法）
+disallowed-methods = []
