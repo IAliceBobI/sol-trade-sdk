@@ -28,7 +28,7 @@ async fn test_auto_mock_get_pool_account() {
     // 创建 Auto Mock RPC 客户端（使用独立命名空间）
     let client = AutoMockRpcClient::new_with_namespace(
         "http://127.0.0.1:8899".to_string(),
-        Some("auto_mock_pool_tests".to_string())
+        Some("auto_mock_pool_tests".to_string()),
     );
 
     let pool_address = Pubkey::from_str(WSOL_USDC_POOL).unwrap();
@@ -66,7 +66,7 @@ async fn test_auto_mock_get_program_accounts() {
     // 创建 Auto Mock RPC 客户端（使用独立命名空间避免与其他测试冲突）
     let client = AutoMockRpcClient::new_with_namespace(
         "http://127.0.0.1:8899".to_string(),
-        Some("auto_mock_pool_tests".to_string())
+        Some("auto_mock_pool_tests".to_string()),
     );
 
     let program_id = Pubkey::from_str(RAYDIUM_AMM_V4).unwrap();
@@ -77,7 +77,7 @@ async fn test_auto_mock_get_program_accounts() {
 
     // 配置过滤器：查询 WSOL 作为 coin_mint 的 Pool
     let filters = vec![
-        RpcFilterType::DataSize(752),  // AMM_INFO_SIZE
+        RpcFilterType::DataSize(752), // AMM_INFO_SIZE
         RpcFilterType::Memcmp(Memcmp::new_base58_encoded(400, &wsol_mint.to_bytes())),
     ];
 
@@ -95,10 +95,7 @@ async fn test_auto_mock_get_program_accounts() {
 
     // 首次运行：从 RPC 获取并保存（约 10-30 秒，取决于 Pool 数量）
     // 后续运行：从缓存加载（约 0.01 秒）
-    let accounts = client
-        .get_program_ui_accounts_with_config(&program_id, config)
-        .await
-        .unwrap();
+    let accounts = client.get_program_ui_accounts_with_config(&program_id, config).await.unwrap();
 
     println!("✅ 查询成功! 找到 {} 个 WSOL Pool", accounts.len());
 
@@ -124,7 +121,7 @@ async fn test_auto_mock_cache_mechanism() {
 
     let client = AutoMockRpcClient::new_with_namespace(
         "http://127.0.0.1:8899".to_string(),
-        Some("auto_mock_pool_tests".to_string())
+        Some("auto_mock_pool_tests".to_string()),
     );
     let pool_address = Pubkey::from_str(WSOL_USDC_POOL).unwrap();
 
@@ -166,7 +163,7 @@ fn test_auto_mock_check_data_exists() {
 
     let client = AutoMockRpcClient::new_with_namespace(
         "http://127.0.0.1:8899".to_string(),
-        Some("auto_mock_pool_tests".to_string())
+        Some("auto_mock_pool_tests".to_string()),
     );
     let pool_address = Pubkey::from_str(WSOL_USDC_POOL).unwrap();
 

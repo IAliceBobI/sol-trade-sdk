@@ -2,9 +2,8 @@ use solana_sdk::{pubkey::Pubkey, signature::Keypair, signer::Signer, transaction
 use solana_system_interface::instruction::transfer;
 
 use crate::common::{
-    auto_mock_rpc::PoolRpcClient,
-    fast_fn::get_associated_token_address_with_program_id_fast, spl_token::close_account,
-    SolanaRpcClient,
+    auto_mock_rpc::PoolRpcClient, fast_fn::get_associated_token_address_with_program_id_fast,
+    spl_token::close_account, SolanaRpcClient,
 };
 use anyhow::anyhow;
 
@@ -17,9 +16,13 @@ pub async fn get_multi_token_balances_with_client<T: PoolRpcClient + ?Sized>(
     token0_vault: &Pubkey,
     token1_vault: &Pubkey,
 ) -> Result<(u64, u64), anyhow::Error> {
-    let token0_balance = rpc.get_token_account_balance(&token0_vault).await
+    let token0_balance = rpc
+        .get_token_account_balance(&token0_vault)
+        .await
         .map_err(|e| anyhow!("Failed to get token0 balance: {}", e))?;
-    let token1_balance = rpc.get_token_account_balance(&token1_vault).await
+    let token1_balance = rpc
+        .get_token_account_balance(&token1_vault)
+        .await
         .map_err(|e| anyhow!("Failed to get token1 balance: {}", e))?;
     // Parse balance string to u64
     let token0_amount = token0_balance

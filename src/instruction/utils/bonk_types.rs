@@ -153,36 +153,36 @@ pub struct PoolState {
     pub mercanti_fee: FixedPoint,     // 328: Mercanti fee
     pub farm_count: u64,              // 336: Farm count
     pub bump: u8,                     // 344: Bump seed
-    
+
     // Old field names (for backward compatibility - calculated values)
     #[serde(skip)]
-    pub base_mint: Pubkey,            // Alias for token_x
+    pub base_mint: Pubkey, // Alias for token_x
     #[serde(skip)]
-    pub quote_mint: Pubkey,           // Alias for token_y
+    pub quote_mint: Pubkey, // Alias for token_y
     #[serde(skip)]
-    pub base_vault: Pubkey,           // Alias for pool_x_account
+    pub base_vault: Pubkey, // Alias for pool_x_account
     #[serde(skip)]
-    pub quote_vault: Pubkey,          // Alias for pool_y_account
+    pub quote_vault: Pubkey, // Alias for pool_y_account
     #[serde(skip)]
-    pub creator: Pubkey,              // Alias for admin
+    pub creator: Pubkey, // Alias for admin
     #[serde(skip)]
-    pub platform_config: Pubkey,      // Alias for project_owner
+    pub platform_config: Pubkey, // Alias for project_owner
     #[serde(skip)]
-    pub global_config: Pubkey,        // Alias for admin
+    pub global_config: Pubkey, // Alias for admin
     #[serde(skip)]
-    pub virtual_base: u128,           // Calculated: K / y
+    pub virtual_base: u128, // Calculated: K / y
     #[serde(skip)]
-    pub virtual_quote: u128,          // Calculated: price * x
+    pub virtual_quote: u128, // Calculated: price * x
     #[serde(skip)]
-    pub real_base: u64,               // Alias for token_x_reserve.v
+    pub real_base: u64, // Alias for token_x_reserve.v
     #[serde(skip)]
-    pub real_quote: u64,              // Alias for token_y_reserve.v
+    pub real_quote: u64, // Alias for token_y_reserve.v
     #[serde(skip)]
-    pub supply: u64,                  // Alias for all_shares.v
+    pub supply: u64, // Alias for all_shares.v
     #[serde(skip)]
-    pub total_base_sell: u64,         // Not available in new format
+    pub total_base_sell: u64, // Not available in new format
     #[serde(skip)]
-    pub status: u8,                   // Not available in new format
+    pub status: u8, // Not available in new format
 }
 
 impl PoolState {
@@ -199,7 +199,7 @@ impl PoolState {
         self.real_base = self.token_x_reserve.v;
         self.real_quote = self.token_y_reserve.v;
         self.supply = self.all_shares.v;
-        
+
         // Calculate virtual reserves from K and price
         // K = x * y (constant product)
         // virtual_x = K / y, virtual_y = price * x (with 10^12 precision)
@@ -258,10 +258,10 @@ impl borsh::BorshDeserialize for PoolState {
             total_base_sell: 0,
             status: 0,
         };
-        
+
         // Update backward compatibility fields
         state.update_compat_fields();
-        
+
         Ok(state)
     }
 }
@@ -311,7 +311,7 @@ pub fn pool_state_decode(data: &[u8]) -> Option<PoolState> {
         }
         return None;
     }
-    
+
     // If data is large enough for old format, try it
     pool_state_decode_old(data)
 }
@@ -327,9 +327,9 @@ fn pool_state_decode_old(data: &[u8]) -> Option<PoolState> {
     if data.len() < OLD_POOL_STATE_SIZE {
         return None;
     }
-    
+
     let old: OldPoolState = borsh::from_slice(&data[..OLD_POOL_STATE_SIZE]).ok()?;
-    
+
     // Convert old format to new format
     Some(PoolState {
         token_x: old.base_mint,

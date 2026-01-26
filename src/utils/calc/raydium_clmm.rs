@@ -1,42 +1,35 @@
 // Copyright (c) Raydium Foundation
-// Licensed under Apache 2.0  
+// Licensed under Apache 2.0
 // Raydium CLMM swap calculations using official math libraries
 
 //! Raydium CLMM calculation module
-//! 
+//!
 //! Uses official Raydium CLMM math libraries (clmm_math) for all calculations.
 //! Dependencies: uint = { git = "https://github.com/raydium-io/parity-common", package = "uint" }
 
 // Re-export official libraries for convenience
 pub use super::clmm_math::{
-    tick_math,
-    liquidity_math,
-    sqrt_price_math,
-    fixed_point_64,
-    swap_math,
-    full_math::MulDiv,
-    U128, U256,
+    fixed_point_64, full_math::MulDiv, liquidity_math, sqrt_price_math, swap_math, tick_math, U128,
+    U256,
 };
 
-// Export constants from official libraries  
-pub use super::clmm_math::tick_math::{
-    MIN_TICK, MAX_TICK, MIN_SQRT_PRICE_X64, MAX_SQRT_PRICE_X64,
-    get_sqrt_price_at_tick, get_tick_at_sqrt_price,
-};
+// Export constants from official libraries
 pub use super::clmm_math::fixed_point_64::{Q64, RESOLUTION};
 pub use super::clmm_math::liquidity_math::{
     add_delta, get_delta_amount_0_unsigned, get_delta_amount_1_unsigned,
 };
 pub use super::clmm_math::sqrt_price_math::{
+    get_next_sqrt_price_from_amount_0_rounding_up, get_next_sqrt_price_from_amount_1_rounding_down,
     get_next_sqrt_price_from_input, get_next_sqrt_price_from_output,
-    get_next_sqrt_price_from_amount_0_rounding_up,
-    get_next_sqrt_price_from_amount_1_rounding_down,
+};
+pub use super::clmm_math::tick_math::{
+    get_sqrt_price_at_tick, get_tick_at_sqrt_price, MAX_SQRT_PRICE_X64, MAX_TICK,
+    MIN_SQRT_PRICE_X64, MIN_TICK,
 };
 
 // Re-export official swap_math components
 pub use super::clmm_math::swap_math::{
-    SwapStep as OfficialSwapStep,
-    compute_swap_step as official_compute_swap_step,
+    compute_swap_step as official_compute_swap_step, SwapStep as OfficialSwapStep,
     FEE_RATE_DENOMINATOR_VALUE,
 };
 
@@ -100,7 +93,7 @@ impl TickState {
 // ============================================================================
 
 /// 计算单步 swap 结果（使用官方实现）
-/// 
+///
 /// 这是 CLMM 最核心的函数，直接调用官方 swap_math::compute_swap_step
 /// 注意：block_timestamp 参数用于未来扩展，当前传入 0 即可
 pub fn compute_swap_step(
@@ -130,7 +123,7 @@ pub fn compute_swap_step(
 // ============================================================================
 
 /// 计算 CLMM swap 的精确输出量（简化版本 - 不需要 tick arrays）
-/// 
+///
 /// 注意：这是简化版本，假设在单个 tick 区间内完成交易
 /// 完整版本需要遍历多个 tick arrays
 pub fn calculate_swap_amount_simple(
@@ -150,11 +143,8 @@ pub fn calculate_swap_amount_simple(
     }
 
     // 设置价格限制
-    let sqrt_price_limit_x64 = if zero_for_one {
-        MIN_SQRT_PRICE_X64 + 1
-    } else {
-        MAX_SQRT_PRICE_X64 - 1
-    };
+    let sqrt_price_limit_x64 =
+        if zero_for_one { MIN_SQRT_PRICE_X64 + 1 } else { MAX_SQRT_PRICE_X64 - 1 };
 
     // 初始化状态
     let mut state = SwapState {
@@ -191,7 +181,7 @@ mod tests {
         let tick = 1000;
         let sqrt_price = get_sqrt_price_at_tick(tick).unwrap();
         let recovered_tick = get_tick_at_sqrt_price(sqrt_price).unwrap();
-        
+
         // 允许 ±1 误差（浮点精度）
         assert!((recovered_tick - tick).abs() <= 1);
     }
@@ -199,11 +189,11 @@ mod tests {
     #[test]
     fn test_liquidity_delta() {
         let liquidity = 1000u128;
-        
+
         // 正增量
         let result = add_delta(liquidity, 500).unwrap();
         assert_eq!(result, 1500);
-        
+
         // 负增量
         let result = add_delta(liquidity, -300).unwrap();
         assert_eq!(result, 700);
@@ -218,7 +208,7 @@ mod tests {
         let liquidity = 10000000u128; // 适中的流动性
         let amount_remaining = 1000u64; // 较小的输入
         let fee_rate = 2500; // 0.25%
-        
+
         let result = compute_swap_step(
             sqrt_price_current,
             sqrt_price_target,
@@ -228,20 +218,22 @@ mod tests {
             true,  // is_base_input
             false, // zero_for_one = false （价格上涨）
         );
-        
+
         if let Err(e) = &result {
             eprintln!("compute_swap_step error: {}", e);
         }
         assert!(result.is_ok(), "compute_swap_step should succeed: {:?}", result.err());
         let step = result.unwrap();
-        
+
         // 检查输出结果
-        println!("amount_in: {}, amount_out: {}, fee_amount: {}, sqrt_price_next: {}", 
-                 step.amount_in, step.amount_out, step.fee_amount, step.sqrt_price_next_x64);
-        
+        println!(
+            "amount_in: {}, amount_out: {}, fee_amount: {}, sqrt_price_next: {}",
+            step.amount_in, step.amount_out, step.fee_amount, step.sqrt_price_next_x64
+        );
+
         // 应该有输出（算法成功执行）
         assert!(step.sqrt_price_next_x64 > 0, "sqrt_price_next should be positive");
-        
+
         // 注意：由于流动性和价格范围的关系，amount_in/amount_out 可能为 0
         // 这里只验证计算不出错
     }
@@ -252,7 +244,7 @@ mod tests {
 // ========================================
 
 /// 完整的 swap 计算（需要外部传入 tick array 数据）
-/// 
+///
 /// 参数：
 /// - tick_arrays: 所有需要的 tick array（从 RPC 获取并解析）
 /// - 其他参数同简化版
@@ -270,11 +262,8 @@ pub fn calculate_swap_amount_with_tick_arrays(
         return Err("amount_specified must not be 0");
     }
 
-    let sqrt_price_limit_x64 = if zero_for_one {
-        MIN_SQRT_PRICE_X64 + 1
-    } else {
-        MAX_SQRT_PRICE_X64 - 1
-    };
+    let sqrt_price_limit_x64 =
+        if zero_for_one { MIN_SQRT_PRICE_X64 + 1 } else { MAX_SQRT_PRICE_X64 - 1 };
 
     // 验证价格限制
     if zero_for_one {
@@ -362,27 +351,17 @@ pub fn calculate_swap_amount_with_tick_arrays(
                 .amount_specified_remaining
                 .checked_sub(step.amount_in + step.fee_amount)
                 .ok_or("amount underflow")?;
-            state.amount_calculated = state
-                .amount_calculated
-                .checked_add(step.amount_out)
-                .ok_or("amount overflow")?;
+            state.amount_calculated =
+                state.amount_calculated.checked_add(step.amount_out).ok_or("amount overflow")?;
 
             // 如果达到下一个 tick，更新流动性
             if state.sqrt_price_x64 == step.sqrt_price_next_x64 {
                 if step.initialized {
-                    let liquidity_delta = if zero_for_one {
-                        -liquidity_net
-                    } else {
-                        liquidity_net
-                    };
+                    let liquidity_delta = if zero_for_one { -liquidity_net } else { liquidity_net };
                     state.liquidity = add_delta(state.liquidity, liquidity_delta)?;
                 }
 
-                state.tick = if zero_for_one {
-                    step.tick_next - 1
-                } else {
-                    step.tick_next
-                };
+                state.tick = if zero_for_one { step.tick_next - 1 } else { step.tick_next };
             } else if state.sqrt_price_x64 != step.sqrt_price_start_x64 {
                 // 重新计算 tick
                 state.tick = get_tick_at_sqrt_price(state.sqrt_price_x64)?;
@@ -395,7 +374,13 @@ pub fn calculate_swap_amount_with_tick_arrays(
         }
 
         // 如果当前 tick array 已经用完，移动到下一个
-        if needs_next_tick_array(state.tick, &tick_arrays, tick_array_idx, tick_spacing, zero_for_one) {
+        if needs_next_tick_array(
+            state.tick,
+            &tick_arrays,
+            tick_array_idx,
+            tick_spacing,
+            zero_for_one,
+        ) {
             tick_array_idx += 1;
             if tick_array_idx >= tick_arrays.len() {
                 break;
@@ -416,7 +401,7 @@ fn find_next_initialized_tick(
     for (_start_index, ticks) in tick_arrays {
         for &(tick, liquidity_net, liquidity_gross) in ticks {
             let is_initialized = liquidity_gross > 0;
-            
+
             if zero_for_one {
                 if tick <= current_tick && is_initialized {
                     return Some((tick, is_initialized, liquidity_net));
@@ -442,10 +427,10 @@ fn needs_next_tick_array(
     if current_idx >= tick_arrays.len() {
         return false;
     }
-    
+
     let (start_index, _) = tick_arrays[current_idx];
     let ticks_in_array = 60 * (tick_spacing as i32);
-    
+
     if zero_for_one {
         current_tick < start_index
     } else {

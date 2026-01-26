@@ -7,14 +7,14 @@
 //! - 系统调用绕过：批处理、快速时间
 //! - 编译器优化：内联、向量化
 
-pub mod simd;
-pub mod hardware_optimizations;
-pub mod zero_copy_io;
-pub mod syscall_bypass;
 pub mod compiler_optimization;
+pub mod hardware_optimizations;
+pub mod simd;
+pub mod syscall_bypass;
+pub mod zero_copy_io;
 
-pub use simd::*;
-pub use hardware_optimizations::*;
-pub use zero_copy_io::*;
-pub use syscall_bypass::*;
 pub use compiler_optimization::*;
+pub use hardware_optimizations::*;
+pub use simd::*;
+pub use syscall_bypass::*;
+pub use zero_copy_io::*;

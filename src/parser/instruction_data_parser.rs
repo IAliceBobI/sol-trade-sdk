@@ -52,8 +52,7 @@ pub fn parse_u64_from_offset(data: &[u8], offset: usize) -> Result<u64, Instruct
     // Solana 使用 little-endian 字节序
     let bytes = &data[offset..offset + 8];
     let value = u64::from_le_bytes([
-        bytes[0], bytes[1], bytes[2], bytes[3],
-        bytes[4], bytes[5], bytes[6], bytes[7],
+        bytes[0], bytes[1], bytes[2], bytes[3], bytes[4], bytes[5], bytes[6], bytes[7],
     ]);
 
     Ok(value)
@@ -68,7 +67,10 @@ pub fn parse_u64_from_offset(data: &[u8], offset: usize) -> Result<u64, Instruct
 /// # 返回
 /// - `Ok(u128)`: 解析出的数值
 /// - `Err(InstructionDataParseError)`: 解析失败
-pub fn parse_u128_from_offset(data: &[u8], offset: usize) -> Result<u128, InstructionDataParseError> {
+pub fn parse_u128_from_offset(
+    data: &[u8],
+    offset: usize,
+) -> Result<u128, InstructionDataParseError> {
     // 检查数据长度
     if data.len() < offset + 16 {
         return Err(InstructionDataParseError::InsufficientData {
@@ -80,10 +82,8 @@ pub fn parse_u128_from_offset(data: &[u8], offset: usize) -> Result<u128, Instru
     // Solana 使用 little-endian 字节序
     let bytes = &data[offset..offset + 16];
     let value = u128::from_le_bytes([
-        bytes[0], bytes[1], bytes[2], bytes[3],
-        bytes[4], bytes[5], bytes[6], bytes[7],
-        bytes[8], bytes[9], bytes[10], bytes[11],
-        bytes[12], bytes[13], bytes[14], bytes[15],
+        bytes[0], bytes[1], bytes[2], bytes[3], bytes[4], bytes[5], bytes[6], bytes[7], bytes[8],
+        bytes[9], bytes[10], bytes[11], bytes[12], bytes[13], bytes[14], bytes[15],
     ]);
 
     Ok(value)
@@ -109,19 +109,16 @@ mod tests {
     fn test_parse_u64_from_offset() {
         // 测试正常情况
         let data = vec![
-            0, 1, 2, 3,  // 前 4 字节（offset）
+            0, 1, 2, 3, // 前 4 字节（offset）
             0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc, 0xde, 0xf0, // u64 数据
-            4, 5, 6, 7,  // 后续数据
+            4, 5, 6, 7, // 后续数据
         ];
 
         let result = parse_u64_from_offset(&data, 4).unwrap();
         assert_eq!(result, 0xf0debc9a78563412);
 
         // 测试 offset = 0
-        let data2 = vec![
-            0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08,
-            0, 0, 0, 0,
-        ];
+        let data2 = vec![0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0, 0, 0, 0];
         let result2 = parse_u64_from_offset(&data2, 0).unwrap();
         assert_eq!(result2, 0x0807060504030201);
     }
@@ -131,20 +128,17 @@ mod tests {
         let data = vec![0, 1, 2, 3]; // 只有 4 字节
         let result = parse_u64_from_offset(&data, 0);
 
-        assert!(matches!(
-            result,
-            Err(InstructionDataParseError::InsufficientData { .. })
-        ));
+        assert!(matches!(result, Err(InstructionDataParseError::InsufficientData { .. })));
     }
 
     #[test]
     fn test_parse_u128_from_offset() {
         // 测试正常情况
         let data = vec![
-            0, 1, 2, 3,  // 前 4 字节（offset）
-            0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08,
-            0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x10, // u128 数据
-            4, 5, 6, 7,  // 后续数据
+            0, 1, 2, 3, // 前 4 字节（offset）
+            0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e,
+            0x0f, 0x10, // u128 数据
+            4, 5, 6, 7, // 后续数据
         ];
 
         let result = parse_u128_from_offset(&data, 4).unwrap();
@@ -156,10 +150,7 @@ mod tests {
         let data = vec![0, 1, 2, 3]; // 只有 4 字节
         let result = parse_u128_from_offset(&data, 0);
 
-        assert!(matches!(
-            result,
-            Err(InstructionDataParseError::InsufficientData { .. })
-        ));
+        assert!(matches!(result, Err(InstructionDataParseError::InsufficientData { .. })));
     }
 
     #[test]

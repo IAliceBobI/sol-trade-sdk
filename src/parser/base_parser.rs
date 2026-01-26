@@ -4,7 +4,7 @@ use async_trait::async_trait;
 
 use super::{
     transaction_adapter::TransactionAdapter,
-    types::{ParsedTradeInfo, DexProtocol},
+    types::{DexProtocol, ParsedTradeInfo},
 };
 
 /// 解析器错误
@@ -34,7 +34,8 @@ pub trait DexParserTrait: Send + Sync {
     ///
     /// # 返回
     /// 解析后的交易信息列表
-    async fn parse(&self, adapter: &TransactionAdapter) -> Result<Vec<ParsedTradeInfo>, ParseError>;
+    async fn parse(&self, adapter: &TransactionAdapter)
+        -> Result<Vec<ParsedTradeInfo>, ParseError>;
 
     /// 获取解析器支持的协议
     fn protocol(&self) -> DexProtocol;
@@ -48,9 +49,7 @@ pub trait DexParserTrait: Send + Sync {
     /// 如果可以解析返回 true
     fn can_parse(&self, adapter: &TransactionAdapter) -> bool {
         let program_id = self.protocol().program_id();
-        adapter.instructions
-            .iter()
-            .any(|instr| instr.program_id.to_string() == program_id)
+        adapter.instructions.iter().any(|instr| instr.program_id.to_string() == program_id)
     }
 }
 
@@ -76,7 +75,10 @@ impl BaseParser {
     ///
     /// 不同协议的池地址在账户列表中的位置不同
     /// 子类可以重写此方法以自定义逻辑
-    pub fn extract_pool_address(&self, accounts: &[solana_sdk::pubkey::Pubkey]) -> Option<solana_sdk::pubkey::Pubkey> {
+    pub fn extract_pool_address(
+        &self,
+        accounts: &[solana_sdk::pubkey::Pubkey],
+    ) -> Option<solana_sdk::pubkey::Pubkey> {
         match self.protocol {
             DexProtocol::PumpSwap => accounts.get(1).copied(),
             DexProtocol::RaydiumV4 => accounts.get(1).copied(),
@@ -88,7 +90,10 @@ impl BaseParser {
     /// 从账户列表中提取用户地址
     ///
     /// 子类可以重写此方法以自定义逻辑
-    pub fn extract_user_address(&self, accounts: &[solana_sdk::pubkey::Pubkey]) -> Option<solana_sdk::pubkey::Pubkey> {
+    pub fn extract_user_address(
+        &self,
+        accounts: &[solana_sdk::pubkey::Pubkey],
+    ) -> Option<solana_sdk::pubkey::Pubkey> {
         accounts.first().copied()
     }
 }

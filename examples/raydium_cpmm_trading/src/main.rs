@@ -1,7 +1,7 @@
 use sol_trade_sdk::common::spl_associated_token_account::get_associated_token_address;
 use sol_trade_sdk::common::TradeConfig;
-use sol_trade_sdk::constants::{WSOL_TOKEN_ACCOUNT, USDC_TOKEN_ACCOUNT};
-use sol_trade_sdk::trading::core::params::{RaydiumCpmmParams, DexParamEnum};
+use sol_trade_sdk::constants::{USDC_TOKEN_ACCOUNT, WSOL_TOKEN_ACCOUNT};
+use sol_trade_sdk::trading::core::params::{DexParamEnum, RaydiumCpmmParams};
 use sol_trade_sdk::trading::factory::DexType;
 use sol_trade_sdk::TradeTokenType;
 use sol_trade_sdk::{common::AnyResult, swqos::SwqosConfig, SolanaTrade};
@@ -134,7 +134,7 @@ async fn raydium_cpmm_copy_trade_with_grpc(trade_info: RaydiumCpmmSwapEvent) -> 
 
     let buy_params =
         RaydiumCpmmParams::from_pool_address_by_rpc(&client.rpc, &trade_info.pool_state).await?;
-    
+
     let is_wsol = trade_info.input_token_mint == sol_trade_sdk::constants::WSOL_TOKEN_ACCOUNT
         || trade_info.output_token_mint == sol_trade_sdk::constants::WSOL_TOKEN_ACCOUNT;
 

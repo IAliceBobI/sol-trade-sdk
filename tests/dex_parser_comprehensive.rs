@@ -4,8 +4,8 @@
 //!
 //! 测试数据来源: docs/plans/task.md
 
-use sol_trade_sdk::parser::DexParser;
 use sol_trade_sdk::parser::types::ParserConfig;
+use sol_trade_sdk::parser::DexParser;
 
 /// 测试所有 4 个 DEX 的交易解析
 ///
@@ -17,11 +17,8 @@ use sol_trade_sdk::parser::types::ParserConfig;
 #[tokio::test]
 #[serial_test::serial(global_dex_cache)]
 async fn test_all_dex_parsing() {
-    let config = ParserConfig {
-        rpc_url: "http://127.0.0.1:8899".to_string(),
-        verbose: false,
-    };
-    let parser = DexParser::new_with_mock(config);  // 使用 Mock 模式
+    let config = ParserConfig { rpc_url: "http://127.0.0.1:8899".to_string(), verbose: false };
+    let parser = DexParser::new_with_mock(config); // 使用 Mock 模式
 
     // 测试交易列表
     let test_cases = vec![
@@ -90,14 +87,8 @@ async fn test_all_dex_parsing() {
         println!("  交易类型: {:?}", trade.trade_type);
         println!("  用户: {}", trade.user);
         println!("  池地址: {}", trade.pool);
-        println!("  输入代币: {} (数量: {})",
-            trade.input_token.mint,
-            trade.input_token.amount
-        );
-        println!("  输出代币: {} (数量: {})",
-            trade.output_token.mint,
-            trade.output_token.amount
-        );
+        println!("  输入代币: {} (数量: {})", trade.input_token.mint, trade.input_token.amount);
+        println!("  输出代币: {} (数量: {})", trade.output_token.mint, trade.output_token.amount);
 
         total_trades += result.trades.len();
         successful_dex += 1;
@@ -129,13 +120,15 @@ async fn test_dex_protocol_detection() {
 
     for (protocol, expected_program_id) in test_cases {
         let actual_program_id = protocol.program_id();
-        assert_eq!(actual_program_id, expected_program_id,
-            "程序ID应该匹配: {} != {}", actual_program_id, expected_program_id);
+        assert_eq!(
+            actual_program_id, expected_program_id,
+            "程序ID应该匹配: {} != {}",
+            actual_program_id, expected_program_id
+        );
 
         // 验证反向解析
         let parsed_protocol = DexProtocol::from_program_id(expected_program_id);
-        assert_eq!(parsed_protocol, Some(protocol),
-            "反向解析应该成功: {:?}", protocol);
+        assert_eq!(parsed_protocol, Some(protocol), "反向解析应该成功: {:?}", protocol);
 
         println!("✓ {} 程序ID识别正确", protocol.name());
     }
@@ -161,12 +154,13 @@ async fn test_parser_config() {
     assert!(!default_config.verbose, "默认不应该开启详细日志");
 
     // 测试自定义配置
-    let custom_config = ParserConfig {
-        verbose: true,
-        rpc_url: "https://api.mainnet-beta.solana.com".to_string(),
-    };
+    let custom_config =
+        ParserConfig { verbose: true, rpc_url: "https://api.mainnet-beta.solana.com".to_string() };
     assert!(custom_config.verbose, "自定义配置应该启用详细日志");
-    assert_eq!(custom_config.rpc_url, "https://api.mainnet-beta.solana.com", "自定义 RPC URL 应该匹配");
+    assert_eq!(
+        custom_config.rpc_url, "https://api.mainnet-beta.solana.com",
+        "自定义 RPC URL 应该匹配"
+    );
 
     println!("✓ 解析器配置测试通过！");
 }
@@ -175,12 +169,10 @@ async fn test_parser_config() {
 #[tokio::test]
 #[serial_test::serial(global_dex_cache)]
 async fn test_pumpswap_detailed_parsing() {
-    let config = ParserConfig {
-        rpc_url: "http://127.0.0.1:8899".to_string(),
-        verbose: false,
-    };
+    let config = ParserConfig { rpc_url: "http://127.0.0.1:8899".to_string(), verbose: false };
     let parser = DexParser::new_with_mock(config);
-    let signature = "5GCZ3TR31aDRP9LZxznKPBux86jWDyCxt1noCAAhX43d6Cmtqi8HvK6oHErq7DBr9j5KRcqeYumW2wHt5qJG1tQK";
+    let signature =
+        "5GCZ3TR31aDRP9LZxznKPBux86jWDyCxt1noCAAhX43d6Cmtqi8HvK6oHErq7DBr9j5KRcqeYumW2wHt5qJG1tQK";
 
     let result = parser.parse_transaction(signature).await;
 
@@ -208,12 +200,10 @@ async fn test_pumpswap_detailed_parsing() {
 #[tokio::test]
 #[serial_test::serial(global_dex_cache)]
 async fn test_raydium_v4_detailed_parsing() {
-    let config = ParserConfig {
-        rpc_url: "http://127.0.0.1:8899".to_string(),
-        verbose: false,
-    };
+    let config = ParserConfig { rpc_url: "http://127.0.0.1:8899".to_string(), verbose: false };
     let parser = DexParser::new_with_mock(config);
-    let signature = "5tqpXeLDzBKXdWUrTXb5pApjhapj6PLZZLvcLFBsYUdGgtnW9MYTC7N16gF4GyVZHQgGZKApNRP3bAUckr7MdpJr";
+    let signature =
+        "5tqpXeLDzBKXdWUrTXb5pApjhapj6PLZZLvcLFBsYUdGgtnW9MYTC7N16gF4GyVZHQgGZKApNRP3bAUckr7MdpJr";
 
     let result = parser.parse_transaction(signature).await;
 
@@ -238,12 +228,10 @@ async fn test_raydium_v4_detailed_parsing() {
 #[tokio::test]
 #[serial_test::serial(global_dex_cache)]
 async fn test_raydium_cpmm_detailed_parsing() {
-    let config = ParserConfig {
-        rpc_url: "http://127.0.0.1:8899".to_string(),
-        verbose: false,
-    };
+    let config = ParserConfig { rpc_url: "http://127.0.0.1:8899".to_string(), verbose: false };
     let parser = DexParser::new_with_mock(config);
-    let signature = "7Q5gThWgQkbSR6GSLVSAjo9x762DSuLQwg6ne6KKomjfWSho26Zmr7qfPQ7zzJk7sdTvHPqhW9grxaNzGhJgRrn";
+    let signature =
+        "7Q5gThWgQkbSR6GSLVSAjo9x762DSuLQwg6ne6KKomjfWSho26Zmr7qfPQ7zzJk7sdTvHPqhW9grxaNzGhJgRrn";
 
     let result = parser.parse_transaction(signature).await;
 
@@ -268,12 +256,10 @@ async fn test_raydium_cpmm_detailed_parsing() {
 #[tokio::test]
 #[serial_test::serial(global_dex_cache)]
 async fn test_raydium_clmm_detailed_parsing() {
-    let config = ParserConfig {
-        rpc_url: "http://127.0.0.1:8899".to_string(),
-        verbose: false,
-    };
+    let config = ParserConfig { rpc_url: "http://127.0.0.1:8899".to_string(), verbose: false };
     let parser = DexParser::new_with_mock(config);
-    let signature = "5DiDUkUntQVmDMUes3mwpiPTRHQW4YWeUWfFyDFDpsKezXdw9xZQmprgrK6ddu7YaNaJ3K5GT6RGUJ8v7828TXJU";
+    let signature =
+        "5DiDUkUntQVmDMUes3mwpiPTRHQW4YWeUWfFyDFDpsKezXdw9xZQmprgrK6ddu7YaNaJ3K5GT6RGUJ8v7828TXJU";
 
     let result = parser.parse_transaction(signature).await;
 

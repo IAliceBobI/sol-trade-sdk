@@ -56,22 +56,14 @@ pub fn get_next_sqrt_price_from_amount_0_rounding_up(
 
         U256::div_rounding_up(
             numerator_1,
-            (numerator_1 / U256::from(sqrt_price_x64))
-                .checked_add(U256::from(amount))
-                .unwrap(),
+            (numerator_1 / U256::from(sqrt_price_x64)).checked_add(U256::from(amount)).unwrap(),
         )
         .as_u128()
     } else {
-        let product = U256::from(
-            U256::from(amount)
-                .checked_mul(U256::from(sqrt_price_x64))
-                .unwrap(),
-        );
+        let product =
+            U256::from(U256::from(amount).checked_mul(U256::from(sqrt_price_x64)).unwrap());
         let denominator = numerator_1.checked_sub(product).unwrap();
-        numerator_1
-            .mul_div_ceil(U256::from(sqrt_price_x64), denominator)
-            .unwrap()
-            .as_u128()
+        numerator_1.mul_div_ceil(U256::from(sqrt_price_x64), denominator).unwrap().as_u128()
     }
 }
 

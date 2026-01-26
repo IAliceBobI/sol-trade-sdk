@@ -2,27 +2,23 @@
 //!
 //! 主解析器，负责根据协议类型分发到对应的子解析器
 
-use std::sync::Arc;
+use solana_client::rpc_config::RpcTransactionConfig;
+use solana_commitment_config::CommitmentConfig;
+use solana_rpc_client::rpc_client::RpcClient;
+use solana_sdk::signature::Signature;
+use solana_transaction_status::{EncodedConfirmedTransactionWithStatusMeta, UiTransactionEncoding};
 use std::collections::HashMap;
 use std::str::FromStr;
-use solana_rpc_client::rpc_client::RpcClient;
-use solana_client::rpc_config::RpcTransactionConfig;
-use solana_sdk::signature::Signature;
-use solana_transaction_status::{UiTransactionEncoding, EncodedConfirmedTransactionWithStatusMeta};
-use solana_commitment_config::CommitmentConfig;
+use std::sync::Arc;
 
 use crate::common::rpc_client_wrapper::RpcClientWrapper;
 
 use super::{
-    transaction_adapter::TransactionAdapter,
     base_parser::{DexParserTrait, ParseError},
-    types::{ParseResult, ParserConfig, DexProtocol},
     pumpswap::PumpswapParser,
-    raydium::{
-        clmm::RaydiumClmmParser,
-        v4::RaydiumV4Parser,
-        cpmm::RaydiumCpmmParser,
-    },
+    raydium::{clmm::RaydiumClmmParser, cpmm::RaydiumCpmmParser, v4::RaydiumV4Parser},
+    transaction_adapter::TransactionAdapter,
+    types::{DexProtocol, ParseResult, ParserConfig},
 };
 
 /// DEX 解析器
@@ -41,9 +37,8 @@ pub struct DexParser {
 impl DexParser {
     /// 创建新的 DEX 解析器
     pub fn new(config: ParserConfig) -> Self {
-        let rpc_client = RpcClientWrapper::Standard(
-            Arc::new(RpcClient::new(config.rpc_url.clone()))
-        );
+        let rpc_client =
+            RpcClientWrapper::Standard(Arc::new(RpcClient::new(config.rpc_url.clone())));
 
         let mut parsers: HashMap<String, Arc<dyn DexParserTrait>> = HashMap::new();
 
@@ -51,29 +46,25 @@ impl DexParser {
         // Pumpswap
         parsers.insert(
             DexProtocol::PumpSwap.program_id().to_string(),
-            Arc::new(PumpswapParser) as Arc<dyn DexParserTrait>
+            Arc::new(PumpswapParser) as Arc<dyn DexParserTrait>,
         );
         // Raydium CLMM
         parsers.insert(
             DexProtocol::RaydiumClmm.program_id().to_string(),
-            Arc::new(RaydiumClmmParser) as Arc<dyn DexParserTrait>
+            Arc::new(RaydiumClmmParser) as Arc<dyn DexParserTrait>,
         );
         // Raydium V4
         parsers.insert(
             DexProtocol::RaydiumV4.program_id().to_string(),
-            Arc::new(RaydiumV4Parser) as Arc<dyn DexParserTrait>
+            Arc::new(RaydiumV4Parser) as Arc<dyn DexParserTrait>,
         );
         // Raydium CPMM
         parsers.insert(
             DexProtocol::RaydiumCpmm.program_id().to_string(),
-            Arc::new(RaydiumCpmmParser) as Arc<dyn DexParserTrait>
+            Arc::new(RaydiumCpmmParser) as Arc<dyn DexParserTrait>,
         );
 
-        Self {
-            config,
-            rpc_client,
-            parsers,
-        }
+        Self { config, rpc_client, parsers }
     }
 
     /// 使用默认配置创建解析器
@@ -94,9 +85,9 @@ impl DexParser {
     pub fn new_with_mock_and_namespace(config: ParserConfig, namespace: Option<String>) -> Self {
         use crate::common::auto_mock_rpc::AutoMockRpcClient;
 
-        let rpc_client = RpcClientWrapper::AutoMock(
-            Arc::new(AutoMockRpcClient::new_with_namespace(config.rpc_url.clone(), namespace))
-        );
+        let rpc_client = RpcClientWrapper::AutoMock(Arc::new(
+            AutoMockRpcClient::new_with_namespace(config.rpc_url.clone(), namespace),
+        ));
 
         let mut parsers: HashMap<String, Arc<dyn DexParserTrait>> = HashMap::new();
 
@@ -104,29 +95,25 @@ impl DexParser {
         // Pumpswap
         parsers.insert(
             DexProtocol::PumpSwap.program_id().to_string(),
-            Arc::new(PumpswapParser) as Arc<dyn DexParserTrait>
+            Arc::new(PumpswapParser) as Arc<dyn DexParserTrait>,
         );
         // Raydium CLMM
         parsers.insert(
             DexProtocol::RaydiumClmm.program_id().to_string(),
-            Arc::new(RaydiumClmmParser) as Arc<dyn DexParserTrait>
+            Arc::new(RaydiumClmmParser) as Arc<dyn DexParserTrait>,
         );
         // Raydium V4
         parsers.insert(
             DexProtocol::RaydiumV4.program_id().to_string(),
-            Arc::new(RaydiumV4Parser) as Arc<dyn DexParserTrait>
+            Arc::new(RaydiumV4Parser) as Arc<dyn DexParserTrait>,
         );
         // Raydium CPMM
         parsers.insert(
             DexProtocol::RaydiumCpmm.program_id().to_string(),
-            Arc::new(RaydiumCpmmParser) as Arc<dyn DexParserTrait>
+            Arc::new(RaydiumCpmmParser) as Arc<dyn DexParserTrait>,
         );
 
-        Self {
-            config,
-            rpc_client,
-            parsers,
-        }
+        Self { config, rpc_client, parsers }
     }
 
     /// 解析交易
@@ -139,11 +126,7 @@ impl DexParser {
     pub async fn parse_transaction(&self, signature: &str) -> ParseResult {
         // 1. 获取并解析交易数据
         match self.fetch_and_parse_transaction(signature).await {
-            Ok(trades) => ParseResult {
-                success: !trades.is_empty(),
-                trades,
-                error: None,
-            },
+            Ok(trades) => ParseResult { success: !trades.is_empty(), trades, error: None },
             Err(e) => ParseResult {
                 success: false,
                 trades: vec![],
@@ -159,8 +142,7 @@ impl DexParser {
     ) -> Result<Vec<super::types::ParsedTradeInfo>, Box<dyn std::error::Error + Send + Sync>> {
         let signature = signature.to_string();
 
-        let sig = Signature::from_str(&signature)
-            .map_err(|e| format!("无效签名: {}", e))?;
+        let sig = Signature::from_str(&signature).map_err(|e| format!("无效签名: {}", e))?;
 
         // 使用 rpc_client 获取交易（异步调用）
         let config = RpcTransactionConfig {
@@ -169,11 +151,11 @@ impl DexParser {
             max_supported_transaction_version: Some(0),
         };
 
-        let tx: EncodedConfirmedTransactionWithStatusMeta = self.rpc_client.get_transaction_with_config(
-            &sig,
-            config,
-        ).await
-        .map_err(|e| format!("获取交易失败: {}", e))?;
+        let tx: EncodedConfirmedTransactionWithStatusMeta = self
+            .rpc_client
+            .get_transaction_with_config(&sig, config)
+            .await
+            .map_err(|e| format!("获取交易失败: {}", e))?;
 
         let slot = tx.slot;
         let block_time = tx.block_time;
@@ -196,7 +178,7 @@ impl DexParser {
     }
 
     /// 识别协议并分发到对应的解析器
-    #[allow(dead_code)]  // 将在后续实现中使用
+    #[allow(dead_code)] // 将在后续实现中使用
     async fn parse_with_correct_parser(
         &self,
         adapter: &TransactionAdapter,
@@ -211,9 +193,7 @@ impl DexParser {
             }
         }
 
-        Err(ParseError::UnsupportedProtocol(
-            "无法识别交易中的 DEX 协议".to_string(),
-        ))
+        Err(ParseError::UnsupportedProtocol("无法识别交易中的 DEX 协议".to_string()))
     }
 }
 
@@ -229,11 +209,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_parse_result() {
-        let result = ParseResult {
-            success: true,
-            trades: vec![],
-            error: None,
-        };
+        let result = ParseResult { success: true, trades: vec![], error: None };
 
         assert!(result.success);
         assert!(result.trades.is_empty());

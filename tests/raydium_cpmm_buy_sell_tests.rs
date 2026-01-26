@@ -14,10 +14,10 @@
 //!     cargo test --test raydium_cpmm_buy_sell_tests -- --nocapture
 
 use sol_trade_sdk::{
-    common::{GasFeeStrategy, auto_mock_rpc::AutoMockRpcClient},
+    common::{auto_mock_rpc::AutoMockRpcClient, GasFeeStrategy},
     instruction::utils::raydium_cpmm::{
-        clear_pool_cache, get_pool_by_address, get_pool_by_mint, list_pools_by_mint,
-        get_token_price_in_usd_with_pool,
+        clear_pool_cache, get_pool_by_address, get_pool_by_mint, get_token_price_in_usd_with_pool,
+        list_pools_by_mint,
     },
     parser::DexParser,
     trading::core::params::{DexParamEnum, RaydiumCpmmParams},
@@ -63,9 +63,11 @@ async fn test_raydium_cpmm_buy_sell_complete() {
 
     // ===== 1. 使用指定的 CPMM Pool (PIPE-WSOL) =====
     let pool_address = Pubkey::from_str("BnYsRpYvJpz6biY3hV6U9smChVePCJ6YyupVDfcnXpTp")
-        .unwrap_or_else(|_| panic!("Invalid pool address: BnYsRpYvJpz6biY3hV6U9smChVePCJ6YyupVDfcnXpTp"));
-    let wsol_mint = Pubkey::from_str(WSOL_MINT)
-        .unwrap_or_else(|_| panic!("Invalid WSOL mint: {}", WSOL_MINT));
+        .unwrap_or_else(|_| {
+            panic!("Invalid pool address: BnYsRpYvJpz6biY3hV6U9smChVePCJ6YyupVDfcnXpTp")
+        });
+    let wsol_mint =
+        Pubkey::from_str(WSOL_MINT).unwrap_or_else(|_| panic!("Invalid WSOL mint: {}", WSOL_MINT));
 
     println!("\n🔍 使用指定的 Raydium CPMM Pool: {}", pool_address);
 
@@ -154,15 +156,13 @@ async fn test_raydium_cpmm_buy_sell_complete() {
                 println!("  用户: {}", trade.user);
                 println!("  Pool: {}", trade.pool);
                 println!("  交易类型: {:?}", trade.trade_type);
-                println!("  输入: {} {} ({} decimals)",
-                    trade.input_token.amount,
-                    trade.input_token.mint,
-                    trade.input_token.decimals
+                println!(
+                    "  输入: {} {} ({} decimals)",
+                    trade.input_token.amount, trade.input_token.mint, trade.input_token.decimals
                 );
-                println!("  输出: {} {} ({} decimals)",
-                    trade.output_token.amount,
-                    trade.output_token.mint,
-                    trade.output_token.decimals
+                println!(
+                    "  输出: {} {} ({} decimals)",
+                    trade.output_token.amount, trade.output_token.mint, trade.output_token.decimals
                 );
                 if let Some(ref fee) = trade.fee {
                     println!("  费用: {} {}", fee.amount, fee.mint);
@@ -230,15 +230,13 @@ async fn test_raydium_cpmm_buy_sell_complete() {
                 println!("  用户: {}", trade.user);
                 println!("  Pool: {}", trade.pool);
                 println!("  交易类型: {:?}", trade.trade_type);
-                println!("  输入: {} {} ({} decimals)",
-                    trade.input_token.amount,
-                    trade.input_token.mint,
-                    trade.input_token.decimals
+                println!(
+                    "  输入: {} {} ({} decimals)",
+                    trade.input_token.amount, trade.input_token.mint, trade.input_token.decimals
                 );
-                println!("  输出: {} {} ({} decimals)",
-                    trade.output_token.amount,
-                    trade.output_token.mint,
-                    trade.output_token.decimals
+                println!(
+                    "  输出: {} {} ({} decimals)",
+                    trade.output_token.amount, trade.output_token.mint, trade.output_token.decimals
                 );
                 if let Some(ref fee) = trade.fee {
                     println!("  费用: {} {}", fee.amount, fee.mint);
@@ -291,7 +289,7 @@ async fn test_get_cpmm_token_price_in_usd() {
     // 使用 Auto Mock RPC 客户端（使用独立命名空间）
     let auto_mock_client = AutoMockRpcClient::new_with_namespace(
         rpc_url.to_string(),
-        Some("raydium_cpmm_buy_sell_tests".to_string())
+        Some("raydium_cpmm_buy_sell_tests".to_string()),
     );
 
     println!("Token Mint: {}", token_mint);
@@ -299,12 +297,8 @@ async fn test_get_cpmm_token_price_in_usd() {
     println!("WSOL-USDT 锚定池: 使用默认锚定池");
 
     // 调用价格计算函数（使用 AutoMock 版本）
-    let result: Result<f64, anyhow::Error> = get_token_price_in_usd_with_pool(
-        &auto_mock_client,
-        &token_mint,
-        &pool_address,
-        None
-    ).await;
+    let result: Result<f64, anyhow::Error> =
+        get_token_price_in_usd_with_pool(&auto_mock_client, &token_mint, &pool_address, None).await;
 
     // 验证结果
     assert!(result.is_ok(), "Failed to get token price in USD: {:?}", result.err());
@@ -334,14 +328,14 @@ async fn test_get_cpmm_token_price_in_usd() {
 async fn test_raydium_cpmm_get_pool_by_mint_with_auto_mock() {
     println!("=== 测试：使用 Auto Mock 加速 get_pool_by_mint 和 list_pools_by_mint ===");
 
-    let wsol_mint = Pubkey::from_str(WSOL_MINT)
-        .unwrap_or_else(|_| panic!("Invalid WSOL mint: {}", WSOL_MINT));
+    let wsol_mint =
+        Pubkey::from_str(WSOL_MINT).unwrap_or_else(|_| panic!("Invalid WSOL mint: {}", WSOL_MINT));
     let rpc_url = "http://127.0.0.1:8899";
 
     // 使用 Auto Mock RPC 客户端（使用独立命名空间）
     let auto_mock_client = AutoMockRpcClient::new_with_namespace(
         rpc_url.to_string(),
-        Some("raydium_cpmm_buy_sell_tests".to_string())
+        Some("raydium_cpmm_buy_sell_tests".to_string()),
     );
 
     println!("Token Mint: {}", wsol_mint);
@@ -350,9 +344,8 @@ async fn test_raydium_cpmm_get_pool_by_mint_with_auto_mock() {
 
     // 1. 使用 Auto Mock 的 list_pools_by_mint
     println!("\n步骤 1: 使用 list_pools_by_mint 查询所有 WSOL Pool...");
-    let pools: Vec<(Pubkey, sol_trade_sdk::instruction::utils::raydium_cpmm_types::PoolState)> = list_pools_by_mint(&auto_mock_client, &wsol_mint)
-        .await
-        .expect("list_pools_by_mint failed");
+    let pools: Vec<(Pubkey, sol_trade_sdk::instruction::utils::raydium_cpmm_types::PoolState)> =
+        list_pools_by_mint(&auto_mock_client, &wsol_mint).await.expect("list_pools_by_mint failed");
     println!("✅ 查询到 {} 个 Pool", pools.len());
     assert!(!pools.is_empty(), "WSOL 相关的 CPMM Pool 列表不应为空");
 
@@ -369,9 +362,10 @@ async fn test_raydium_cpmm_get_pool_by_mint_with_auto_mock() {
 
     // 2. 使用 Auto Mock 的 get_pool_by_mint（无缓存版本）
     println!("\n步骤 2: 使用 get_pool_by_mint 查询最优 Pool...");
-    let (pool_addr, pool_state): (Pubkey, sol_trade_sdk::instruction::utils::raydium_cpmm_types::PoolState) = get_pool_by_mint(&auto_mock_client, &wsol_mint)
-        .await
-        .expect("get_pool_by_mint failed");
+    let (pool_addr, pool_state): (
+        Pubkey,
+        sol_trade_sdk::instruction::utils::raydium_cpmm_types::PoolState,
+    ) = get_pool_by_mint(&auto_mock_client, &wsol_mint).await.expect("get_pool_by_mint failed");
     println!("✅ 找到最优 Pool: {}", pool_addr);
 
     // 验证基本字段

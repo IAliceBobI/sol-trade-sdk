@@ -59,5 +59,9 @@ pub const fn calculate_with_slippage_buy(amount: u64, basis_points: u64) -> u64 
 /// * basis_points = 500 -> 5% slippage
 #[inline(always)]
 pub const fn calculate_with_slippage_sell(amount: u64, basis_points: u64) -> u64 {
-    if amount <= basis_points / 10000 { 1 } else { amount - (amount * basis_points / 10000) }
+    if amount <= basis_points / 10000 {
+        1
+    } else {
+        amount - (amount * basis_points / 10000)
+    }
 }

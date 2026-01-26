@@ -1,7 +1,7 @@
 use crate::{
-    common::{SolanaRpcClient, auto_mock_rpc::PoolRpcClient},
-    instruction::utils::raydium_amm_v4_types::{amm_info_decode, AmmInfo, AMM_INFO_SIZE},
+    common::{auto_mock_rpc::PoolRpcClient, SolanaRpcClient},
     constants::{SOL_MINT, USDC_MINT, USDT_MINT},
+    instruction::utils::raydium_amm_v4_types::{amm_info_decode, AmmInfo, AMM_INFO_SIZE},
 };
 use anyhow::anyhow;
 use base64::engine::general_purpose::STANDARD;
@@ -12,7 +12,8 @@ use solana_sdk::{pubkey, pubkey::Pubkey};
 
 /// Raydium CLMM WSOL-USDT 锚定池（用于 USD 价格计算）
 /// 如果不传入锚定池参数，默认使用此池
-pub const DEFAULT_WSOL_USDT_CLMM_POOL: Pubkey = pubkey!("ExcBWu8fGPdJiaF1b1z3iEef38sjQJks8xvj6M85pPY6");
+pub const DEFAULT_WSOL_USDT_CLMM_POOL: Pubkey =
+    pubkey!("ExcBWu8fGPdJiaF1b1z3iEef38sjQJks8xvj6M85pPY6");
 
 /// Constants used as seeds for deriving PDAs (Program Derived Addresses)
 pub mod seeds {
@@ -116,13 +117,13 @@ pub async fn get_pool_by_address<T: PoolRpcClient + ?Sized>(
     }
 
     // 2. RPC 查询
-    let account = rpc.get_account(pool_address).await
-        .map_err(|e| anyhow!("RPC 调用失败: {}", e))?;
+    let account =
+        rpc.get_account(pool_address).await.map_err(|e| anyhow!("RPC 调用失败: {}", e))?;
     if account.owner != accounts::RAYDIUM_AMM_V4 {
         return Err(anyhow!("Account is not owned by Raydium AMM V4 program"));
     }
-    let amm_info = amm_info_decode(&account.data)
-        .ok_or_else(|| anyhow!("Failed to decode amm info"))?;
+    let amm_info =
+        amm_info_decode(&account.data).ok_or_else(|| anyhow!("Failed to decode amm info"))?;
 
     // 3. 写入缓存
     cache_pool_by_address(pool_address, &amm_info);
@@ -159,15 +160,13 @@ fn is_hot_mint(mint: &Pubkey) -> bool {
 /// - 否则计算两侧的总交易量
 fn calculate_effective_volume(amm: &AmmInfo) -> u128 {
     // 检查 coin_mint 是否为 WSOL/USDC/USDT
-    let coin_is_stable = amm.coin_mint == SOL_MINT 
-        || amm.coin_mint == USDC_MINT 
-        || amm.coin_mint == USDT_MINT;
-    
+    let coin_is_stable =
+        amm.coin_mint == SOL_MINT || amm.coin_mint == USDC_MINT || amm.coin_mint == USDT_MINT;
+
     // 检查 pc_mint 是否为 WSOL/USDC/USDT
-    let pc_is_stable = amm.pc_mint == SOL_MINT 
-        || amm.pc_mint == USDC_MINT 
-        || amm.pc_mint == USDT_MINT;
-    
+    let pc_is_stable =
+        amm.pc_mint == SOL_MINT || amm.pc_mint == USDC_MINT || amm.pc_mint == USDT_MINT;
+
     if coin_is_stable && !pc_is_stable {
         // 只计算 coin 侧（WSOL/USDC/USDT）的交易量
         amm.out_put.swap_coin_in_amount.saturating_add(amm.out_put.swap_pc_out_amount)
@@ -176,7 +175,8 @@ fn calculate_effective_volume(amm: &AmmInfo) -> u128 {
         amm.out_put.swap_pc_in_amount.saturating_add(amm.out_put.swap_coin_out_amount)
     } else {
         // 两侧都是稳定资产或都不是，计算总交易量
-        amm.out_put.swap_coin_in_amount
+        amm.out_put
+            .swap_coin_in_amount
             .saturating_add(amm.out_put.swap_pc_out_amount)
             .saturating_add(amm.out_put.swap_pc_in_amount)
             .saturating_add(amm.out_put.swap_coin_out_amount)
@@ -184,7 +184,7 @@ fn calculate_effective_volume(amm: &AmmInfo) -> u128 {
 }
 
 /// 按累计交易量选择最佳池（零网络开销）
-/// 
+///
 /// 策略：
 /// - 优先选择活跃状态的池
 /// - 如果池子包含 WSOL/USDC/USDT，只计算这些稳定资产侧的累计交易量
@@ -633,10 +633,8 @@ pub async fn list_pools_by_mint<T: PoolRpcClient + ?Sized>(
 
     // 如果需要过滤活跃状态的 pool
     if filter_active {
-        let filtered: Vec<_> = sorted_pools
-            .into_iter()
-            .filter(|(_, amm)| is_pool_tradeable(amm))
-            .collect();
+        let filtered: Vec<_> =
+            sorted_pools.into_iter().filter(|(_, amm)| is_pool_tradeable(amm)).collect();
         if filtered.is_empty() {
             return Err(anyhow!(
                 "No active Raydium AMM V4 pool found for mint {} (all pools are disabled or not tradeable)",
@@ -707,25 +705,23 @@ pub async fn get_token_price_in_usd(
         let pc_decimals = crate::utils::token::get_token_decimals(rpc, &amm.pc_mint).await?;
 
         // 获取实时余额
-        let coin_balance = rpc.get_token_account_balance(&amm.token_coin).await?.ui_amount.ok_or_else(|| anyhow!("Failed to get coin balance"))? as u64;
-        let pc_balance = rpc.get_token_account_balance(&amm.token_pc).await?.ui_amount.ok_or_else(|| anyhow!("Failed to get pc balance"))? as u64;
+        let coin_balance =
+            rpc.get_token_account_balance(&amm.token_coin)
+                .await?
+                .ui_amount
+                .ok_or_else(|| anyhow!("Failed to get coin balance"))? as u64;
+        let pc_balance = rpc
+            .get_token_account_balance(&amm.token_pc)
+            .await?
+            .ui_amount
+            .ok_or_else(|| anyhow!("Failed to get pc balance"))? as u64;
 
         let price_x_in_stable = if is_coin_x {
             // coin = X, pc = USDC/USDT
-            price_base_in_quote(
-                coin_balance,
-                pc_balance,
-                coin_decimals,
-                pc_decimals,
-            )
+            price_base_in_quote(coin_balance, pc_balance, coin_decimals, pc_decimals)
         } else {
             // pc = X, coin = USDC/USDT
-            price_quote_in_base(
-                coin_balance,
-                pc_balance,
-                coin_decimals,
-                pc_decimals,
-            )
+            price_quote_in_base(coin_balance, pc_balance, coin_decimals, pc_decimals)
         };
 
         if price_x_in_stable <= 0.0 {
@@ -752,25 +748,23 @@ pub async fn get_token_price_in_usd(
     let pc_decimals = crate::utils::token::get_token_decimals(rpc, &amm.pc_mint).await?;
 
     // 获取实时余额
-    let coin_balance = rpc.get_token_account_balance(&amm.token_coin).await?.ui_amount.ok_or_else(|| anyhow!("Failed to get coin balance"))? as u64;
-    let pc_balance = rpc.get_token_account_balance(&amm.token_pc).await?.ui_amount.ok_or_else(|| anyhow!("Failed to get pc balance"))? as u64;
+    let coin_balance = rpc
+        .get_token_account_balance(&amm.token_coin)
+        .await?
+        .ui_amount
+        .ok_or_else(|| anyhow!("Failed to get coin balance"))? as u64;
+    let pc_balance = rpc
+        .get_token_account_balance(&amm.token_pc)
+        .await?
+        .ui_amount
+        .ok_or_else(|| anyhow!("Failed to get pc balance"))? as u64;
 
     let price_x_in_wsol = if is_coin_x {
         // coin = X, pc = WSOL
-        price_base_in_quote(
-            coin_balance,
-            pc_balance,
-            coin_decimals,
-            pc_decimals,
-        )
+        price_base_in_quote(coin_balance, pc_balance, coin_decimals, pc_decimals)
     } else {
         // pc = X, coin = WSOL
-        price_quote_in_base(
-            coin_balance,
-            pc_balance,
-            coin_decimals,
-            pc_decimals,
-        )
+        price_quote_in_base(coin_balance, pc_balance, coin_decimals, pc_decimals)
     };
 
     if price_x_in_wsol <= 0.0 {
@@ -778,11 +772,12 @@ pub async fn get_token_price_in_usd(
     }
 
     // 4. 计算 WSOL 的 USD 价格
-    let price_wsol_in_usd = crate::instruction::utils::raydium_clmm::get_wsol_price_in_usd_with_client(
-        rpc,
-        Some(wsol_usd_pool),
-    )
-    .await?;
+    let price_wsol_in_usd =
+        crate::instruction::utils::raydium_clmm::get_wsol_price_in_usd_with_client(
+            rpc,
+            Some(wsol_usd_pool),
+        )
+        .await?;
 
     Ok(price_x_in_wsol * price_wsol_in_usd)
 }
@@ -850,25 +845,23 @@ pub async fn get_token_price_in_usd_with_pool(
         let pc_decimals = crate::utils::token::get_token_decimals(rpc, &amm.pc_mint).await?;
 
         // 获取实时余额
-        let coin_balance = rpc.get_token_account_balance(&amm.token_coin).await?.ui_amount.ok_or_else(|| anyhow!("Failed to get coin balance"))? as u64;
-        let pc_balance = rpc.get_token_account_balance(&amm.token_pc).await?.ui_amount.ok_or_else(|| anyhow!("Failed to get pc balance"))? as u64;
+        let coin_balance =
+            rpc.get_token_account_balance(&amm.token_coin)
+                .await?
+                .ui_amount
+                .ok_or_else(|| anyhow!("Failed to get coin balance"))? as u64;
+        let pc_balance = rpc
+            .get_token_account_balance(&amm.token_pc)
+            .await?
+            .ui_amount
+            .ok_or_else(|| anyhow!("Failed to get pc balance"))? as u64;
 
         let price_x_in_stable = if is_coin_x {
             // coin = X, pc = USDC/USDT
-            price_base_in_quote(
-                coin_balance,
-                pc_balance,
-                coin_decimals,
-                pc_decimals,
-            )
+            price_base_in_quote(coin_balance, pc_balance, coin_decimals, pc_decimals)
         } else {
             // pc = X, coin = USDC/USDT
-            price_quote_in_base(
-                coin_balance,
-                pc_balance,
-                coin_decimals,
-                pc_decimals,
-            )
+            price_quote_in_base(coin_balance, pc_balance, coin_decimals, pc_decimals)
         };
 
         if price_x_in_stable <= 0.0 {
@@ -895,25 +888,23 @@ pub async fn get_token_price_in_usd_with_pool(
     let pc_decimals = crate::utils::token::get_token_decimals(rpc, &amm.pc_mint).await?;
 
     // 获取实时余额
-    let coin_balance = rpc.get_token_account_balance(&amm.token_coin).await?.ui_amount.ok_or_else(|| anyhow!("Failed to get coin balance"))? as u64;
-    let pc_balance = rpc.get_token_account_balance(&amm.token_pc).await?.ui_amount.ok_or_else(|| anyhow!("Failed to get pc balance"))? as u64;
+    let coin_balance = rpc
+        .get_token_account_balance(&amm.token_coin)
+        .await?
+        .ui_amount
+        .ok_or_else(|| anyhow!("Failed to get coin balance"))? as u64;
+    let pc_balance = rpc
+        .get_token_account_balance(&amm.token_pc)
+        .await?
+        .ui_amount
+        .ok_or_else(|| anyhow!("Failed to get pc balance"))? as u64;
 
     let price_x_in_wsol = if is_coin_x {
         // coin = X, pc = WSOL
-        price_base_in_quote(
-            coin_balance,
-            pc_balance,
-            coin_decimals,
-            pc_decimals,
-        )
+        price_base_in_quote(coin_balance, pc_balance, coin_decimals, pc_decimals)
     } else {
         // pc = X, coin = WSOL
-        price_quote_in_base(
-            coin_balance,
-            pc_balance,
-            coin_decimals,
-            pc_decimals,
-        )
+        price_quote_in_base(coin_balance, pc_balance, coin_decimals, pc_decimals)
     };
 
     if price_x_in_wsol <= 0.0 {
@@ -921,11 +912,12 @@ pub async fn get_token_price_in_usd_with_pool(
     }
 
     // 4. 计算 WSOL 的 USD 价格
-    let price_wsol_in_usd = crate::instruction::utils::raydium_clmm::get_wsol_price_in_usd_with_client(
-        rpc,
-        Some(wsol_usd_pool),
-    )
-    .await?;
+    let price_wsol_in_usd =
+        crate::instruction::utils::raydium_clmm::get_wsol_price_in_usd_with_client(
+            rpc,
+            Some(wsol_usd_pool),
+        )
+        .await?;
 
     Ok(price_x_in_wsol * price_wsol_in_usd)
 }

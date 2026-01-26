@@ -2,10 +2,10 @@
 //!
 //! 提供交易生命周期钩子，允许上游应用在关键节点拦截和处理交易
 
-use anyhow::Result;
-use solana_sdk::transaction::VersionedTransaction;
 use crate::swqos::{SwqosType, TradeType};
+use anyhow::Result;
 use base64::Engine;
+use solana_sdk::transaction::VersionedTransaction;
 use std::sync::Arc;
 use tracing::warn;
 
@@ -27,7 +27,10 @@ pub trait TransactionLifecycleCallback: Send + Sync {
     /// - 此回调在异步任务中执行，**不会阻塞**交易发送
     /// - 建议使用异步非阻塞方式处理（如发送到消息队列）
     /// - 如果回调耗时较长，建议使用 `tokio::spawn` 在后台处理
-    fn on_transaction_signed(&self, context: CallbackContext) -> futures::future::BoxFuture<'static, Result<()>>;
+    fn on_transaction_signed(
+        &self,
+        context: CallbackContext,
+    ) -> futures::future::BoxFuture<'static, Result<()>>;
 }
 
 /// 回调上下文
@@ -66,11 +69,8 @@ impl CallbackContext {
         with_tip: bool,
         tip_amount: f64,
     ) -> Self {
-        let signature = transaction
-            .signatures
-            .first()
-            .map(|sig| sig.to_string())
-            .unwrap_or_else(|| {
+        let signature =
+            transaction.signatures.first().map(|sig| sig.to_string()).unwrap_or_else(|| {
                 warn!("交易没有签名，使用空字符串作为默认签名");
                 String::new()
             });
@@ -83,15 +83,7 @@ impl CallbackContext {
             })
             .as_nanos() as u64;
 
-        Self {
-            transaction,
-            swqos_type,
-            trade_type,
-            signature,
-            timestamp_ns,
-            with_tip,
-            tip_amount,
-        }
+        Self { transaction, swqos_type, trade_type, signature, timestamp_ns, with_tip, tip_amount }
     }
 
     /// 获取交易的 Base64 编码
@@ -125,7 +117,10 @@ impl CallbackContext {
 pub struct NoopCallback;
 
 impl TransactionLifecycleCallback for NoopCallback {
-    fn on_transaction_signed(&self, _context: CallbackContext) -> futures::future::BoxFuture<'static, Result<()>> {
+    fn on_transaction_signed(
+        &self,
+        _context: CallbackContext,
+    ) -> futures::future::BoxFuture<'static, Result<()>> {
         Box::pin(async { Ok(()) })
     }
 }

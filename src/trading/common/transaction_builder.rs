@@ -1,6 +1,8 @@
 use solana_hash::Hash;
 use solana_sdk::{
-    instruction::Instruction, message::AddressLookupTableAccount, native_token::sol_str_to_lamports, pubkey::Pubkey, signature::Keypair, signer::Signer, transaction::VersionedTransaction
+    instruction::Instruction, message::AddressLookupTableAccount,
+    native_token::sol_str_to_lamports, pubkey::Pubkey, signature::Keypair, signer::Signer,
+    transaction::VersionedTransaction,
 };
 use solana_system_interface::instruction::transfer;
 use std::sync::Arc;
@@ -11,7 +13,10 @@ use super::{
 };
 use crate::{
     common::{nonce_cache::DurableNonceInfo, SolanaRpcClient},
-    trading::{MiddlewareManager, core::transaction_pool::{acquire_builder, release_builder}},
+    trading::{
+        core::transaction_pool::{acquire_builder, release_builder},
+        MiddlewareManager,
+    },
 };
 
 /// Build standard RPC transaction
@@ -36,8 +41,7 @@ pub async fn build_transaction(
     let mut instructions = Vec::with_capacity(business_instructions.len() + 5);
 
     // Add nonce instruction
-    if let Err(e) =
-        add_nonce_instruction(&mut instructions, payer.as_ref(), durable_nonce.clone())
+    if let Err(e) = add_nonce_instruction(&mut instructions, payer.as_ref(), durable_nonce.clone())
     {
         return Err(e);
     }
@@ -46,18 +50,11 @@ pub async fn build_transaction(
     if with_tip && tip_amount > 0.0 {
         let tip_lamports = sol_str_to_lamports(&tip_amount.to_string())
             .ok_or_else(|| anyhow::anyhow!("无效的小费金额 '{}': 转换失败", tip_amount))?;
-        instructions.push(transfer(
-            &payer.pubkey(),
-            tip_account,
-            tip_lamports,
-        ));
+        instructions.push(transfer(&payer.pubkey(), tip_account, tip_lamports));
     }
 
     // Add compute budget instructions
-    instructions.extend(compute_budget_instructions(
-        unit_price,
-        unit_limit,
-    ));
+    instructions.extend(compute_budget_instructions(unit_price, unit_limit));
 
     // Add business instructions
     instructions.extend(business_instructions);
@@ -109,8 +106,8 @@ async fn build_versioned_transaction(
     );
 
     let msg_bytes = versioned_msg.serialize();
-    let signature = payer.try_sign_message(&msg_bytes)
-        .expect("交易签名失败：payer 密钥无效或消息序列化错误");
+    let signature =
+        payer.try_sign_message(&msg_bytes).expect("交易签名失败：payer 密钥无效或消息序列化错误");
     let tx = VersionedTransaction { signatures: vec![signature], message: versioned_msg };
 
     // 归还构建器到池

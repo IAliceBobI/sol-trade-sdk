@@ -46,9 +46,7 @@ impl Default for DiscriminatorRegistry {
 
 impl DiscriminatorRegistry {
     pub fn new() -> Self {
-        let mut registry = Self {
-            discriminators: HashMap::new(),
-        };
+        let mut registry = Self { discriminators: HashMap::new() };
 
         // 注册 Raydium CLMM discriminators
         // 来源: solana-dex-parser/src/constants/discriminators.ts
@@ -72,18 +70,15 @@ impl DiscriminatorRegistry {
 
         // ADD_LIQUIDITY 操作
         let add_liquidity = [
-            [135, 128, 47, 77, 15, 152, 240, 49], // openPosition
-            [77, 184, 74, 214, 112, 86, 241, 199], // openPositionV2
-            [77, 255, 174, 82, 125, 29, 201, 46],  // openPositionWithToken22Nft
+            [135, 128, 47, 77, 15, 152, 240, 49],   // openPosition
+            [77, 184, 74, 214, 112, 86, 241, 199],  // openPositionV2
+            [77, 255, 174, 82, 125, 29, 201, 46],   // openPositionWithToken22Nft
             [46, 156, 243, 118, 13, 205, 251, 178], // increaseLiquidity
-            [133, 29, 89, 223, 69, 238, 176, 10],  // increaseLiquidityV2
+            [133, 29, 89, 223, 69, 238, 176, 10],   // increaseLiquidityV2
         ];
 
         for disc in add_liquidity {
-            self.discriminators.insert(
-                (DexProtocol::RaydiumClmm, disc),
-                AddLiquidity
-            );
+            self.discriminators.insert((DexProtocol::RaydiumClmm, disc), AddLiquidity);
         }
 
         // REMOVE_LIQUIDITY 操作
@@ -93,10 +88,7 @@ impl DiscriminatorRegistry {
         ];
 
         for disc in remove_liquidity {
-            self.discriminators.insert(
-                (DexProtocol::RaydiumClmm, disc),
-                RemoveLiquidity
-            );
+            self.discriminators.insert((DexProtocol::RaydiumClmm, disc), RemoveLiquidity);
         }
 
         // CREATE 操作
@@ -105,10 +97,7 @@ impl DiscriminatorRegistry {
         ];
 
         for disc in create {
-            self.discriminators.insert(
-                (DexProtocol::RaydiumClmm, disc),
-                CreatePool
-            );
+            self.discriminators.insert((DexProtocol::RaydiumClmm, disc), CreatePool);
         }
     }
 
@@ -187,16 +176,18 @@ impl DiscriminatorRegistry {
         let copy_len = std::cmp::min(data.len(), 8);
         key[0..copy_len].copy_from_slice(&data[0..copy_len]);
 
-        self.discriminators
-            .get(&(protocol, key))
-            .copied()
-            .unwrap_or(InstructionType::Unknown)
+        self.discriminators.get(&(protocol, key)).copied().unwrap_or(InstructionType::Unknown)
     }
 
     /// 判断是否是流动性操作（应该被 Swap 解析器排除）
     pub fn is_liquidity_discriminator(&self, protocol: DexProtocol, data: &[u8]) -> bool {
         let instr_type = self.identify(protocol, data);
-        matches!(instr_type, InstructionType::CreatePool | InstructionType::AddLiquidity | InstructionType::RemoveLiquidity)
+        matches!(
+            instr_type,
+            InstructionType::CreatePool
+                | InstructionType::AddLiquidity
+                | InstructionType::RemoveLiquidity
+        )
     }
 
     /// 判断是否是 Swap 操作（Buy/Sell）

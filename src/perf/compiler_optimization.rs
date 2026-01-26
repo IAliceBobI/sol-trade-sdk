@@ -1,5 +1,5 @@
 //! 🚀 编译器级性能优化 - 极致编译时优化
-//! 
+//!
 //! 实现编译时的极致性能优化，包括：
 //! - 编译器标志优化配置
 //! - 编译时代码生成
@@ -137,100 +137,110 @@ impl CompilerOptimizer {
             stats: CompilerOptimizationStats::default(),
         }
     }
-    
+
     /// 🚀 生成超高性能编译配置
     pub fn generate_ultra_performance_config(&self) -> Result<CompilerConfig> {
         log::info!("🚀 Generating ultra-performance compiler configuration...");
-        
+
         let mut rustflags = Vec::new();
-        
+
         // 基础优化标志
         rustflags.push("-C".to_string());
         rustflags.push("opt-level=3".to_string()); // 最高优化级别
-        
+
         // 链接时优化
         if self.optimization_flags.enable_lto {
             rustflags.push("-C".to_string());
             rustflags.push("lto=fat".to_string()); // 胖LTO获得最佳优化
         }
-        
+
         // 目标CPU优化
         if !self.optimization_flags.target_cpu.is_empty() {
             rustflags.push("-C".to_string());
             rustflags.push(format!("target-cpu={}", self.optimization_flags.target_cpu));
         }
-        
+
         // 目标特性
         if !self.optimization_flags.target_features.is_empty() {
             rustflags.push("-C".to_string());
-            rustflags.push(format!("target-feature={}", self.optimization_flags.target_features.join(",")));
+            rustflags.push(format!(
+                "target-feature={}",
+                self.optimization_flags.target_features.join(",")
+            ));
         }
-        
+
         // 代码模型
         rustflags.push("-C".to_string());
-        rustflags.push(format!("code-model={:?}", self.optimization_flags.code_model).to_lowercase());
-        
+        rustflags
+            .push(format!("code-model={:?}", self.optimization_flags.code_model).to_lowercase());
+
         // 恐慌处理
         if self.codegen_config.panic_abort {
             rustflags.push("-C".to_string());
             rustflags.push("panic=abort".to_string());
         }
-        
+
         // 溢出检查
         if !self.codegen_config.overflow_checks {
             rustflags.push("-C".to_string());
             rustflags.push("overflow-checks=no".to_string());
         }
-        
+
         // 代码生成单元
         if let Some(units) = self.optimization_flags.codegen_units {
             rustflags.push("-C".to_string());
             rustflags.push(format!("codegen-units={}", units));
         }
-        
+
         // 内联阈值
         rustflags.push("-C".to_string());
         rustflags.push(format!("inline-threshold={}", self.inline_strategy.inline_threshold));
-        
+
         // 额外的性能优化标志
         rustflags.extend([
-            "-C".to_string(), "embed-bitcode=no".to_string(), // 不嵌入位码以减少体积
-            "-C".to_string(), "debuginfo=0".to_string(), // 禁用调试信息
-            "-C".to_string(), "rpath=no".to_string(), // 禁用rpath
-            "-C".to_string(), "force-frame-pointers=no".to_string(), // 禁用帧指针
+            "-C".to_string(),
+            "embed-bitcode=no".to_string(), // 不嵌入位码以减少体积
+            "-C".to_string(),
+            "debuginfo=0".to_string(), // 禁用调试信息
+            "-C".to_string(),
+            "rpath=no".to_string(), // 禁用rpath
+            "-C".to_string(),
+            "force-frame-pointers=no".to_string(), // 禁用帧指针
         ]);
-        
+
         let config = CompilerConfig {
             rustflags,
             env_vars: self.generate_env_vars(),
             cargo_config: self.generate_cargo_config(),
         };
-        
+
         log::info!("✅ Ultra-performance compiler configuration generated");
         Ok(config)
     }
-    
+
     /// 生成环境变量配置
     fn generate_env_vars(&self) -> HashMap<String, String> {
         let mut env_vars = HashMap::new();
-        
+
         // CPU特定优化
-        env_vars.insert("CARGO_CFG_TARGET_FEATURE".to_string(), 
-                       self.optimization_flags.target_features.join(","));
-        
+        env_vars.insert(
+            "CARGO_CFG_TARGET_FEATURE".to_string(),
+            self.optimization_flags.target_features.join(","),
+        );
+
         // 启用不稳定特性
         env_vars.insert("RUSTC_BOOTSTRAP".to_string(), "1".to_string());
-        
+
         // 编译缓存设置
         if self.optimization_flags.incremental {
             env_vars.insert("CARGO_INCREMENTAL".to_string(), "1".to_string());
         } else {
             env_vars.insert("CARGO_INCREMENTAL".to_string(), "0".to_string());
         }
-        
+
         env_vars
     }
-    
+
     /// 生成Cargo配置
     fn generate_cargo_config(&self) -> CargoConfig {
         CargoConfig {
@@ -244,17 +254,21 @@ impl CompilerOptimizer {
                 debug_assertions: false,
                 rpath: false,
                 strip: true, // 去除符号表
-            }
+            },
         }
     }
-    
+
     /// 获取统计信息
     pub fn get_stats(&self) -> CompilerOptimizationStats {
         CompilerOptimizationStats {
             inlined_functions: AtomicU64::new(self.stats.inlined_functions.load(Ordering::Relaxed)),
             constant_folding: AtomicU64::new(self.stats.constant_folding.load(Ordering::Relaxed)),
-            dead_code_elimination: AtomicU64::new(self.stats.dead_code_elimination.load(Ordering::Relaxed)),
-            loop_optimizations: AtomicU64::new(self.stats.loop_optimizations.load(Ordering::Relaxed)),
+            dead_code_elimination: AtomicU64::new(
+                self.stats.dead_code_elimination.load(Ordering::Relaxed),
+            ),
+            loop_optimizations: AtomicU64::new(
+                self.stats.loop_optimizations.load(Ordering::Relaxed),
+            ),
         }
     }
 }
@@ -275,23 +289,20 @@ impl OptimizationFlags {
         ];
 
         #[cfg(target_arch = "aarch64")]
-        let target_features = vec![
-            "+neon".to_string(),
-            "+fp-armv8".to_string(),
-            "+crc".to_string(),
-        ];
+        let target_features =
+            vec!["+neon".to_string(), "+fp-armv8".to_string(), "+crc".to_string()];
 
         #[cfg(not(any(target_arch = "x86_64", target_arch = "aarch64")))]
         let target_features = vec![];
         Self {
             opt_level: OptLevel::Aggressive,
             enable_lto: true,
-            enable_pgo: false, // PGO需要多阶段构建
+            enable_pgo: false,                // PGO需要多阶段构建
             target_cpu: "native".to_string(), // 使用本机CPU特性
             target_features,
             code_model: CodeModel::Small,
             debug_info: false,
-            incremental: false, // 发布版本禁用增量编译
+            incremental: false,     // 发布版本禁用增量编译
             codegen_units: Some(1), // 单个代码生成单元获得最佳优化
         }
     }
@@ -301,7 +312,7 @@ impl CodegenConfig {
     /// 超高性能配置
     pub fn ultra_performance() -> Self {
         Self {
-            panic_abort: true, // 恐慌即中止，避免展开开销
+            panic_abort: true,      // 恐慌即中止，避免展开开销
             overflow_checks: false, // 生产环境禁用溢出检查
             fat_lto: true,
             enable_simd: true,
@@ -360,14 +371,14 @@ macro_rules! compile_time_optimize {
     (const $expr:expr) => {
         const { $expr }
     };
-    
+
     // 强制内联热路径
     (inline_hot $fn_name:ident) => {
         #[inline(always)]
         #[hot]
         $fn_name
     };
-    
+
     // 标记冷路径
     (cold $fn_name:ident) => {
         #[inline(never)]
@@ -379,10 +390,10 @@ macro_rules! compile_time_optimize {
 /// 🚀 零成本抽象特征
 pub trait ZeroCostAbstraction {
     type Output;
-    
+
     /// 编译时计算
     fn compute_at_compile_time(&self) -> Self::Output;
-    
+
     /// 内联操作
     #[inline(always)]
     fn inline_operation(&self) -> Self::Output {
@@ -406,35 +417,35 @@ impl CompileTimeOptimizedEventProcessor {
             route_table: Self::precompute_route_table(),
         }
     }
-    
+
     /// 编译时预计算哈希表
     const fn precompute_hash_table() -> [u64; 256] {
         let mut table = [0u64; 256];
         let mut i = 0;
-        
+
         while i < 256 {
             // 使用编译时常量计算哈希值
             table[i] = Self::const_hash(i as u8);
             i += 1;
         }
-        
+
         table
     }
-    
+
     /// 编译时预计算路由表
     const fn precompute_route_table() -> [u32; 1024] {
         let mut table = [0u32; 1024];
         let mut i = 0;
-        
+
         while i < 1024 {
             // 预计算路由信息
             table[i] = (i as u32) % 16; // 16个工作线程
             i += 1;
         }
-        
+
         table
     }
-    
+
     /// 编译时常量哈希函数
     const fn const_hash(input: u8) -> u64 {
         // 使用简单的编译时常量哈希
@@ -444,16 +455,14 @@ impl CompileTimeOptimizedEventProcessor {
         hash ^= hash << 17;
         hash
     }
-    
+
     /// 🚀 零开销事件路由
     #[inline(always)]
     pub fn route_event_zero_cost(&self, event_id: u8) -> u32 {
         // 编译时优化：直接数组访问，无边界检查
-        unsafe {
-            *self.route_table.get_unchecked((event_id as usize) & 1023)
-        }
+        unsafe { *self.route_table.get_unchecked((event_id as usize) & 1023) }
     }
-    
+
     /// 🚀 编译时优化的哈希查找
     #[inline(always)]
     pub fn hash_lookup_optimized(&self, key: u8) -> u64 {
@@ -471,28 +480,28 @@ impl SIMDCompileTimeOptimizer {
     #[target_feature(enable = "avx2")]
     pub unsafe fn vectorized_sum_compile_time(data: &[u64]) -> u64 {
         use std::arch::x86_64::*;
-        
+
         if data.len() < 4 {
             return data.iter().sum();
         }
-        
+
         let chunks = data.len() / 4;
         let mut sum_vec = _mm256_setzero_si256();
-        
+
         for i in 0..chunks {
             let ptr = data.as_ptr().add(i * 4) as *const __m256i;
             let vec = _mm256_loadu_si256(ptr);
             sum_vec = _mm256_add_epi64(sum_vec, vec);
         }
-        
+
         // 水平求和
         let mut result = [0u64; 4];
         _mm256_storeu_si256(result.as_mut_ptr() as *mut __m256i, sum_vec);
         let partial_sum: u64 = result.iter().sum();
-        
+
         // 处理剩余元素
         let remaining: u64 = data[chunks * 4..].iter().sum();
-        
+
         partial_sum + remaining
     }
 
@@ -530,7 +539,8 @@ fn main() {
         println!("cargo:rustc-link-arg=-fprofile-use");
     }
 }
-"#.to_string()
+"#
+    .to_string()
 }
 
 /// 🚀 生成.cargo/config.toml
@@ -583,56 +593,58 @@ rustflags = [
 rustflags = [
     "-C", "target-feature=+sse4.2,+avx,+avx2,+fma,+bmi1,+bmi2,+lzcnt,+popcnt",
 ]
-"#.to_string()
+"#
+    .to_string()
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_compiler_optimizer_creation() {
         let optimizer = CompilerOptimizer::new();
         assert!(optimizer.optimization_flags.enable_lto);
         assert_eq!(optimizer.optimization_flags.opt_level as u8, OptLevel::Aggressive as u8);
     }
-    
+
     #[test]
     fn test_compile_time_processor() {
-        const PROCESSOR: CompileTimeOptimizedEventProcessor = CompileTimeOptimizedEventProcessor::new();
-        
+        const PROCESSOR: CompileTimeOptimizedEventProcessor =
+            CompileTimeOptimizedEventProcessor::new();
+
         let route = PROCESSOR.route_event_zero_cost(42);
         assert!(route < 16); // 应该路由到16个工作线程之一
-        
+
         let hash = PROCESSOR.hash_lookup_optimized(100);
         assert!(hash > 0); // 哈希值应该非零
     }
-    
+
     #[test]
     fn test_ultra_performance_config() {
         let flags = OptimizationFlags::ultra_performance();
         assert!(flags.enable_lto);
         assert_eq!(flags.target_cpu, "native");
         assert!(!flags.target_features.is_empty());
-        
+
         let codegen = CodegenConfig::ultra_performance();
         assert!(codegen.panic_abort);
         assert!(!codegen.overflow_checks);
         assert!(codegen.enable_simd);
     }
-    
-    #[test] 
+
+    #[test]
     fn test_compiler_config_generation() {
         let optimizer = CompilerOptimizer::new();
         let config = optimizer.generate_ultra_performance_config().unwrap();
-        
+
         assert!(!config.rustflags.is_empty());
         assert!(config.rustflags.contains(&"-C".to_string()));
         assert!(config.rustflags.contains(&"opt-level=3".to_string()));
-        
+
         assert!(config.env_vars.contains_key("CARGO_INCREMENTAL"));
     }
-    
+
     #[test]
     fn test_simd_compile_time_optimization() {
         #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
@@ -649,7 +661,7 @@ mod tests {
             assert_eq!(sum, 36); // 1+2+3+4+5+6+7+8 = 36
         }
     }
-    
+
     #[test]
     fn test_build_script_generation() {
         let build_script = generate_build_script();
@@ -657,7 +669,7 @@ mod tests {
         assert!(build_script.contains("TARGET_FEATURE"));
         assert!(build_script.contains("lld"));
     }
-    
+
     #[test]
     fn test_cargo_config_generation() {
         let config = generate_cargo_config_toml();

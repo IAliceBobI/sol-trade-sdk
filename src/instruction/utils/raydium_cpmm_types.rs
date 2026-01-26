@@ -52,7 +52,7 @@ pub struct PoolState {
     pub padding: [u64; 31],
 }
 
-pub const POOL_STATE_SIZE: usize = 629;  // 不包含 discriminator 的数据大小（637 - 8 = 629）
+pub const POOL_STATE_SIZE: usize = 629; // 不包含 discriminator 的数据大小（637 - 8 = 629）
 
 pub fn pool_state_decode(data: &[u8]) -> Option<PoolState> {
     if data.len() < POOL_STATE_SIZE {

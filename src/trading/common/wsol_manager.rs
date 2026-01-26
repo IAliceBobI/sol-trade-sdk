@@ -54,16 +54,14 @@ pub fn close_wsol(payer: &Pubkey) -> Vec<Instruction> {
             wsol_token_account,
         },
         || {
-            vec![
-                close_account(
-                    &crate::constants::TOKEN_PROGRAM,
-                    &wsol_token_account,
-                    &payer,
-                    &payer,
-                    &[],
-                )
-                .unwrap(),
-            ]
+            vec![close_account(
+                &crate::constants::TOKEN_PROGRAM,
+                &wsol_token_account,
+                &payer,
+                &payer,
+                &[],
+            )
+            .unwrap()]
         },
     );
 
@@ -213,11 +211,12 @@ mod tests {
         let payer = &Pubkey::new_unique();
         let amount_in = 1_000_000;
 
-        let expected_ata = crate::common::fast_fn::get_associated_token_address_with_program_id_fast(
-            payer,
-            &WSOL_TOKEN_ACCOUNT,
-            &TOKEN_PROGRAM,
-        );
+        let expected_ata =
+            crate::common::fast_fn::get_associated_token_address_with_program_id_fast(
+                payer,
+                &WSOL_TOKEN_ACCOUNT,
+                &TOKEN_PROGRAM,
+            );
 
         let instructions = handle_wsol(payer, amount_in);
 
@@ -291,9 +290,7 @@ mod tests {
         let transfer_instruction = &instructions[1];
         // 转账指令的数据包含 lamports 金额
         let lamports = u64::from_le_bytes(
-            transfer_instruction.data[4..12]
-                .try_into()
-                .expect("should have 8 bytes for lamports"),
+            transfer_instruction.data[4..12].try_into().expect("should have 8 bytes for lamports"),
         );
         assert_eq!(lamports, amount_in);
     }
@@ -312,8 +309,8 @@ mod tests {
     fn test_wsol_address_pda_derivation() {
         // 测试 WSOL ATA 地址推导是否正确
         let payer = Pubkey::new_from_array([
-            1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16,
-            17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32,
+            1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24,
+            25, 26, 27, 28, 29, 30, 31, 32,
         ]);
         let wsol_ata = crate::common::fast_fn::get_associated_token_address_with_program_id_fast(
             &payer,

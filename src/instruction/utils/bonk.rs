@@ -242,9 +242,9 @@ pub fn get_creator_associated_account(creator: &Pubkey) -> Option<Pubkey> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use solana_client::nonblocking::rpc_client::RpcClient;
     use solana_sdk::pubkey::Pubkey;
     use std::str::FromStr;
-    use solana_client::nonblocking::rpc_client::RpcClient;
 
     #[test]
     fn test_get_pool_pda_returns_valid_pda() {
@@ -262,7 +262,8 @@ mod tests {
         println!("计算得到的池子地址: {}", pool_pda);
 
         // 验证池子地址是否正确
-        let expected_pool = Pubkey::from_str("HytrL5NCP55DyJJtD8Rx7BTKw59ZPZx558GuGW2AP2od").unwrap();
+        let expected_pool =
+            Pubkey::from_str("HytrL5NCP55DyJJtD8Rx7BTKw59ZPZx558GuGW2AP2od").unwrap();
         println!("期望的池子地址: {}", expected_pool);
 
         assert_eq!(pool_pda, expected_pool, "池子地址不匹配!");
@@ -278,7 +279,8 @@ mod tests {
     #[tokio::test]
     async fn test_fetch_pool_state() {
         // Test pool address provided by user
-        let pool_address = Pubkey::from_str("5UUBHfBssdFDtqFrcuPYA8xvYftYwYWEawucDuAH45KX").unwrap();
+        let pool_address =
+            Pubkey::from_str("5UUBHfBssdFDtqFrcuPYA8xvYftYwYWEawucDuAH45KX").unwrap();
 
         // Use public Solana RPC endpoint
         let rpc_url = "http://127.0.0.1:8899";
@@ -291,7 +293,7 @@ mod tests {
         assert!(result.is_ok(), "Failed to fetch pool state: {:?}", result.err());
 
         let pool_state = result.unwrap();
-        
+
         // Print pool state for verification
         println!("Pool State fetched successfully!");
         println!("  Token X: {}", pool_state.token_x);

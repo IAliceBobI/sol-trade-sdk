@@ -1,12 +1,8 @@
-use sol_trade_sdk::instruction::utils::raydium_amm_v4::{
-    get_pool_by_address,
-    get_pool_by_address_force,
-    get_pool_by_mint,
-    list_pools_by_mint,
-    clear_pool_cache,
-    get_token_price_in_usd_with_pool,
-};
 use sol_trade_sdk::common::auto_mock_rpc::AutoMockRpcClient;
+use sol_trade_sdk::instruction::utils::raydium_amm_v4::{
+    clear_pool_cache, get_pool_by_address, get_pool_by_address_force, get_pool_by_mint,
+    get_token_price_in_usd_with_pool, list_pools_by_mint,
+};
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_sdk::pubkey::Pubkey;
 use std::str::FromStr;
@@ -40,7 +36,7 @@ async fn test_fetch_amm_info() {
     // 使用 Auto Mock RPC 客户端加速测试（使用独立命名空间）
     let rpc = AutoMockRpcClient::new_with_namespace(
         rpc_url.to_string(),
-        Some("raydium_amm_v4_pool_tests".to_string())
+        Some("raydium_amm_v4_pool_tests".to_string()),
     );
 
     // 清除缓存，确保测试从干净状态开始
@@ -260,23 +256,25 @@ async fn test_get_pool_by_address_cache() {
 #[tokio::test]
 async fn test_public_rpc_limitations() {
     println!("=== 测试：验证公共 RPC getProgramAccounts 限制 ===");
-    
+
     use sol_trade_sdk::instruction::utils::raydium_amm_v4::accounts::RAYDIUM_AMM_V4;
     use solana_account_decoder::UiAccountEncoding;
     use solana_client::rpc_filter::Memcmp;
     use solana_rpc_client_api::{config::RpcProgramAccountsConfig, filter::RpcFilterType};
-    
-    let wsol_mint = Pubkey::from_str("So11111111111111111111111111111111111111112")
-        .unwrap_or_else(|_| panic!("Invalid WSOL mint: So11111111111111111111111111111111111111112"));
+
+    let wsol_mint =
+        Pubkey::from_str("So11111111111111111111111111111111111111112").unwrap_or_else(|_| {
+            panic!("Invalid WSOL mint: So11111111111111111111111111111111111111112")
+        });
     let rpc_url = "http://127.0.0.1:8899";
     let rpc = RpcClient::new(rpc_url.to_string());
 
     // 尝试查询 coin_mint offset (400)
     let filters = vec![
-        RpcFilterType::DataSize(752),  // AMM_INFO_SIZE
+        RpcFilterType::DataSize(752), // AMM_INFO_SIZE
         RpcFilterType::Memcmp(Memcmp::new_base58_encoded(400, &wsol_mint.to_bytes())),
     ];
-    
+
     let config = RpcProgramAccountsConfig {
         filters: Some(filters),
         account_config: solana_rpc_client_api::config::RpcAccountInfoConfig {
@@ -288,7 +286,7 @@ async fn test_public_rpc_limitations() {
         with_context: None,
         sort_results: None,
     };
-    
+
     println!("正在查询 Raydium AMM V4 程序账户（coin_mint = WSOL）...");
     match rpc.get_program_ui_accounts_with_config(&RAYDIUM_AMM_V4, config).await {
         Ok(accounts) => {
@@ -354,7 +352,7 @@ async fn test_raydium_amm_v4_get_pool_by_mint_with_auto_mock() {
     // 使用 Auto Mock RPC 客户端（使用独立命名空间避免与其他测试冲突）
     let auto_mock_client = AutoMockRpcClient::new_with_namespace(
         rpc_url.to_string(),
-        Some("raydium_amm_v4_tests".to_string())
+        Some("raydium_amm_v4_tests".to_string()),
     );
 
     println!("Token Mint: {}", wsol_mint);
@@ -384,9 +382,8 @@ async fn test_raydium_amm_v4_get_pool_by_mint_with_auto_mock() {
 
     // 2. 使用 Auto Mock 的 get_pool_by_mint（无缓存版本）
     println!("\n步骤 2: 使用 get_pool_by_mint 查询最优 Pool...");
-    let (pool_addr_1, amm_info_1) = get_pool_by_mint(&auto_mock_client, &wsol_mint)
-        .await
-        .expect("get_pool_by_mint failed");
+    let (pool_addr_1, amm_info_1) =
+        get_pool_by_mint(&auto_mock_client, &wsol_mint).await.expect("get_pool_by_mint failed");
     println!("✅ 找到最优 Pool: {}", pool_addr_1);
 
     // 验证基本字段

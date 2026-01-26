@@ -10,7 +10,10 @@ use sol_trade_sdk::TradeTokenType;
 use sol_trade_sdk::{
     common::AnyResult,
     swqos::SwqosConfig,
-    trading::{core::params::{PumpFunParams, DexParamEnum}, factory::DexType},
+    trading::{
+        core::params::{DexParamEnum, PumpFunParams},
+        factory::DexType,
+    },
     SolanaTrade,
 };
 use solana_commitment_config::CommitmentConfig;
@@ -121,14 +124,7 @@ async fn pumpfun_copy_trade_with_grpc(trade_info: PumpFunTradeEvent) -> AnyResul
     let recent_blockhash = client.rpc.get_latest_blockhash().await?;
 
     let gas_fee_strategy = sol_trade_sdk::common::GasFeeStrategy::new();
-    gas_fee_strategy.set_global_fee_strategy(
-        150000,
-        150000,
-        500000,
-        500000,
-        0.001,
-        0.001,
-    );
+    gas_fee_strategy.set_global_fee_strategy(150000, 150000, 500000, 500000, 0.001, 0.001);
 
     // Buy tokens
     println!("Buying tokens from PumpFun...");

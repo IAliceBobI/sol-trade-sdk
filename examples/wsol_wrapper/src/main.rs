@@ -38,7 +38,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Example 2: Unwrap half of the WSOL back to SOL using seed account
     println!("\n🔄 Example 2: Unwrapping half of WSOL back to SOL using seed account");
     let unwrap_amount = wrap_amount / 2; // Half of the wrapped amount
-    println!("Unwrapping {} lamports (0.0005 SOL) back to SOL using seed account...", unwrap_amount);
+    println!(
+        "Unwrapping {} lamports (0.0005 SOL) back to SOL using seed account...",
+        unwrap_amount
+    );
 
     match solana_trade.wrap_wsol_to_sol(unwrap_amount).await {
         Ok(signature) => {
@@ -77,23 +80,23 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 /// Create and initialize SolanaTrade client
 async fn create_solana_trade_client() -> Result<SolanaTrade, Box<dyn std::error::Error>> {
     println!("🚀 Initializing SolanaTrade client...");
-    
+
     // Read payer keypair from ~/.config/solana/id.json
     let home_dir = std::env::var("HOME").expect("HOME environment variable not set");
     let keypair_path = format!("{}/.config/solana/id.json", home_dir);
     println!("Loading keypair from: {}", keypair_path);
-    
+
     let keypair_data = fs::read_to_string(&keypair_path)
         .expect(&format!("Failed to read keypair file: {}", keypair_path));
-    
+
     // Parse JSON and extract private key array
-    let private_key: Vec<u8> = serde_json::from_str(&keypair_data)
-        .expect("Failed to parse keypair JSON");
-    
+    let private_key: Vec<u8> =
+        serde_json::from_str(&keypair_data).expect("Failed to parse keypair JSON");
+
     // Use the first 32 bytes as the secret key
     let secret_key: [u8; 32] = private_key[0..32].try_into().expect("Invalid key length");
     let payer = Keypair::new_from_array(secret_key);
-    
+
     let rpc_url = "http://127.0.0.1:8899".to_string();
     let commitment = CommitmentConfig::confirmed();
     let swqos_configs: Vec<SwqosConfig> = vec![SwqosConfig::Default(rpc_url.clone())];

@@ -12,7 +12,8 @@ use sol_trade_sdk::{
     swqos::SwqosConfig,
     trading::{
         core::params::{
-            BonkParams, PumpFunParams, PumpSwapParams, RaydiumAmmV4Params, RaydiumCpmmParams, DexParamEnum,
+            BonkParams, DexParamEnum, PumpFunParams, PumpSwapParams, RaydiumAmmV4Params,
+            RaydiumCpmmParams,
         },
         factory::DexType,
     },
@@ -536,8 +537,15 @@ async fn handle_buy(
 
     match dex {
         "pumpfun" => {
-            handle_buy_pumpfun(mint, sol_amount, slippage, create_mint_ata, _use_seed, _owner_pubkey)
-                .await?;
+            handle_buy_pumpfun(
+                mint,
+                sol_amount,
+                slippage,
+                create_mint_ata,
+                _use_seed,
+                _owner_pubkey,
+            )
+            .await?;
         }
         "pumpswap" => {
             handle_buy_pumpswap(
@@ -567,8 +575,16 @@ async fn handle_buy_rv4(
     let client = initialize_real_client().await?;
     let (create_mint_ata, _use_seed, _owner_pubkey, _amount_f64, _decimals) =
         check_mint_ata(&client, mint).await?;
-    handle_buy_raydium_v4(mint, amm, sol_amount, slippage, create_mint_ata, _use_seed, _owner_pubkey)
-        .await?;
+    handle_buy_raydium_v4(
+        mint,
+        amm,
+        sol_amount,
+        slippage,
+        create_mint_ata,
+        _use_seed,
+        _owner_pubkey,
+    )
+    .await?;
     Ok(())
 }
 

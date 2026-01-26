@@ -6,28 +6,21 @@ pub mod perf;
 pub mod swqos;
 pub mod trading;
 pub mod utils;
-use crate::common::GasFeeStrategy;
-use crate::common::TradeConfig;
-use crate::common::InfrastructureConfig;
-use crate::common::CallbackExecutionMode;
 use crate::common::nonce_cache::DurableNonceInfo;
+use crate::common::CallbackExecutionMode;
+use crate::common::GasFeeStrategy;
+use crate::common::InfrastructureConfig;
+use crate::common::TradeConfig;
+#[cfg(feature = "perf-trace")]
+use crate::constants::trade::trade::DEFAULT_SLIPPAGE;
 use crate::constants::SOL_TOKEN_ACCOUNT;
 use crate::constants::USD1_TOKEN_ACCOUNT;
 use crate::constants::USDC_TOKEN_ACCOUNT;
 use crate::constants::WSOL_TOKEN_ACCOUNT;
-pub use crate::trading::CallbackRef;
-pub use crate::trading::TransactionLifecycleCallback;
-pub use crate::trading::CallbackContext;
-pub use crate::trading::NoopCallback;
-#[cfg(feature = "perf-trace")]
-use crate::constants::trade::trade::DEFAULT_SLIPPAGE;
+use crate::swqos::common::TradeError;
 use crate::swqos::SwqosClient;
 use crate::swqos::SwqosConfig;
 use crate::swqos::TradeType;
-use crate::swqos::common::TradeError;
-use crate::trading::MiddlewareManager;
-use crate::trading::SwapParams;
-use crate::trading::TradeFactory;
 use crate::trading::core::params::BonkParams;
 use crate::trading::core::params::DexParamEnum;
 use crate::trading::core::params::MeteoraDammV2Params;
@@ -35,9 +28,16 @@ use crate::trading::core::params::PumpFunParams;
 use crate::trading::core::params::PumpSwapParams;
 use crate::trading::core::params::{RaydiumAmmV4Params, RaydiumClmmParams, RaydiumCpmmParams};
 pub use crate::trading::factory::DexType;
+pub use crate::trading::CallbackContext;
+pub use crate::trading::CallbackRef;
+use crate::trading::MiddlewareManager;
+pub use crate::trading::NoopCallback;
+use crate::trading::SwapParams;
+use crate::trading::TradeFactory;
+pub use crate::trading::TransactionLifecycleCallback;
 use common::SolanaRpcClient;
 use parking_lot::Mutex;
-use rustls::crypto::{CryptoProvider, ring::default_provider};
+use rustls::crypto::{ring::default_provider, CryptoProvider};
 use solana_sdk::hash::Hash;
 use solana_sdk::message::AddressLookupTableAccount;
 use solana_sdk::signer::Signer;
@@ -96,14 +96,19 @@ impl TradingInfrastructure {
         for swqos in &config.swqos_configs {
             // Check blacklist, skip disabled providers
             if swqos.is_blacklisted() {
-                eprintln!("\u{26a0}\u{fe0f} SWQOS {:?} is blacklisted, skipping", swqos.swqos_type());
+                eprintln!(
+                    "\u{26a0}\u{fe0f} SWQOS {:?} is blacklisted, skipping",
+                    swqos.swqos_type()
+                );
                 continue;
             }
             match SwqosConfig::get_swqos_client(
                 config.rpc_url.clone(),
                 config.commitment.clone(),
                 swqos.clone(),
-            ).await {
+            )
+            .await
+            {
                 Ok(swqos_client) => swqos_clients.push(swqos_client),
                 Err(err) => eprintln!(
                     "failed to create {:?} swqos client: {err}. Excluding from swqos list",
@@ -112,14 +117,9 @@ impl TradingInfrastructure {
             }
         }
 
-        Self {
-            rpc,
-            swqos_clients,
-            config,
-        }
+        Self { rpc, swqos_clients, config }
     }
 }
-
 
 /// Main trading client for Solana DeFi protocols
 ///
@@ -296,7 +296,9 @@ impl TradingClient {
         let mut swqos_clients: Vec<Arc<SwqosClient>> = vec![];
 
         for swqos in swqos_configs {
-            match SwqosConfig::get_swqos_client(rpc_url.clone(), commitment.clone(), swqos.clone()).await {
+            match SwqosConfig::get_swqos_client(rpc_url.clone(), commitment.clone(), swqos.clone())
+                .await
+            {
                 Ok(client) => swqos_clients.push(client),
                 Err(e) => {
                     eprintln!("Failed to create SWQOS client {:?}: {}", swqos, e);
@@ -512,7 +514,9 @@ impl TradingClient {
             gas_fee_strategy: params.gas_fee_strategy,
             simulate: params.simulate,
             on_transaction_signed: params.on_transaction_signed,
-            callback_execution_mode: params.callback_execution_mode.or(Some(self.callback_execution_mode)),
+            callback_execution_mode: params
+                .callback_execution_mode
+                .or(Some(self.callback_execution_mode)),
         };
 
         // Validate protocol params
@@ -626,7 +630,9 @@ impl TradingClient {
             gas_fee_strategy: params.gas_fee_strategy,
             simulate: params.simulate,
             on_transaction_signed: params.on_transaction_signed,
-            callback_execution_mode: params.callback_execution_mode.or(Some(self.callback_execution_mode)),
+            callback_execution_mode: params
+                .callback_execution_mode
+                .or(Some(self.callback_execution_mode)),
         };
 
         // Validate protocol params

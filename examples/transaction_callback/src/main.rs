@@ -3,16 +3,17 @@
 // 本示例演示如何使用交易生命周期回调在交易签名后、发送前获取签名后的交易实体，用于入库等操作
 
 use anyhow::Result;
-use sol_trade_sdk::{
-    SolanaTrade, TradeBuyParams, TradeTokenType, DexType,
-    CallbackContext, TransactionLifecycleCallback,
-    trading::core::params::{PumpSwapParams, DexParamEnum},
-    common::TradeConfig, swqos::SwqosConfig,
-};
-use solana_sdk::{pubkey::Pubkey, signature::Keypair};
-use solana_commitment_config::CommitmentConfig;
-use std::{str::FromStr, sync::Arc};
 use futures::future::BoxFuture;
+use sol_trade_sdk::{
+    common::TradeConfig,
+    swqos::SwqosConfig,
+    trading::core::params::{DexParamEnum, PumpSwapParams},
+    CallbackContext, DexType, SolanaTrade, TradeBuyParams, TradeTokenType,
+    TransactionLifecycleCallback,
+};
+use solana_commitment_config::CommitmentConfig;
+use solana_sdk::{pubkey::Pubkey, signature::Keypair};
+use std::{str::FromStr, sync::Arc};
 
 /// 自定义数据库回调示例
 ///
@@ -24,10 +25,7 @@ impl TransactionLifecycleCallback for MyDatabaseCallback {
     fn on_transaction_signed(&self, context: CallbackContext) -> BoxFuture<'static, Result<()>> {
         let context_clone = context.clone();
         Box::pin(async move {
-            println!(
-                "[Database] Saving transaction: {}",
-                context_clone.signature
-            );
+            println!("[Database] Saving transaction: {}", context_clone.signature);
             println!("  - SWQOS Type: {:?}", context_clone.swqos_type);
             println!("  - Trade Type: {:?}", context_clone.trade_type);
             println!("  - Timestamp: {}", context_clone.timestamp_ns);
@@ -72,10 +70,7 @@ impl TransactionLifecycleCallback for DatabaseCallbackWithPool {
     fn on_transaction_signed(&self, context: CallbackContext) -> BoxFuture<'static, Result<()>> {
         // pool = self.pool.clone();
         Box::pin(async move {
-            println!(
-                "[DatabaseWithPool] Saving transaction: {}",
-                context.signature
-            );
+            println!("[DatabaseWithPool] Saving transaction: {}", context.signature);
 
             // 示例：使用连接池保存到数据库
             // sqlx::query!(
@@ -210,7 +205,7 @@ async fn main() -> Result<()> {
         durable_nonce: None,
         fixed_output_token_amount: None,
         gas_fee_strategy: sol_trade_sdk::common::GasFeeStrategy::new(),
-        simulate: true, // 模拟模式，不实际发送交易
+        simulate: true,              // 模拟模式，不实际发送交易
         on_transaction_signed: None, // 不使用回调
         callback_execution_mode: None,
     };

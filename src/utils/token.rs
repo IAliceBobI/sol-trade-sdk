@@ -2,8 +2,8 @@
 //!
 //! 提供跨项目使用的 Token 相关工具函数
 
-use crate::constants::{SOL_MINT, USDC_MINT, USDT_MINT, RAY_MINT};
 use crate::common::auto_mock_rpc::PoolRpcClient;
+use crate::constants::{RAY_MINT, SOL_MINT, USDC_MINT, USDT_MINT};
 use anyhow::Result;
 use dashmap::DashMap;
 use once_cell::sync::Lazy;
@@ -66,8 +66,8 @@ pub async fn get_mint_info(
 
             // 尝试获取 TokenMetadata 中的 symbol
             let symbol = if let Ok(metadata) = mint_account
-                .get_variable_len_extension::<spl_token_metadata_interface::state::TokenMetadata>()
-            {
+                .get_variable_len_extension::<spl_token_metadata_interface::state::TokenMetadata>(
+            ) {
                 let s = metadata.symbol.to_string();
                 if s.is_empty() {
                     get_known_token_symbol(mint)
@@ -78,11 +78,7 @@ pub async fn get_mint_info(
                 get_known_token_symbol(mint)
             };
 
-            let info = MintInfo {
-                decimals,
-                symbol,
-                is_token2022: true,
-            };
+            let info = MintInfo { decimals, symbol, is_token2022: true };
             MINT_INFO_CACHE.insert(*mint, info.clone());
             return Ok(info);
         }
@@ -103,8 +99,8 @@ pub async fn get_mint_info_with_client<T: PoolRpcClient + ?Sized>(
     rpc: &T,
     mint: &Pubkey,
 ) -> Result<MintInfo> {
-    let account = rpc.get_account(mint).await
-        .map_err(|e| anyhow::anyhow!("RPC 调用失败: {}", e))?;
+    let account =
+        rpc.get_account(mint).await.map_err(|e| anyhow::anyhow!("RPC 调用失败: {}", e))?;
     let is_token2022 = account.owner == spl_token_2022::ID;
 
     // 尝试解析为传统 Token 程序的 Mint
@@ -129,8 +125,8 @@ pub async fn get_mint_info_with_client<T: PoolRpcClient + ?Sized>(
 
             // 尝试获取 TokenMetadata 中的 symbol
             let symbol = if let Ok(metadata) = mint_account
-                .get_variable_len_extension::<spl_token_metadata_interface::state::TokenMetadata>()
-            {
+                .get_variable_len_extension::<spl_token_metadata_interface::state::TokenMetadata>(
+            ) {
                 let s = metadata.symbol.to_string();
                 if s.is_empty() {
                     get_known_token_symbol(mint)
@@ -141,11 +137,7 @@ pub async fn get_mint_info_with_client<T: PoolRpcClient + ?Sized>(
                 get_known_token_symbol(mint)
             };
 
-            let info = MintInfo {
-                decimals,
-                symbol,
-                is_token2022: true,
-            };
+            let info = MintInfo { decimals, symbol, is_token2022: true };
             MINT_INFO_CACHE.insert(*mint, info.clone());
             return Ok(info);
         }
@@ -162,10 +154,7 @@ pub async fn get_mint_info_with_client<T: PoolRpcClient + ?Sized>(
 /// 获取代币精度（统一实现，支持 Token 和 Token2022）
 ///
 /// 使用全局缓存减少 RPC 调用
-pub async fn get_token_decimals(
-    rpc: &crate::common::SolanaRpcClient,
-    mint: &Pubkey,
-) -> Result<u8> {
+pub async fn get_token_decimals(rpc: &crate::common::SolanaRpcClient, mint: &Pubkey) -> Result<u8> {
     get_token_decimals_with_client(rpc, mint).await
 }
 
@@ -282,7 +271,7 @@ mod tests {
         use solana_client::nonblocking::rpc_client::RpcClient;
         let rpc = RpcClient::new("http://127.0.0.1:8899".to_string());
         let wsol = Pubkey::from_str_const("So11111111111111111111111111111111111111112");
-        
+
         let decimals = get_token_decimals(&rpc, &wsol).await.unwrap();
         assert_eq!(decimals, 9);
     }
@@ -292,7 +281,7 @@ mod tests {
         use solana_client::nonblocking::rpc_client::RpcClient;
         let rpc = RpcClient::new("http://127.0.0.1:8899".to_string());
         let usdc = Pubkey::from_str_const("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v");
-        
+
         let decimals = get_token_decimals(&rpc, &usdc).await.unwrap();
         assert_eq!(decimals, 6);
     }

@@ -1,18 +1,17 @@
 //! 交易序列化模块
 
+use crate::perf::{
+    compiler_optimization::CompileTimeOptimizedEventProcessor, simd::SIMDSerializer,
+};
 use anyhow::Result;
-use base64::Engine;
 use base64::engine::general_purpose::STANDARD;
+use base64::Engine;
+use crossbeam_queue::ArrayQueue;
 use once_cell::sync::Lazy;
 use solana_client::rpc_client::SerializableTransaction;
 use solana_sdk::signature::Signature;
 use solana_transaction_status::UiTransactionEncoding;
 use std::sync::Arc;
-use crossbeam_queue::ArrayQueue;
-use crate::perf::{
-    simd::SIMDSerializer,
-    compiler_optimization::CompileTimeOptimizedEventProcessor,
-};
 
 /// 零分配序列化器 - 使用缓冲池避免运行时分配
 pub struct ZeroAllocSerializer {
@@ -31,13 +30,14 @@ impl ZeroAllocSerializer {
             let _ = pool.push(buffer);
         }
 
-        Self {
-            buffer_pool: Arc::new(pool),
-            buffer_size,
-        }
+        Self { buffer_pool: Arc::new(pool), buffer_size }
     }
 
-    pub fn serialize_zero_alloc<T: serde::Serialize>(&self, data: &T, _label: &str) -> Result<Vec<u8>> {
+    pub fn serialize_zero_alloc<T: serde::Serialize>(
+        &self,
+        data: &T,
+        _label: &str,
+    ) -> Result<Vec<u8>> {
         // 尝试从池中获取缓冲区
         let mut buffer = self.buffer_pool.pop().unwrap_or_else(|| {
             let mut buf = Vec::with_capacity(self.buffer_size);
@@ -69,8 +69,8 @@ impl ZeroAllocSerializer {
 /// 全局序列化器实例
 static SERIALIZER: Lazy<Arc<ZeroAllocSerializer>> = Lazy::new(|| {
     Arc::new(ZeroAllocSerializer::new(
-        10_000,      // 池大小
-        256 * 1024,  // 缓冲区大小: 256KB
+        10_000,     // 池大小
+        256 * 1024, // 缓冲区大小: 256KB
     ))
 });
 

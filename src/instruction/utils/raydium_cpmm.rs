@@ -1,18 +1,19 @@
 use crate::{
-    common::{SolanaRpcClient, auto_mock_rpc::PoolRpcClient},
-    instruction::utils::raydium_cpmm_types::{PoolState, pool_state_decode},
+    common::{auto_mock_rpc::PoolRpcClient, SolanaRpcClient},
+    constants::{USDC_MINT, USDT_MINT, WSOL_TOKEN_ACCOUNT},
+    instruction::utils::raydium_cpmm_types::{pool_state_decode, PoolState},
     trading::core::params::RaydiumCpmmParams,
-    constants::{WSOL_TOKEN_ACCOUNT, USDC_MINT, USDT_MINT},
 };
 use anyhow::anyhow;
-use solana_sdk::{pubkey, pubkey::Pubkey};
-use solana_account_decoder::UiAccountData;
-use base64::Engine;
 use base64::engine::general_purpose::STANDARD;
+use base64::Engine;
+use solana_account_decoder::UiAccountData;
+use solana_sdk::{pubkey, pubkey::Pubkey};
 
 /// Raydium CLMM WSOL-USDT 锚定池（用于 USD 价格计算）
 /// 如果不传入锚定池参数，默认使用此池
-pub const DEFAULT_WSOL_USDT_CLMM_POOL: Pubkey = pubkey!("ExcBWu8fGPdJiaF1b1z3iEef38sjQJks8xvj6M85pPY6");
+pub const DEFAULT_WSOL_USDT_CLMM_POOL: Pubkey =
+    pubkey!("ExcBWu8fGPdJiaF1b1z3iEef38sjQJks8xvj6M85pPY6");
 
 /// Constants used as seeds for deriving PDAs (Program Derived Addresses)
 pub mod seeds {
@@ -98,8 +99,8 @@ pub(crate) mod raydium_cpmm_cache {
 // 常量偏移量（包含 discriminator）
 // 根据实际数据解析结果，mintA 在 offset 160（不包含 discriminator），mintB 在 offset 192（不包含 discriminator）
 // RPC 查询时使用包含 discriminator 的偏移量，所以需要加 8
-const TOKEN0_MINT_OFFSET: usize = 168;  // mintA offset (160 + 8 discriminator)
-const TOKEN1_MINT_OFFSET: usize = 200;  // mintB offset (192 + 8 discriminator)
+const TOKEN0_MINT_OFFSET: usize = 168; // mintA offset (160 + 8 discriminator)
+const TOKEN1_MINT_OFFSET: usize = 200; // mintB offset (192 + 8 discriminator)
 
 /// 判断是否为 Hot Mint（主流桥接资产）
 /// 当前包含：WSOL、USDC、USDT
@@ -127,8 +128,8 @@ pub async fn get_pool_by_address<T: PoolRpcClient + ?Sized>(
         return Ok(pool);
     }
     // 2. RPC 查询
-    let account = rpc.get_account(pool_address).await
-        .map_err(|e| anyhow!("RPC 调用失败: {}", e))?;
+    let account =
+        rpc.get_account(pool_address).await.map_err(|e| anyhow!("RPC 调用失败: {}", e))?;
     if account.owner != accounts::RAYDIUM_CPMM {
         return Err(anyhow!("Account is not owned by Raydium Cpmm program"));
     }
@@ -363,10 +364,8 @@ pub async fn get_pool_token_balances<T: PoolRpcClient + ?Sized>(
         rpc.get_token_account_balance(&token1_vault),
     );
 
-    let token0_balance = token0_balance_result
-        .map_err(|e| anyhow!("RPC 调用失败: {}", e))?;
-    let token1_balance = token1_balance_result
-        .map_err(|e| anyhow!("RPC 调用失败: {}", e))?;
+    let token0_balance = token0_balance_result.map_err(|e| anyhow!("RPC 调用失败: {}", e))?;
+    let token1_balance = token1_balance_result.map_err(|e| anyhow!("RPC 调用失败: {}", e))?;
 
     // Parse balance string to u64
     let token0_amount = token0_balance
@@ -393,9 +392,13 @@ pub async fn quote_exact_in(
     is_token0_in: bool,
 ) -> Result<crate::utils::quote::QuoteExactInResult, anyhow::Error> {
     let pool_state = get_pool_by_address(rpc, pool_address).await?;
-    let (token0_reserve, token1_reserve) =
-        get_pool_token_balances(rpc, pool_address, &pool_state.token0_mint, &pool_state.token1_mint)
-            .await?;
+    let (token0_reserve, token1_reserve) = get_pool_token_balances(
+        rpc,
+        pool_address,
+        &pool_state.token0_mint,
+        &pool_state.token1_mint,
+    )
+    .await?;
 
     let q = crate::utils::calc::raydium_cpmm::compute_swap_amount(
         token0_reserve,
@@ -420,17 +423,15 @@ async fn find_pools_by_mint_offset_collect<T: PoolRpcClient + ?Sized>(
     offset: usize,
 ) -> Result<Vec<(Pubkey, PoolState)>, anyhow::Error> {
     use solana_account_decoder::UiAccountEncoding;
-    use solana_rpc_client_api::{config::RpcProgramAccountsConfig, filter::RpcFilterType};
     use solana_client::rpc_filter::Memcmp;
+    use solana_rpc_client_api::{config::RpcProgramAccountsConfig, filter::RpcFilterType};
 
     // 暂时移除 DataSize 过滤，只使用 Memcmp 过滤
     // let filters = vec![
     //     RpcFilterType::DataSize((POOL_STATE_SIZE + 8) as u64),
     //     RpcFilterType::Memcmp(Memcmp::new_base58_encoded(offset, &mint.to_bytes())),
     // ];
-    let filters = vec![
-        RpcFilterType::Memcmp(Memcmp::new_base58_encoded(offset, &mint.to_bytes())),
-    ];
+    let filters = vec![RpcFilterType::Memcmp(Memcmp::new_base58_encoded(offset, &mint.to_bytes()))];
     let config = RpcProgramAccountsConfig {
         filters: Some(filters),
         account_config: solana_rpc_client_api::config::RpcAccountInfoConfig {
@@ -443,7 +444,9 @@ async fn find_pools_by_mint_offset_collect<T: PoolRpcClient + ?Sized>(
         sort_results: None,
     };
 
-    let accounts = rpc.get_program_ui_accounts_with_config(&accounts::RAYDIUM_CPMM, config).await
+    let accounts = rpc
+        .get_program_ui_accounts_with_config(&accounts::RAYDIUM_CPMM, config)
+        .await
         .map_err(|e| anyhow!("RPC 调用失败: {}", e))?;
 
     let pools: Vec<(Pubkey, PoolState)> = accounts
@@ -644,7 +647,9 @@ pub fn get_vault_account(
 ) -> Pubkey {
     if protocol_params.base_mint == *token_mint && protocol_params.base_vault != Pubkey::default() {
         protocol_params.base_vault
-    } else if protocol_params.quote_mint == *token_mint && protocol_params.quote_vault != Pubkey::default() {
+    } else if protocol_params.quote_mint == *token_mint
+        && protocol_params.quote_vault != Pubkey::default()
+    {
         protocol_params.quote_vault
     } else {
         get_vault_pda(pool_state, token_mint).unwrap()
@@ -708,13 +713,9 @@ pub async fn get_token_price_in_usd(
     if other_mint == USDC_MINT || other_mint == USDT_MINT {
         // X-稳定币池：直接计算 X 相对稳定币的价格
         // 获取实时余额
-        let (token0_balance, token1_balance) = get_pool_token_balances(
-            rpc,
-            &pool_address,
-            &pool.token0_mint,
-            &pool.token1_mint,
-        )
-        .await?;
+        let (token0_balance, token1_balance) =
+            get_pool_token_balances(rpc, &pool_address, &pool.token0_mint, &pool.token1_mint)
+                .await?;
 
         let price_x_in_stable = if is_token0_x {
             // token0 = X, token1 = USDC/USDT
@@ -755,13 +756,8 @@ pub async fn get_token_price_in_usd(
 
     // X-WSOL 池：计算 X 相对 WSOL 的价格
     // 获取实时余额
-    let (token0_balance, token1_balance) = get_pool_token_balances(
-        rpc,
-        &pool_address,
-        &pool.token0_mint,
-        &pool.token1_mint,
-    )
-    .await?;
+    let (token0_balance, token1_balance) =
+        get_pool_token_balances(rpc, &pool_address, &pool.token0_mint, &pool.token1_mint).await?;
 
     let price_x_in_wsol = if is_token0_x {
         // token0 = X, token1 = WSOL
@@ -786,11 +782,12 @@ pub async fn get_token_price_in_usd(
     }
 
     // 4. 计算 WSOL 的 USD 价格
-    let price_wsol_in_usd = crate::instruction::utils::raydium_clmm::get_wsol_price_in_usd_with_client(
-        rpc,
-        Some(wsol_usd_pool),
-    )
-    .await?;
+    let price_wsol_in_usd =
+        crate::instruction::utils::raydium_clmm::get_wsol_price_in_usd_with_client(
+            rpc,
+            Some(wsol_usd_pool),
+        )
+        .await?;
 
     Ok(price_x_in_wsol * price_wsol_in_usd)
 }
@@ -857,13 +854,9 @@ pub async fn get_token_price_in_usd_with_pool<T: PoolRpcClient + ?Sized>(
     if other_mint == USDC_MINT || other_mint == USDT_MINT {
         // X-稳定币池：直接计算 X 相对稳定币的价格
         // 获取实时余额
-        let (token0_balance, token1_balance) = get_pool_token_balances(
-            rpc,
-            x_wsol_pool_address,
-            &pool.token0_mint,
-            &pool.token1_mint,
-        )
-        .await?;
+        let (token0_balance, token1_balance) =
+            get_pool_token_balances(rpc, x_wsol_pool_address, &pool.token0_mint, &pool.token1_mint)
+                .await?;
 
         let price_x_in_stable = if is_token0_x {
             // token0 = X, token1 = USDC/USDT
@@ -904,13 +897,9 @@ pub async fn get_token_price_in_usd_with_pool<T: PoolRpcClient + ?Sized>(
 
     // 3. X-WSOL 池：计算 X 相对 WSOL 的价格
     // 获取实时余额
-    let (token0_balance, token1_balance) = get_pool_token_balances(
-        rpc,
-        x_wsol_pool_address,
-        &pool.token0_mint,
-        &pool.token1_mint,
-    )
-    .await?;
+    let (token0_balance, token1_balance) =
+        get_pool_token_balances(rpc, x_wsol_pool_address, &pool.token0_mint, &pool.token1_mint)
+            .await?;
 
     let price_x_in_wsol = if is_token0_x {
         // token0 = X, token1 = WSOL
@@ -935,11 +924,12 @@ pub async fn get_token_price_in_usd_with_pool<T: PoolRpcClient + ?Sized>(
     }
 
     // 4. 计算 WSOL 的 USD 价格
-    let price_wsol_in_usd = crate::instruction::utils::raydium_clmm::get_wsol_price_in_usd_with_client(
-        rpc,
-        Some(wsol_usd_pool),
-    )
-    .await?;
+    let price_wsol_in_usd =
+        crate::instruction::utils::raydium_clmm::get_wsol_price_in_usd_with_client(
+            rpc,
+            Some(wsol_usd_pool),
+        )
+        .await?;
 
     Ok(price_x_in_wsol * price_wsol_in_usd)
 }

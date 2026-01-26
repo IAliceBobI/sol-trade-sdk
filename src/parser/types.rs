@@ -115,10 +115,7 @@ pub struct ParserConfig {
 
 impl Default for ParserConfig {
     fn default() -> Self {
-        Self {
-            verbose: false,
-            rpc_url: "http://127.0.0.1:8899".to_string(),
-        }
+        Self { verbose: false, rpc_url: "http://127.0.0.1:8899".to_string() }
     }
 }
 

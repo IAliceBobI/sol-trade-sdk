@@ -17,11 +17,7 @@ impl InfrastructureConfig {
         swqos_configs: Vec<SwqosConfig>,
         commitment: CommitmentConfig,
     ) -> Self {
-        Self {
-            rpc_url,
-            swqos_configs,
-            commitment,
-        }
+        Self { rpc_url, swqos_configs, commitment }
     }
 
     /// Create from TradeConfig (extract infrastructure-only settings)
@@ -128,9 +124,9 @@ impl TradeConfig {
             rpc_url,
             swqos_configs,
             commitment,
-            create_wsol_ata_on_startup: true,  // 默认：启动时检查并创建
-            use_seed_optimize: false,          // 默认：禁用seed优化
-            callback_execution_mode: CallbackExecutionMode::Async,  // 默认：异步模式
+            create_wsol_ata_on_startup: true, // 默认：启动时检查并创建
+            use_seed_optimize: false,         // 默认：禁用seed优化
+            callback_execution_mode: CallbackExecutionMode::Async, // 默认：异步模式
         }
     }
 

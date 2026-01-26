@@ -1,8 +1,8 @@
-use sol_trade_sdk::instruction::utils::pumpswap::{
-    clear_pool_cache, find_pool, get_pool_by_address,
-    get_token_balances, get_token_price_in_usd_with_pool,
-};
 use sol_trade_sdk::common::auto_mock_rpc::AutoMockRpcClient;
+use sol_trade_sdk::instruction::utils::pumpswap::{
+    clear_pool_cache, find_pool, get_pool_by_address, get_token_balances,
+    get_token_price_in_usd_with_pool,
+};
 use solana_sdk::pubkey::Pubkey;
 use std::str::FromStr;
 
@@ -27,7 +27,7 @@ async fn test_find_pool_by_mint() {
     // 使用 Auto Mock RPC 客户端（使用独立命名空间）
     let rpc = AutoMockRpcClient::new_with_namespace(
         rpc_url.to_string(),
-        Some("pumpswap_pool_tests".to_string())
+        Some("pumpswap_pool_tests".to_string()),
     );
 
     // 调用泛型版本的 find_pool_with_client
@@ -59,7 +59,7 @@ async fn test_get_pool_by_address() {
     // 使用 Auto Mock RPC 客户端（使用独立命名空间）
     let rpc = AutoMockRpcClient::new_with_namespace(
         rpc_url.to_string(),
-        Some("pumpswap_pool_tests".to_string())
+        Some("pumpswap_pool_tests".to_string()),
     );
 
     // 第一次调用（会写入缓存）
@@ -122,7 +122,7 @@ async fn test_get_pumpswap_token_price_in_usd() {
     // 使用 Auto Mock RPC 客户端（使用独立命名空间）
     let rpc = AutoMockRpcClient::new_with_namespace(
         rpc_url.to_string(),
-        Some("pumpswap_pool_tests".to_string())
+        Some("pumpswap_pool_tests".to_string()),
     );
 
     println!("Token Mint: {}", token_mint);

@@ -11,7 +11,9 @@ use crate::{
             traits::InstructionBuilder,
         },
     },
-    utils::calc::pumpswap::{buy_base_input_internal, buy_quote_input_internal, sell_base_input_internal},
+    utils::calc::pumpswap::{
+        buy_base_input_internal, buy_quote_input_internal, sell_base_input_internal,
+    },
 };
 use anyhow::{anyhow, Result};
 use solana_sdk::{

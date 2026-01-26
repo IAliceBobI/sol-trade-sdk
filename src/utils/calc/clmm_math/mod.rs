@@ -16,5 +16,5 @@ pub mod unsafe_math;
 // Re-exports for convenience
 pub use big_num::{U128, U256, U512};
 pub use full_math::MulDiv;
-pub use swap_math::{SwapStep, compute_swap_step, FEE_RATE_DENOMINATOR_VALUE};
+pub use swap_math::{compute_swap_step, SwapStep, FEE_RATE_DENOMINATOR_VALUE};
 pub use unsafe_math::UnsafeMathTrait;

@@ -14,7 +14,7 @@
 //! - Shared RPC connection pool and SWQOS clients
 
 use sol_trade_sdk::{
-    common::{InfrastructureConfig, CallbackExecutionMode, TradeConfig},
+    common::{CallbackExecutionMode, InfrastructureConfig, TradeConfig},
     swqos::{SwqosConfig, SwqosRegion},
     TradingClient, TradingInfrastructure,
 };
@@ -35,7 +35,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Step 1: Create shared infrastructure (expensive, do once)
     println!("Creating shared infrastructure...");
-    let infra_config = InfrastructureConfig::new(rpc_url.clone(), swqos_configs.clone(), commitment.clone());
+    let infra_config =
+        InfrastructureConfig::new(rpc_url.clone(), swqos_configs.clone(), commitment.clone());
     let infrastructure = Arc::new(TradingInfrastructure::new(infra_config).await);
     println!("Infrastructure created with {} SWQOS clients", infrastructure.swqos_clients.len());
 
@@ -52,8 +53,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let payer = Arc::new(Keypair::from_base58_string(key));
 
         // Create TradeConfig for each wallet
-        let trade_config = TradeConfig::new(rpc_url.clone(), swqos_configs.clone(), commitment.clone())
-            .with_callback_execution_mode(CallbackExecutionMode::Async);
+        let trade_config =
+            TradeConfig::new(rpc_url.clone(), swqos_configs.clone(), commitment.clone())
+                .with_callback_execution_mode(CallbackExecutionMode::Async);
 
         // Create TradingClient (uses the same infrastructure internally)
         let client = TradingClient::new(payer, trade_config).await;

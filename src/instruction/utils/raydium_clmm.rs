@@ -1,9 +1,9 @@
 use crate::{
-    common::{SolanaRpcClient, auto_mock_rpc::PoolRpcClient},
+    common::{auto_mock_rpc::PoolRpcClient, SolanaRpcClient},
     constants::{SOL_MINT, USDC_MINT, USDT_MINT},
     instruction::utils::raydium_clmm_types::{
-        pool_state_decode, amm_config_decode, tick_array_state_decode,
-        PoolState, AmmConfig, TickArrayState,
+        amm_config_decode, pool_state_decode, tick_array_state_decode, AmmConfig, PoolState,
+        TickArrayState,
     },
 };
 use anyhow::anyhow;
@@ -14,7 +14,8 @@ use solana_sdk::{pubkey, pubkey::Pubkey};
 
 /// Raydium CLMM WSOL-USDT 锚定池（用于 USD 价格计算）
 /// 如果不传入锚定池参数，默认使用此池
-pub const DEFAULT_WSOL_USDT_CLMM_POOL: Pubkey = pubkey!("ExcBWu8fGPdJiaF1b1z3iEef38sjQJks8xvj6M85pPY6");
+pub const DEFAULT_WSOL_USDT_CLMM_POOL: Pubkey =
+    pubkey!("ExcBWu8fGPdJiaF1b1z3iEef38sjQJks8xvj6M85pPY6");
 
 /// Seeds for PDA derivation
 pub mod seeds {
@@ -197,8 +198,8 @@ pub async fn get_pool_by_address<T: PoolRpcClient + ?Sized>(
         return Ok(pool);
     }
     // 2. RPC 查询
-    let account = rpc.get_account(pool_address).await
-        .map_err(|e| anyhow!("RPC 调用失败: {}", e))?;
+    let account =
+        rpc.get_account(pool_address).await.map_err(|e| anyhow!("RPC 调用失败: {}", e))?;
     if account.owner != accounts::RAYDIUM_CLMM {
         return Err(anyhow!("Account is not owned by Raydium CLMM program"));
     }
@@ -218,8 +219,7 @@ pub async fn get_amm_config(
     if account.owner != accounts::RAYDIUM_CLMM {
         return Err(anyhow!("Account is not owned by Raydium CLMM program"));
     }
-    amm_config_decode(&account.data)
-        .ok_or_else(|| anyhow!("Failed to decode amm config"))
+    amm_config_decode(&account.data).ok_or_else(|| anyhow!("Failed to decode amm config"))
 }
 
 /// 获取多个 tick arrays
@@ -396,54 +396,60 @@ async fn find_pools_by_mint_offset_collect<T: PoolRpcClient + ?Sized>(
         sort_results: None,
     };
 
-    let accounts = rpc.get_program_ui_accounts_with_config(&accounts::RAYDIUM_CLMM, config).await
+    let accounts = rpc
+        .get_program_ui_accounts_with_config(&accounts::RAYDIUM_CLMM, config)
+        .await
         .map_err(|e| anyhow!("RPC 调用失败: {}", e))?;
 
     // 检查是否需要限制返回数量（测试环境优化）
     // 生产环境通过环境变量 CLMM_POOL_SCAN_LIMIT 控制，默认不限制
-    let pools: Vec<(Pubkey, PoolState)> = if let Ok(limit_str) = std::env::var("CLMM_POOL_SCAN_LIMIT") {
-        let limit = match limit_str.parse::<usize>() {
-            Ok(n) => n,
-            Err(_) => {
-                eprintln!("警告: CLMM_POOL_SCAN_LIMIT 环境变量值无效 '{}'，将不限制返回数量", limit_str);
-                usize::MAX
-            }
+    let pools: Vec<(Pubkey, PoolState)> =
+        if let Ok(limit_str) = std::env::var("CLMM_POOL_SCAN_LIMIT") {
+            let limit = match limit_str.parse::<usize>() {
+                Ok(n) => n,
+                Err(_) => {
+                    eprintln!(
+                        "警告: CLMM_POOL_SCAN_LIMIT 环境变量值无效 '{}'，将不限制返回数量",
+                        limit_str
+                    );
+                    usize::MAX
+                }
+            };
+            // 测试环境：限制返回数量，避免超时
+            accounts
+                .into_iter()
+                .filter_map(|(addr, acc)| {
+                    let addr_pubkey = addr.parse::<Pubkey>().ok()?;
+                    let data_bytes = match &acc.data {
+                        UiAccountData::Binary(base64_str, _) => STANDARD.decode(base64_str).ok()?,
+                        _ => return None,
+                    };
+                    if data_bytes.len() > 8 {
+                        pool_state_decode(&data_bytes[8..]).map(|pool| (addr_pubkey, pool))
+                    } else {
+                        None
+                    }
+                })
+                .take(limit) // 限制返回数量
+                .collect()
+        } else {
+            // 生产环境：读取所有 Pool
+            accounts
+                .into_iter()
+                .filter_map(|(addr, acc)| {
+                    let addr_pubkey = addr.parse::<Pubkey>().ok()?;
+                    let data_bytes = match &acc.data {
+                        UiAccountData::Binary(base64_str, _) => STANDARD.decode(base64_str).ok()?,
+                        _ => return None,
+                    };
+                    if data_bytes.len() > 8 {
+                        pool_state_decode(&data_bytes[8..]).map(|pool| (addr_pubkey, pool))
+                    } else {
+                        None
+                    }
+                })
+                .collect()
         };
-        // 测试环境：限制返回数量，避免超时
-        accounts
-            .into_iter()
-            .filter_map(|(addr, acc)| {
-                let addr_pubkey = addr.parse::<Pubkey>().ok()?;
-                let data_bytes = match &acc.data {
-                    UiAccountData::Binary(base64_str, _) => STANDARD.decode(base64_str).ok()?,
-                    _ => return None,
-                };
-                if data_bytes.len() > 8 {
-                    pool_state_decode(&data_bytes[8..]).map(|pool| (addr_pubkey, pool))
-                } else {
-                    None
-                }
-            })
-            .take(limit) // 限制返回数量
-            .collect()
-    } else {
-        // 生产环境：读取所有 Pool
-        accounts
-            .into_iter()
-            .filter_map(|(addr, acc)| {
-                let addr_pubkey = addr.parse::<Pubkey>().ok()?;
-                let data_bytes = match &acc.data {
-                    UiAccountData::Binary(base64_str, _) => STANDARD.decode(base64_str).ok()?,
-                    _ => return None,
-                };
-                if data_bytes.len() > 8 {
-                    pool_state_decode(&data_bytes[8..]).map(|pool| (addr_pubkey, pool))
-                } else {
-                    None
-                }
-            })
-            .collect()
-    };
 
     Ok(pools)
 }
@@ -477,22 +483,20 @@ fn select_best_pool(pools: &[(Pubkey, PoolState)]) -> Option<(Pubkey, PoolState)
     };
 
     // 2. 在候选集中按「流动性 -> open_time -> tick_spacing」排序
-    let best = candidates
-        .iter()
-        .max_by(|(_, pool_a), (_, pool_b)| {
-            use std::cmp::Ordering;
+    let best = candidates.iter().max_by(|(_, pool_a), (_, pool_b)| {
+        use std::cmp::Ordering;
 
-            match pool_a.liquidity.cmp(&pool_b.liquidity) {
-                Ordering::Equal => match pool_a.open_time.cmp(&pool_b.open_time) {
-                    Ordering::Equal => {
-                        // Tick spacing 越小，价格粒度越细，优先级越高
-                        pool_b.tick_spacing.cmp(&pool_a.tick_spacing)
-                    }
-                    other => other,
-                },
+        match pool_a.liquidity.cmp(&pool_b.liquidity) {
+            Ordering::Equal => match pool_a.open_time.cmp(&pool_b.open_time) {
+                Ordering::Equal => {
+                    // Tick spacing 越小，价格粒度越细，优先级越高
+                    pool_b.tick_spacing.cmp(&pool_a.tick_spacing)
+                }
                 other => other,
-            }
-        });
+            },
+            other => other,
+        }
+    });
 
     best.cloned()
 }
@@ -555,15 +559,15 @@ fn select_best_pool_by_volume(pools: &[(Pubkey, PoolState)]) -> Option<(Pubkey, 
 /// - 否则计算两侧的总交易量
 fn calculate_effective_volume(pool: &PoolState) -> u128 {
     // 检查 token0 是否为 WSOL/USDC/USDT
-    let token0_is_stable = pool.token_mint0 == SOL_MINT 
-        || pool.token_mint0 == USDC_MINT 
+    let token0_is_stable = pool.token_mint0 == SOL_MINT
+        || pool.token_mint0 == USDC_MINT
         || pool.token_mint0 == USDT_MINT;
-    
+
     // 检查 token1 是否为 WSOL/USDC/USDT
-    let token1_is_stable = pool.token_mint1 == SOL_MINT 
-        || pool.token_mint1 == USDC_MINT 
+    let token1_is_stable = pool.token_mint1 == SOL_MINT
+        || pool.token_mint1 == USDC_MINT
         || pool.token_mint1 == USDT_MINT;
-    
+
     if token0_is_stable && !token1_is_stable {
         // 只计算 token0 侧（WSOL/USDC/USDT）的交易量
         pool.swap_in_amount_token0.saturating_add(pool.swap_out_amount_token0)
@@ -587,7 +591,7 @@ struct PoolCandidate {
 }
 
 /// 在一组候选池中，按金库余额并发读取并选择最佳池
-/// 
+///
 /// 策略：并发读取所有候选池的金库余额（控制并发数为100），按余额从大到小选择
 async fn pick_best_by_vault_balance_concurrent(
     rpc: &SolanaRpcClient,
@@ -614,10 +618,8 @@ async fn pick_best_by_vault_balance_concurrent(
         .await;
 
     // 过滤掉余额为0的池，并按余额从大到小排序
-    let mut valid_pools: Vec<_> = results
-        .into_iter()
-        .filter(|(_, _, amount)| *amount > 0)
-        .collect();
+    let mut valid_pools: Vec<_> =
+        results.into_iter().filter(|(_, _, amount)| *amount > 0).collect();
 
     if valid_pools.is_empty() {
         return None;
@@ -1020,8 +1022,10 @@ pub async fn get_wsol_price_in_usd_with_client<T: PoolRpcClient + ?Sized>(
     // 只支持 WSOL <-> USDC/USDT 的稳定币池
     let is_token0_sol = pool_state.token_mint0 == SOL_MINT;
     let is_token1_sol = pool_state.token_mint1 == SOL_MINT;
-    let is_token0_stable = pool_state.token_mint0 == USDC_MINT || pool_state.token_mint0 == USDT_MINT;
-    let is_token1_stable = pool_state.token_mint1 == USDC_MINT || pool_state.token_mint1 == USDT_MINT;
+    let is_token0_stable =
+        pool_state.token_mint0 == USDC_MINT || pool_state.token_mint0 == USDT_MINT;
+    let is_token1_stable =
+        pool_state.token_mint1 == USDC_MINT || pool_state.token_mint1 == USDT_MINT;
 
     let price_wsol_in_stable = if is_token0_sol && is_token1_stable {
         // token0 = WSOL, token1 = USDC/USDT
@@ -1040,7 +1044,8 @@ pub async fn get_wsol_price_in_usd_with_client<T: PoolRpcClient + ?Sized>(
     } else {
         return Err(anyhow!(
             "WSOL-USD anchor pool must be a SOL<->USDC/USDT CLMM pool, got {:?} / {:?}",
-            pool_state.token_mint0, pool_state.token_mint1
+            pool_state.token_mint0,
+            pool_state.token_mint1
         ));
     };
 

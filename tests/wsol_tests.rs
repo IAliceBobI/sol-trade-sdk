@@ -29,16 +29,17 @@ async fn test_wsol_wrap_complete_flow() {
     let client = create_test_client().await;
     let wrap_amount = 100_000_000; // 0.1 SOL in lamports
     let rpc_url = "http://127.0.0.1:8899".to_string();
-    let payer_pubkey = client.payer.try_pubkey()
-        .expect("Failed to get payer pubkey from TradingClient");
+    let payer_pubkey =
+        client.payer.try_pubkey().expect("Failed to get payer pubkey from TradingClient");
 
     println!("=== 测试 WSOL 完整流程 ===");
     println!("包装 {} lamports (0.1 SOL) 到 WSOL...", wrap_amount);
 
     // 打印初始余额
-    let (sol_before, wsol_before) = print_balances(&rpc_url, &payer_pubkey)
-        .await
-        .unwrap_or_else(|e| panic!("获取初始余额失败: {}\n  钱包: {}\n  RPC: {}", e, payer_pubkey, rpc_url));
+    let (sol_before, wsol_before) =
+        print_balances(&rpc_url, &payer_pubkey).await.unwrap_or_else(|e| {
+            panic!("获取初始余额失败: {}\n  钱包: {}\n  RPC: {}", e, payer_pubkey, rpc_url)
+        });
 
     // Step 1: 包装 SOL 到 WSOL
     match client.wrap_sol_to_wsol(wrap_amount).await {
@@ -72,16 +73,18 @@ async fn test_wsol_wrap_complete_flow() {
             println!("❌ WSOL -> SOL 失败: {}", e);
             panic!(
                 "WSOL -> SOL 解包装失败: {}\n  钱包: {}\n  解包装金额: {} lamports ({:.4} SOL)",
-                e, payer_pubkey, wrap_amount, wrap_amount as f64 / 1e9
+                e,
+                payer_pubkey,
+                wrap_amount,
+                wrap_amount as f64 / 1e9
             );
         }
     }
 
     // 打印解包装后余额
-    let (sol_after_unwrap, wsol_after_unwrap) =
-        print_balances(&rpc_url, &payer_pubkey)
-            .await
-            .unwrap_or_else(|e| panic!("获取解包装后余额失败: {}\n  钱包: {}", e, payer_pubkey));
+    let (sol_after_unwrap, wsol_after_unwrap) = print_balances(&rpc_url, &payer_pubkey)
+        .await
+        .unwrap_or_else(|e| panic!("获取解包装后余额失败: {}\n  钱包: {}", e, payer_pubkey));
     assert!(sol_after_unwrap > sol_after_wrap, "SOL 余额应该增加");
     assert!(wsol_after_unwrap < wsol_after_wrap, "WSOL 余额应该减少");
 
@@ -132,7 +135,10 @@ async fn test_wsol_multiple_wraps() {
                 println!("  ❌ 第 {} 次包装失败: {}", i, e);
                 panic!(
                     "连续 WSOL 包装失败（第 {} 次）: {}\n  钱包: {}\n  包装金额: {} lamports",
-                    i, e, client.payer.pubkey(), wrap_amount
+                    i,
+                    e,
+                    client.payer.pubkey(),
+                    wrap_amount
                 );
             }
         }
@@ -162,7 +168,8 @@ async fn test_wsol_ata_creation_idempotent() {
         Ok(sig) => println!("✅ 第一次创建成功: {}", sig),
         Err(e) => panic!(
             "第一次 WSOL ATA 创建失败: {}\n  钱包: {}\n  包装金额: 10_000_000 lamports",
-            e, client.payer.pubkey()
+            e,
+            client.payer.pubkey()
         ),
     }
 
@@ -172,7 +179,8 @@ async fn test_wsol_ata_creation_idempotent() {
         Ok(sig) => println!("✅ 第二次创建成功: {}", sig),
         Err(e) => panic!(
             "第二次 WSOL ATA 创建失败（幂等性测试失败）: {}\n  钱包: {}",
-            e, client.payer.pubkey()
+            e,
+            client.payer.pubkey()
         ),
     }
 
@@ -192,8 +200,9 @@ async fn test_trade_with_wsol() {
     println!("=== 测试交易中使用 WSOL (工具函数版) ===");
 
     // 使用一个已知的 PumpSwap 池进行测试
-    let pool = Pubkey::from_str("539m4mVWt6iduB6W8rDGPMarzNCMesuqY5eUTiiYHAgR")
-        .expect("Failed to parse PumpSwap pool address: 539m4mVWt6iduB6W8rDGPMarzNCMesuqY5eUTiiYHAgR");
+    let pool = Pubkey::from_str("539m4mVWt6iduB6W8rDGPMarzNCMesuqY5eUTiiYHAgR").expect(
+        "Failed to parse PumpSwap pool address: 539m4mVWt6iduB6W8rDGPMarzNCMesuqY5eUTiiYHAgR",
+    );
     let mint = Pubkey::from_str("pumpCmXqMfrsAkQ5r49WcJnRayYRqmXz6ae8H7H9Dfn")
         .expect("Failed to parse Pump mint address: pumpCmXqMfrsAkQ5r49WcJnRayYRqmXz6ae8H7H9Dfn");
 
@@ -234,13 +243,14 @@ async fn test_trade_with_fixed_output_token_amount() {
     println!("=== 测试 fixed_output_token_amount 参数 ===");
 
     // 使用一个已知的 PumpSwap 池进行测试
-    let pool = Pubkey::from_str("539m4mVWt6iduB6W8rDGPMarzNCMesuqY5eUTiiYHAgR")
-        .expect("Failed to parse PumpSwap pool address: 539m4mVWt6iduB6W8rDGPMarzNCMesuqY5eUTiiYHAgR");
+    let pool = Pubkey::from_str("539m4mVWt6iduB6W8rDGPMarzNCMesuqY5eUTiiYHAgR").expect(
+        "Failed to parse PumpSwap pool address: 539m4mVWt6iduB6W8rDGPMarzNCMesuqY5eUTiiYHAgR",
+    );
     let mint = Pubkey::from_str("pumpCmXqMfrsAkQ5r49WcJnRayYRqmXz6ae8H7H9Dfn")
         .expect("Failed to parse Pump mint address: pumpCmXqMfrsAkQ5r49WcJnRayYRqmXz6ae8H7H9Dfn");
     let rpc_url = "http://127.0.0.1:8899".to_string();
-    let payer_pubkey = client.payer.try_pubkey()
-        .expect("Failed to get payer pubkey from TradingClient");
+    let payer_pubkey =
+        client.payer.try_pubkey().expect("Failed to get payer pubkey from TradingClient");
 
     // 要购买的代币数量
     let target_token_amount = 10_000u64;
@@ -256,8 +266,8 @@ async fn test_trade_with_fixed_output_token_amount() {
     println!("  交易前余额: {}", balance_before);
 
     // 使用工具函数购买指定数量的代币
-    let result = buy_pump_with_fixed_output(&client, pool, mint, target_token_amount, Some(500))
-        .await;
+    let result =
+        buy_pump_with_fixed_output(&client, pool, mint, target_token_amount, Some(500)).await;
 
     // 验证交易结果
     match result {
@@ -284,11 +294,7 @@ async fn test_trade_with_fixed_output_token_amount() {
             println!("  实际买入数量: {}", actual_amount);
 
             // 验证买入数量大于 0
-            assert!(
-                actual_amount > 0,
-                "实际买入数量应该大于 0，实际: {}",
-                actual_amount
-            );
+            assert!(actual_amount > 0, "实际买入数量应该大于 0，实际: {}", actual_amount);
 
             // 验证买入数量接近目标（考虑滑点，允许 10% 误差）
             let min_expected = target_token_amount * 90 / 100; // 90% 下限
@@ -301,7 +307,10 @@ async fn test_trade_with_fixed_output_token_amount() {
                 actual_amount
             );
 
-            println!("  ✅ 验证通过：实际买入 {} 个代币 (目标: {})", actual_amount, target_token_amount);
+            println!(
+                "  ✅ 验证通过：实际买入 {} 个代币 (目标: {})",
+                actual_amount, target_token_amount
+            );
         }
         Err(e) => {
             panic!(

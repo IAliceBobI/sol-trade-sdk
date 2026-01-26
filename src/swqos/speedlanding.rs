@@ -121,7 +121,11 @@ impl SwqosClientTrait for SpeedlandingClient {
             Ok(_) => (),
             Err(e) => {
                 println!(" signature: {:?}", signature);
-                println!(" [speedlanding] {} confirmation failed: {:?}", trade_type, start_time.elapsed());
+                println!(
+                    " [speedlanding] {} confirmation failed: {:?}",
+                    trade_type,
+                    start_time.elapsed()
+                );
                 return Err(e);
             }
         }

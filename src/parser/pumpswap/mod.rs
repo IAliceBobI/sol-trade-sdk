@@ -6,12 +6,12 @@ pub mod events;
 
 use async_trait::async_trait;
 
-use crate::parser::{
-    transaction_adapter::TransactionAdapter,
-    base_parser::{DexParserTrait, ParseError},
-    types::{ParsedTradeInfo, TradeType, TokenInfo, DexProtocol},
-};
 use crate::parser::pumpswap::events::{parse_pumpswap_event, EventData, PumpswapEventType};
+use crate::parser::{
+    base_parser::{DexParserTrait, ParseError},
+    transaction_adapter::TransactionAdapter,
+    types::{DexProtocol, ParsedTradeInfo, TokenInfo, TradeType},
+};
 
 /// PumpSwap 解析器
 pub struct PumpswapParser;
@@ -33,7 +33,8 @@ impl PumpswapParser {
             .ok_or(ParseError::MissingTokenInfo)?;
 
         // 对于新创建的账户，尝试从转账动作中查找 mint
-        let output_mint = if let Some(mint) = adapter.get_token_mint(&event.user_base_token_account) {
+        let output_mint = if let Some(mint) = adapter.get_token_mint(&event.user_base_token_account)
+        {
             *mint
         } else {
             // 尝试从转账动作中查找
@@ -50,18 +51,17 @@ impl PumpswapParser {
             found_mint.ok_or(ParseError::MissingTokenInfo)?
         };
 
-        let input_decimals = adapter
-            .get_mint_decimals(&input_mint)
-            .ok_or(ParseError::MissingTokenInfo)?;
+        let input_decimals =
+            adapter.get_mint_decimals(&input_mint).ok_or(ParseError::MissingTokenInfo)?;
 
-        let output_decimals = adapter
-            .get_mint_decimals(&output_mint)
-            .ok_or(ParseError::MissingTokenInfo)?;
+        let output_decimals =
+            adapter.get_mint_decimals(&output_mint).ok_or(ParseError::MissingTokenInfo)?;
 
         // 计算实际数量（考虑精度）
         // 使用 quote_amount_in_with_lp_fee 作为输入金额，因为这是用户实际向池转账的金额
         // LP 费用包含在输入金额中（给流动性提供者），协议费用单独转账
-        let input_amount = event.quote_amount_in_with_lp_fee as f64 / 10_f64.powi(input_decimals as i32);
+        let input_amount =
+            event.quote_amount_in_with_lp_fee as f64 / 10_f64.powi(input_decimals as i32);
         let output_amount = event.base_amount_out as f64 / 10_f64.powi(output_decimals as i32);
 
         let input_token = TokenInfo {
@@ -120,7 +120,8 @@ impl PumpswapParser {
         event: &crate::parser::pumpswap::events::PumpswapSellEvent,
         adapter: &TransactionAdapter,
     ) -> Result<ParsedTradeInfo, ParseError> {
-        let input_mint = if let Some(mint) = adapter.get_token_mint(&event.user_base_token_account) {
+        let input_mint = if let Some(mint) = adapter.get_token_mint(&event.user_base_token_account)
+        {
             *mint
         } else {
             // 尝试从转账动作中查找
@@ -141,13 +142,11 @@ impl PumpswapParser {
             .get_token_mint(&event.user_quote_token_account)
             .ok_or(ParseError::MissingTokenInfo)?;
 
-        let input_decimals = adapter
-            .get_mint_decimals(&input_mint)
-            .ok_or(ParseError::MissingTokenInfo)?;
+        let input_decimals =
+            adapter.get_mint_decimals(&input_mint).ok_or(ParseError::MissingTokenInfo)?;
 
-        let output_decimals = adapter
-            .get_mint_decimals(&output_mint)
-            .ok_or(ParseError::MissingTokenInfo)?;
+        let output_decimals =
+            adapter.get_mint_decimals(&output_mint).ok_or(ParseError::MissingTokenInfo)?;
 
         let input_amount = event.base_amount_in as f64 / 10_f64.powi(input_decimals as i32);
         let output_amount = event.quote_amount_out as f64 / 10_f64.powi(output_decimals as i32);
@@ -205,13 +204,17 @@ impl PumpswapParser {
 
 #[async_trait]
 impl DexParserTrait for PumpswapParser {
-    async fn parse(&self, adapter: &TransactionAdapter) -> Result<Vec<ParsedTradeInfo>, ParseError> {
+    async fn parse(
+        &self,
+        adapter: &TransactionAdapter,
+    ) -> Result<Vec<ParsedTradeInfo>, ParseError> {
         let mut trades = Vec::new();
 
         // 获取 PumpSwap 程序的所有指令
         let program_id_str = DexProtocol::PumpSwap.program_id();
-        let program_pubkey = program_id_str.parse()
-            .map_err(|_| ParseError::UnsupportedProtocol("Invalid PumpSwap program ID".to_string()))?;
+        let program_pubkey = program_id_str.parse().map_err(|_| {
+            ParseError::UnsupportedProtocol("Invalid PumpSwap program ID".to_string())
+        })?;
 
         // 从内部指令中查找事件（事件在 CPI 调用中发出）
         let inner_instructions = adapter.get_inner_instructions_by_program(&program_pubkey);
@@ -219,7 +222,8 @@ impl DexParserTrait for PumpswapParser {
         // 解析每个指令中的事件
         for inner_ix in inner_instructions {
             // 尝试解析事件
-            if let Some((event_type, event_data)) = parse_pumpswap_event(&inner_ix.instruction.data) {
+            if let Some((event_type, event_data)) = parse_pumpswap_event(&inner_ix.instruction.data)
+            {
                 let trade = match event_type {
                     PumpswapEventType::Buy => {
                         if let EventData::Buy(ref buy_event) = event_data {
@@ -227,14 +231,14 @@ impl DexParserTrait for PumpswapParser {
                         } else {
                             continue;
                         }
-                    },
+                    }
                     PumpswapEventType::Sell => {
                         if let EventData::Sell(ref sell_event) = event_data {
                             self.parse_sell_event(sell_event, adapter)?
                         } else {
                             continue;
                         }
-                    },
+                    }
                     _ => continue, // 跳过其他事件类型
                 };
                 trades.push(trade);
@@ -242,9 +246,7 @@ impl DexParserTrait for PumpswapParser {
         }
 
         if trades.is_empty() {
-            return Err(ParseError::ParseFailed(
-                "未找到有效的 PumpSwap 交易事件".to_string(),
-            ));
+            return Err(ParseError::ParseFailed("未找到有效的 PumpSwap 交易事件".to_string()));
         }
 
         Ok(trades)

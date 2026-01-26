@@ -1,13 +1,16 @@
 use sol_trade_sdk::{
-    common::{TradeConfig, AnyResult},
+    common::{AnyResult, TradeConfig},
     swqos::{SwqosConfig, SwqosRegion},
     trading::{core::params::PumpFunParams, factory::DexType},
-    SolanaTrade, TradeTokenType, TradeBuyParams,
+    SolanaTrade, TradeBuyParams, TradeTokenType,
 };
 use solana_commitment_config::CommitmentConfig;
-use solana_sdk::{signature::{Keypair, Signer}, pubkey::Pubkey};
-use std::sync::Arc;
+use solana_sdk::{
+    pubkey::Pubkey,
+    signature::{Keypair, Signer},
+};
 use std::env;
+use std::sync::Arc;
 
 #[tokio::main]
 async fn main() -> AnyResult<()> {
@@ -31,24 +34,33 @@ async fn main() -> AnyResult<()> {
     // 配置4个SWQOS节点并发发送
     let swqos_configs: Vec<SwqosConfig> = vec![
         SwqosConfig::Jito(
-            String::new(),  // uuid
+            String::new(), // uuid
             SwqosRegion::Default,
-            Some(env::var("SWQOS_JITO").unwrap_or_else(|_| "http://127.0.0.1:8899".to_string()))
+            Some(env::var("SWQOS_JITO").unwrap_or_else(|_| "http://127.0.0.1:8899".to_string())),
         ),
         SwqosConfig::Bloxroute(
-            String::new(),  // api_token
+            String::new(), // api_token
             SwqosRegion::Default,
-            Some(env::var("SWQOS_BLOXROUTE").unwrap_or_else(|_| "https://ny.solana.dex.blxrbdn.com".to_string()))
+            Some(
+                env::var("SWQOS_BLOXROUTE")
+                    .unwrap_or_else(|_| "https://ny.solana.dex.blxrbdn.com".to_string()),
+            ),
         ),
         SwqosConfig::NextBlock(
-            String::new(),  // api_token
+            String::new(), // api_token
             SwqosRegion::Default,
-            Some(env::var("SWQOS_NEXTBLOCK").unwrap_or_else(|_| "https://api.nextblock.io/v1/solana".to_string()))
+            Some(
+                env::var("SWQOS_NEXTBLOCK")
+                    .unwrap_or_else(|_| "https://api.nextblock.io/v1/solana".to_string()),
+            ),
         ),
         SwqosConfig::FlashBlock(
-            String::new(),  // api_token
+            String::new(), // api_token
             SwqosRegion::Default,
-            Some(env::var("SWQOS_FLASHBLOCK").unwrap_or_else(|_| "https://api.flashblock.io/v1/solana".to_string()))
+            Some(
+                env::var("SWQOS_FLASHBLOCK")
+                    .unwrap_or_else(|_| "https://api.flashblock.io/v1/solana".to_string()),
+            ),
         ),
     ];
 
@@ -60,12 +72,12 @@ async fn main() -> AnyResult<()> {
     // 设置 PumpFun 的 gas 策略
     let gas_fee_strategy = sol_trade_sdk::common::GasFeeStrategy::new();
     gas_fee_strategy.set_global_fee_strategy(
-        200000,      // buy_cu_limit
-        1000000,     // sell_cu_limit
-        500000,      // buy_cu_price
-        500000,      // sell_cu_price
-        0.005,       // buy_tip
-        0.01,        // sell_tip
+        200000,  // buy_cu_limit
+        1000000, // sell_cu_limit
+        500000,  // buy_cu_price
+        500000,  // sell_cu_price
+        0.005,   // buy_tip
+        0.01,    // sell_tip
     );
 
     println!("✅ 客户端初始化完成\n");
@@ -95,18 +107,18 @@ async fn main() -> AnyResult<()> {
 
     // PumpFun买入参数 (买入不需要特殊参数，使用零值)
     let params = PumpFunParams::from_trade(
-        Pubkey::default(),  // bonding_curve
-        Pubkey::default(),  // associated_bonding_curve
-        mint,               // mint
-        Pubkey::default(),  // creator
-        Pubkey::default(),  // creator_vault
-        0,                  // virtual_token_reserves
-        0,                  // virtual_sol_reserves
-        0,                  // real_token_reserves
-        0,                  // real_sol_reserves
-        None,               // close_token_account_when_sell
-        Pubkey::default(),  // fee_recipient
-        sol_trade_sdk::constants::TOKEN_PROGRAM,  // token_program
+        Pubkey::default(),                       // bonding_curve
+        Pubkey::default(),                       // associated_bonding_curve
+        mint,                                    // mint
+        Pubkey::default(),                       // creator
+        Pubkey::default(),                       // creator_vault
+        0,                                       // virtual_token_reserves
+        0,                                       // virtual_sol_reserves
+        0,                                       // real_token_reserves
+        0,                                       // real_sol_reserves
+        None,                                    // close_token_account_when_sell
+        Pubkey::default(),                       // fee_recipient
+        sol_trade_sdk::constants::TOKEN_PROGRAM, // token_program
     )?;
 
     let buy_params = TradeBuyParams {
@@ -118,7 +130,7 @@ async fn main() -> AnyResult<()> {
         recent_blockhash: Some(recent_blockhash),
         extension_params: sol_trade_sdk::trading::core::params::DexParamEnum::PumpFun(params),
         address_lookup_table_account: None,
-        wait_transaction_confirmed: false,  // 不等待确认，测试最快提交速度
+        wait_transaction_confirmed: false, // 不等待确认，测试最快提交速度
         create_input_token_ata: true,
         close_input_token_ata: true,
         create_mint_ata: true,

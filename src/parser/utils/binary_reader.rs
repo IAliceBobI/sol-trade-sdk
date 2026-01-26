@@ -12,10 +12,7 @@ pub struct BinaryReader {
 
 impl BinaryReader {
     pub fn new(buffer: Vec<u8>) -> Self {
-        Self {
-            buffer,
-            offset: 0,
-        }
+        Self { buffer, offset: 0 }
     }
 
     pub fn remaining(&self) -> usize {
@@ -44,10 +41,7 @@ impl BinaryReader {
 
     pub fn read_u16(&mut self) -> Result<u16, String> {
         self.check_bounds(2)?;
-        let value = u16::from_le_bytes([
-            self.buffer[self.offset],
-            self.buffer[self.offset + 1],
-        ]);
+        let value = u16::from_le_bytes([self.buffer[self.offset], self.buffer[self.offset + 1]]);
         self.offset += 2;
         Ok(value)
     }
@@ -105,8 +99,7 @@ impl BinaryReader {
 
     pub fn read_pubkey(&mut self) -> Result<Pubkey, String> {
         let bytes = self.read_fixed_array(32)?;
-        Pubkey::try_from(bytes.as_slice())
-            .map_err(|e| format!("Invalid pubkey: {}", e))
+        Pubkey::try_from(bytes.as_slice()).map_err(|e| format!("Invalid pubkey: {}", e))
     }
 
     pub fn skip(&mut self, length: usize) -> Result<(), String> {

@@ -26,13 +26,17 @@ use sol_trade_sdk::common::fast_fn::get_associated_token_address_with_program_id
 use sol_trade_sdk::{
     common::AnyResult,
     swqos::SwqosConfig,
-    trading::{core::params::{RaydiumAmmV4Params, DexParamEnum}, factory::DexType},
+    trading::{
+        core::params::{DexParamEnum, RaydiumAmmV4Params},
+        factory::DexType,
+    },
     SolanaTrade,
 };
 use sol_trade_sdk::{
     common::TradeConfig,
     instruction::utils::raydium_amm_v4::{get_pool_by_address, is_pool_tradeable, pool_status},
-    trading::common::get_multi_token_balances, TradeTokenType,
+    trading::common::get_multi_token_balances,
+    TradeTokenType,
 };
 use solana_commitment_config::CommitmentConfig;
 use solana_sdk::signature::Keypair;
@@ -185,14 +189,7 @@ async fn raydium_amm_v4_copy_trade_with_grpc(trade_info: RaydiumAmmV4SwapEvent) 
     );
 
     let gas_fee_strategy = sol_trade_sdk::common::GasFeeStrategy::new();
-    gas_fee_strategy.set_global_fee_strategy(
-        150000,
-        150000,
-        500000,
-        500000,
-        0.001,
-        0.001,
-    );
+    gas_fee_strategy.set_global_fee_strategy(150000, 150000, 500000, 500000, 0.001, 0.001);
 
     // Buy tokens
     println!("Buying tokens from Raydium_amm_v4...");

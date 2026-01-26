@@ -3,7 +3,8 @@ use sol_trade_sdk::{
     common::{AnyResult, TradeConfig},
     swqos::SwqosConfig,
     trading::{
-        core::params::{PumpSwapParams, DexParamEnum}, factory::DexType,
+        core::params::{DexParamEnum, PumpSwapParams},
+        factory::DexType,
         InstructionMiddleware, MiddlewareManager,
     },
     SolanaTrade, TradeTokenType,

@@ -10,16 +10,17 @@
 //! - 后续运行会从 tests/mock_data/ 目录加载缓存（速度提升 100 倍）
 //! - 如需重新录制，删除 tests/mock_data/ 目录中的对应文件即可
 
-use sol_trade_sdk::parser::DexParser;
 use sol_trade_sdk::parser::discriminators::DiscriminatorRegistry;
 use sol_trade_sdk::parser::types::ParserConfig;
+use sol_trade_sdk::parser::DexParser;
 
 /// 使用真实交易测试 CLMM Swap 解析
 #[tokio::test]
 #[serial_test::serial(global_dex_cache)]
 async fn test_clmm_swap_with_discriminator() {
     // 这个交易应该包含 Swap 操作（非流动性操作）
-    let signature = "5DiDUkUntQVmDMUes3mwpiPTRHQW4YWeUWfFyDFDpsKezXdw9xZQmprgrK6ddu7YaNaJ3K5GT6RGUJ8v7828TXJU";
+    let signature =
+        "5DiDUkUntQVmDMUes3mwpiPTRHQW4YWeUWfFyDFDpsKezXdw9xZQmprgrK6ddu7YaNaJ3K5GT6RGUJ8v7828TXJU";
 
     // 使用 Auto Mock 模式：首次运行从 RPC 获取并缓存，后续运行从缓存加载
     let config = ParserConfig::default();

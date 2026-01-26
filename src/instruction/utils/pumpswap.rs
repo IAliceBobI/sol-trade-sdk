@@ -1,21 +1,22 @@
 use crate::{
     common::{
-        SolanaRpcClient,
         auto_mock_rpc::PoolRpcClient,
         spl_associated_token_account::get_associated_token_address_with_program_id,
+        SolanaRpcClient,
     },
-    constants::{TOKEN_PROGRAM, WSOL_TOKEN_ACCOUNT, USDC_MINT, USDT_MINT},
-    instruction::utils::pumpswap_types::{Pool, pool_decode},
+    constants::{TOKEN_PROGRAM, USDC_MINT, USDT_MINT, WSOL_TOKEN_ACCOUNT},
+    instruction::utils::pumpswap_types::{pool_decode, Pool},
 };
 use anyhow::anyhow;
-use solana_account_decoder::{UiAccountEncoding, UiAccountData};
-use solana_sdk::{pubkey, pubkey::Pubkey};
-use base64::Engine;
 use base64::engine::general_purpose::STANDARD;
+use base64::Engine;
+use solana_account_decoder::{UiAccountData, UiAccountEncoding};
+use solana_sdk::{pubkey, pubkey::Pubkey};
 
 /// Raydium CLMM WSOL-USDT 锚定池（用于 USD 价格计算）
 /// 如果不传入锚定池参数，默认使用此池
-pub const DEFAULT_WSOL_USDT_CLMM_POOL: Pubkey = pubkey!("ExcBWu8fGPdJiaF1b1z3iEef38sjQJks8xvj6M85pPY6");
+pub const DEFAULT_WSOL_USDT_CLMM_POOL: Pubkey =
+    pubkey!("ExcBWu8fGPdJiaF1b1z3iEef38sjQJks8xvj6M85pPY6");
 
 /// Constants used as seeds for deriving PDAs (Program Derived Addresses)
 pub mod seeds {
@@ -246,8 +247,8 @@ pub async fn get_pool_by_address<T: PoolRpcClient + ?Sized>(
         return Ok(pool);
     }
     // 2. RPC 查询
-    let account = rpc.get_account(pool_address).await
-        .map_err(|e| anyhow!("RPC 调用失败: {}", e))?;
+    let account =
+        rpc.get_account(pool_address).await.map_err(|e| anyhow!("RPC 调用失败: {}", e))?;
     if account.owner != accounts::AMM_PROGRAM {
         return Err(anyhow!("Account is not owned by PumpSwap program"));
     }
@@ -305,7 +306,6 @@ pub async fn get_pool_by_mint_force<T: PoolRpcClient + ?Sized>(
 pub fn clear_pool_cache() {
     pump_swap_cache::clear_all();
 }
-
 
 // PumpSwap Pool 缓存（Step 2）
 pub(crate) mod pump_swap_cache {
@@ -385,7 +385,9 @@ async fn find_pools_by_mint_offset_collect<T: PoolRpcClient + ?Sized>(
         sort_results: None,
     };
     let program_id = accounts::AMM_PROGRAM;
-    let accounts = rpc.get_program_ui_accounts_with_config(&program_id, config).await
+    let accounts = rpc
+        .get_program_ui_accounts_with_config(&program_id, config)
+        .await
         .map_err(|e| anyhow!("RPC 调用失败: {}", e))?;
 
     let pools: Vec<(Pubkey, Pool)> = accounts
@@ -492,8 +494,9 @@ async fn find_pool_by_mint_impl<T: PoolRpcClient + ?Sized>(
     if let Some((pool_address, _)) = calculate_canonical_pool_pda(mint) {
         if let Ok(pool) = get_pool_by_address(rpc, &pool_address).await {
             // Verify it's actually a mint/WSOL pool
-            if (pool.base_mint == *mint && pool.quote_mint == WSOL_TOKEN_ACCOUNT) ||
-               (pool.base_mint == WSOL_TOKEN_ACCOUNT && pool.quote_mint == *mint) {
+            if (pool.base_mint == *mint && pool.quote_mint == WSOL_TOKEN_ACCOUNT)
+                || (pool.base_mint == WSOL_TOKEN_ACCOUNT && pool.quote_mint == *mint)
+            {
                 return Ok((pool_address, pool));
             }
         }
@@ -630,8 +633,6 @@ pub async fn list_pools_by_mint<T: PoolRpcClient + ?Sized>(
     Ok(sorted_pools)
 }
 
-
-
 /// 获取 Pool 的 base 和 quote token 余额（支持 Auto Mock）
 ///
 /// 支持 PoolRpcClient trait，可以接受 AutoMockRpcClient 或标准 RpcClient。
@@ -644,12 +645,20 @@ pub async fn get_token_balances<T: PoolRpcClient + ?Sized>(
         rpc.get_token_account_balance(&pool.pool_quote_token_account),
     );
 
-    let base_balance = base_balance_result.map_err(|e| anyhow::anyhow!("获取 base token 余额失败: {}", e))?;
-    let quote_balance = quote_balance_result.map_err(|e| anyhow::anyhow!("获取 quote token 余额失败: {}", e))?;
+    let base_balance =
+        base_balance_result.map_err(|e| anyhow::anyhow!("获取 base token 余额失败: {}", e))?;
+    let quote_balance =
+        quote_balance_result.map_err(|e| anyhow::anyhow!("获取 quote token 余额失败: {}", e))?;
 
     // UiTokenAmount 的 amount 字段是字符串形式
-    let base_amount = base_balance.amount.parse::<u64>().map_err(|e| anyhow!("解析 base token 余额失败: {}", e))?;
-    let quote_amount = quote_balance.amount.parse::<u64>().map_err(|e| anyhow!("解析 quote token 余额失败: {}", e))?;
+    let base_amount = base_balance
+        .amount
+        .parse::<u64>()
+        .map_err(|e| anyhow!("解析 base token 余额失败: {}", e))?;
+    let quote_amount = quote_balance
+        .amount
+        .parse::<u64>()
+        .map_err(|e| anyhow!("解析 quote token 余额失败: {}", e))?;
 
     Ok((base_amount, quote_amount))
 }
@@ -771,11 +780,12 @@ pub async fn get_token_price_in_usd(
     }
 
     // 7. 获取 WSOL 的 USD 价格（通过 Raydium CLMM 锚定池）
-    let price_wsol_in_usd = crate::instruction::utils::raydium_clmm::get_wsol_price_in_usd_with_client(
-        rpc,
-        Some(wsol_usd_pool),
-    )
-    .await?;
+    let price_wsol_in_usd =
+        crate::instruction::utils::raydium_clmm::get_wsol_price_in_usd_with_client(
+            rpc,
+            Some(wsol_usd_pool),
+        )
+        .await?;
 
     Ok(price_x_in_wsol * price_wsol_in_usd)
 }
@@ -833,8 +843,10 @@ pub async fn get_token_price_in_usd_with_pool<T: PoolRpcClient + ?Sized>(
     let (base_reserve, quote_reserve) = get_token_balances(&pool, rpc).await?;
 
     // 4. 获取两侧代币精度
-    let base_decimals = crate::utils::token::get_token_decimals_with_client(rpc, &pool.base_mint).await?;
-    let quote_decimals = crate::utils::token::get_token_decimals_with_client(rpc, &pool.quote_mint).await?;
+    let base_decimals =
+        crate::utils::token::get_token_decimals_with_client(rpc, &pool.base_mint).await?;
+    let quote_decimals =
+        crate::utils::token::get_token_decimals_with_client(rpc, &pool.quote_mint).await?;
 
     // 5. 计算 X 相对 WSOL 的价格
     let price_x_in_wsol = if is_base_x {
@@ -850,11 +862,12 @@ pub async fn get_token_price_in_usd_with_pool<T: PoolRpcClient + ?Sized>(
     }
 
     // 6. 获取 WSOL 的 USD 价格（通过 Raydium CLMM 锚定池）
-    let price_wsol_in_usd = crate::instruction::utils::raydium_clmm::get_wsol_price_in_usd_with_client(
-        rpc,
-        Some(wsol_usd_pool),
-    )
-    .await?;
+    let price_wsol_in_usd =
+        crate::instruction::utils::raydium_clmm::get_wsol_price_in_usd_with_client(
+            rpc,
+            Some(wsol_usd_pool),
+        )
+        .await?;
 
     Ok(price_x_in_wsol * price_wsol_in_usd)
 }
@@ -866,18 +879,16 @@ mod tests {
     /// 测试：USDC/USDT 价格分支（不依赖真实 RPC，只要函数能返回 1.0 即可）
     #[tokio::test]
     async fn test_get_token_price_in_usd_stable_tokens() {
-        use solana_client::nonblocking::rpc_client::RpcClient;
         use crate::constants::{USDC_MINT, USDT_MINT};
+        use solana_client::nonblocking::rpc_client::RpcClient;
 
         let rpc = RpcClient::new("http://127.0.0.1:8899".to_string());
         let dummy_anchor_pool = Pubkey::new_unique();
 
-        let usdc_price = get_token_price_in_usd(&rpc, &USDC_MINT, Some(&dummy_anchor_pool))
-            .await
-            .unwrap();
-        let usdt_price = get_token_price_in_usd(&rpc, &USDT_MINT, Some(&dummy_anchor_pool))
-            .await
-            .unwrap();
+        let usdc_price =
+            get_token_price_in_usd(&rpc, &USDC_MINT, Some(&dummy_anchor_pool)).await.unwrap();
+        let usdt_price =
+            get_token_price_in_usd(&rpc, &USDT_MINT, Some(&dummy_anchor_pool)).await.unwrap();
 
         assert_eq!(usdc_price, 1.0);
         assert_eq!(usdt_price, 1.0);

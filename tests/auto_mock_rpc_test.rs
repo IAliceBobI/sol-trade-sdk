@@ -10,7 +10,7 @@ use std::str::FromStr;
 fn test_auto_mock_client_creation() {
     let client = AutoMockRpcClient::new_with_namespace(
         "http://127.0.0.1:8899".to_string(),
-        Some("auto_mock_rpc_test".to_string())
+        Some("auto_mock_rpc_test".to_string()),
     );
 
     assert_eq!(client.mock_dir(), "tests/mock_data");
@@ -21,10 +21,13 @@ fn test_auto_mock_client_creation() {
 fn test_generate_file_name() {
     let client = AutoMockRpcClient::new_with_namespace(
         "http://127.0.0.1:8899".to_string(),
-        Some("auto_mock_rpc_test".to_string())
+        Some("auto_mock_rpc_test".to_string()),
     );
 
-    let sig = Signature::from_str("5GCZ3TR31aDRP9LZxznKPBux86jWDyCxt1noCAAhX43d6Cmtqi8HvK6oHErq7DBr9j5KRcqeYumW2wHt5qJG1tQK").unwrap();
+    let sig = Signature::from_str(
+        "5GCZ3TR31aDRP9LZxznKPBux86jWDyCxt1noCAAhX43d6Cmtqi8HvK6oHErq7DBr9j5KRcqeYumW2wHt5qJG1tQK",
+    )
+    .unwrap();
     let params = serde_json::json!([sig, {"encoding": "jsonParsed"}]);
 
     let file1 = client.generate_file_name("getTransaction", &params);
@@ -42,10 +45,13 @@ fn test_generate_file_name() {
 fn test_has_mock_data() {
     let client = AutoMockRpcClient::new_with_namespace(
         "http://127.0.0.1:8899".to_string(),
-        Some("auto_mock_rpc_test".to_string())
+        Some("auto_mock_rpc_test".to_string()),
     );
 
-    let sig = Signature::from_str("5GCZ3TR31aDRP9LZxznKPBux86jWDyCxt1noCAAhX43d6Cmtqi8HvK6oHErq7DBr9j5KRcqeYumW2wHt5qJG1tQK").unwrap();
+    let sig = Signature::from_str(
+        "5GCZ3TR31aDRP9LZxznKPBux86jWDyCxt1noCAAhX43d6Cmtqi8HvK6oHErq7DBr9j5KRcqeYumW2wHt5qJG1tQK",
+    )
+    .unwrap();
     let params = serde_json::json!([sig, {"encoding": "jsonParsed"}]);
 
     // 初始状态：没有 Mock 数据
@@ -55,14 +61,17 @@ fn test_has_mock_data() {
 }
 
 #[tokio::test]
-#[ignore]  // 需要 RPC 节点，手动运行
+#[ignore] // 需要 RPC 节点，手动运行
 async fn test_auto_mode_first_call() {
     let client = AutoMockRpcClient::new_with_namespace(
         "http://127.0.0.1:8899".to_string(),
-        Some("auto_mock_rpc_test".to_string())
+        Some("auto_mock_rpc_test".to_string()),
     );
 
-    let sig = Signature::from_str("5GCZ3TR31aDRP9LZxznKPBux86jWDyCxt1noCAAhX43d6Cmtqi8HvK6oHErq7DBr9j5KRcqeYumW2wHt5qJG1tQK").unwrap();
+    let sig = Signature::from_str(
+        "5GCZ3TR31aDRP9LZxznKPBux86jWDyCxt1noCAAhX43d6Cmtqi8HvK6oHErq7DBr9j5KRcqeYumW2wHt5qJG1tQK",
+    )
+    .unwrap();
 
     use solana_client::rpc_config::{RpcTransactionConfig, UiTransactionEncoding};
     use solana_commitment_config::CommitmentConfig;

@@ -142,17 +142,12 @@ pub fn compute_swap_step(
         if is_base_input && swap_step.sqrt_price_next_x64 != sqrt_price_target_x64 {
             // we didn't reach the target, so take the remainder of the maximum input as fee
             // swap dust is granted as fee
-            u64::from(amount_remaining)
-                .checked_sub(swap_step.amount_in)
-                .unwrap()
+            u64::from(amount_remaining).checked_sub(swap_step.amount_in).unwrap()
         } else {
             // take pip percentage as fee
             swap_step
                 .amount_in
-                .mul_div_ceil(
-                    fee_rate.into(),
-                    (FEE_RATE_DENOMINATOR_VALUE - fee_rate).into(),
-                )
+                .mul_div_ceil(fee_rate.into(), (FEE_RATE_DENOMINATOR_VALUE - fee_rate).into())
                 .unwrap()
         };
 

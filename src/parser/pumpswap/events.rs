@@ -2,11 +2,8 @@
 //!
 //! 参考 solana-dex-parser 的 PumpswapEventParser 实现
 
+use crate::parser::{constants::discriminators::pumpswap, utils::BinaryReader};
 use solana_sdk::pubkey::Pubkey;
-use crate::parser::{
-    utils::BinaryReader,
-    constants::discriminators::pumpswap,
-};
 
 /// PumpSwap 事件类型
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -71,11 +68,9 @@ pub fn parse_pumpswap_event(data: &[u8]) -> Option<(PumpswapEventType, EventData
 
     // 匹配事件类型
     if discriminator == &pumpswap::BUY_EVENT {
-        parse_buy_event(&data[16..])
-            .map(|evt| (PumpswapEventType::Buy, EventData::Buy(evt)))
+        parse_buy_event(&data[16..]).map(|evt| (PumpswapEventType::Buy, EventData::Buy(evt)))
     } else if discriminator == &pumpswap::SELL_EVENT {
-        parse_sell_event(&data[16..])
-            .map(|evt| (PumpswapEventType::Sell, EventData::Sell(evt)))
+        parse_sell_event(&data[16..]).map(|evt| (PumpswapEventType::Sell, EventData::Sell(evt)))
     } else if discriminator == &pumpswap::CREATE_POOL_EVENT {
         parse_create_event(&data[16..])
             .map(|_| (PumpswapEventType::Create, EventData::Buy(create_dummy_buy())))
@@ -113,7 +108,7 @@ fn parse_buy_event(data: &[u8]) -> Option<PumpswapBuyEvent> {
         timestamp,
         base_amount_out,
         quote_amount_in,
-        quote_amount_in_with_lp_fee,  // 使用事件中的值
+        quote_amount_in_with_lp_fee, // 使用事件中的值
         lp_fee,
         protocol_fee,
         pool,
@@ -152,7 +147,7 @@ fn parse_sell_event(data: &[u8]) -> Option<PumpswapSellEvent> {
         timestamp,
         base_amount_in,
         quote_amount_out,
-        quote_amount_out_without_lp_fee,  // 使用事件中的值
+        quote_amount_out_without_lp_fee, // 使用事件中的值
         lp_fee,
         protocol_fee,
         pool,
@@ -206,7 +201,7 @@ mod tests {
 
     #[test]
     fn test_parse_insufficient_data() {
-        let data = vec![1, 2, 3];  // 少于 16 字节
+        let data = vec![1, 2, 3]; // 少于 16 字节
         let result = parse_pumpswap_event(&data);
         assert!(result.is_none());
     }

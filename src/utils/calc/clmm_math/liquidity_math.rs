@@ -21,10 +21,14 @@ pub fn add_delta(x: u128, y: i128) -> Result<u128, &'static str> {
     let z: u128;
     if y < 0 {
         z = x - u128::try_from(-y).unwrap();
-        if x <= z { return Err("Requirement failed"); }
+        if x <= z {
+            return Err("Requirement failed");
+        }
     } else {
         z = x + u128::try_from(y).unwrap();
-        if z < x { return Err("Requirement failed"); }
+        if z < x {
+            return Err("Requirement failed");
+        }
     }
 
     Ok(z)
@@ -42,17 +46,11 @@ pub fn get_liquidity_from_amount_0(
         std::mem::swap(&mut sqrt_ratio_a_x64, &mut sqrt_ratio_b_x64);
     };
     let intermediate = U128::from(sqrt_ratio_a_x64)
-        .mul_div_floor(
-            U128::from(sqrt_ratio_b_x64),
-            U128::from(fixed_point_64::Q64),
-        )
+        .mul_div_floor(U128::from(sqrt_ratio_b_x64), U128::from(fixed_point_64::Q64))
         .unwrap();
 
     U128::from(amount_0)
-        .mul_div_floor(
-            intermediate,
-            U128::from(sqrt_ratio_b_x64 - sqrt_ratio_a_x64),
-        )
+        .mul_div_floor(intermediate, U128::from(sqrt_ratio_b_x64 - sqrt_ratio_a_x64))
         .unwrap()
         .as_u128()
 }
@@ -184,15 +182,11 @@ pub fn get_delta_amount_0_unsigned(
 
     let result = if round_up {
         U256::div_rounding_up(
-            numerator_1
-                .mul_div_ceil(numerator_2, U256::from(sqrt_ratio_b_x64))
-                .unwrap(),
+            numerator_1.mul_div_ceil(numerator_2, U256::from(sqrt_ratio_b_x64)).unwrap(),
             U256::from(sqrt_ratio_a_x64),
         )
     } else {
-        numerator_1
-            .mul_div_floor(numerator_2, U256::from(sqrt_ratio_b_x64))
-            .unwrap()
+        numerator_1.mul_div_floor(numerator_2, U256::from(sqrt_ratio_b_x64)).unwrap()
             / U256::from(sqrt_ratio_a_x64)
     };
     if result > U256::from(u64::MAX) {

@@ -2,18 +2,18 @@ use crate::common::bonding_curve::BondingCurveAccount;
 use crate::common::nonce_cache::DurableNonceInfo;
 use crate::common::spl_associated_token_account::get_associated_token_address_with_program_id;
 use crate::common::{auto_mock_rpc::PoolRpcClient, GasFeeStrategy, SolanaRpcClient};
-use crate::utils::token::calculate_ata;
 use crate::constants::TOKEN_PROGRAM;
 use crate::instruction::utils::pumpfun::global_constants::MAYHEM_FEE_RECIPIENT;
 use crate::instruction::utils::pumpswap::accounts::MAYHEM_FEE_RECIPIENT as MAYHEM_FEE_RECIPIENT_SWAP;
 use crate::swqos::{SwqosClient, TradeType};
-use crate::trading::MiddlewareManager;
 use crate::trading::common::get_multi_token_balances_with_client;
+use crate::trading::MiddlewareManager;
+use crate::utils::token::calculate_ata;
+use anyhow::Result;
 use solana_hash::Hash;
 use solana_sdk::message::AddressLookupTableAccount;
 use solana_sdk::{pubkey::Pubkey, signature::Keypair};
 use std::sync::Arc;
-use anyhow::Result;
 
 /// DEX 参数枚举 - 零开销抽象替代 Box<dyn ProtocolParams>
 #[derive(Clone)]
@@ -198,11 +198,7 @@ impl PumpFunParams {
             creator: account.0.creator,
             is_mayhem_mode: account.0.is_mayhem_mode,
         };
-        let associated_bonding_curve = calculate_ata(
-            rpc,
-            &bonding_curve.account,
-            mint,
-        ).await?;
+        let associated_bonding_curve = calculate_ata(rpc, &bonding_curve.account, mint).await?;
         let creator_vault =
             crate::instruction::utils::pumpfun::get_creator_vault_pda(&bonding_curve.creator);
         Ok(Self {
@@ -289,7 +285,8 @@ impl PumpSwapParams {
         rpc: &SolanaRpcClient,
         mint: &Pubkey,
     ) -> Result<Self, anyhow::Error> {
-        let (pool_address, _) = crate::instruction::utils::pumpswap::get_pool_by_mint(rpc, mint).await?;
+        let (pool_address, _) =
+            crate::instruction::utils::pumpswap::get_pool_by_mint(rpc, mint).await?;
         Self::from_pool_address_by_rpc(rpc, &pool_address).await
     }
 
@@ -297,7 +294,8 @@ impl PumpSwapParams {
         rpc: &SolanaRpcClient,
         pool_address: &Pubkey,
     ) -> Result<Self, anyhow::Error> {
-        let pool_data = crate::instruction::utils::pumpswap::get_pool_by_address(rpc, pool_address).await?;
+        let pool_data =
+            crate::instruction::utils::pumpswap::get_pool_by_address(rpc, pool_address).await?;
         let (pool_base_token_reserves, pool_quote_token_reserves) =
             crate::instruction::utils::pumpswap::get_token_balances(&pool_data, rpc).await?;
         let creator = pool_data.coin_creator;
@@ -645,9 +643,11 @@ impl RaydiumAmmV4Params {
         rpc: &T,
         amm: Pubkey,
     ) -> Result<Self, anyhow::Error> {
-        let amm_info = crate::instruction::utils::raydium_amm_v4::get_pool_by_address(rpc, &amm).await?;
+        let amm_info =
+            crate::instruction::utils::raydium_amm_v4::get_pool_by_address(rpc, &amm).await?;
         let (coin_reserve, pc_reserve) =
-            get_multi_token_balances_with_client(rpc, &amm_info.token_coin, &amm_info.token_pc).await?;
+            get_multi_token_balances_with_client(rpc, &amm_info.token_coin, &amm_info.token_pc)
+                .await?;
         Ok(Self {
             amm,
             coin_mint: amm_info.coin_mint,
@@ -729,7 +729,8 @@ impl RaydiumClmmParams {
         rpc: &SolanaRpcClient,
         pool_address: &Pubkey,
     ) -> Result<Self, anyhow::Error> {
-        let pool_state = crate::instruction::utils::raydium_clmm::get_pool_by_address(rpc, pool_address).await?;
+        let pool_state =
+            crate::instruction::utils::raydium_clmm::get_pool_by_address(rpc, pool_address).await?;
 
         // Determine token programs by querying mint accounts
         let token0_account = rpc.get_account(&pool_state.token_mint0).await?;
@@ -738,16 +739,16 @@ impl RaydiumClmmParams {
         } else {
             TOKEN_PROGRAM
         };
-        
+
         let token1_account = rpc.get_account(&pool_state.token_mint1).await?;
         let token1_program = if token1_account.owner == crate::constants::TOKEN_PROGRAM_2022 {
             crate::constants::TOKEN_PROGRAM_2022
         } else {
             TOKEN_PROGRAM
         };
-        
+
         // Observation state is stored in pool_state.observation_key
-        
+
         Ok(Self {
             pool_state: pool_address.clone(),
             amm_config: pool_state.amm_config,
@@ -803,7 +804,8 @@ impl MeteoraDammV2Params {
         pool_address: &Pubkey,
     ) -> Result<Self, anyhow::Error> {
         let pool_data =
-            crate::instruction::utils::meteora_damm_v2::get_pool_by_address(rpc, pool_address).await?;
+            crate::instruction::utils::meteora_damm_v2::get_pool_by_address(rpc, pool_address)
+                .await?;
         Ok(Self {
             pool: pool_address.clone(),
             token_a_vault: pool_data.token_a_vault,

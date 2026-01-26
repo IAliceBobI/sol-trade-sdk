@@ -2,9 +2,9 @@
 //!
 //! 使用 syscall_bypass 提供的快速时间戳避免频繁的系统调用
 
-use std::time::{Duration, Instant};
-use once_cell::sync::Lazy;
 use crate::perf::syscall_bypass::SystemCallBypassManager;
+use once_cell::sync::Lazy;
+use std::time::{Duration, Instant};
 
 /// 全局快速时间提供器
 static FAST_TIMER: Lazy<FastTimer> = Lazy::new(|| FastTimer::new());
@@ -26,11 +26,7 @@ impl FastTimer {
         let base_instant = Instant::now();
         let base_nanos = bypass_manager.fast_timestamp_nanos();
 
-        Self {
-            bypass_manager,
-            _base_instant: base_instant,
-            _base_nanos: base_nanos,
-        }
+        Self { bypass_manager, _base_instant: base_instant, _base_nanos: base_nanos }
     }
 
     /// 🚀 获取当前时间戳（纳秒） - 使用快速系统调用绕过
@@ -107,10 +103,7 @@ impl FastStopwatch {
     /// 创建并启动计时器
     #[inline(always)]
     pub fn start(label: &'static str) -> Self {
-        Self {
-            start_nanos: fast_now_nanos(),
-            label,
-        }
+        Self { start_nanos: fast_now_nanos(), label }
     }
 
     /// 获取已耗时（纳秒）
@@ -151,7 +144,7 @@ mod tests {
 
         // 应该大约是 10ms（放宽范围以适应系统调度）
         assert!(elapsed >= Duration::from_millis(8) && elapsed <= Duration::from_millis(50));
-        
+
         // 测试 fast_now_nanos 至少可以调用
         let _ = fast_now_nanos();
     }
@@ -165,7 +158,7 @@ mod tests {
         let elapsed = start.elapsed();
 
         assert!(elapsed >= Duration::from_millis(8) && elapsed <= Duration::from_millis(50));
-        
+
         // 测试 FastStopwatch 至少可以创建
         let _sw = FastStopwatch::start("test");
     }
@@ -182,13 +175,13 @@ mod tests {
 
         let total_elapsed = start.elapsed();
         let avg_per_call = total_elapsed.as_nanos() / iterations;
-    
+
         println!("Average fast_now_nanos() call: {}ns", avg_per_call);
-    
+
         // 快速时间戳应该非常快(<100ns per call)
         assert!(avg_per_call < 200);
     }
-    
+
     #[test]
     fn test_instant_now_overhead() {
         // 对比标准 Instant::now() 的开销

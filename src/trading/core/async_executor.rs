@@ -13,24 +13,15 @@ use std::{str::FromStr, sync::Arc, time::Instant};
 use crate::{
     common::nonce_cache::DurableNonceInfo,
     common::{GasFeeStrategy, SolanaRpcClient},
+    constants::swqos::{
+        SWQOS_MIN_TIP_ASTRALANE, SWQOS_MIN_TIP_BLOCKRAZOR, SWQOS_MIN_TIP_BLOXROUTE,
+        SWQOS_MIN_TIP_DEFAULT, SWQOS_MIN_TIP_FLASHBLOCK, SWQOS_MIN_TIP_JITO,
+        SWQOS_MIN_TIP_LIGHTSPEED, SWQOS_MIN_TIP_NEXTBLOCK, SWQOS_MIN_TIP_NODE1,
+        SWQOS_MIN_TIP_SOYAS, SWQOS_MIN_TIP_SPEEDLANDING, SWQOS_MIN_TIP_STELLIUM,
+        SWQOS_MIN_TIP_TEMPORAL, SWQOS_MIN_TIP_ZERO_SLOT,
+    },
     swqos::{SwqosClient, SwqosType, TradeType},
     trading::{common::build_transaction, MiddlewareManager},
-    constants::swqos::{
-        SWQOS_MIN_TIP_DEFAULT,
-        SWQOS_MIN_TIP_JITO,
-        SWQOS_MIN_TIP_NEXTBLOCK,
-        SWQOS_MIN_TIP_ZERO_SLOT,
-        SWQOS_MIN_TIP_TEMPORAL,
-        SWQOS_MIN_TIP_BLOXROUTE,
-        SWQOS_MIN_TIP_NODE1,
-        SWQOS_MIN_TIP_FLASHBLOCK,
-        SWQOS_MIN_TIP_BLOCKRAZOR,
-        SWQOS_MIN_TIP_ASTRALANE,
-        SWQOS_MIN_TIP_STELLIUM,
-        SWQOS_MIN_TIP_LIGHTSPEED,
-        SWQOS_MIN_TIP_SOYAS,
-        SWQOS_MIN_TIP_SPEEDLANDING
-    },
 };
 
 #[repr(align(64))]
@@ -38,7 +29,7 @@ struct TaskResult {
     success: bool,
     signature: Signature,
     error: Option<anyhow::Error>,
-    _swqos_type: SwqosType,  // 🔧 增加：记录SWQOS类型
+    _swqos_type: SwqosType, // 🔧 增加：记录SWQOS类型
     landed_on_chain: bool,  // 🔧 Whether tx landed on-chain (even if failed)
 }
 
@@ -69,7 +60,7 @@ fn is_landed_error(error: &anyhow::Error) -> bool {
 struct ResultCollector {
     results: Arc<ArrayQueue<TaskResult>>,
     success_flag: Arc<AtomicBool>,
-    landed_failed_flag: Arc<AtomicBool>,  // 🔧 Tx landed on-chain but failed (nonce consumed)
+    landed_failed_flag: Arc<AtomicBool>, // 🔧 Tx landed on-chain but failed (nonce consumed)
     completed_count: Arc<AtomicUsize>,
     total_tasks: usize,
 }
@@ -173,7 +164,7 @@ impl ResultCollector {
         let mut signatures = Vec::new();
         let mut has_success = false;
         let mut last_error = None;
-        
+
         while let Some(result) = self.results.pop() {
             signatures.push(result.signature);
             if result.success {
@@ -183,7 +174,7 @@ impl ResultCollector {
                 last_error = result.error;
             }
         }
-        
+
         if !signatures.is_empty() {
             Some((has_success, signatures, last_error))
         } else {
@@ -310,8 +301,10 @@ pub async fn execute_parallel(
                 Ok(pubkey) => (pubkey, true),
                 Err(e) => {
                     // 转换失败，记录错误并跳过此 SWQOS
-                    eprintln!("⚠️  [{}] 跳过：无效的小费接收地址 '{}': {}",
-                        swqos_type, tip_account_str, e);
+                    eprintln!(
+                        "⚠️  [{}] 跳过：无效的小费接收地址 '{}': {}",
+                        swqos_type, tip_account_str, e
+                    );
                     collector.submit(TaskResult {
                         success: false,
                         signature: Signature::default(),
@@ -368,7 +361,7 @@ pub async fn execute_parallel(
                         success: false,
                         signature: Signature::default(),
                         error: Some(e),
-                        _swqos_type: swqos_type,  // 🔧 记录SWQOS类型
+                        _swqos_type: swqos_type, // 🔧 记录SWQOS类型
                         landed_on_chain: false,  // Build failed, tx never sent
                     });
                     return;
@@ -399,7 +392,10 @@ pub async fn execute_parallel(
                     crate::common::CallbackExecutionMode::Sync => {
                         // 同步模式：等待回调完成，失败则阻止交易发送
                         if let Err(e) = callback_clone.on_transaction_signed(context).await {
-                            eprintln!("[Callback Error] on_transaction_signed failed (Sync mode): {:?}", e);
+                            eprintln!(
+                                "[Callback Error] on_transaction_signed failed (Sync mode): {:?}",
+                                e
+                            );
                             collector.submit(TaskResult {
                                 success: false,
                                 signature: Signature::default(),
@@ -435,7 +431,7 @@ pub async fn execute_parallel(
                 .await
             {
                 Ok(()) => {
-                    landed_on_chain = true;  // Success means tx confirmed on-chain
+                    landed_on_chain = true; // Success means tx confirmed on-chain
                     true
                 }
                 Err(e) => {
@@ -454,8 +450,8 @@ pub async fn execute_parallel(
                     success,
                     signature: *signature,
                     error: err,
-                    _swqos_type: swqos_type,  // 🔧 记录SWQOS类型
-                    landed_on_chain,  // 🔧 Whether tx landed (even if it failed)
+                    _swqos_type: swqos_type, // 🔧 记录SWQOS类型
+                    landed_on_chain,         // 🔧 Whether tx landed (even if it failed)
                 });
             }
         });

@@ -58,7 +58,6 @@ pub async fn airdrop_to_payer(
     Ok(())
 }
 
-
 /// 创建测试用的 SolanaTrade 客户端
 #[allow(dead_code)]
 pub async fn create_test_client() -> SolanaTrade {
@@ -75,16 +74,13 @@ pub async fn create_test_client_with_seed_optimize(use_seed_optimize: bool) -> S
     // 空投 SOL
     let payer_pubkey = payer.pubkey();
     if let Err(e) = airdrop_to_payer(&rpc_url, &payer_pubkey).await {
-        panic!(
-            "空投 SOL 失败，无法继续测试: {}\n  账户: {}\n  RPC: {}",
-            e, payer_pubkey, rpc_url
-        );
+        panic!("空投 SOL 失败，无法继续测试: {}\n  账户: {}\n  RPC: {}", e, payer_pubkey, rpc_url);
     }
 
     let commitment = CommitmentConfig::confirmed();
     let swqos_configs: Vec<SwqosConfig> = vec![SwqosConfig::Default(rpc_url.clone())];
-    let trade_config =
-        TradeConfig::new(rpc_url, swqos_configs, commitment).with_wsol_ata_config(true, use_seed_optimize);
+    let trade_config = TradeConfig::new(rpc_url, swqos_configs, commitment)
+        .with_wsol_ata_config(true, use_seed_optimize);
     SolanaTrade::new(Arc::new(payer), trade_config).await
 }
 
@@ -133,10 +129,7 @@ pub async fn print_balances(
                 (amount, token.decimals, token.ui_amount_string)
             }
             Err(e) => {
-                println!(
-                    "⚠️  get_token_account_balance 查询 WSOL 账户失败: {}，视为余额 0",
-                    e
-                );
+                println!("⚠️  get_token_account_balance 查询 WSOL 账户失败: {}，视为余额 0", e);
                 (0, 9, "0".to_string())
             }
         };
@@ -157,15 +150,9 @@ pub async fn print_balances(
         wsol_balance as f64 / LAMPORTS_PER_SOL as f64
     );
     println!("   ATA: {}", wsol_ata);
-    println!(
-        "🪙 WSOL 余额 (get_token_account_balance): {} lamports",
-        wsol_amount
-    );
+    println!("🪙 WSOL 余额 (get_token_account_balance): {} lamports", wsol_amount);
     println!("   ATA: {}", wsol_ata);
-    println!(
-        "🪙 WSOL uiAmountString: {} (decimals: {})",
-        wsol_ui_amount_str, wsol_decimals
-    );
+    println!("🪙 WSOL uiAmountString: {} (decimals: {})", wsol_ui_amount_str, wsol_decimals);
     println!("   ATA: {}", wsol_ata);
     println!("================================\n");
 
@@ -204,7 +191,8 @@ pub async fn get_token_balance(
     }
 
     // 尝试 TOKEN_PROGRAM_2022
-    let ata2022 = get_associated_token_address_with_program_id_fast(payer, mint, &TOKEN_PROGRAM_2022);
+    let ata2022 =
+        get_associated_token_address_with_program_id_fast(payer, mint, &TOKEN_PROGRAM_2022);
     if let Ok(token) = client.get_token_account_balance(&ata2022).await {
         let amount: u64 = token.amount.parse().unwrap_or_else(|e| {
             println!(
@@ -261,16 +249,10 @@ pub async fn print_seed_optimize_balances(
     let client = RpcClient::new(rpc_url.to_string());
 
     // 计算 4 个 ATA 地址
-    let ata_token_standard = get_associated_token_address_with_program_id_fast(
-        payer,
-        mint,
-        &TOKEN_PROGRAM,
-    );
-    let ata_token2022_standard = get_associated_token_address_with_program_id_fast(
-        payer,
-        mint,
-        &TOKEN_PROGRAM_2022,
-    );
+    let ata_token_standard =
+        get_associated_token_address_with_program_id_fast(payer, mint, &TOKEN_PROGRAM);
+    let ata_token2022_standard =
+        get_associated_token_address_with_program_id_fast(payer, mint, &TOKEN_PROGRAM_2022);
     let ata_token_seed = get_associated_token_address_with_program_id_fast_use_seed(
         payer,
         mint,
@@ -300,24 +282,14 @@ pub async fn print_seed_optimize_balances(
     for (name, address) in addresses.iter() {
         match client.get_token_account_balance(address).await {
             Ok(token) => {
-                println!(
-                    "  {:<30} {} ({})",
-                    format!("{}:", name),
-                    token.ui_amount_string,
-                    address
-                );
+                println!("  {:<30} {} ({})", format!("{}:", name), token.ui_amount_string, address);
             }
             Err(_) => {
                 // 尝试用 get_balance
                 match client.get_balance(address).await {
                     Ok(lamports) => {
                         let sol = lamports as f64 / LAMPORTS_PER_SOL as f64;
-                        println!(
-                            "  {:<30} {:.4} UNIT ({})",
-                            format!("{}:", name),
-                            sol,
-                            address
-                        );
+                        println!("  {:<30} {:.4} UNIT ({})", format!("{}:", name), sol, address);
                     }
                     Err(_) => {
                         println!("  {:<30} N/A ({})", format!("{}:", name), address);
@@ -366,7 +338,10 @@ pub async fn buy_pump_with_sol(
     mint: Pubkey,
     sol_amount: u64,
     slippage_basis_points: Option<u64>,
-) -> Result<(bool, Vec<solana_sdk::signature::Signature>, Option<sol_trade_sdk::swqos::common::TradeError>), anyhow::Error> {
+) -> Result<
+    (bool, Vec<solana_sdk::signature::Signature>, Option<sol_trade_sdk::swqos::common::TradeError>),
+    anyhow::Error,
+> {
     println!("\n🛒 开始购买 Pump 代币");
     println!("  - Pool: {}", pool);
     println!("  - Token Mint: {}", mint);
@@ -376,18 +351,21 @@ pub async fn buy_pump_with_sol(
     }
 
     // 1. 从 RPC 获取池信息
-    let pump_swap_params = PumpSwapParams::from_pool_address_by_rpc(&client.rpc, &pool)
-        .await
-        .unwrap_or_else(|e| panic!(
-            "从 RPC 获取 PumpSwap Pool 信息失败: {}\n  Pool: {}\n  RPC: {}",
-            e, pool, client.rpc.url()
-        ));
+    let pump_swap_params =
+        PumpSwapParams::from_pool_address_by_rpc(&client.rpc, &pool).await.unwrap_or_else(|e| {
+            panic!(
+                "从 RPC 获取 PumpSwap Pool 信息失败: {}\n  Pool: {}\n  RPC: {}",
+                e,
+                pool,
+                client.rpc.url()
+            )
+        });
     println!("  - 池信息获取成功");
 
     // 2. 从 RPC 获取最新的 blockhash
-    let recent_blockhash = client.rpc.get_latest_blockhash()
-        .await
-        .map_err(|e| anyhow::anyhow!("获取最新 blockhash 失败: {}\n  RPC: {}", e, client.rpc.url()))?;
+    let recent_blockhash = client.rpc.get_latest_blockhash().await.map_err(|e| {
+        anyhow::anyhow!("获取最新 blockhash 失败: {}\n  RPC: {}", e, client.rpc.url())
+    })?;
 
     // 3. 设置 Gas 策略
     let gas_fee_strategy = GasFeeStrategy::new();
@@ -457,7 +435,10 @@ pub async fn buy_pump_with_fixed_output(
     mint: Pubkey,
     token_amount: u64,
     slippage_basis_points: Option<u64>,
-) -> Result<(bool, Vec<solana_sdk::signature::Signature>, Option<sol_trade_sdk::swqos::common::TradeError>), anyhow::Error> {
+) -> Result<
+    (bool, Vec<solana_sdk::signature::Signature>, Option<sol_trade_sdk::swqos::common::TradeError>),
+    anyhow::Error,
+> {
     println!("\n🛒 开始购买 Pump 代币（固定输出数量）");
     println!("  - Pool: {}", pool);
     println!("  - Token Mint: {}", mint);
@@ -467,18 +448,21 @@ pub async fn buy_pump_with_fixed_output(
     }
 
     // 1. 从 RPC 获取池信息
-    let pump_swap_params = PumpSwapParams::from_pool_address_by_rpc(&client.rpc, &pool)
-        .await
-        .unwrap_or_else(|e| panic!(
-            "从 RPC 获取 PumpSwap Pool 信息失败: {}\n  Pool: {}\n  RPC: {}",
-            e, pool, client.rpc.url()
-        ));
+    let pump_swap_params =
+        PumpSwapParams::from_pool_address_by_rpc(&client.rpc, &pool).await.unwrap_or_else(|e| {
+            panic!(
+                "从 RPC 获取 PumpSwap Pool 信息失败: {}\n  Pool: {}\n  RPC: {}",
+                e,
+                pool,
+                client.rpc.url()
+            )
+        });
     println!("  - 池信息获取成功");
 
     // 2. 从 RPC 获取最新的 blockhash
-    let recent_blockhash = client.rpc.get_latest_blockhash()
-        .await
-        .map_err(|e| anyhow::anyhow!("获取最新 blockhash 失败: {}\n  RPC: {}", e, client.rpc.url()))?;
+    let recent_blockhash = client.rpc.get_latest_blockhash().await.map_err(|e| {
+        anyhow::anyhow!("获取最新 blockhash 失败: {}\n  RPC: {}", e, client.rpc.url())
+    })?;
 
     // 3. 设置 Gas 策略
     let gas_fee_strategy = GasFeeStrategy::new();

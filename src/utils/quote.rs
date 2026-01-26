@@ -14,4 +14,3 @@ pub struct QuoteExactInResult {
     /// Number of extra on-chain accounts read to produce this quote.
     pub extra_accounts_read: usize,
 }
-

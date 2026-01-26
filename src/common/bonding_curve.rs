@@ -25,10 +25,10 @@
 //! - `get_final_market_cap_sol`: Calculates the final market cap in SOL after all tokens are sold
 //! - `get_buy_out_price`: Calculates the price to buy out all remaining tokens
 
+use anyhow::{anyhow, Result};
 use borsh::BorshDeserialize;
 use serde::{Deserialize, Serialize};
 use solana_sdk::pubkey::Pubkey;
-use anyhow::{Result, anyhow};
 
 use crate::instruction::utils::pumpfun::global_constants::{
     INITIAL_REAL_TOKEN_RESERVES, INITIAL_VIRTUAL_SOL_RESERVES, INITIAL_VIRTUAL_TOKEN_RESERVES,
@@ -273,14 +273,14 @@ impl BondingCurveAccount {
 
     /// Calculates the amount of tokens received for a given SOL amount
     /// using Raydium LaunchLab's constant product curve formula.
-    /// 
+    ///
     /// This differs from PumpFun's formula:
     /// - Raydium uses dynamic reserves: inputReserve = virtualB + realB, outputReserve = virtualA - realA
     /// - PumpFun uses: inputReserve = virtualB, outputReserve = virtualA
-    /// 
+    ///
     /// # Arguments
     /// * `sol_amount` - Amount of SOL to spend (after fees have been deducted)
-    /// 
+    ///
     /// # Returns
     /// * `Ok(u64)` - Amount of tokens that would be received
     /// * `Err(&str)` - Error message if curve is complete
@@ -297,43 +297,45 @@ impl BondingCurveAccount {
         // inputReserve = virtualB + realB (virtual_sol_reserves + real_sol_reserves)
         // outputReserve = virtualA - realA (virtual_token_reserves - real_token_reserves)
         // amountOut = amountIn * outputReserve / (inputReserve + amountIn)
-        
-        let input_reserve: u128 = (self.virtual_sol_reserves as u128) + (self.real_sol_reserves as u128);
-        let output_reserve: u128 = (self.virtual_token_reserves as u128).saturating_sub(self.real_token_reserves as u128);
-        
+
+        let input_reserve: u128 =
+            (self.virtual_sol_reserves as u128) + (self.real_sol_reserves as u128);
+        let output_reserve: u128 =
+            (self.virtual_token_reserves as u128).saturating_sub(self.real_token_reserves as u128);
+
         if output_reserve == 0 {
             return Ok(0);
         }
-        
+
         let amount_in: u128 = sol_amount as u128;
         let numerator: u128 = amount_in * output_reserve;
         let denominator: u128 = input_reserve + amount_in;
-        
+
         let amount_out = numerator / denominator;
-        
+
         // Cap at remaining real token reserves
         let amount_out_u64 = amount_out as u64;
-        Ok(if amount_out_u64 < self.real_token_reserves { 
-            amount_out_u64 
-        } else { 
-            self.real_token_reserves 
+        Ok(if amount_out_u64 < self.real_token_reserves {
+            amount_out_u64
+        } else {
+            self.real_token_reserves
         })
     }
 
     /// Calculates the amount of tokens received after applying Raydium LaunchLab fees.
-    /// 
+    ///
     /// # Arguments
     /// * `sol_amount` - Amount of SOL to spend (before fees)
     /// * `protocol_fee_rate` - Protocol fee rate (from GlobalConfig.trade_fee_rate, in basis points * 100, e.g. 10000 = 1%)
     /// * `platform_fee_rate` - Platform fee rate (from PlatformConfig.fee_rate, in basis points * 100)
     /// * `creator_fee_rate` - Creator fee rate (from PlatformConfig.creator_fee_rate, in basis points * 100)
     /// * `share_fee_rate` - Share fee rate (typically 0)
-    /// 
+    ///
     /// # Returns
     /// * `Ok(u64)` - Amount of tokens that would be received after fees
     /// * `Err(&str)` - Error message if calculation fails
     pub fn get_buy_price_raydium_with_fees(
-        &self, 
+        &self,
         sol_amount: u64,
         protocol_fee_rate: u64,
         platform_fee_rate: u64,
@@ -351,19 +353,20 @@ impl BondingCurveAccount {
         // Calculate total fee rate
         // Fee rate denominator is 1_000_000 (FEE_RATE_DENOMINATOR_VALUE in SDK)
         const FEE_RATE_DENOMINATOR: u128 = 1_000_000;
-        let total_fee_rate = protocol_fee_rate as u128 
-            + platform_fee_rate as u128 
-            + creator_fee_rate as u128 
+        let total_fee_rate = protocol_fee_rate as u128
+            + platform_fee_rate as u128
+            + creator_fee_rate as u128
             + share_fee_rate as u128;
-        
+
         // Calculate fee amount using ceiling division
         // fee = ceil(amount * fee_rate / denominator)
         let sol_amount_u128 = sol_amount as u128;
-        let fee = (sol_amount_u128 * total_fee_rate + FEE_RATE_DENOMINATOR - 1) / FEE_RATE_DENOMINATOR;
-        
+        let fee =
+            (sol_amount_u128 * total_fee_rate + FEE_RATE_DENOMINATOR - 1) / FEE_RATE_DENOMINATOR;
+
         // Amount after fees
         let amount_less_fee = sol_amount_u128.saturating_sub(fee) as u64;
-        
+
         // Calculate tokens using Raydium formula
         self.get_buy_price_raydium(amount_less_fee)
     }

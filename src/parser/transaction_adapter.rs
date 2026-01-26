@@ -3,8 +3,8 @@
 //! 参考 solana-dex-parser 的 TransactionAdapter 实现
 //! 支持 Solana 3.0 的交易格式
 
-use solana_sdk::pubkey::Pubkey;
 use solana_account_decoder::parse_token::UiTokenAmount;
+use solana_sdk::pubkey::Pubkey;
 use solana_transaction_status::{
     EncodedConfirmedTransactionWithStatusMeta, EncodedTransactionWithStatusMeta,
 };
@@ -166,13 +166,11 @@ impl TransactionAdapter {
     }
 
     /// 提取签名
-    fn extract_signature(
-        tx: &EncodedTransactionWithStatusMeta,
-    ) -> Result<String, AdapterError> {
+    fn extract_signature(tx: &EncodedTransactionWithStatusMeta) -> Result<String, AdapterError> {
         // 从 transaction 中提取签名
         // 使用 JSON 序列化来避免复杂的类型匹配
-        let tx_value = serde_json::to_value(tx)
-            .map_err(|e| AdapterError::JsonError(e.to_string()))?;
+        let tx_value =
+            serde_json::to_value(tx).map_err(|e| AdapterError::JsonError(e.to_string()))?;
 
         if let Some(signatures) = tx_value["transaction"]["signatures"].as_array() {
             if let Some(first_sig) = signatures.first() {
@@ -193,8 +191,8 @@ impl TransactionAdapter {
         let mut keys = Vec::new();
 
         // 使用 JSON 方式提取账户密钥
-        let tx_value = serde_json::to_value(tx)
-            .map_err(|e| AdapterError::JsonError(e.to_string()))?;
+        let tx_value =
+            serde_json::to_value(tx).map_err(|e| AdapterError::JsonError(e.to_string()))?;
 
         // 尝试多种可能的路径
         // 1. transaction.message.accountKeys (字符串数组)
@@ -217,7 +215,9 @@ impl TransactionAdapter {
 
         // 2. transaction.message.staticAccountKeys (备用)
         if keys.is_empty() {
-            if let Some(account_keys) = tx_value["transaction"]["message"]["staticAccountKeys"].as_array() {
+            if let Some(account_keys) =
+                tx_value["transaction"]["message"]["staticAccountKeys"].as_array()
+            {
                 for key_value in account_keys {
                     if let Some(key_str) = key_value.as_str() {
                         if let Ok(pubkey) = Pubkey::from_str(key_str) {
@@ -230,7 +230,9 @@ impl TransactionAdapter {
 
         // 3. accountKeys (在 message 级别)
         if keys.is_empty() {
-            if let Some(account_keys) = tx_value["transaction"]["message"]["accountKeys"]["accountKeys"].as_array() {
+            if let Some(account_keys) =
+                tx_value["transaction"]["message"]["accountKeys"]["accountKeys"].as_array()
+            {
                 for key_value in account_keys {
                     if let Some(key_str) = key_value.as_str() {
                         if let Ok(pubkey) = Pubkey::from_str(key_str) {
@@ -248,17 +250,20 @@ impl TransactionAdapter {
     fn extract_token_balances(
         tx: &EncodedTransactionWithStatusMeta,
         account_keys: &[Pubkey],
-    ) -> Result<(
-        HashMap<Pubkey, (Option<UiTokenAmount>, Option<UiTokenAmount>)>,
-        HashMap<Pubkey, Pubkey>,
-        HashMap<Pubkey, u8>,
-    ), AdapterError> {
+    ) -> Result<
+        (
+            HashMap<Pubkey, (Option<UiTokenAmount>, Option<UiTokenAmount>)>,
+            HashMap<Pubkey, Pubkey>,
+            HashMap<Pubkey, u8>,
+        ),
+        AdapterError,
+    > {
         let mut token_balance_changes = HashMap::new();
         let mut spl_token_map = HashMap::new();
         let mut spl_decimals_map = HashMap::new();
 
-        let tx_value = serde_json::to_value(tx)
-            .map_err(|e| AdapterError::JsonError(e.to_string()))?;
+        let tx_value =
+            serde_json::to_value(tx).map_err(|e| AdapterError::JsonError(e.to_string()))?;
 
         let meta = &tx_value["meta"];
 
@@ -290,7 +295,10 @@ impl TransactionAdapter {
                                     amount: ui_amount["amount"].as_str().unwrap_or("0").to_string(),
                                     decimals,
                                     ui_amount: ui_amount["uiAmount"].as_f64().or(Some(0.0)),
-                                    ui_amount_string: ui_amount["uiAmountString"].as_str().unwrap_or("0").to_string(),
+                                    ui_amount_string: ui_amount["uiAmountString"]
+                                        .as_str()
+                                        .unwrap_or("0")
+                                        .to_string(),
                                 };
 
                                 token_balance_changes
@@ -330,7 +338,10 @@ impl TransactionAdapter {
                                     amount: ui_amount["amount"].as_str().unwrap_or("0").to_string(),
                                     decimals,
                                     ui_amount: ui_amount["uiAmount"].as_f64().or(Some(0.0)),
-                                    ui_amount_string: ui_amount["uiAmountString"].as_str().unwrap_or("0").to_string(),
+                                    ui_amount_string: ui_amount["uiAmountString"]
+                                        .as_str()
+                                        .unwrap_or("0")
+                                        .to_string(),
                                 };
 
                                 token_balance_changes
@@ -351,13 +362,16 @@ impl TransactionAdapter {
     fn extract_instructions(
         tx: &EncodedTransactionWithStatusMeta,
         account_keys: &[Pubkey],
-    ) -> Result<(Vec<InstructionInfo>, Vec<InnerInstructionInfo>, Vec<serde_json::Value>), AdapterError> {
+    ) -> Result<
+        (Vec<InstructionInfo>, Vec<InnerInstructionInfo>, Vec<serde_json::Value>),
+        AdapterError,
+    > {
         let mut instructions = Vec::new();
         let mut inner_instructions = Vec::new();
         let mut inner_instructions_json = Vec::new();
 
-        let tx_value = serde_json::to_value(tx)
-            .map_err(|e| AdapterError::JsonError(e.to_string()))?;
+        let tx_value =
+            serde_json::to_value(tx).map_err(|e| AdapterError::JsonError(e.to_string()))?;
 
         // 提取外部指令
         if let Some(ixs) = tx_value["transaction"]["message"]["instructions"].as_array() {
@@ -365,7 +379,8 @@ impl TransactionAdapter {
                 // Solana 新格式使用 programIdIndex (指向 accountKeys 的索引)
                 // 旧格式可能使用直接的 programId 字符串
 
-                let program_id = if let Some(program_id_index) = ix_value["programIdIndex"].as_u64() {
+                let program_id = if let Some(program_id_index) = ix_value["programIdIndex"].as_u64()
+                {
                     // 新格式：通过索引获取 programId
                     let index = program_id_index as usize;
                     if index < account_keys.len() {
@@ -386,7 +401,8 @@ impl TransactionAdapter {
 
                 // 解析账户列表 - 新格式使用索引数组
                 let accounts = if let Some(accounts_arr) = ix_value["accounts"].as_array() {
-                    accounts_arr.iter()
+                    accounts_arr
+                        .iter()
                         .filter_map(|acc| {
                             // 尝试作为索引解析
                             if let Some(index) = acc.as_u64() {
@@ -410,8 +426,11 @@ impl TransactionAdapter {
 
                 // 解析 data
                 let data = if let Some(data_str) = ix_value["data"].as_str() {
-                    bs58::decode(data_str).into_vec()
-                        .inspect_err(|e| warn!("指令数据 base58 解析失败 (指令索引 {}): {}", idx, e))
+                    bs58::decode(data_str)
+                        .into_vec()
+                        .inspect_err(|e| {
+                            warn!("指令数据 base58 解析失败 (指令索引 {}): {}", idx, e)
+                        })
                         .unwrap_or_default()
                 } else {
                     Vec::new()
@@ -437,26 +456,28 @@ impl TransactionAdapter {
                 if let Some(instructions_arr) = inner_set["instructions"].as_array() {
                     for (inner_idx, ix_json) in instructions_arr.iter().enumerate() {
                         // 同样处理 programIdIndex
-                        let program_id = if let Some(program_id_index) = ix_json["programIdIndex"].as_u64() {
-                            let index = program_id_index as usize;
-                            if index < account_keys.len() {
-                                account_keys[index]
+                        let program_id =
+                            if let Some(program_id_index) = ix_json["programIdIndex"].as_u64() {
+                                let index = program_id_index as usize;
+                                if index < account_keys.len() {
+                                    account_keys[index]
+                                } else {
+                                    continue;
+                                }
+                            } else if let Some(program_id_str) = ix_json["programId"].as_str() {
+                                if let Ok(pid) = Pubkey::from_str(program_id_str) {
+                                    pid
+                                } else {
+                                    continue;
+                                }
                             } else {
                                 continue;
-                            }
-                        } else if let Some(program_id_str) = ix_json["programId"].as_str() {
-                            if let Ok(pid) = Pubkey::from_str(program_id_str) {
-                                pid
-                            } else {
-                                continue;
-                            }
-                        } else {
-                            continue;
-                        };
+                            };
 
                         // 解析账户列表
                         let accounts = if let Some(accounts_arr) = ix_json["accounts"].as_array() {
-                            accounts_arr.iter()
+                            accounts_arr
+                                .iter()
                                 .filter_map(|acc| {
                                     if let Some(index) = acc.as_u64() {
                                         let idx = index as usize;
@@ -524,9 +545,7 @@ impl TransactionAdapter {
 
     /// 获取指定程序ID的所有外部指令
     pub fn get_instructions_by_program(&self, program_id: &Pubkey) -> Vec<&InstructionInfo> {
-        self.instructions.iter()
-            .filter(|ix| &ix.program_id == program_id)
-            .collect()
+        self.instructions.iter().filter(|ix| &ix.program_id == program_id).collect()
     }
 
     /// 获取指定程序ID的所有内部指令
@@ -534,18 +553,21 @@ impl TransactionAdapter {
         &self,
         program_id: &Pubkey,
     ) -> Vec<&InnerInstructionInfo> {
-        self.inner_instructions.iter()
+        self.inner_instructions
+            .iter()
             .filter(|ix| &ix.instruction.program_id == program_id)
             .collect()
     }
 
     /// 获取所有 transferChecked 类型的内部指令
     pub fn get_transfer_checked_instructions(&self) -> Vec<&InnerInstructionInfo> {
-        self.inner_instructions.iter()
+        self.inner_instructions
+            .iter()
             .filter(|ix| {
                 if let Some(json) = &ix.instruction.parsed_json {
                     // 检查 parsed.type 是否为 transferChecked
-                    json["parsed"]["type"].as_str()
+                    json["parsed"]["type"]
+                        .as_str()
                         .map(|t| t == "transferChecked" || t == "transfer")
                         .unwrap_or(false)
                 } else {
@@ -557,19 +579,19 @@ impl TransactionAdapter {
 
     /// 获取所有转账类型的内部指令（扩展版）
     pub fn get_all_transfer_instructions(&self) -> Vec<&InnerInstructionInfo> {
-        let token_program_id = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
-            .parse::<Pubkey>()
-            .unwrap();
+        let token_program_id =
+            "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA".parse::<Pubkey>().unwrap();
 
-        let token_2022_program_id = "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb"
-            .parse::<Pubkey>()
-            .unwrap();
+        let token_2022_program_id =
+            "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb".parse::<Pubkey>().unwrap();
 
-        self.inner_instructions.iter()
+        self.inner_instructions
+            .iter()
             .filter(|ix| {
                 // 必须是 Token Program 或 Token-2022 Program 的指令
                 if ix.instruction.program_id != token_program_id
-                    && ix.instruction.program_id != token_2022_program_id {
+                    && ix.instruction.program_id != token_2022_program_id
+                {
                     return false;
                 }
 
@@ -578,9 +600,12 @@ impl TransactionAdapter {
                     if let Some(t) = json["parsed"]["type"].as_str() {
                         return matches!(
                             t,
-                            "transfer" | "transferChecked" |
-                            "mintTo" | "mintToChecked" |
-                            "burn" | "burnChecked"
+                            "transfer"
+                                | "transferChecked"
+                                | "mintTo"
+                                | "mintToChecked"
+                                | "burn"
+                                | "burnChecked"
                         );
                     }
                 }
@@ -609,7 +634,9 @@ impl TransactionAdapter {
 
         for ix in self.get_all_transfer_instructions() {
             if let Some(json) = &ix.instruction.parsed_json {
-                if let Ok(transfer_data) = self.parse_transfer_instruction(json, ix.outer_index, ix.inner_index) {
+                if let Ok(transfer_data) =
+                    self.parse_transfer_instruction(json, ix.outer_index, ix.inner_index)
+                {
                     transfers.push(transfer_data);
                 }
             }
@@ -634,16 +661,31 @@ impl TransactionAdapter {
             let program_id = Pubkey::from_str(program_id_str)
                 .map_err(|e| AdapterError::PubkeyParseError(e.to_string()))?;
 
-            return self.parse_transfer_instruction_parsed(json, outer_index, inner_index, parsed_type, program_id);
+            return self.parse_transfer_instruction_parsed(
+                json,
+                outer_index,
+                inner_index,
+                parsed_type,
+                program_id,
+            );
         }
 
         // 如果没有 parsed 字段，尝试从原始数据解析
         // 从 inner_instructions 获取 program_id
-        let inner_instr = self.inner_instructions.iter()
+        let inner_instr = self
+            .inner_instructions
+            .iter()
             .find(|ix| ix.outer_index == outer_index && ix.inner_index == inner_index)
-            .ok_or_else(|| AdapterError::InstructionParseError("找不到对应的内部指令".to_string()))?;
+            .ok_or_else(|| {
+                AdapterError::InstructionParseError("找不到对应的内部指令".to_string())
+            })?;
 
-        self.parse_transfer_instruction_raw(json, outer_index, inner_index, inner_instr.instruction.program_id)
+        self.parse_transfer_instruction_raw(
+            json,
+            outer_index,
+            inner_index,
+            inner_instr.instruction.program_id,
+        )
     }
 
     /// 从 parsed 格式解析转账指令
@@ -661,11 +703,13 @@ impl TransactionAdapter {
             .ok_or_else(|| AdapterError::InstructionParseError("缺少 info 字段".to_string()))?;
 
         // 解析 source 和 destination
-        let source_str = info.get("source")
+        let source_str = info
+            .get("source")
             .and_then(|v| v.as_str())
             .ok_or_else(|| AdapterError::InstructionParseError("缺少 source".to_string()))?;
 
-        let destination_str = info.get("destination")
+        let destination_str = info
+            .get("destination")
             .and_then(|v| v.as_str())
             .ok_or_else(|| AdapterError::InstructionParseError("缺少 destination".to_string()))?;
 
@@ -677,21 +721,23 @@ impl TransactionAdapter {
 
         // 解析 mint
         let mint = if let Some(mint_str) = info.get("mint").and_then(|v| v.as_str()) {
-            Pubkey::from_str(mint_str)
-                .map_err(|e| AdapterError::PubkeyParseError(e.to_string()))?
+            Pubkey::from_str(mint_str).map_err(|e| AdapterError::PubkeyParseError(e.to_string()))?
         } else {
-            self.spl_token_map.get(&source)
+            self.spl_token_map
+                .get(&source)
                 .or_else(|| self.spl_token_map.get(&destination))
                 .copied()
-                .ok_or_else(|| AdapterError::InstructionParseError(
-                    format!("无法从 source/destination 推断 mint")
-                ))?
+                .ok_or_else(|| {
+                    AdapterError::InstructionParseError(format!(
+                        "无法从 source/destination 推断 mint"
+                    ))
+                })?
         };
 
         // 解析 decimals
-        let decimals = self.spl_decimals_map.get(&mint)
-            .copied()
-            .ok_or_else(|| AdapterError::InstructionParseError(format!("找不到 mint {} 的精度", mint)))?;
+        let decimals = self.spl_decimals_map.get(&mint).copied().ok_or_else(|| {
+            AdapterError::InstructionParseError(format!("找不到 mint {} 的精度", mint))
+        })?;
 
         // 解析 tokenAmount
         let token_amount = if let Some(token_amount_json) = info.get("tokenAmount") {
@@ -701,31 +747,28 @@ impl TransactionAdapter {
                 decimals,
             }
         } else {
-            let amount_str = info.get("amount")
-                .and_then(|v| v.as_str())
-                .unwrap_or("0");
+            let amount_str = info.get("amount").and_then(|v| v.as_str()).unwrap_or("0");
             let amount_u64 = amount_str.parse::<u64>().unwrap_or(0);
             let ui_amount = amount_u64 as f64 / 10_f64.powi(decimals as i32);
-            TokenAmount {
-                amount: amount_str.to_string(),
-                ui_amount,
-                decimals,
-            }
+            TokenAmount { amount: amount_str.to_string(), ui_amount, decimals }
         };
 
         // 解析 authority
-        let authority = info.get("authority")
-            .and_then(|v| v.as_str())
-            .and_then(|s| Pubkey::from_str(s).ok());
+        let authority =
+            info.get("authority").and_then(|v| v.as_str()).and_then(|s| Pubkey::from_str(s).ok());
 
         // 获取余额信息
-        let source_balance = self.token_balance_changes.get(&source)
-            .and_then(|(pre, _)| pre.as_ref().cloned());
-        let source_pre_balance = self.token_balance_changes.get(&source)
-            .and_then(|(pre, _)| pre.as_ref().cloned());
-        let destination_balance = self.token_balance_changes.get(&destination)
+        let source_balance =
+            self.token_balance_changes.get(&source).and_then(|(pre, _)| pre.as_ref().cloned());
+        let source_pre_balance =
+            self.token_balance_changes.get(&source).and_then(|(pre, _)| pre.as_ref().cloned());
+        let destination_balance = self
+            .token_balance_changes
+            .get(&destination)
             .and_then(|(_, post)| post.as_ref().cloned());
-        let destination_pre_balance = self.token_balance_changes.get(&destination)
+        let destination_pre_balance = self
+            .token_balance_changes
+            .get(&destination)
             .and_then(|(_, post)| post.as_ref().cloned());
 
         Ok(TransferData {
@@ -757,9 +800,13 @@ impl TransactionAdapter {
     ) -> Result<TransferData, AdapterError> {
         // 从外部获取账户信息
         // 通过找到对应的 InnerInstructionInfo
-        let inner_instr = self.inner_instructions.iter()
+        let inner_instr = self
+            .inner_instructions
+            .iter()
             .find(|ix| ix.outer_index == outer_index && ix.inner_index == inner_index)
-            .ok_or_else(|| AdapterError::InstructionParseError("找不到对应的内部指令".to_string()))?;
+            .ok_or_else(|| {
+                AdapterError::InstructionParseError("找不到对应的内部指令".to_string())
+            })?;
 
         let accounts = &inner_instr.instruction.accounts;
         let data = &inner_instr.instruction.data;
@@ -776,7 +823,9 @@ impl TransactionAdapter {
             3 => {
                 // Transfer
                 if accounts.len() < 3 {
-                    return Err(AdapterError::InstructionParseError("Transfer 指令账户不足".to_string()));
+                    return Err(AdapterError::InstructionParseError(
+                        "Transfer 指令账户不足".to_string(),
+                    ));
                 }
                 let source = accounts[0];
                 let destination = accounts[1];
@@ -784,17 +833,23 @@ impl TransactionAdapter {
                 let authority = Some(accounts[2]);
 
                 // 从 spl_token_map 获取 mint
-                let mint = self.spl_token_map.get(&source)
+                let mint = self
+                    .spl_token_map
+                    .get(&source)
                     .or_else(|| self.spl_token_map.get(&destination))
                     .copied()
-                    .ok_or_else(|| AdapterError::InstructionParseError("无法推断 mint".to_string()))?;
+                    .ok_or_else(|| {
+                        AdapterError::InstructionParseError("无法推断 mint".to_string())
+                    })?;
 
                 (source, mint, destination, authority)
             }
             12 => {
                 // TransferChecked
                 if accounts.len() < 4 {
-                    return Err(AdapterError::InstructionParseError("TransferChecked 指令账户不足".to_string()));
+                    return Err(AdapterError::InstructionParseError(
+                        "TransferChecked 指令账户不足".to_string(),
+                    ));
                 }
                 let source = accounts[0];
                 let mint = accounts[1];
@@ -804,9 +859,10 @@ impl TransactionAdapter {
                 (source, mint, destination, authority)
             }
             _ => {
-                return Err(AdapterError::InstructionParseError(
-                    format!("未知的指令 discriminator: {}", discriminator)
-                ));
+                return Err(AdapterError::InstructionParseError(format!(
+                    "未知的指令 discriminator: {}",
+                    discriminator
+                )));
             }
         };
 
@@ -817,14 +873,15 @@ impl TransactionAdapter {
 
         let amount_bytes = &data[1..9];
         let amount = u64::from_le_bytes(
-            amount_bytes.try_into()
-                .map_err(|_| AdapterError::InstructionParseError("无法解析 amount".to_string()))?
+            amount_bytes
+                .try_into()
+                .map_err(|_| AdapterError::InstructionParseError("无法解析 amount".to_string()))?,
         );
 
         // 获取 decimals
-        let decimals = self.spl_decimals_map.get(&mint)
-            .copied()
-            .ok_or_else(|| AdapterError::InstructionParseError(format!("找不到 mint {} 的精度", mint)))?;
+        let decimals = self.spl_decimals_map.get(&mint).copied().ok_or_else(|| {
+            AdapterError::InstructionParseError(format!("找不到 mint {} 的精度", mint))
+        })?;
 
         let token_amount = TokenAmount {
             amount: amount.to_string(),
@@ -833,13 +890,17 @@ impl TransactionAdapter {
         };
 
         // 获取余额信息
-        let source_balance = self.token_balance_changes.get(&source)
-            .and_then(|(pre, _)| pre.as_ref().cloned());
-        let source_pre_balance = self.token_balance_changes.get(&source)
-            .and_then(|(pre, _)| pre.as_ref().cloned());
-        let destination_balance = self.token_balance_changes.get(&destination)
+        let source_balance =
+            self.token_balance_changes.get(&source).and_then(|(pre, _)| pre.as_ref().cloned());
+        let source_pre_balance =
+            self.token_balance_changes.get(&source).and_then(|(pre, _)| pre.as_ref().cloned());
+        let destination_balance = self
+            .token_balance_changes
+            .get(&destination)
             .and_then(|(_, post)| post.as_ref().cloned());
-        let destination_pre_balance = self.token_balance_changes.get(&destination)
+        let destination_pre_balance = self
+            .token_balance_changes
+            .get(&destination)
             .and_then(|(_, post)| post.as_ref().cloned());
 
         let transfer_type = match discriminator {
@@ -875,10 +936,7 @@ impl TransactionAdapter {
     /// # 返回
     /// 该外部指令内的所有 Transfer 记录
     pub fn get_transfers_for_instruction(&self, outer_index: usize) -> Vec<TransferData> {
-        self.get_transfer_actions()
-            .into_iter()
-            .filter(|t| t.outer_index == outer_index)
-            .collect()
+        self.get_transfer_actions().into_iter().filter(|t| t.outer_index == outer_index).collect()
     }
 }
 
@@ -921,11 +979,8 @@ mod tests {
             parsed_json: None,
         };
 
-        let inner_instruction = InnerInstructionInfo {
-            outer_index: 1,
-            inner_index: 0,
-            instruction,
-        };
+        let inner_instruction =
+            InnerInstructionInfo { outer_index: 1, inner_index: 0, instruction };
 
         assert_eq!(inner_instruction.outer_index, 1);
         assert_eq!(inner_instruction.inner_index, 0);

@@ -8,14 +8,10 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use solana_account_decoder::UiAccount;
 use solana_client::nonblocking::rpc_client::RpcClient as NonblockingRpcClient;
-use solana_client::rpc_config::{RpcProgramAccountsConfig, RpcTransactionConfig};
 use solana_client::rpc_client::RpcClient;
+use solana_client::rpc_config::{RpcProgramAccountsConfig, RpcTransactionConfig};
 use solana_client::rpc_response::UiTokenAmount;
-use solana_sdk::{
-    account::Account,
-    pubkey::Pubkey,
-    signature::Signature,
-};
+use solana_sdk::{account::Account, pubkey::Pubkey, signature::Signature};
 use solana_transaction_status::EncodedConfirmedTransactionWithStatusMeta;
 use std::collections::hash_map::DefaultHasher;
 use std::fs;
@@ -39,10 +35,7 @@ pub trait PoolRpcClient: Send + Sync {
     ) -> Result<Vec<(String, UiAccount)>, String>;
 
     /// 获取 Token 账户余额
-    async fn get_token_account_balance(
-        &self,
-        pubkey: &Pubkey,
-    ) -> Result<UiTokenAmount, String>;
+    async fn get_token_account_balance(&self, pubkey: &Pubkey) -> Result<UiTokenAmount, String>;
 
     /// 获取 SOL 余额
     async fn get_balance(&self, pubkey: &Pubkey) -> Result<u64, String>;
@@ -74,9 +67,7 @@ pub trait PoolRpcClient: Send + Sync {
 #[async_trait::async_trait]
 impl PoolRpcClient for NonblockingRpcClient {
     async fn get_account(&self, pubkey: &Pubkey) -> Result<Account, String> {
-        self.get_account(pubkey)
-            .await
-            .map_err(|e| format!("RPC 调用失败: {}", e))
+        self.get_account(pubkey).await.map_err(|e| format!("RPC 调用失败: {}", e))
     }
 
     async fn get_program_ui_accounts_with_config(
@@ -90,31 +81,19 @@ impl PoolRpcClient for NonblockingRpcClient {
             .map_err(|e| format!("RPC 调用失败: {}", e))?;
 
         // 将 Pubkey 转换为 String 以保持一致性
-        Ok(accounts
-            .into_iter()
-            .map(|(pubkey, account)| (pubkey.to_string(), account))
-            .collect())
+        Ok(accounts.into_iter().map(|(pubkey, account)| (pubkey.to_string(), account)).collect())
     }
 
-    async fn get_token_account_balance(
-        &self,
-        pubkey: &Pubkey,
-    ) -> Result<UiTokenAmount, String> {
-        self.get_token_account_balance(pubkey)
-            .await
-            .map_err(|e| format!("RPC 调用失败: {}", e))
+    async fn get_token_account_balance(&self, pubkey: &Pubkey) -> Result<UiTokenAmount, String> {
+        self.get_token_account_balance(pubkey).await.map_err(|e| format!("RPC 调用失败: {}", e))
     }
 
     async fn get_balance(&self, pubkey: &Pubkey) -> Result<u64, String> {
-        self.get_balance(pubkey)
-            .await
-            .map_err(|e| format!("RPC 调用失败: {}", e))
+        self.get_balance(pubkey).await.map_err(|e| format!("RPC 调用失败: {}", e))
     }
 
     async fn get_latest_blockhash(&self) -> Result<solana_sdk::hash::Hash, String> {
-        self.get_latest_blockhash()
-            .await
-            .map_err(|e| format!("RPC 调用失败: {}", e))
+        self.get_latest_blockhash().await.map_err(|e| format!("RPC 调用失败: {}", e))
     }
 
     async fn send_and_confirm_transaction(
@@ -131,9 +110,7 @@ impl PoolRpcClient for NonblockingRpcClient {
         pubkey: &Pubkey,
         lamports: u64,
     ) -> Result<solana_sdk::signature::Signature, String> {
-        self.request_airdrop(pubkey, lamports)
-            .await
-            .map_err(|e| format!("RPC 调用失败: {}", e))
+        self.request_airdrop(pubkey, lamports).await.map_err(|e| format!("RPC 调用失败: {}", e))
     }
 
     async fn confirm_transaction(
@@ -155,10 +132,7 @@ impl PoolRpcClient for NonblockingRpcClient {
 #[async_trait::async_trait]
 impl PoolRpcClient for Arc<NonblockingRpcClient> {
     async fn get_account(&self, pubkey: &Pubkey) -> Result<Account, String> {
-        self.as_ref()
-            .get_account(pubkey)
-            .await
-            .map_err(|e| format!("RPC 调用失败: {}", e))
+        self.as_ref().get_account(pubkey).await.map_err(|e| format!("RPC 调用失败: {}", e))
     }
 
     async fn get_program_ui_accounts_with_config(
@@ -173,16 +147,10 @@ impl PoolRpcClient for Arc<NonblockingRpcClient> {
             .map_err(|e| format!("RPC 调用失败: {}", e))?;
 
         // 将 Pubkey 转换为 String 以保持一致性
-        Ok(accounts
-            .into_iter()
-            .map(|(pubkey, account)| (pubkey.to_string(), account))
-            .collect())
+        Ok(accounts.into_iter().map(|(pubkey, account)| (pubkey.to_string(), account)).collect())
     }
 
-    async fn get_token_account_balance(
-        &self,
-        pubkey: &Pubkey,
-    ) -> Result<UiTokenAmount, String> {
+    async fn get_token_account_balance(&self, pubkey: &Pubkey) -> Result<UiTokenAmount, String> {
         self.as_ref()
             .get_token_account_balance(pubkey)
             .await
@@ -190,17 +158,11 @@ impl PoolRpcClient for Arc<NonblockingRpcClient> {
     }
 
     async fn get_balance(&self, pubkey: &Pubkey) -> Result<u64, String> {
-        self.as_ref()
-            .get_balance(pubkey)
-            .await
-            .map_err(|e| format!("RPC 调用失败: {}", e))
+        self.as_ref().get_balance(pubkey).await.map_err(|e| format!("RPC 调用失败: {}", e))
     }
 
     async fn get_latest_blockhash(&self) -> Result<solana_sdk::hash::Hash, String> {
-        self.as_ref()
-            .get_latest_blockhash()
-            .await
-            .map_err(|e| format!("RPC 调用失败: {}", e))
+        self.as_ref().get_latest_blockhash().await.map_err(|e| format!("RPC 调用失败: {}", e))
     }
 
     async fn send_and_confirm_transaction(
@@ -254,15 +216,10 @@ impl PoolRpcClient for Arc<dyn PoolRpcClient + Send + Sync> {
         program_id: &Pubkey,
         config: RpcProgramAccountsConfig,
     ) -> Result<Vec<(String, UiAccount)>, String> {
-        self.as_ref()
-            .get_program_ui_accounts_with_config(program_id, config)
-            .await
+        self.as_ref().get_program_ui_accounts_with_config(program_id, config).await
     }
 
-    async fn get_token_account_balance(
-        &self,
-        pubkey: &Pubkey,
-    ) -> Result<UiTokenAmount, String> {
+    async fn get_token_account_balance(&self, pubkey: &Pubkey) -> Result<UiTokenAmount, String> {
         self.as_ref().get_token_account_balance(pubkey).await
     }
 
@@ -348,17 +305,12 @@ impl AutoMockRpcClient {
     /// - `MOCK_DIR`: Mock 数据目录（默认: tests/mock_data）
     /// - `MOCK_NAMESPACE`: Mock 命名空间（可选，用于隔离不同测试的 mock 数据）
     pub fn new(rpc_url: String) -> Self {
-        let mock_dir = std::env::var("MOCK_DIR")
-            .unwrap_or_else(|_| "tests/mock_data".to_string());
+        let mock_dir = std::env::var("MOCK_DIR").unwrap_or_else(|_| "tests/mock_data".to_string());
 
         // 从环境变量读取 namespace
         let namespace = std::env::var("MOCK_NAMESPACE").ok();
 
-        Self {
-            inner: Arc::new(RpcClient::new(rpc_url)),
-            mock_dir,
-            namespace,
-        }
+        Self { inner: Arc::new(RpcClient::new(rpc_url)), mock_dir, namespace }
     }
 
     /// 创建新的 Auto Mock RPC 客户端（指定命名空间）
@@ -386,14 +338,9 @@ impl AutoMockRpcClient {
     /// );
     /// ```
     pub fn new_with_namespace(rpc_url: String, namespace: Option<String>) -> Self {
-        let mock_dir = std::env::var("MOCK_DIR")
-            .unwrap_or_else(|_| "tests/mock_data".to_string());
+        let mock_dir = std::env::var("MOCK_DIR").unwrap_or_else(|_| "tests/mock_data".to_string());
 
-        Self {
-            inner: Arc::new(RpcClient::new(rpc_url)),
-            mock_dir,
-            namespace,
-        }
+        Self { inner: Arc::new(RpcClient::new(rpc_url)), mock_dir, namespace }
     }
 
     /// 获取当前命名空间
@@ -541,15 +488,16 @@ impl AutoMockRpcClient {
         let sig = *signature;
 
         let tx = tokio::task::spawn_blocking(move || {
-            inner.get_transaction_with_config(&sig, config)
+            inner
+                .get_transaction_with_config(&sig, config)
                 .map_err(|e| format!("RPC 调用失败: {}", e))
         })
         .await
         .map_err(|e| format!("任务执行失败: {}", e))??;
 
         // 保存到文件
-        let result_json = serde_json::to_value(&tx)
-            .map_err(|e| format!("序列化结果失败: {}", e))?;
+        let result_json =
+            serde_json::to_value(&tx).map_err(|e| format!("序列化结果失败: {}", e))?;
         self.save_mock_data("get_transaction_with_config", &params_json, &result_json);
 
         Ok(tx)
@@ -571,15 +519,14 @@ impl AutoMockRpcClient {
         let pk = *pubkey;
 
         let account = tokio::task::spawn_blocking(move || {
-            inner.get_account(&pk)
-                .map_err(|e| format!("RPC 调用失败: {}", e))
+            inner.get_account(&pk).map_err(|e| format!("RPC 调用失败: {}", e))
         })
         .await
         .map_err(|e| format!("任务执行失败: {}", e))??;
 
         // 保存到文件
-        let result_json = serde_json::to_value(&account)
-            .map_err(|e| format!("序列化结果失败: {}", e))?;
+        let result_json =
+            serde_json::to_value(&account).map_err(|e| format!("序列化结果失败: {}", e))?;
         self.save_mock_data("get_account", &params_json, &result_json);
 
         Ok(account)
@@ -594,12 +541,9 @@ impl AutoMockRpcClient {
         config: RpcProgramAccountsConfig,
     ) -> Result<Vec<(String, UiAccount)>, String> {
         // 序列化 config 用于缓存键（需要先克隆，因为后面还要用）
-        let config_for_json = serde_json::to_value(&config)
-            .map_err(|e| format!("序列化 config 失败: {}", e))?;
-        let params_json = serde_json::json!((
-            program_id.to_string(),
-            config_for_json
-        ));
+        let config_for_json =
+            serde_json::to_value(&config).map_err(|e| format!("序列化 config 失败: {}", e))?;
+        let params_json = serde_json::json!((program_id.to_string(), config_for_json));
 
         // 有缓存就用
         if self.has_mock_data("get_program_ui_accounts_with_config", &params_json) {
@@ -611,21 +555,20 @@ impl AutoMockRpcClient {
         let pid = *program_id;
 
         let accounts = tokio::task::spawn_blocking(move || {
-            inner.get_program_ui_accounts_with_config(&pid, config)
+            inner
+                .get_program_ui_accounts_with_config(&pid, config)
                 .map_err(|e| format!("RPC 调用失败: {}", e))
         })
         .await
         .map_err(|e| format!("任务执行失败: {}", e))??;
 
         // 将 Pubkey 转换为 String
-        let accounts: Vec<(String, UiAccount)> = accounts
-            .into_iter()
-            .map(|(pubkey, account)| (pubkey.to_string(), account))
-            .collect();
+        let accounts: Vec<(String, UiAccount)> =
+            accounts.into_iter().map(|(pubkey, account)| (pubkey.to_string(), account)).collect();
 
         // 保存到文件（保存原始格式，Pubkey 转为 String）
-        let result_json = serde_json::to_value(&accounts)
-            .map_err(|e| format!("序列化结果失败: {}", e))?;
+        let result_json =
+            serde_json::to_value(&accounts).map_err(|e| format!("序列化结果失败: {}", e))?;
         self.save_mock_data("get_program_ui_accounts_with_config", &params_json, &result_json);
 
         Ok(accounts)
@@ -650,15 +593,14 @@ impl AutoMockRpcClient {
         let pk = *pubkey;
 
         let balance = tokio::task::spawn_blocking(move || {
-            inner.get_token_account_balance(&pk)
-                .map_err(|e| format!("RPC 调用失败: {}", e))
+            inner.get_token_account_balance(&pk).map_err(|e| format!("RPC 调用失败: {}", e))
         })
         .await
         .map_err(|e| format!("任务执行失败: {}", e))??;
 
         // 保存到文件
-        let result_json = serde_json::to_value(&balance)
-            .map_err(|e| format!("序列化结果失败: {}", e))?;
+        let result_json =
+            serde_json::to_value(&balance).map_err(|e| format!("序列化结果失败: {}", e))?;
         self.save_mock_data("get_token_account_balance", &params_json, &result_json);
 
         Ok(balance)
@@ -680,15 +622,14 @@ impl AutoMockRpcClient {
         let pk = *pubkey;
 
         let balance = tokio::task::spawn_blocking(move || {
-            inner.get_balance(&pk)
-                .map_err(|e| format!("RPC 调用失败: {}", e))
+            inner.get_balance(&pk).map_err(|e| format!("RPC 调用失败: {}", e))
         })
         .await
         .map_err(|e| format!("任务执行失败: {}", e))??;
 
         // 保存到文件
-        let result_json = serde_json::to_value(&balance)
-            .map_err(|e| format!("序列化结果失败: {}", e))?;
+        let result_json =
+            serde_json::to_value(&balance).map_err(|e| format!("序列化结果失败: {}", e))?;
         self.save_mock_data("get_balance", &params_json, &result_json);
 
         Ok(balance)
@@ -710,10 +651,7 @@ impl PoolRpcClient for AutoMockRpcClient {
         self.get_program_ui_accounts_with_config(program_id, config).await
     }
 
-    async fn get_token_account_balance(
-        &self,
-        pubkey: &Pubkey,
-    ) -> Result<UiTokenAmount, String> {
+    async fn get_token_account_balance(&self, pubkey: &Pubkey) -> Result<UiTokenAmount, String> {
         self.get_token_account_balance(pubkey).await
     }
 
@@ -723,9 +661,7 @@ impl PoolRpcClient for AutoMockRpcClient {
 
     async fn get_latest_blockhash(&self) -> Result<solana_sdk::hash::Hash, String> {
         // 交易操作不适合使用 Mock，直接调用底层 RPC
-        self.inner
-            .get_latest_blockhash()
-            .map_err(|e| format!("RPC 调用失败: {}", e))
+        self.inner.get_latest_blockhash().map_err(|e| format!("RPC 调用失败: {}", e))
     }
 
     async fn send_and_confirm_transaction(
@@ -737,8 +673,7 @@ impl PoolRpcClient for AutoMockRpcClient {
             let inner = self.inner.clone();
             let tx = transaction.clone();
             move || {
-                inner.send_and_confirm_transaction(&tx)
-                    .map_err(|e| format!("RPC 调用失败: {}", e))
+                inner.send_and_confirm_transaction(&tx).map_err(|e| format!("RPC 调用失败: {}", e))
             }
         })
         .await
@@ -754,8 +689,7 @@ impl PoolRpcClient for AutoMockRpcClient {
         let inner = self.inner.clone();
         let pk = *pubkey;
         tokio::task::spawn_blocking(move || {
-            inner.request_airdrop(&pk, lamports)
-                .map_err(|e| format!("RPC 调用失败: {}", e))
+            inner.request_airdrop(&pk, lamports).map_err(|e| format!("RPC 调用失败: {}", e))
         })
         .await
         .map_err(|e| format!("任务执行失败: {}", e))?
@@ -769,11 +703,12 @@ impl PoolRpcClient for AutoMockRpcClient {
         let inner = self.inner.clone();
         let sig = *signature;
         let response = tokio::task::spawn_blocking(move || {
-            inner.confirm_transaction_with_commitment(
-                &sig,
-                solana_commitment_config::CommitmentConfig::confirmed(),
-            )
-            .map_err(|e| format!("RPC 调用失败: {}", e))
+            inner
+                .confirm_transaction_with_commitment(
+                    &sig,
+                    solana_commitment_config::CommitmentConfig::confirmed(),
+                )
+                .map_err(|e| format!("RPC 调用失败: {}", e))
         })
         .await
         .map_err(|e| format!("任务执行失败: {}", e))??;

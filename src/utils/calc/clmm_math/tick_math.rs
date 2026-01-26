@@ -27,11 +27,7 @@ pub fn get_sqrt_price_at_tick(tick: i32) -> Result<u128, &'static str> {
     }
 
     // i = 0
-    let mut ratio = if abs_tick & 0x1 != 0 {
-        U128([0xfffcb933bd6fb800, 0])
-    } else {
-        U128([0, 1])
-    };
+    let mut ratio = if abs_tick & 0x1 != 0 { U128([0xfffcb933bd6fb800, 0]) } else { U128([0, 1]) };
 
     // i = 1..18
     if abs_tick & 0x2 != 0 {
@@ -109,11 +105,7 @@ pub fn get_tick_at_sqrt_price(sqrt_price_x64: u128) -> Result<i32, &'static str>
     let mut precision = 0;
     let mut log2p_fraction_x64 = 0;
 
-    let mut r = if msb >= 64 {
-        sqrt_price_x64 >> (msb - 63)
-    } else {
-        sqrt_price_x64 << (63 - msb)
-    };
+    let mut r = if msb >= 64 { sqrt_price_x64 >> (msb - 63) } else { sqrt_price_x64 << (63 - msb) };
 
     const BIT_PRECISION: u32 = 16;
     while bit > 0 && precision < BIT_PRECISION {
