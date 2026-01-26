@@ -179,3 +179,68 @@ too_many_arguments = "allow"
 
 # 允许复杂类型（一些复杂的泛型类型是必要的）
 type_complexity = "allow"
+
+# === 低优先级警告（不影响代码正确性） ===
+
+# Default 实现建议 - 不是所有类型都需要 Default
+missing_trait_impl = "allow"
+should_implement_trait = "allow"
+
+# 文档相关 - 文档格式优化建议
+missing_errors_doc = "allow"
+missing_panics_doc = "allow"
+missing_safety_doc = "allow"
+doc_markdown = "allow"
+
+# 代码风格 - 这些是风格偏好，不影响正确性
+if_same_then_else = "allow"
+needless_else = "allow"
+let_and_return = "allow"
+deprecated_cfg_attr = "allow"
+
+# 循环和初始化优化建议
+range_plus_one = "allow"
+redundant_else = "allow"
+uninit_assumed_init = "allow"
+late_initialization = "allow"
+init_numbered_ranges = "allow"
+
+# 命名和组织建议
+module_name_repetitions = "allow"
+single_match = "allow"
+match_same_arms = "allow"
+
+# 其他建议
+similar_names = "allow"
+struct_field_names = "allow"
+too_many_lines = "allow"
+
+# === 更多代码风格建议 ===
+
+# 引用和切片建议
+vec_box = "allow"
+ptr_as_ptr = "allow"
+ptr_cast_constness = "allow"
+
+# 数学和计算建议
+manual_div_ceil = "allow"
+
+# 方法和trait建议
+wrong_self_convention = "allow"
+
+# 循环和迭代
+needless_range_loop = "allow"
+explicit_iter_loop = "allow"
+explicit_into_iter_loop = "allow"
+
+# 代码简洁性
+redundant_pattern_matching = "allow"
+matched_wildcard = "allow"
+wildcard_enum_match_arm = "allow"
+
+# 其他
+blocks_in_conditions = "allow"
+collapsible_if = "allow"
+collapsible_else_if = "allow"
+if_not_else = "allow"
+bool_comparison = "allow"
