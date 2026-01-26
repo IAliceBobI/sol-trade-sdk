@@ -1,3 +1,8 @@
+// 允许文档格式的当前写法
+#![allow(clippy::doc_markdown)]
+// 允许经过类型检查后的 unwrap_err（已验证变量类型）
+#![allow(clippy::unwrap_used)]
+
 use crate::{
     common::{SolanaRpcClient, auto_mock_rpc::PoolRpcClient},
     constants::{USDC_MINT, USDT_MINT, WSOL_TOKEN_ACCOUNT},

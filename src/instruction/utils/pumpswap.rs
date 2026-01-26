@@ -1,4 +1,7 @@
 use crate::{
+// 允许文件操作的当前写法
+#![allow(clippy::permissions_preference_field)]
+
     common::{
         SolanaRpcClient, auto_mock_rpc::PoolRpcClient,
         spl_associated_token_account::get_associated_token_address_with_program_id,

@@ -3,6 +3,11 @@
 // Source: https://github.com/raydium-io/raydium-clmm/programs/amm/src/libraries/swap_math.rs
 // Complete copy with anchor dependencies removed for client-side use
 
+// 允许经过类型检查后的 unwrap（已验证变量类型）
+#![allow(clippy::unwrap_used)]
+// 允许布尔表达式的当前写法（为了代码可读性）
+#![allow(clippy::bool_to_int_with_if)]
+
 use super::full_math::MulDiv;
 use super::liquidity_math;
 use super::sqrt_price_math;

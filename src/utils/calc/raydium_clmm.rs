@@ -1,4 +1,9 @@
 // Copyright (c) Raydium Foundation
+// 允许文档格式的当前写法
+#![allow(clippy::doc_markdown)]
+// 允许使用 &Vec（为了类型一致性）
+#![allow(clippy::vec_box)]
+
 // Licensed under Apache 2.0
 // Raydium CLMM swap calculations using official math libraries
 

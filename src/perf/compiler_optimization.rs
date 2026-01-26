@@ -1,4 +1,7 @@
 //! 🚀 编译器级性能优化 - 极致编译时优化
+// 允许建议的 Default 实现（这些类型不需要 Default）
+#![allow(clippy::should_implement_trait)]
+
 //!
 //! 实现编译时的极致性能优化，包括：
 //! - 编译器标志优化配置

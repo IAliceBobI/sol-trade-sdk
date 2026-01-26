@@ -1,4 +1,7 @@
 //! Global account for the Pump.fun Solana Program
+// 允许模块与父模块同名（合理的命名）
+#![allow(clippy::module_inception)]
+
 //!
 //! This module contains the definition for the global configuration account.
 //!

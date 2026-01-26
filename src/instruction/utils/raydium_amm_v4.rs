@@ -1,4 +1,7 @@
 use crate::{
+// 允许文档格式的当前写法
+#![allow(clippy::doc_markdown)]
+
     common::{SolanaRpcClient, auto_mock_rpc::PoolRpcClient},
     constants::{SOL_MINT, USDC_MINT, USDT_MINT},
     instruction::utils::raydium_amm_v4_types::{AMM_INFO_SIZE, AmmInfo, amm_info_decode},
