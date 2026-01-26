@@ -361,8 +361,7 @@ impl BondingCurveAccount {
         // Calculate fee amount using ceiling division
         // fee = ceil(amount * fee_rate / denominator)
         let sol_amount_u128 = sol_amount as u128;
-        let fee =
-            (sol_amount_u128 * total_fee_rate).div_ceil(FEE_RATE_DENOMINATOR);
+        let fee = (sol_amount_u128 * total_fee_rate).div_ceil(FEE_RATE_DENOMINATOR);
 
         // Amount after fees
         let amount_less_fee = sol_amount_u128.saturating_sub(fee) as u64;

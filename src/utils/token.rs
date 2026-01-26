@@ -45,16 +45,15 @@ pub async fn get_mint_info(
     let is_token2022 = account.owner == spl_token_2022::ID;
 
     // 尝试解析为传统 Token 程序的 Mint
-    if !is_token2022
-        && let Ok(mint_account) = Mint::unpack(&account.data) {
-            let info = MintInfo {
-                decimals: mint_account.decimals,
-                symbol: get_known_token_symbol(mint),
-                is_token2022: false,
-            };
-            MINT_INFO_CACHE.insert(*mint, info.clone());
-            return Ok(info);
-        }
+    if !is_token2022 && let Ok(mint_account) = Mint::unpack(&account.data) {
+        let info = MintInfo {
+            decimals: mint_account.decimals,
+            symbol: get_known_token_symbol(mint),
+            is_token2022: false,
+        };
+        MINT_INFO_CACHE.insert(*mint, info.clone());
+        return Ok(info);
+    }
 
     // 尝试解析为 Token2022 的 Mint
     if is_token2022 {
@@ -101,16 +100,15 @@ pub async fn get_mint_info_with_client<T: PoolRpcClient + ?Sized>(
     let is_token2022 = account.owner == spl_token_2022::ID;
 
     // 尝试解析为传统 Token 程序的 Mint
-    if !is_token2022
-        && let Ok(mint_account) = Mint::unpack(&account.data) {
-            let info = MintInfo {
-                decimals: mint_account.decimals,
-                symbol: get_known_token_symbol(mint),
-                is_token2022: false,
-            };
-            MINT_INFO_CACHE.insert(*mint, info.clone());
-            return Ok(info);
-        }
+    if !is_token2022 && let Ok(mint_account) = Mint::unpack(&account.data) {
+        let info = MintInfo {
+            decimals: mint_account.decimals,
+            symbol: get_known_token_symbol(mint),
+            is_token2022: false,
+        };
+        MINT_INFO_CACHE.insert(*mint, info.clone());
+        return Ok(info);
+    }
 
     // 尝试解析为 Token2022 的 Mint
     if is_token2022 {

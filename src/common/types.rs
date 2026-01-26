@@ -61,8 +61,7 @@ impl Eq for InfrastructureConfig {}
 /// 回调执行模式
 ///
 /// 控制交易生命周期回调的执行方式
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[derive(Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum CallbackExecutionMode {
     /// 异步模式：不阻塞交易发送（默认）
     ///
@@ -89,7 +88,6 @@ pub enum CallbackExecutionMode {
     /// - 失败影响：阻止交易发送
     Sync,
 }
-
 
 #[derive(Debug, Clone)]
 pub struct TradeConfig {
