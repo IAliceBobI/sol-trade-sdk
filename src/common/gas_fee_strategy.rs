@@ -116,13 +116,7 @@ impl GasFeeStrategy {
         trade_type: TradeType,
         params: HighLowFeeParams,
     ) {
-        let HighLowFeeParams {
-            cu_limit,
-            low_cu_price,
-            high_cu_price,
-            low_tip,
-            high_tip,
-        } = params;
+        let HighLowFeeParams { cu_limit, low_cu_price, high_cu_price, low_tip, high_tip } = params;
 
         for swqos_type in swqos_types {
             self.del(*swqos_type, trade_type, GasFeeStrategyType::Normal);
@@ -156,13 +150,7 @@ impl GasFeeStrategy {
         if swqos_type.eq(&SwqosType::Default) {
             return;
         }
-        let HighLowFeeParams {
-            cu_limit,
-            low_cu_price,
-            high_cu_price,
-            low_tip,
-            high_tip,
-        } = params;
+        let HighLowFeeParams { cu_limit, low_cu_price, high_cu_price, low_tip, high_tip } = params;
 
         self.del(swqos_type, trade_type, GasFeeStrategyType::Normal);
         self.set(

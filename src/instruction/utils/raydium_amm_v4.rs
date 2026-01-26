@@ -1,7 +1,7 @@
-use crate::{
 // 允许文档格式的当前写法
 #![allow(clippy::doc_markdown)]
 
+use crate::{
     common::{SolanaRpcClient, auto_mock_rpc::PoolRpcClient},
     constants::{SOL_MINT, USDC_MINT, USDT_MINT},
     instruction::utils::raydium_amm_v4_types::{AMM_INFO_SIZE, AmmInfo, amm_info_decode},
@@ -375,9 +375,9 @@ async fn find_all_pools_by_mint_impl<T: PoolRpcClient + ?Sized>(
     );
 
     // 检测是否都失败，如果都失败则返回第一个错误（通常包含 RPC 限制信息）
-    if coin_result.is_err() && pc_result.is_err() {
-        // 返回 coin_result 的错误，它包含我们的自定义错误消息
-        return Err(coin_result.unwrap_err());
+    match (&coin_result, &pc_result) {
+        (Err(e), Err(_)) => return Err(anyhow::anyhow!("{}", e)),
+        _ => {}
     }
 
     let mut all_pools: Vec<(Pubkey, AmmInfo)> = Vec::new();
