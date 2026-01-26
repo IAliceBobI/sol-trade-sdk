@@ -56,8 +56,8 @@ pub fn compute_swap_step(
             is_base_input,
             block_timestamp,
         )?;
-        if amount_in.is_some() {
-            swap_step.amount_in = amount_in.unwrap();
+        if let Some(v) = amount_in {
+            swap_step.amount_in = v;
         }
 
         swap_step.sqrt_price_next_x64 =
@@ -80,8 +80,8 @@ pub fn compute_swap_step(
             is_base_input,
             block_timestamp,
         )?;
-        if amount_out.is_some() {
-            swap_step.amount_out = amount_out.unwrap();
+        if let Some(v) = amount_out {
+            swap_step.amount_out = v;
         }
         // In exact output case, amount_remaining is negative
         swap_step.sqrt_price_next_x64 =
@@ -111,7 +111,7 @@ pub fn compute_swap_step(
             )?
         };
         // if max is reached for exact output case, entire amount_out is needed
-        if !(max && !is_base_input) {
+        if !max || is_base_input {
             swap_step.amount_out = liquidity_math::get_delta_amount_1_unsigned(
                 swap_step.sqrt_price_next_x64,
                 sqrt_price_current_x64,
@@ -128,7 +128,7 @@ pub fn compute_swap_step(
                 true,
             )?
         };
-        if !(max && !is_base_input) {
+        if !max || is_base_input {
             swap_step.amount_out = liquidity_math::get_delta_amount_0_unsigned(
                 sqrt_price_current_x64,
                 swap_step.sqrt_price_next_x64,
@@ -187,12 +187,10 @@ fn calculate_amount_in_range(
             )
         };
 
-        if result.is_ok() {
-            Ok(Some(result.unwrap()))
-        } else if result.err().unwrap() == "MaxTokenOverflow" {
-            Ok(None)
-        } else {
-            Err("SqrtPriceLimitOverflow")
+        match result {
+            Ok(v) => Ok(Some(v)),
+            Err("MaxTokenOverflow") => Ok(None),
+            Err(_) => Err("SqrtPriceLimitOverflow"),
         }
     } else {
         let result = if zero_for_one {
@@ -210,12 +208,10 @@ fn calculate_amount_in_range(
                 false,
             )
         };
-        if result.is_ok() {
-            Ok(Some(result.unwrap()))
-        } else if result.err().unwrap() == "MaxTokenOverflow" {
-            Ok(None)
-        } else {
-            Err("SqrtPriceLimitOverflow")
+        match result {
+            Ok(v) => Ok(Some(v)),
+            Err("MaxTokenOverflow") => Ok(None),
+            Err(_) => Err("SqrtPriceLimitOverflow"),
         }
     }
 }

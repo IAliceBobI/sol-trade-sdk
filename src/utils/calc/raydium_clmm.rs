@@ -309,8 +309,10 @@ pub fn calculate_swap_amount_with_tick_arrays(
             return Err("loop_count limit exceeded");
         }
 
-        let mut step = StepComputations::default();
-        step.sqrt_price_start_x64 = state.sqrt_price_x64;
+        let mut step = StepComputations {
+            sqrt_price_start_x64: state.sqrt_price_x64,
+            ..Default::default()
+        };
 
         // 找到下一个初始化的 tick
         let next_initialized_tick = find_next_initialized_tick(
