@@ -143,7 +143,7 @@ pub trait SwqosClientTrait {
     async fn send_transactions(
         &self,
         trade_type: TradeType,
-        transactions: &Vec<VersionedTransaction>,
+        transactions: &[VersionedTransaction],
         wait_confirmation: bool,
     ) -> Result<()>;
     fn get_tip_account(&self) -> Result<String>;
