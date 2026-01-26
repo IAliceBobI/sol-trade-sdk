@@ -1,0 +1,113 @@
+# cargo-nextest 配置
+# 为每个测试设置超时限制，识别需要优化的慢测试
+
+[store]
+dir = "target/nextest"
+
+[profile.default]
+status-level = "all"
+final-status-level = "slow"
+failure-output = "immediate"
+fail-fast = false
+success-output = "never"
+
+# 默认超时：60秒后标记为慢速，最多允许3个周期
+slow-timeout = { period = "60s", terminate-after = 3 }
+# 资源泄漏检测
+leak-timeout = "10s"
+
+# 失败重试
+retries = 0
+
+[profile.ci]
+# CI 环境：更严格的配置
+status-level = "fail"
+final-status-level = "fail"
+failure-output = "immediate-final"
+fail-fast = false
+slow-timeout = { period = "30s", terminate-after = 1 }
+leak-timeout = "5s"
+retries = 0
+
+# ============================================================================
+# 针对不同测试类型的超时覆盖
+# 格式说明：
+# - slow-timeout = "N" 表示 N 秒后标记为慢速，不自动终止
+# - slow-timeout = { period = "N", terminate-after = M } 表示 M 次超时后终止
+# ============================================================================
+
+# 1. 快速单元测试（10秒）
+[[profile.default.overrides]]
+filter = "test(test_parse|test_error|test_config|test_discriminator|test_adapter)"
+slow-timeout = "10s"
+
+# 2. 交易解析器测试（30秒）
+[[profile.default.overrides]]
+filter = "test(test_parser_)"
+slow-timeout = "30s"
+
+# 3. Pool 查询测试（45秒，可能涉及网络请求）
+[[profile.default.overrides]]
+filter = "test(test_pool_|test_find_pool|test_get_pool)"
+slow-timeout = "45s"
+
+# 4. 交易解析器综合测试（60秒）
+[[profile.default.overrides]]
+filter = "test(dex_parser_comprehensive|dex_parser_real_tx|tx_adapter_tests)"
+slow-timeout = "60s"
+
+# 5. WSOL 相关测试（45秒）
+[[profile.default.overrides]]
+filter = "test(test_wsol)"
+slow-timeout = "45s"
+
+# 6. Seed 优化测试（30秒）
+[[profile.default.overrides]]
+filter = "test(test_seed)"
+slow-timeout = "30s"
+
+# 7. PumpSwap Pool 测试（60秒）
+[[profile.default.overrides]]
+filter = "test(pumpswap_pool_tests)"
+slow-timeout = "60s"
+
+# 8. Raydium CLMM Pool 测试（60秒）
+[[profile.default.overrides]]
+filter = "test(raydium_clmm_pool_tests)"
+slow-timeout = "60s"
+
+# 9. Raydium CLMM 买卖测试（90秒，涉及实际交易）
+[[profile.default.overrides]]
+filter = "test(raydium_clmm_buy_sell_tests)"
+slow-timeout = "90s"
+
+# 10. Raydium CPMM 买卖测试（90秒，涉及实际交易）
+[[profile.default.overrides]]
+filter = "test(raydium_cpmm_buy_sell_tests)"
+slow-timeout = "90s"
+
+# 11. Raydium AMM V4 Pool 测试（60秒）
+[[profile.default.overrides]]
+filter = "test(raydium_amm_v4_pool_tests)"
+slow-timeout = "60s"
+
+# 12. Raydium AMM V4 买卖测试（90秒，涉及实际交易）
+[[profile.default.overrides]]
+filter = "test(raydium_amm_v4_buy_sell_tests)"
+slow-timeout = "90s"
+
+# 13. 自动 Mock 测试（45秒）
+[[profile.default.overrides]]
+filter = "test(auto_mock_)"
+slow-timeout = "45s"
+
+# 14. 解析器 discriminator 测试（30秒）
+[[profile.default.overrides]]
+filter = "test(_discriminator_test)"
+slow-timeout = "30s"
+
+# 15. 兜底配置：所有其他测试（300秒 = 5分钟）
+[[profile.default.overrides]]
+filter = "test(*)"
+slow-timeout = { period = "60s", terminate-after = 5 }
+leak-timeout = "10s"
