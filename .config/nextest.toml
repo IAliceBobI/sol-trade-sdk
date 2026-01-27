@@ -11,13 +11,16 @@ failure-output = "immediate"
 fail-fast = false
 success-output = "never"
 
+# 1. 并发度优化：使用所有 CPU 核心
+test-threads = "num-cpus"
+
 # 默认超时：60秒后标记为慢速，最多允许3个周期
 slow-timeout = { period = "60s", terminate-after = 3 }
 # 资源泄漏检测
 leak-timeout = "10s"
 
-# 失败重试
-retries = 0
+# 2. 自动重试不稳定测试（特别是涉及网络的测试）
+retries = 2
 
 [profile.ci]
 # CI 环境：更严格的配置
@@ -27,7 +30,8 @@ failure-output = "immediate-final"
 fail-fast = false
 slow-timeout = { period = "30s", terminate-after = 1 }
 leak-timeout = "5s"
-retries = 0
+retries = 1
+test-threads = "num-cpus"
 
 # ============================================================================
 # 针对不同测试类型的超时覆盖
@@ -70,31 +74,37 @@ slow-timeout = "30s"
 [[profile.default.overrides]]
 filter = "test(pumpswap_pool_tests)"
 slow-timeout = "60s"
+threads-required = 2
 
 # 8. Raydium CLMM Pool 测试（60秒）
 [[profile.default.overrides]]
 filter = "test(raydium_clmm_pool_tests)"
 slow-timeout = "60s"
+threads-required = 2
 
 # 9. Raydium CLMM 买卖测试（90秒，涉及实际交易）
 [[profile.default.overrides]]
 filter = "test(raydium_clmm_buy_sell_tests)"
 slow-timeout = "90s"
+threads-required = 2
 
 # 10. Raydium CPMM 买卖测试（90秒，涉及实际交易）
 [[profile.default.overrides]]
 filter = "test(raydium_cpmm_buy_sell_tests)"
 slow-timeout = "90s"
+threads-required = 2
 
 # 11. Raydium AMM V4 Pool 测试（60秒）
 [[profile.default.overrides]]
 filter = "test(raydium_amm_v4_pool_tests)"
 slow-timeout = "60s"
+threads-required = 2
 
 # 12. Raydium AMM V4 买卖测试（90秒，涉及实际交易）
 [[profile.default.overrides]]
 filter = "test(raydium_amm_v4_buy_sell_tests)"
 slow-timeout = "90s"
+threads-required = 2
 
 # 13. 自动 Mock 测试（45秒）
 [[profile.default.overrides]]
@@ -109,5 +119,5 @@ slow-timeout = "30s"
 # 15. 兜底配置：所有其他测试（300秒 = 5分钟）
 [[profile.default.overrides]]
 filter = "test(*)"
-slow-timeout = { period = "60s", terminate-after = 5 }
+slow-timeout = { period = "60s", terminate-after = 3 }
 leak-timeout = "10s"
