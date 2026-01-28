@@ -9,6 +9,7 @@ use solana_sdk::{
 };
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::{str::FromStr, sync::Arc, time::Instant};
+use tokio::sync::Notify;
 
 use crate::{
     common::nonce_cache::DurableNonceInfo,
@@ -63,6 +64,7 @@ struct ResultCollector {
     landed_failed_flag: Arc<AtomicBool>, // 🔧 Tx landed on-chain but failed (nonce consumed)
     completed_count: Arc<AtomicUsize>,
     total_tasks: usize,
+    notify: Arc<Notify>, // 🔧 事件驱动：通知机制
 }
 
 impl ResultCollector {
@@ -73,6 +75,7 @@ impl ResultCollector {
             landed_failed_flag: Arc::new(AtomicBool::new(false)),
             completed_count: Arc::new(AtomicUsize::new(0)),
             total_tasks: capacity,
+            notify: Arc::new(Notify::new()), // 🔧 创建通知实例
         }
     }
 
@@ -91,6 +94,9 @@ impl ResultCollector {
         }
 
         self.completed_count.fetch_add(1, Ordering::Release);
+
+        // 🔧 事件驱动：通知等待者有新结果到达
+        self.notify.notify_waiters();
     }
 
     async fn wait_for_success(&self) -> Option<(bool, Vec<Signature>, Option<anyhow::Error>)> {
@@ -176,6 +182,22 @@ impl ResultCollector {
         }
 
         if !signatures.is_empty() { Some((has_success, signatures, last_error)) } else { None }
+    }
+
+    /// 🔧 事件驱动：等待第一个结果（带超时）
+    /// 当有任务提交结果时立即返回，避免固定等待时间
+    async fn wait_for_first(&self, timeout: std::time::Duration) -> Option<(bool, Vec<Signature>, Option<anyhow::Error>)> {
+        // 使用事件驱动：等待通知或超时
+        match tokio::time::timeout(timeout, self.notify.notified()).await {
+            Ok(_) => {
+                // 收到通知，尝试获取结果
+                self.get_first()
+            },
+            Err(_) => {
+                // 超时，尝试获取结果（可能为空）
+                self.get_first()
+            },
+        }
     }
 }
 
@@ -458,11 +480,15 @@ pub async fn execute_parallel(
     // All tasks spawned
 
     if !wait_transaction_confirmed {
-        tokio::time::sleep(std::time::Duration::from_millis(10)).await;
-        if let Some(result) = collector.get_first() {
-            return Ok(result);
+        // 🔧 事件驱动：等待第一个结果，最多等待 100ms
+        // 相比固定等待 10ms，这种方式：
+        // 1. 结果到达立即返回（更快）
+        // 2. 给足够时间等待 MEV 服务响应（更可靠）
+        let timeout = std::time::Duration::from_millis(100);
+        match collector.wait_for_first(timeout).await {
+            Some(result) => return Ok(result),
+            None => return Err(anyhow!("No transaction signature available (timeout after {:?})", timeout)),
         }
-        return Err(anyhow!("No transaction signature available"));
     }
 
     if let Some(result) = collector.wait_for_success().await {
