@@ -1,3 +1,9 @@
+pub mod types;
+pub mod dynamic_tip;
+
+pub use dynamic_tip::{DynamicTipConfig, JitoTipFloorClient, TipPercentile};
+pub use types::JitoRegion;
+
 use crate::swqos::common::{
     FormatBase64VersionedTransaction, poll_transaction_confirmation,
     serialize_transaction_and_encode,
@@ -16,6 +22,39 @@ use anyhow::Result;
 use solana_sdk::transaction::VersionedTransaction;
 
 use crate::{common::SolanaRpcClient, constants::swqos::JITO_TIP_ACCOUNTS};
+
+/// Jito Sandwich 保护账户前缀
+///
+/// 在交易中添加以 `jitodontfront` 开头的只读账户可以防止 sandwich attacks
+/// 参考：https://docs.jito.wtf/lowlatencytxnsend/#sandwich-mitigation
+pub const JITO_DONT_FRONT_PREFIX: &str = "jitodontfront";
+
+/// 默认的 jitodontfront 账户
+pub const JITO_DONT_FRONT_DEFAULT: &str = "jitodontfront111111111111111111111111111111";
+
+/// 生成 jitodontfront 账户
+///
+/// # 参数
+///
+/// * `custom_suffix` - 自定义后缀（可选）
+///
+/// # 示例
+///
+/// ```rust
+/// use sol_trade_sdk::swqos::jito::generate_dont_front_account;
+///
+/// // 使用默认账户
+/// let account = generate_dont_front_account(None);
+///
+/// // 使用自定义后缀
+/// let account = generate_dont_front_account(Some("myapp"));
+/// ```
+pub fn generate_dont_front_account(custom_suffix: Option<&str>) -> String {
+    match custom_suffix {
+        Some(suffix) => format!("{}{}", JITO_DONT_FRONT_PREFIX, suffix),
+        None => JITO_DONT_FRONT_DEFAULT.to_string(),
+    }
+}
 
 pub struct JitoClient {
     pub endpoint: String,
@@ -58,7 +97,35 @@ impl SwqosClientTrait for JitoClient {
 }
 
 impl JitoClient {
-    pub fn new(rpc_url: String, endpoint: String, auth_token: String) -> Self {
+    /// 创建新的 Jito Client
+    ///
+    /// # 参数
+    ///
+    /// * `rpc_url` - Solana RPC URL
+    /// * `region` - Jito 区域（选择最近的区域以降低延迟）
+    /// * `auth_token` - Jito 认证令牌（可选，用于更高的速率限制）
+    ///
+    /// # 示例
+    ///
+    /// ```rust,no_run
+    /// use sol_trade_sdk::swqos::jito::{JitoClient, types::JitoRegion};
+    ///
+    /// // 使用默认区域
+    /// let client = JitoClient::new(
+    ///     "http://127.0.0.1:8899".to_string(),
+    ///     JitoRegion::Default,
+    ///     String::new(),
+    /// );
+    ///
+    /// // 亚洲用户使用东京区域
+    /// let client = JitoClient::new(
+    ///     "http://127.0.0.1:8899".to_string(),
+    ///     JitoRegion::Tokyo,
+    ///     String::new(),
+    /// );
+    /// ```
+    pub fn new(rpc_url: String, region: JitoRegion, auth_token: String) -> Self {
+        let endpoint = region.endpoint().to_string();
         let rpc_client = SolanaRpcClient::new(rpc_url);
         let http_client = Client::builder()
             // Optimized connection pool settings for high performance
@@ -79,6 +146,23 @@ impl JitoClient {
             auth_token,
             http_client,
         }
+    }
+
+    /// 使用指定区域创建 Jito Client（推荐）
+    ///
+    /// # 示例
+    ///
+    /// ```rust,no_run
+    /// use sol_trade_sdk::swqos::jito::{JitoClient, types::JitoRegion};
+    ///
+    /// let client = JitoClient::with_region(JitoRegion::Tokyo);
+    /// ```
+    pub fn with_region(region: JitoRegion) -> Self {
+        Self::new(
+            "http://127.0.0.1:8899".to_string(),
+            region,
+            String::new(),
+        )
     }
 
     pub async fn send_transaction_impl(

@@ -140,24 +140,19 @@ pub const SPEEDLANDING_TIP_ACCOUNTS: &[Pubkey] = &[
     pubkey!("speede8xCcUq2Tiv1efXeTuE3k9TDNq8TnGKaKSc6J4"),
 ];
 
-// NewYork,
-// Frankfurt,
-// Amsterdam,
-// SLC,
-// Tokyo,
-// London,
-// LosAngeles,
-// Default,
+// 根据 Jito 官方文档：https://docs.jito.wtf/lowlatencytxnsend/
+// 支持的区域：Default, Amsterdam, Dublin, Frankfurt, London, NewYork, SLC, Singapore, Tokyo
 
-pub const SWQOS_ENDPOINTS_JITO: [&str; 8] = [
-    "https://ny.mainnet.block-engine.jito.wtf",
-    "https://frankfurt.mainnet.block-engine.jito.wtf",
+pub const SWQOS_ENDPOINTS_JITO: [&str; 9] = [
+    "https://mainnet.block-engine.jito.wtf",        // Default
     "https://amsterdam.mainnet.block-engine.jito.wtf",
-    "https://slc.mainnet.block-engine.jito.wtf",
-    "https://tokyo.mainnet.block-engine.jito.wtf",
+    "https://dublin.mainnet.block-engine.jito.wtf",
+    "https://frankfurt.mainnet.block-engine.jito.wtf",
     "https://london.mainnet.block-engine.jito.wtf",
-    "https://ny.mainnet.block-engine.jito.wtf",
-    "https://mainnet.block-engine.jito.wtf",
+    "https://ny.mainnet.block-engine.jito.wtf",     // NewYork
+    "https://slc.mainnet.block-engine.jito.wtf",
+    "https://singapore.mainnet.block-engine.jito.wtf",
+    "https://tokyo.mainnet.block-engine.jito.wtf",
 ];
 
 pub const SWQOS_ENDPOINTS_NEXTBLOCK: [&str; 8] = [

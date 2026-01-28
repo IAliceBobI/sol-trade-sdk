@@ -23,6 +23,23 @@ use tokio::sync::RwLock;
 
 use anyhow::Result;
 
+// 为 SwqosRegion 添加转换为 JitoRegion 的方法
+impl SwqosRegion {
+    pub fn to_jito_region(&self) -> Option<crate::swqos::jito::JitoRegion> {
+        match self {
+            SwqosRegion::NewYork => Some(crate::swqos::jito::JitoRegion::NewYork),
+            SwqosRegion::Frankfurt => Some(crate::swqos::jito::JitoRegion::Frankfurt),
+            SwqosRegion::Amsterdam => Some(crate::swqos::jito::JitoRegion::Amsterdam),
+            SwqosRegion::SLC => Some(crate::swqos::jito::JitoRegion::SLC),
+            SwqosRegion::Tokyo => Some(crate::swqos::jito::JitoRegion::Tokyo),
+            SwqosRegion::London => Some(crate::swqos::jito::JitoRegion::London),
+            SwqosRegion::Dublin => Some(crate::swqos::jito::JitoRegion::Dublin),
+            SwqosRegion::Singapore => Some(crate::swqos::jito::JitoRegion::Singapore),
+            SwqosRegion::Default => Some(crate::swqos::jito::JitoRegion::Default),
+        }
+    }
+}
+
 use crate::{
     common::SolanaRpcClient,
     constants::swqos::{
@@ -158,7 +175,8 @@ pub enum SwqosRegion {
     SLC,
     Tokyo,
     London,
-    LosAngeles,
+    Dublin,
+    Singapore,
     Default,
 }
 
@@ -251,8 +269,13 @@ impl SwqosConfig {
     ) -> Result<Arc<SwqosClient>> {
         match swqos_config {
             SwqosConfig::Jito(auth_token, region, url) => {
-                let endpoint = SwqosConfig::get_endpoint(SwqosType::Jito, region, url);
-                let jito_client = JitoClient::new(rpc_url.clone(), endpoint, auth_token);
+                // 如果有自定义 URL，使用 Default region
+                let jito_region = if url.is_some() {
+                    crate::swqos::jito::JitoRegion::Default
+                } else {
+                    region.to_jito_region().unwrap_or(crate::swqos::jito::JitoRegion::Default)
+                };
+                let jito_client = JitoClient::new(rpc_url.clone(), jito_region, auth_token);
                 Ok(Arc::new(jito_client))
             },
             SwqosConfig::NextBlock(auth_token, region, url) => {
