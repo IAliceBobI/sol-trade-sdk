@@ -186,7 +186,10 @@ impl ResultCollector {
 
     /// 🔧 事件驱动：等待第一个结果（带超时）
     /// 当有任务提交结果时立即返回，避免固定等待时间
-    async fn wait_for_first(&self, timeout: std::time::Duration) -> Option<(bool, Vec<Signature>, Option<anyhow::Error>)> {
+    async fn wait_for_first(
+        &self,
+        timeout: std::time::Duration,
+    ) -> Option<(bool, Vec<Signature>, Option<anyhow::Error>)> {
         // 使用事件驱动：等待通知或超时
         match tokio::time::timeout(timeout, self.notify.notified()).await {
             Ok(_) => {
@@ -487,7 +490,12 @@ pub async fn execute_parallel(
         let timeout = std::time::Duration::from_millis(100);
         match collector.wait_for_first(timeout).await {
             Some(result) => return Ok(result),
-            None => return Err(anyhow!("No transaction signature available (timeout after {:?})", timeout)),
+            None => {
+                return Err(anyhow!(
+                    "No transaction signature available (timeout after {:?})",
+                    timeout
+                ));
+            },
         }
     }
 

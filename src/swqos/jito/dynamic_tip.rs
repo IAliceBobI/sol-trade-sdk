@@ -42,16 +42,6 @@ impl TipPercentile {
             _ => anyhow::bail!("Invalid tip percentile: {}", s),
         }
     }
-
-    fn as_str(&self) -> &'static str {
-        match self {
-            TipPercentile::P25 => "25th",
-            TipPercentile::P50 => "50th",
-            TipPercentile::P75 => "75th",
-            TipPercentile::P95 => "95th",
-            TipPercentile::P99 => "99th",
-        }
-    }
 }
 
 /// 动态 Tip 配置
@@ -91,15 +81,9 @@ impl JitoTipFloorClient {
     const DEFAULT_ENDPOINT: &'static str = "https://bundles.jito.wtf/api/v1/bundles/tip_floor";
 
     pub fn new() -> Self {
-        let client = Client::builder()
-            .timeout(Duration::from_millis(2000))
-            .build()
-            .unwrap();
+        let client = Client::builder().timeout(Duration::from_millis(2000)).build().unwrap();
 
-        Self {
-            client,
-            endpoint: Self::DEFAULT_ENDPOINT.to_string(),
-        }
+        Self { client, endpoint: Self::DEFAULT_ENDPOINT.to_string() }
     }
 
     /// 获取 Tip Floor 数据
@@ -114,10 +98,7 @@ impl JitoTipFloorClient {
             .context("Failed to fetch tip floor")?;
 
         if !response.status().is_success() {
-            anyhow::bail!(
-                "Tip floor API returned status: {}",
-                response.status()
-            );
+            anyhow::bail!("Tip floor API returned status: {}", response.status());
         }
 
         let text = response.text().await.context("Failed to read response")?;
@@ -186,14 +167,8 @@ mod tests {
 
     #[test]
     fn test_percentile_parsing() {
-        assert_eq!(
-            TipPercentile::from_str("50th").unwrap(),
-            TipPercentile::P50
-        );
-        assert_eq!(
-            TipPercentile::from_str("75th").unwrap(),
-            TipPercentile::P75
-        );
+        assert_eq!(TipPercentile::from_str("50th").unwrap(), TipPercentile::P50);
+        assert_eq!(TipPercentile::from_str("75th").unwrap(), TipPercentile::P75);
         assert!(TipPercentile::from_str("invalid").is_err());
     }
 

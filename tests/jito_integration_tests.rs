@@ -1,7 +1,7 @@
 //! Jito 集成测试
 
-use sol_trade_sdk::swqos::jito::{JitoClient, JitoRegion};
 use sol_trade_sdk::swqos::SwqosClientTrait;
+use sol_trade_sdk::swqos::jito::{JitoClient, JitoRegion};
 
 #[test]
 fn test_jito_client_with_all_regions() {
@@ -33,10 +33,7 @@ fn test_jito_client_with_region() {
 
     let client = JitoClient::with_region(JitoRegion::Tokyo);
 
-    assert_eq!(
-        client.endpoint,
-        "https://tokyo.mainnet.block-engine.jito.wtf"
-    );
+    assert_eq!(client.endpoint, "https://tokyo.mainnet.block-engine.jito.wtf");
 
     println!("✅ with_region() 方法正确");
 }
@@ -74,16 +71,9 @@ fn test_jito_tip_accounts_randomness() {
     }
 
     // 应该至少有 5 个不同的 account（证明有随机性）
-    assert!(
-        accounts.len() >= 5,
-        "Tip accounts 缺乏随机性，只有 {} 个不同的",
-        accounts.len()
-    );
+    assert!(accounts.len() >= 5, "Tip accounts 缺乏随机性，只有 {} 个不同的", accounts.len());
 
-    println!(
-        "✅ Tip accounts 有随机性：20 次获取得到 {} 个不同的",
-        accounts.len()
-    );
+    println!("✅ Tip accounts 有随机性：20 次获取得到 {} 个不同的", accounts.len());
 }
 
 #[test]
@@ -185,12 +175,7 @@ fn test_dynamic_tip_percentile_parsing() {
 
     for (input, expected) in valid_percentiles {
         let result = TipPercentile::from_str(input);
-        assert!(
-            result.is_ok(),
-            "Failed to parse percentile '{}': {:?}",
-            input,
-            result
-        );
+        assert!(result.is_ok(), "Failed to parse percentile '{}': {:?}", input, result);
         assert_eq!(result.unwrap(), expected, "Percentile mismatch for '{}'", input);
     }
 

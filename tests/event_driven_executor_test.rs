@@ -7,8 +7,8 @@
 //! - 性能相比固定等待有提升
 
 use sol_trade_sdk::{
-    common::GasFeeStrategy,
     DexType, TradeBuyParams, TradeTokenType,
+    common::GasFeeStrategy,
     instruction::utils::raydium_cpmm::get_pool_by_address,
     trading::core::params::{DexParamEnum, RaydiumCpmmParams},
 };
@@ -37,7 +37,6 @@ async fn test_event_driven_fast_return() {
 
     let client = create_test_client().await;
     let payer_pubkey = client.payer.as_ref().pubkey();
-    let rpc_url = "http://127.0.0.1:8899";
 
     println!("测试钱包: {}", payer_pubkey);
 
@@ -75,13 +74,14 @@ async fn test_event_driven_fast_return() {
     println!("目标代币: {}", target_mint);
 
     // 从 Pool 地址构建参数
-    let cpmm_params = match RaydiumCpmmParams::from_pool_address_by_rpc(&client.rpc, &pool_address).await {
-        Ok(params) => params,
-        Err(e) => {
-            println!("⚠️  构建参数失败: {:?}，跳过测试", e);
-            return;
-        },
-    };
+    let cpmm_params =
+        match RaydiumCpmmParams::from_pool_address_by_rpc(&client.rpc, &pool_address).await {
+            Ok(params) => params,
+            Err(e) => {
+                println!("⚠️  构建参数失败: {:?}，跳过测试", e);
+                return;
+            },
+        };
 
     // 配置 Gas 费策略
     let gas_fee_strategy = GasFeeStrategy::new();

@@ -183,22 +183,13 @@ mod tests {
     fn test_region_endpoints() {
         let test_cases = vec![
             (JitoRegion::Default, "https://mainnet.block-engine.jito.wtf"),
-            (
-                JitoRegion::Amsterdam,
-                "https://amsterdam.mainnet.block-engine.jito.wtf",
-            ),
+            (JitoRegion::Amsterdam, "https://amsterdam.mainnet.block-engine.jito.wtf"),
             (JitoRegion::Dublin, "https://dublin.mainnet.block-engine.jito.wtf"),
-            (
-                JitoRegion::Frankfurt,
-                "https://frankfurt.mainnet.block-engine.jito.wtf",
-            ),
+            (JitoRegion::Frankfurt, "https://frankfurt.mainnet.block-engine.jito.wtf"),
             (JitoRegion::London, "https://london.mainnet.block-engine.jito.wtf"),
             (JitoRegion::NewYork, "https://ny.mainnet.block-engine.jito.wtf"),
             (JitoRegion::SLC, "https://slc.mainnet.block-engine.jito.wtf"),
-            (
-                JitoRegion::Singapore,
-                "https://singapore.mainnet.block-engine.jito.wtf",
-            ),
+            (JitoRegion::Singapore, "https://singapore.mainnet.block-engine.jito.wtf"),
             (JitoRegion::Tokyo, "https://tokyo.mainnet.block-engine.jito.wtf"),
         ];
 
@@ -213,10 +204,7 @@ mod tests {
         assert_eq!(JitoRegion::from_str("TOKYO").unwrap(), JitoRegion::Tokyo);
         assert_eq!(JitoRegion::from_str("ny").unwrap(), JitoRegion::NewYork);
         assert_eq!(JitoRegion::from_str("newyork").unwrap(), JitoRegion::NewYork);
-        assert_eq!(
-            JitoRegion::from_str("singapore").unwrap(),
-            JitoRegion::Singapore
-        );
+        assert_eq!(JitoRegion::from_str("singapore").unwrap(), JitoRegion::Singapore);
         assert_eq!(JitoRegion::from_str("sg").unwrap(), JitoRegion::Singapore);
 
         assert!(JitoRegion::from_str("invalid").is_err());

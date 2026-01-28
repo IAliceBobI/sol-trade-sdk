@@ -144,12 +144,12 @@ pub const SPEEDLANDING_TIP_ACCOUNTS: &[Pubkey] = &[
 // 支持的区域：Default, Amsterdam, Dublin, Frankfurt, London, NewYork, SLC, Singapore, Tokyo
 
 pub const SWQOS_ENDPOINTS_JITO: [&str; 9] = [
-    "https://mainnet.block-engine.jito.wtf",        // Default
+    "https://mainnet.block-engine.jito.wtf", // Default
     "https://amsterdam.mainnet.block-engine.jito.wtf",
     "https://dublin.mainnet.block-engine.jito.wtf",
     "https://frankfurt.mainnet.block-engine.jito.wtf",
     "https://london.mainnet.block-engine.jito.wtf",
-    "https://ny.mainnet.block-engine.jito.wtf",     // NewYork
+    "https://ny.mainnet.block-engine.jito.wtf", // NewYork
     "https://slc.mainnet.block-engine.jito.wtf",
     "https://singapore.mainnet.block-engine.jito.wtf",
     "https://tokyo.mainnet.block-engine.jito.wtf",

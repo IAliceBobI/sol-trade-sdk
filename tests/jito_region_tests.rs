@@ -6,48 +6,19 @@ use sol_trade_sdk::swqos::jito::types::JitoRegion;
 fn test_all_region_endpoints() {
     // 测试所有区域的 endpoint URL 是否正确
     let test_cases = vec![
-        (
-            JitoRegion::Default,
-            "https://mainnet.block-engine.jito.wtf",
-        ),
-        (
-            JitoRegion::Amsterdam,
-            "https://amsterdam.mainnet.block-engine.jito.wtf",
-        ),
-        (
-            JitoRegion::Dublin,
-            "https://dublin.mainnet.block-engine.jito.wtf",
-        ),
-        (
-            JitoRegion::Frankfurt,
-            "https://frankfurt.mainnet.block-engine.jito.wtf",
-        ),
-        (
-            JitoRegion::London,
-            "https://london.mainnet.block-engine.jito.wtf",
-        ),
-        (
-            JitoRegion::NewYork,
-            "https://ny.mainnet.block-engine.jito.wtf",
-        ),
+        (JitoRegion::Default, "https://mainnet.block-engine.jito.wtf"),
+        (JitoRegion::Amsterdam, "https://amsterdam.mainnet.block-engine.jito.wtf"),
+        (JitoRegion::Dublin, "https://dublin.mainnet.block-engine.jito.wtf"),
+        (JitoRegion::Frankfurt, "https://frankfurt.mainnet.block-engine.jito.wtf"),
+        (JitoRegion::London, "https://london.mainnet.block-engine.jito.wtf"),
+        (JitoRegion::NewYork, "https://ny.mainnet.block-engine.jito.wtf"),
         (JitoRegion::SLC, "https://slc.mainnet.block-engine.jito.wtf"),
-        (
-            JitoRegion::Singapore,
-            "https://singapore.mainnet.block-engine.jito.wtf",
-        ),
-        (
-            JitoRegion::Tokyo,
-            "https://tokyo.mainnet.block-engine.jito.wtf",
-        ),
+        (JitoRegion::Singapore, "https://singapore.mainnet.block-engine.jito.wtf"),
+        (JitoRegion::Tokyo, "https://tokyo.mainnet.block-engine.jito.wtf"),
     ];
 
     for (region, expected_endpoint) in test_cases {
-        assert_eq!(
-            region.endpoint(),
-            expected_endpoint,
-            "Region {:?} endpoint mismatch",
-            region
-        );
+        assert_eq!(region.endpoint(), expected_endpoint, "Region {:?} endpoint mismatch", region);
     }
 
     println!("✅ 所有 9 个区域的 endpoint URL 正确");
@@ -82,18 +53,8 @@ fn test_region_from_str() {
 
     for (input, expected) in test_cases {
         let result = JitoRegion::from_str(input);
-        assert!(
-            result.is_ok(),
-            "Failed to parse region from '{}': {:?}",
-            input,
-            result
-        );
-        assert_eq!(
-            result.unwrap(),
-            expected,
-            "Region mismatch for input '{}'",
-            input
-        );
+        assert!(result.is_ok(), "Failed to parse region from '{}': {:?}", input, result);
+        assert_eq!(result.unwrap(), expected, "Region mismatch for input '{}'", input);
     }
 
     println!("✅ 所有区域字符串解析正确");

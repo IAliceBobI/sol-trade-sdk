@@ -1,5 +1,5 @@
-pub mod types;
 pub mod dynamic_tip;
+pub mod types;
 
 pub use dynamic_tip::{DynamicTipConfig, JitoTipFloorClient, TipPercentile};
 pub use types::JitoRegion;
@@ -158,11 +158,7 @@ impl JitoClient {
     /// let client = JitoClient::with_region(JitoRegion::Tokyo);
     /// ```
     pub fn with_region(region: JitoRegion) -> Self {
-        Self::new(
-            "http://127.0.0.1:8899".to_string(),
-            region,
-            String::new(),
-        )
+        Self::new("http://127.0.0.1:8899".to_string(), region, String::new())
     }
 
     pub async fn send_transaction_impl(
