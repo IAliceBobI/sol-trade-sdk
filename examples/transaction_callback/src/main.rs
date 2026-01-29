@@ -136,6 +136,7 @@ async fn main() -> Result<()> {
         simulate: true, // 模拟模式，不实际发送交易
         on_transaction_signed: Some(custom_callback),
         callback_execution_mode: None,
+        enable_jito_sandwich_protection: None,
     };
 
     println!("执行买入交易（模拟模式）...");
@@ -173,6 +174,7 @@ async fn main() -> Result<()> {
         simulate: true, // 模拟模式，不实际发送交易
         on_transaction_signed: Some(callback_with_pool),
         callback_execution_mode: None,
+        enable_jito_sandwich_protection: None,
     };
 
     println!("执行买入交易（模拟模式）...");
@@ -208,6 +210,7 @@ async fn main() -> Result<()> {
         simulate: true,              // 模拟模式，不实际发送交易
         on_transaction_signed: None, // 不使用回调
         callback_execution_mode: None,
+        enable_jito_sandwich_protection: None,
     };
 
     println!("执行买入交易（模拟模式，无回调）...");

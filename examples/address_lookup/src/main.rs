@@ -165,6 +165,7 @@ async fn pumpfun_copy_trade_with_grpc(trade_info: PumpFunTradeEvent) -> AnyResul
         simulate: false,
         on_transaction_signed: None,
         callback_execution_mode: None,
+        enable_jito_sandwich_protection: None,
     };
     client.buy(buy_params).await?;
 

@@ -652,6 +652,7 @@ async fn handle_buy_pumpfun(
         simulate: false,
         on_transaction_signed: None,
         callback_execution_mode: None,
+        enable_jito_sandwich_protection: None,
     };
     match client.buy(buy_params).await {
         Ok((_, signature, _)) => {
@@ -708,6 +709,7 @@ async fn handle_buy_pumpswap(
         simulate: false,
         on_transaction_signed: None,
         callback_execution_mode: None,
+        enable_jito_sandwich_protection: None,
     };
     match client.buy(buy_params).await {
         Ok((_, signature, _)) => {
@@ -763,6 +765,7 @@ async fn handle_buy_bonk(
         simulate: false,
         on_transaction_signed: None,
         callback_execution_mode: None,
+        enable_jito_sandwich_protection: None,
     };
     match client.buy(buy_params).await {
         Ok((_, signature, _)) => {
@@ -822,6 +825,7 @@ async fn handle_buy_raydium_v4(
         simulate: false,
         on_transaction_signed: None,
         callback_execution_mode: None,
+        enable_jito_sandwich_protection: None,
     };
     match client.buy(buy_params).await {
         Ok((_, signature, _)) => {
@@ -881,6 +885,7 @@ async fn handle_buy_raydium_cpmm(
         simulate: false,
         on_transaction_signed: None,
         callback_execution_mode: None,
+        enable_jito_sandwich_protection: None,
     };
     match client.buy(buy_params).await {
         Ok((_, signature, _)) => {
@@ -1051,6 +1056,7 @@ async fn handle_sell_pumpfun(
         simulate: false,
         on_transaction_signed: None,
         callback_execution_mode: None,
+        enable_jito_sandwich_protection: None,
     };
 
     match client.sell(sell_params).await {
@@ -1111,6 +1117,7 @@ async fn handle_sell_pumpswap(
         simulate: false,
         on_transaction_signed: None,
         callback_execution_mode: None,
+        enable_jito_sandwich_protection: None,
     };
     match client.sell(sell_params).await {
         Ok((_, signature, _)) => {
@@ -1170,6 +1177,7 @@ async fn handle_sell_bonk(
         simulate: false,
         on_transaction_signed: None,
         callback_execution_mode: None,
+        enable_jito_sandwich_protection: None,
     };
     match client.sell(sell_params).await {
         Ok((_, signature, _)) => {
@@ -1232,6 +1240,7 @@ async fn handle_sell_raydium_v4(
         simulate: false,
         on_transaction_signed: None,
         callback_execution_mode: None,
+        enable_jito_sandwich_protection: None,
     };
     match client.sell(sell_params).await {
         Ok((_, signature, _)) => {
@@ -1294,6 +1303,7 @@ async fn handle_sell_raydium_cpmm(
         simulate: false,
         on_transaction_signed: None,
         callback_execution_mode: None,
+        enable_jito_sandwich_protection: None,
     };
     match client.sell(sell_params).await {
         Ok((_, signature, _)) => {

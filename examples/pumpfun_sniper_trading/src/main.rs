@@ -129,6 +129,7 @@ async fn pumpfun_sniper_trade_with_shreds(trade_info: PumpFunTradeEvent) -> AnyR
         simulate: false,
         on_transaction_signed: None,
         callback_execution_mode: None,
+        enable_jito_sandwich_protection: None,
     };
     client.buy(buy_params).await?;
 
@@ -167,6 +168,7 @@ async fn pumpfun_sniper_trade_with_shreds(trade_info: PumpFunTradeEvent) -> AnyR
         simulate: false,
         on_transaction_signed: None,
         callback_execution_mode: None,
+        enable_jito_sandwich_protection: None,
     };
     client.sell(sell_params).await?;
 

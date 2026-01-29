@@ -143,6 +143,7 @@ async fn bonk_sniper_trade_with_shreds(trade_info: BonkTradeEvent) -> AnyResult<
         simulate: false,
         on_transaction_signed: None,
         callback_execution_mode: None,
+        enable_jito_sandwich_protection: None,
     };
     client.buy(buy_params).await?;
 
@@ -188,6 +189,7 @@ async fn bonk_sniper_trade_with_shreds(trade_info: BonkTradeEvent) -> AnyResult<
         simulate: false,
         on_transaction_signed: None,
         callback_execution_mode: None,
+        enable_jito_sandwich_protection: None,
     };
     client.sell(sell_params).await?;
 

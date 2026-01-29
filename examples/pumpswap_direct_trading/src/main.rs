@@ -50,6 +50,7 @@ async fn main() -> Result<(), anyhow::Error> {
         simulate: false,
         on_transaction_signed: None,
         callback_execution_mode: None,
+        enable_jito_sandwich_protection: None,
     };
 
     let (success, signatures, trade_error) = client.buy(buy_params).await?;
@@ -98,6 +99,7 @@ async fn main() -> Result<(), anyhow::Error> {
         simulate: false,
         on_transaction_signed: None,
         callback_execution_mode: None,
+        enable_jito_sandwich_protection: None,
     };
 
     let (success, signatures, trade_error) = client.sell(sell_params).await?;

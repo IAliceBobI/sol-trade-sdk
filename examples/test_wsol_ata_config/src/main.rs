@@ -254,6 +254,7 @@ async fn execute_buy(
         simulate,
         on_transaction_signed: None,
         callback_execution_mode: None,
+        enable_jito_sandwich_protection: None,
     };
 
     let (success, signatures, error) = client.buy(buy_params).await?;

@@ -140,6 +140,7 @@ async fn main() -> AnyResult<()> {
         simulate: false,
         on_transaction_signed: None,
         callback_execution_mode: None,
+        enable_jito_sandwich_protection: None,
     };
 
     println!("⏱️  开始执行买入流程...");
