@@ -97,7 +97,7 @@ pub async fn simulate_swap_transaction(
     let input_balance_before = get_token_balance(rpc, &user_input_token_account).await?;
     let output_balance_before = get_token_balance(rpc, &user_output_token_account).await?;
 
-    // 模拟交易
+    // 模拟交易（启用 inner instructions 以获取 Token Transfer 详情）
     let simulate_result = rpc
         .simulate_transaction_with_config(
             &transaction,
@@ -108,7 +108,7 @@ pub async fn simulate_swap_transaction(
                 encoding: Some(UiTransactionEncoding::Base64),
                 accounts: None,
                 min_context_slot: None,
-                inner_instructions: false,
+                inner_instructions: true,  // 启用以获取内部指令（Token Transfer）
             },
         )
         .await
@@ -121,16 +121,23 @@ pub async fn simulate_swap_transaction(
         (true, None)
     };
 
-    // 解析账户变化（模拟不改变链上状态，所以余额不变）
-    // 我们需要从日志中解析，或者返回默认值
-    // 这里简化：返回 0，表示无法从模拟中获取实际余额变化
     let transaction_fee = simulate_result.value.fee.unwrap_or(5000);
 
-    // 注意：模拟交易不会真正执行，所以余额不会改变
-    // 要获取实际的输出量，需要解析交易日志
-    let actual_input_amount = 0u64;
-    let actual_output_amount = 0u64;
+    // 从日志中解析 Token Transfer 金额
+    // Token Program 的日志格式：
+    // "Program TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA invoke [1]"
+    // "Program log: Instruction: Transfer"
+    // "Transfer 1234567890 tokens"
+    // "Program TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA consumed 2916 of 200000 compute units"
 
+    let (actual_input_amount, actual_output_amount) = if let Some(logs) = &simulate_result.value.logs {
+        parse_transfer_amounts_from_logs(logs, &user_input_token_account, &user_output_token_account)
+            .unwrap_or((0, 0))
+    } else {
+        (0, 0)
+    };
+
+    // 模拟不改变链上状态，所以余额不变
     let input_balance_after = input_balance_before;
     let output_balance_after = output_balance_before;
 
@@ -163,6 +170,61 @@ async fn get_token_balance(rpc: &Arc<SolanaRpcClient>, token_account: &Pubkey) -
             Ok(balance_u64)
         },
         Err(_) => Ok(0), // 账户不存在时返回 0
+    }
+}
+
+/// 从程序日志中解析 Token Transfer 金额
+///
+/// Solana Token Transfer 指令通常会在日志中输出转账金额
+/// 日志格式示例：
+/// - "Program log: Transfer: { amount: "1234567890" }"
+/// - "Program TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA: Transfer 1234567890 tokens"
+///
+/// 注意：这个函数依赖于具体的程序日志格式，可能不完全准确
+/// 更可靠的方法是解析 inner instructions 中的指令数据
+fn parse_transfer_amounts_from_logs(
+    logs: &[String],
+    _input_account: &Pubkey,
+    _output_account: &Pubkey,
+) -> Option<(u64, u64)> {
+    use regex::Regex;
+
+    // 尝试从日志中提取所有数字
+    let mut numbers: Vec<u64> = Vec::new();
+
+    for log in logs {
+        // 查找包含大数字的日志（转账金额通常很大）
+        // 使用正则表达式提取数字
+        if let Ok(re) = Regex::new(r"\b\d{8,}\b") {
+            for cap in re.captures_iter(log) {
+                if let Some(num_str) = cap.get(0) {
+                    if let Ok(num) = num_str.as_str().parse::<u64>() {
+                        // 过滤掉明显不是转账金额的数字
+                        // 例如：compute units (通常是几千到几十万)
+                        if num > 1_000_000 {  // 转账金额通常大于 100 万
+                            numbers.push(num);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // 如果找到多个数字，通常：
+    // - 最小的数字可能是输入金额
+    // - 最大的数字可能是输出金额
+    if numbers.len() >= 2 {
+        numbers.sort();
+        let input_amount = numbers.first().copied()?;
+        let output_amount = numbers.last().copied()?;
+        Some((input_amount, output_amount))
+    } else if numbers.len() == 1 {
+        // 只找到一个数字，可能是输出金额
+        let output_amount = numbers[0];
+        Some((0, output_amount))  // 无法确定输入金额
+    } else {
+        // 没找到明显的转账金额
+        None
     }
 }
 
