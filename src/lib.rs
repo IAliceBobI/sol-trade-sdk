@@ -146,6 +146,30 @@ pub struct TradingClient {
     pub use_seed_optimize: bool,
     /// 回调执行模式（全局默认配置）
     pub callback_execution_mode: CallbackExecutionMode,
+    /// 是否启用 Jito 三明治攻击防护（全局默认配置）
+    ///
+    /// # 优先级
+    ///
+    /// 1. **交易级别**: TradeBuyParams/TradeSellParams.enable_jito_sandwich_protection
+    /// 2. **全局级别**: TradingClient.enable_jito_sandwich_protection (这里)
+    /// 3. **默认值**: false
+    ///
+    /// # 示例
+    ///
+    /// ```rust,no_run
+    /// # use sol_trade_sdk::TradingClient;
+    /// # use sol_trade_sdk::TradeConfig;
+    /// // 全局禁用（默认）
+    /// let config = TradeConfig::new(...);
+    ///
+    /// // 全局启用
+    /// let config = TradeConfig::new(...).with_jito_sandwich_protection(true);
+    ///
+    /// // 单次交易覆盖全局配置
+    /// let mut buy_params = TradeBuyParams::new(...);
+    /// buy_params.enable_jito_sandwich_protection = Some(true); // 强制启用
+    /// ```
+    pub enable_jito_sandwich_protection: bool,
 }
 
 static INSTANCE: Mutex<Option<Arc<TradingClient>>> = Mutex::new(None);
@@ -162,6 +186,7 @@ impl Clone for TradingClient {
             middleware_manager: self.middleware_manager.clone(),
             use_seed_optimize: self.use_seed_optimize,
             callback_execution_mode: self.callback_execution_mode,
+            enable_jito_sandwich_protection: self.enable_jito_sandwich_protection,
             infrastructure: self.infrastructure.clone(),
         }
     }
@@ -216,6 +241,16 @@ pub struct TradeBuyParams {
     /// - `Some(Sync)`：同步执行，等待回调完成后再发送交易
     /// - `None`：使用全局配置（TradeConfig.callback_execution_mode）
     pub callback_execution_mode: Option<CallbackExecutionMode>,
+    /// 是否启用 Jito 三明治攻击防护（可选，覆盖全局配置）
+    ///
+    /// - `Some(true)`：启用防护
+    /// - `Some(false)`：禁用防护
+    /// - `None`：使用全局配置（TradeConfig.enable_jito_sandwich_protection）
+    ///
+    /// # 详细说明
+    ///
+    /// 参见 `TradeConfig.enable_jito_sandwich_protection` 字段的详细文档。
+    pub enable_jito_sandwich_protection: Option<bool>,
 }
 
 /// Parameters for executing sell orders across different DEX protocols
@@ -269,6 +304,16 @@ pub struct TradeSellParams {
     /// - `Some(Sync)`：同步执行，等待回调完成后再发送交易
     /// - `None`：使用全局配置（TradeConfig.callback_execution_mode）
     pub callback_execution_mode: Option<CallbackExecutionMode>,
+    /// 是否启用 Jito 三明治攻击防护（可选，覆盖全局配置）
+    ///
+    /// - `Some(true)`：启用防护
+    /// - `Some(false)`：禁用防护
+    /// - `None`：使用全局配置（TradeConfig.enable_jito_sandwich_protection）
+    ///
+    /// # 详细说明
+    ///
+    /// 参见 `TradeConfig.enable_jito_sandwich_protection` 字段的详细文档。
+    pub enable_jito_sandwich_protection: Option<bool>,
 }
 
 impl TradingClient {
@@ -390,6 +435,7 @@ impl TradingClient {
             middleware_manager: None,
             use_seed_optimize: trade_config.use_seed_optimize,
             callback_execution_mode: trade_config.callback_execution_mode,
+            enable_jito_sandwich_protection: trade_config.enable_jito_sandwich_protection,
             infrastructure: None,
         };
 
@@ -525,6 +571,9 @@ impl TradingClient {
             callback_execution_mode: params
                 .callback_execution_mode
                 .or(Some(self.callback_execution_mode)),
+            enable_jito_sandwich_protection: params
+                .enable_jito_sandwich_protection
+                .or(Some(self.enable_jito_sandwich_protection)),
         };
 
         // Validate protocol params
@@ -640,6 +689,9 @@ impl TradingClient {
             callback_execution_mode: params
                 .callback_execution_mode
                 .or(Some(self.callback_execution_mode)),
+            enable_jito_sandwich_protection: params
+                .enable_jito_sandwich_protection
+                .or(Some(self.enable_jito_sandwich_protection)),
         };
 
         // Validate protocol params

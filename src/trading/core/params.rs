@@ -80,6 +80,16 @@ pub struct SwapParams {
     /// - `Some(Sync)`：同步执行，等待回调完成后再发送交易
     /// - `None`：使用全局配置（TradeConfig.callback_execution_mode）
     pub callback_execution_mode: Option<crate::common::CallbackExecutionMode>,
+    /// 是否启用 Jito 三明治攻击防护（可选，覆盖全局配置）
+    ///
+    /// - `Some(true)`：启用防护
+    /// - `Some(false)`：禁用防护
+    /// - `None`：使用全局配置（TradeConfig.enable_jito_sandwich_protection）
+    ///
+    /// # 详细说明
+    ///
+    /// 参见 `TradeConfig.enable_jito_sandwich_protection` 字段的详细文档。
+    pub enable_jito_sandwich_protection: Option<bool>,
 }
 
 impl std::fmt::Debug for SwapParams {

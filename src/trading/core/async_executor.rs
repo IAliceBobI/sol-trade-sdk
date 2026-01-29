@@ -221,6 +221,7 @@ pub async fn execute_parallel(
     gas_fee_strategy: GasFeeStrategy,
     on_transaction_signed: Option<crate::trading::CallbackRef>,
     callback_execution_mode: crate::common::CallbackExecutionMode,
+    enable_jito_sandwich_protection: bool,
 ) -> Result<(bool, Vec<Signature>, Option<anyhow::Error>)> {
     let _exec_start = Instant::now();
 
@@ -371,6 +372,7 @@ pub async fn execute_parallel(
                 &tip_account,
                 tip_amount,
                 durable_nonce,
+                enable_jito_sandwich_protection,
             )
             .await
             {
