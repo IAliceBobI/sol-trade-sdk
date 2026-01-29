@@ -9,7 +9,7 @@ use std::time::Duration;
 use tokio::time::Instant;
 
 /// Jito Tip Floor API 响应
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct JitoTipFloorResponse {
     #[serde(default)]
     pub time: String,
@@ -86,6 +86,34 @@ impl JitoTipFloorClient {
         Self { client, endpoint: Self::DEFAULT_ENDPOINT.to_string() }
     }
 
+    /// 使用代理创建客户端
+    ///
+    /// ## 参数
+    /// - `proxy_url`: 代理地址（例如 "http://127.0.0.1:7891"）
+    pub fn with_proxy(proxy_url: &str) -> Result<Self> {
+        use reqwest::Proxy;
+        let proxy = Proxy::all(proxy_url).context("Failed to create proxy")?;
+
+        let client = Client::builder()
+            .timeout(Duration::from_millis(2000))
+            .proxy(proxy)
+            .build()
+            .context("Failed to build client")?;
+
+        Ok(Self { client, endpoint: Self::DEFAULT_ENDPOINT.to_string() })
+    }
+
+    /// 从环境变量 PROXY_URL 创建客户端（如果设置）
+    pub fn from_env_proxy() -> Self {
+        use std::env;
+
+        if let Ok(proxy_url) = env::var("PROXY_URL") {
+            Self::with_proxy(&proxy_url).unwrap_or_else(|_| Self::new())
+        } else {
+            Self::new()
+        }
+    }
+
     /// 获取 Tip Floor 数据
     pub async fn get_tip_floor(&self) -> Result<JitoTipFloorResponse> {
         let start = Instant::now();
@@ -102,8 +130,16 @@ impl JitoTipFloorClient {
         }
 
         let text = response.text().await.context("Failed to read response")?;
-        let tip_data: JitoTipFloorResponse =
+
+        // API 返回的是数组，取第一个元素
+        let tip_data_array: Vec<JitoTipFloorResponse> =
             serde_json::from_str(&text).context("Failed to parse tip floor response")?;
+
+        if tip_data_array.is_empty() {
+            anyhow::bail!("Tip floor API returned empty array");
+        }
+
+        let tip_data = tip_data_array[0].clone();
 
         println!(
             "[jito] Tip floor fetched in {:?}: 50th = {} SOL",

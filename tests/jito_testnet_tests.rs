@@ -34,99 +34,9 @@ use solana_sdk::{
 };
 use std::str::FromStr;
 
-// ============================================================================
-// 辅助函数
-// ============================================================================
-
-/// 通过代理查询余额
-async fn get_balance_with_proxy(
-    client: &reqwest::Client,
-    rpc_url: &str,
-    address: &str,
-) -> Result<u64, Box<dyn std::error::Error>> {
-    let request = serde_json::json!({
-        "jsonrpc": "2.0",
-        "id": 1,
-        "method": "getBalance",
-        "params": [address, {"commitment": "confirmed"}]
-    });
-
-    let response = client
-        .post(rpc_url)
-        .header("Content-Type", "application/json")
-        .json(&request)
-        .send()
-        .await?;
-
-    let rpc_response: RpcResponseBalance = response.json().await?;
-
-    if let Some(error) = rpc_response.error {
-        Err(format!("RPC 错误: {}", error.message).into())
-    } else {
-        Ok(rpc_response.result.value)
-    }
-}
-
-/// 通过代理获取 blockhash
-async fn get_blockhash_with_proxy(
-    client: &reqwest::Client,
-    rpc_url: &str,
-) -> Result<String, Box<dyn std::error::Error>> {
-    let request = serde_json::json!({
-        "jsonrpc": "2.0",
-        "id": 1,
-        "method": "getLatestBlockhash",
-        "params": [{"commitment": "confirmed"}]
-    });
-
-    let response = client
-        .post(rpc_url)
-        .header("Content-Type", "application/json")
-        .json(&request)
-        .send()
-        .await?;
-
-    let rpc_response: RpcResponseBlockhash = response.json().await?;
-
-    if let Some(error) = rpc_response.error {
-        Err(format!("RPC 错误: {}", error.message).into())
-    } else {
-        Ok(rpc_response.result.value.blockhash)
-    }
-}
-
-// RPC 响应结构
-#[derive(serde::Deserialize)]
-struct RpcResponseBalance {
-    result: BalanceResult,
-    error: Option<RpcError>,
-}
-
-#[derive(serde::Deserialize)]
-struct BalanceResult {
-    value: u64,
-}
-
-#[derive(serde::Deserialize)]
-struct RpcResponseBlockhash {
-    result: BlockhashResult,
-    error: Option<RpcError>,
-}
-
-#[derive(serde::Deserialize)]
-struct BlockhashResult {
-    value: BlockhashValue,
-}
-
-#[derive(serde::Deserialize)]
-struct BlockhashValue {
-    blockhash: String,
-}
-
-#[derive(serde::Deserialize)]
-struct RpcError {
-    message: String,
-}
+// 导入公共代理库
+mod common;
+use common::proxy_http::{get_latest_blockhash_with_proxy, get_solana_balance_with_proxy};
 
 // ============================================================================
 // Test 1: Jito Bundle Testnet 模拟测试
@@ -173,16 +83,12 @@ async fn test_jito_bundle_send_example() -> Result<(), Box<dyn std::error::Error
     println!("🚀 Jito Testnet: {}", jito_testnet_endpoint);
 
     // ========== 4. 创建 RPC 客户端（通过代理） ==========
-    use reqwest::Proxy;
-
-    let proxy = Proxy::all(&proxy_url)?;
-    let http_client = reqwest::Client::builder().proxy(proxy).build()?;
-
     println!("\n📡 正在查询账户余额...");
 
-    // 查询余额
+    // 查询余额（使用公共代理库）
     let balance =
-        get_balance_with_proxy(&http_client, testnet_rpc, &payer.pubkey().to_string()).await?;
+        get_solana_balance_with_proxy(testnet_rpc, Some(&proxy_url), &payer.pubkey().to_string())
+            .await?;
     let sol_balance = balance as f64 / 1_000_000_000.0;
 
     println!("💰 账户余额: {:.9} SOL ({} lamports)", sol_balance, balance);
@@ -197,7 +103,7 @@ async fn test_jito_bundle_send_example() -> Result<(), Box<dyn std::error::Error
     // ========== 5. 获取 recent blockhash ==========
     println!("\n📡 正在获取 recent blockhash...");
 
-    let blockhash = get_blockhash_with_proxy(&http_client, testnet_rpc).await?;
+    let blockhash = get_latest_blockhash_with_proxy(testnet_rpc, Some(&proxy_url)).await?;
     println!("✅ Blockhash: {}", blockhash);
 
     // ========== 6. 创建 receiver 和 tip account ==========
@@ -306,8 +212,8 @@ async fn test_jito_dynamic_tip_floor() {
 
     println!("\n========== Jito 动态 Tip Floor 测试 ==========\n");
 
-    // 创建 Tip Floor 客户端
-    let tip_client = JitoTipFloorClient::new();
+    // 创建 Tip Floor 客户端（使用环境变量 PROXY_URL 中的代理，如果设置）
+    let tip_client = JitoTipFloorClient::from_env_proxy();
 
     println!("📡 正在获取 Jito Tip Floor 数据...");
 
