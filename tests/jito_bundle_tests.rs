@@ -417,7 +417,7 @@ fn test_jito_fixed_vs_dynamic_tip() {
     println!("    ❌ 缺点:");
     println!("       - 网络空闲时成本过高");
     println!("       - 网络拥堵时可能失败");
-    println!("");
+    println!();
     println!("  动态 Tip:");
     println!("    ✅ 优点:");
     println!("       - 根据市场实时调整");

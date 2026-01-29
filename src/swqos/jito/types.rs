@@ -40,10 +40,11 @@ use std::fmt::{self, Display, Formatter};
 /// let region = JitoRegion::from_str("tokyo").unwrap();
 /// assert_eq!(region, JitoRegion::Tokyo);
 /// ```
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum JitoRegion {
     /// 默认区域（推荐大多数用户）
+    #[default]
     Default,
 
     /// 荷兰阿姆斯特丹
@@ -166,12 +167,6 @@ impl Display for JitoRegion {
             JitoRegion::Tokyo => "Tokyo",
         };
         write!(f, "{}", name)
-    }
-}
-
-impl Default for JitoRegion {
-    fn default() -> Self {
-        JitoRegion::Default
     }
 }
 
