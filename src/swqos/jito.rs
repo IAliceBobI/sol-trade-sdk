@@ -272,28 +272,18 @@ impl JitoClient {
             } else if let Some(error) = response_json.get("error") {
                 // 解析 Jito 错误信息
                 let code = error.get("code").and_then(|c| c.as_i64()).unwrap_or(-1);
-                let message = error.get("message")
-                    .and_then(|m| m.as_str())
-                    .unwrap_or("Unknown error");
+                let message =
+                    error.get("message").and_then(|m| m.as_str()).unwrap_or("Unknown error");
 
                 // 根据错误码提供友好的错误描述和建议
                 let (error_type, suggestion) = match code {
-                    -32097 => (
-                        "⏳ 网络拥堵 / 限流",
-                        "建议：等待几秒后重试，或降低发送频率"
-                    ),
+                    -32097 => ("⏳ 网络拥堵 / 限流", "建议：等待几秒后重试，或降低发送频率"),
                     -32602 => (
                         "🔄 重复交易",
-                        "建议：交易已在内存池中，请勿重复发送，或使用新的 blockhash"
+                        "建议：交易已在内存池中，请勿重复发送，或使用新的 blockhash",
                     ),
-                    -32603 => (
-                        "⚠️  内部错误",
-                        "建议：Jito 服务暂时不可用，请稍后重试"
-                    ),
-                    _ => (
-                        "❌ 未知错误",
-                        ""
-                    )
+                    -32603 => ("⚠️  内部错误", "建议：Jito 服务暂时不可用，请稍后重试"),
+                    _ => ("❌ 未知错误", ""),
                 };
 
                 let full_error = format!(
@@ -301,7 +291,11 @@ impl JitoClient {
                     error_type,
                     code,
                     message,
-                    if !suggestion.is_empty() { format!("💡 {}", suggestion) } else { String::new() }
+                    if !suggestion.is_empty() {
+                        format!("💡 {}", suggestion)
+                    } else {
+                        String::new()
+                    }
                 );
 
                 eprintln!(" jito {} submission failed:", trade_type);
@@ -309,10 +303,18 @@ impl JitoClient {
 
                 Err(anyhow::anyhow!("Jito {} submission failed: {}", trade_type, full_error))
             } else {
-                Err(anyhow::anyhow!("Jito {} submission failed: unknown response: {}", trade_type, response_text))
+                Err(anyhow::anyhow!(
+                    "Jito {} submission failed: unknown response: {}",
+                    trade_type,
+                    response_text
+                ))
             }
         } else {
-            Err(anyhow::anyhow!("Jito {} submission failed: invalid response: {}", trade_type, response_text))
+            Err(anyhow::anyhow!(
+                "Jito {} submission failed: invalid response: {}",
+                trade_type,
+                response_text
+            ))
         }
     }
 }

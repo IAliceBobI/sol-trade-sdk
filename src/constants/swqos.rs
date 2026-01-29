@@ -1,6 +1,38 @@
 use solana_program::pubkey;
 use solana_sdk::pubkey::Pubkey;
 
+/// Jito Mainnet Tip 账户
+///
+/// ⚠️ **重要提示**: 这些是 **Jito Mainnet** 的 tip accounts，不能用于 Jito Testnet！
+///
+/// **Jito Testnet Tip Accounts**（完全不同）:
+///   - Testnet API: https://dallas.testnet.block-engine.jito.wtf/api/v1/getTipAccounts
+///   - 获取方式:
+///     ```bash
+///     curl -X POST "https://dallas.testnet.block-engine.jito.wtf/api/v1/getTipAccounts" \
+///       -H "Content-Type: application/json" \
+///       -d '{"jsonrpc":"2.0","id":1,"method":"getTipAccounts","params":[]}'
+///     ```
+///   - Testnet 账户示例:
+///     - 7aewvu8fMf1DK4fKoMXKfs3h3wpAQ7r7D8T1C71LmMF
+///     - 84DrGKhycCUGfLzw8hXsUYX9SnWdh2wW3ozsTPrC5xyg
+///     - ... (共 8 个)
+///
+/// **为什么 Testnet 和 Mainnet 的 Tip Accounts 不同？**
+///   1. **独立环境**: Testnet 是独立的测试网络，有自己的验证者
+///   2. **收益分配**: Testnet 的 tip 收益分配给 Testnet 验证者，Mainnet 的分配给 Mainnet 验证者
+///   3. **账户隔离**: 使用错误网络的 tip accounts 会导致 Bundle 被拒绝
+///
+/// **如何获取正确的 Tip Accounts？**
+///   - Mainnet: curl -X POST "https://mainnet.block-engine.jito.wtf/api/v1/getTipAccounts" ...
+///   - Testnet: curl -X POST "https://testnet.block-engine.jito.wtf/api/v1/getTipAccounts" ...
+///   - 或者指定区域: https://<region>.<testnet|mainnet>.block-engine.jito.wtf/api/v1/getTipAccounts
+///
+/// **可用区域**:
+///   - Mainnet: Amsterdam, Dublin, Frankfurt, London, New York, Salt Lake City, Singapore, Tokyo
+///   - Testnet: Frankfurt, New York, Dallas
+///
+/// **参考文档**: https://docs.jito.wtf/lowlatencytxnsend/
 pub const JITO_TIP_ACCOUNTS: &[Pubkey] = &[
     pubkey!("96gYZGLnJYVFmbjzopPSU6QiEV5fGqZNyN9nmNhvrZU5"),
     pubkey!("HFqU5x63VTqvQss8hp11i4wVV8bD44PvwucfZ2bU7gRe"),
