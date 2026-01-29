@@ -17,7 +17,7 @@
 //! - 测试新 DEX 协议的 swap 逻辑
 
 use crate::common::SolanaRpcClient;
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use solana_client::rpc_config::RpcSimulateTransactionConfig;
 use solana_commitment_config::{CommitmentConfig, CommitmentLevel};
 use solana_sdk::{
@@ -104,9 +104,7 @@ pub async fn simulate_swap_transaction(
             RpcSimulateTransactionConfig {
                 sig_verify: false,
                 replace_recent_blockhash: false,
-                commitment: Some(CommitmentConfig {
-                    commitment: CommitmentLevel::Processed,
-                }),
+                commitment: Some(CommitmentConfig { commitment: CommitmentLevel::Processed }),
                 encoding: Some(UiTransactionEncoding::Base64),
                 accounts: None,
                 min_context_slot: None,
@@ -163,7 +161,7 @@ async fn get_token_balance(rpc: &Arc<SolanaRpcClient>, token_account: &Pubkey) -
                 .parse::<u64>()
                 .map_err(|_| anyhow!("Failed to parse token balance"))?;
             Ok(balance_u64)
-        }
+        },
         Err(_) => Ok(0), // 账户不存在时返回 0
     }
 }
@@ -209,11 +207,7 @@ pub fn verify_calculation_accuracy(
         return Err(anyhow!("模拟输出为 0，无法验证"));
     }
 
-    let diff = if calculated_output > simulated_output {
-        calculated_output - simulated_output
-    } else {
-        simulated_output - calculated_output
-    };
+    let diff = calculated_output.abs_diff(simulated_output);
 
     let error_rate = (diff as f64 / simulated_output as f64) * 100.0;
 

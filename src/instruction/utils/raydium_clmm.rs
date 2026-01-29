@@ -951,7 +951,8 @@ pub async fn quote_exact_in(
     let fee_rate = config.trade_fee_rate as u32;
 
     // 获取 tick arrays（使用完整版计算）
-    let current_tick_array_start = get_tick_array_start_index(pool_state.tick_current, pool_state.tick_spacing);
+    let current_tick_array_start =
+        get_tick_array_start_index(pool_state.tick_current, pool_state.tick_spacing);
 
     // 计算需要获取的 tick arrays（当前 + 可能的下一个）
     let mut start_indices = vec![current_tick_array_start];
@@ -971,8 +972,10 @@ pub async fn quote_exact_in(
     let mut tick_arrays: Vec<TickData> = Vec::new();
 
     for (start_index, tick_array_state) in tick_array_states {
-        let ticks: Vec<(i32, i128, u128)> = tick_array_state.ticks
-            .to_vec()
+        let ticks: Vec<(i32, i128, u128)> = tick_array_state
+            .ticks
+            .iter()
+            .cloned()
             .into_iter()
             .filter_map(|tick_state| {
                 // 只返回已初始化的 tick
@@ -996,7 +999,8 @@ pub async fn quote_exact_in(
         fee_rate,
         zero_for_one,
         &tick_arrays,
-    ).map_err(|e| anyhow!("CLMM calculation failed: {}", e))?;
+    )
+    .map_err(|e| anyhow!("CLMM calculation failed: {}", e))?;
 
     Ok(crate::utils::quote::QuoteExactInResult {
         amount_out,

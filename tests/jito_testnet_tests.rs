@@ -214,23 +214,28 @@ async fn test_jito_bundle_send_example() -> Result<(), Box<dyn std::error::Error
     let base_tip_amount: u64 = match tip_floor_client.get_tip_floor().await {
         Ok(tip_floor) => {
             println!("✅ Tip Floor 数据获取成功:");
-            println!("  ├─ 25th: {:.6} SOL ({} lamports)",
+            println!(
+                "  ├─ 25th: {:.6} SOL ({} lamports)",
                 tip_floor.landed_tips_25th_percentile,
                 (tip_floor.landed_tips_25th_percentile * 1_000_000_000.0) as u64
             );
-            println!("  ├─ 50th: {:.6} SOL ({} lamports)",
+            println!(
+                "  ├─ 50th: {:.6} SOL ({} lamports)",
                 tip_floor.landed_tips_50th_percentile,
                 (tip_floor.landed_tips_50th_percentile * 1_000_000_000.0) as u64
             );
-            println!("  ├─ 75th: {:.6} SOL ({} lamports)",
+            println!(
+                "  ├─ 75th: {:.6} SOL ({} lamports)",
                 tip_floor.landed_tips_75th_percentile,
                 (tip_floor.landed_tips_75th_percentile * 1_000_000_000.0) as u64
             );
-            println!("  ├─ 95th: {:.6} SOL ({} lamports)",
+            println!(
+                "  ├─ 95th: {:.6} SOL ({} lamports)",
                 tip_floor.landed_tips_95th_percentile,
                 (tip_floor.landed_tips_95th_percentile * 1_000_000_000.0) as u64
             );
-            println!("  └─ 99th: {:.6} SOL ({} lamports)",
+            println!(
+                "  └─ 99th: {:.6} SOL ({} lamports)",
                 tip_floor.landed_tips_99th_percentile,
                 (tip_floor.landed_tips_99th_percentile * 1_000_000_000.0) as u64
             );
@@ -239,10 +244,10 @@ async fn test_jito_bundle_send_example() -> Result<(), Box<dyn std::error::Error
             // 使用 P75 + 1.0 倍数（合理范围，避免被拒绝）
             let config = DynamicTipConfig {
                 enabled: true,
-                percentile: TipPercentile::P75,  // 使用中等百分位
-                multiplier: 1.0,  // 1倍，不激进
+                percentile: TipPercentile::P75, // 使用中等百分位
+                multiplier: 1.0,                // 1倍，不激进
                 min_tip: 0.00001,
-                max_tip: 0.0001,  // 设置合理上限
+                max_tip: 0.0001, // 设置合理上限
             };
 
             let tip_sol = tip_floor_client.calculate_tip(&tip_floor, &config);
@@ -257,7 +262,7 @@ async fn test_jito_bundle_send_example() -> Result<(), Box<dyn std::error::Error
             println!();
 
             tip_lamports
-        }
+        },
         Err(e) => {
             println!("⚠️  无法获取 Tip Floor: {}", e);
             println!("💡 使用备用固定值（合理范围）");
@@ -266,7 +271,7 @@ async fn test_jito_bundle_send_example() -> Result<(), Box<dyn std::error::Error
 
             // 备用值：合理的固定 tip（0.00001 SOL）
             10_000
-        }
+        },
     };
 
     let base_transfer_amount: u64 = 1_000; // 基础转账金额 0.000001 SOL
@@ -413,12 +418,12 @@ async fn test_jito_bundle_send_example() -> Result<(), Box<dyn std::error::Error
     // 使用代理创建 HTTP 客户端
     let client = if !proxy_url.is_empty() {
         use reqwest::Proxy;
-        let proxy = Proxy::all(proxy_url)
-            .map_err(|e| format!("Failed to create proxy: {}", e))?;
+        let proxy = Proxy::all(proxy_url).map_err(|e| format!("Failed to create proxy: {}", e))?;
         Client::builder().proxy(proxy).build()
     } else {
         Client::builder().build()
-    }.map_err(|e| format!("Failed to build HTTP client: {}", e))?;
+    }
+    .map_err(|e| format!("Failed to build HTTP client: {}", e))?;
 
     let response = client
         .post(&jito_endpoint)
@@ -608,13 +613,11 @@ async fn test_simulate_bundle() -> Result<(), Box<dyn std::error::Error>> {
     println!("  ✓ 交易 2: Tip {} lamports (仅 tip)", tip_amount_2);
 
     // ========== 7. 转换为 VersionedTransaction 并编码 ==========
-    use solana_sdk::transaction::VersionedTransaction;
     use sol_trade_sdk::swqos::common::FormatBase64VersionedTransaction;
+    use solana_sdk::transaction::VersionedTransaction;
 
-    let versioned_transactions: Vec<VersionedTransaction> = vec![
-        VersionedTransaction::from(tx1),
-        VersionedTransaction::from(tx2),
-    ];
+    let versioned_transactions: Vec<VersionedTransaction> =
+        vec![VersionedTransaction::from(tx1), VersionedTransaction::from(tx2)];
 
     let txs_base64: Vec<String> =
         versioned_transactions.iter().map(|tx| tx.to_base64_string()).collect();
@@ -647,12 +650,12 @@ async fn test_simulate_bundle() -> Result<(), Box<dyn std::error::Error>> {
     // 使用代理创建 HTTP 客户端
     use reqwest::Proxy;
     let client = if !proxy_url.is_empty() {
-        let proxy = Proxy::all(proxy_url)
-            .map_err(|e| format!("Failed to create proxy: {}", e))?;
+        let proxy = Proxy::all(proxy_url).map_err(|e| format!("Failed to create proxy: {}", e))?;
         reqwest::Client::builder().proxy(proxy).build()
     } else {
         reqwest::Client::builder().build()
-    }.map_err(|e| format!("Failed to build HTTP client: {}", e))?;
+    }
+    .map_err(|e| format!("Failed to build HTTP client: {}", e))?;
 
     let response = client
         .post(&jito_endpoint)
@@ -717,7 +720,9 @@ async fn test_simulate_bundle() -> Result<(), Box<dyn std::error::Error>> {
                 }
 
                 // 显示账户状态变化
-                if let Some(pre_accounts) = value.get("preExecutionAccounts").and_then(|a| a.as_array()) {
+                if let Some(pre_accounts) =
+                    value.get("preExecutionAccounts").and_then(|a| a.as_array())
+                {
                     println!("\n📊 执行前账户状态:");
                     for (i, account) in pre_accounts.iter().enumerate() {
                         if let Some(lamports) = account.get("lamports").and_then(|l| l.as_u64()) {
@@ -726,7 +731,9 @@ async fn test_simulate_bundle() -> Result<(), Box<dyn std::error::Error>> {
                     }
                 }
 
-                if let Some(post_accounts) = value.get("postExecutionAccounts").and_then(|a| a.as_array()) {
+                if let Some(post_accounts) =
+                    value.get("postExecutionAccounts").and_then(|a| a.as_array())
+                {
                     println!("\n📊 执行后账户状态:");
                     for (i, account) in post_accounts.iter().enumerate() {
                         if let Some(lamports) = account.get("lamports").and_then(|l| l.as_u64()) {
@@ -736,21 +743,25 @@ async fn test_simulate_bundle() -> Result<(), Box<dyn std::error::Error>> {
                 }
 
                 // 显示 Compute Unit 消耗
-                if let Some(units_consumed) = value.get("computeUnitsConsumed").and_then(|u| u.as_u64()) {
+                if let Some(units_consumed) =
+                    value.get("computeUnitsConsumed").and_then(|u| u.as_u64())
+                {
                     println!("\n💰 Compute Unit 消耗: {}", units_consumed);
                 }
 
                 // 显示返回数据
                 if let Some(return_data) = value.get("returnData") {
                     println!("\n📦 返回数据:");
-                    println!("   {}", serde_json::to_string_pretty(return_data).unwrap_or_default());
+                    println!(
+                        "   {}",
+                        serde_json::to_string_pretty(return_data).unwrap_or_default()
+                    );
                 }
             }
 
             println!("\n✅ Bundle 模拟通过，可以安全发送!");
             println!("\n============================================\n");
             Ok(())
-
         } else if let Some(error) = response_json.get("error") {
             println!("\n❌ Jito API 返回错误:");
             println!("   错误码: {}", error.get("code").unwrap_or(&serde_json::json!("N/A")));
