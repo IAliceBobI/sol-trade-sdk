@@ -36,7 +36,12 @@ mod region_tests {
         ];
 
         for (region, expected_endpoint) in test_cases {
-            assert_eq!(region.endpoint(), expected_endpoint, "Region {:?} endpoint mismatch", region);
+            assert_eq!(
+                region.endpoint(),
+                expected_endpoint,
+                "Region {:?} endpoint mismatch",
+                region
+            );
         }
 
         println!("✅ 所有 9 个区域的 endpoint URL 正确");
@@ -172,8 +177,8 @@ mod region_tests {
 
 mod client_tests {
     use sol_trade_sdk::swqos::SwqosClientTrait;
-    use sol_trade_sdk::swqos::jito::{JitoClient, JitoRegion};
     use sol_trade_sdk::swqos::SwqosType;
+    use sol_trade_sdk::swqos::jito::{JitoClient, JitoRegion};
 
     #[test]
     fn test_jito_client_with_region() {
@@ -464,9 +469,9 @@ mod bundle_tests {
 // ============================================================================
 
 mod sandwich_tests {
-    use solana_commitment_config::CommitmentConfig;
     use sol_trade_sdk::common::TradeConfig;
     use sol_trade_sdk::swqos::{SwqosConfig, SwqosRegion};
+    use solana_commitment_config::CommitmentConfig;
 
     #[test]
     fn test_generate_dont_front_account_default() {
@@ -504,11 +509,8 @@ mod sandwich_tests {
             CommitmentConfig::confirmed(),
         );
 
-        assert_eq!(config.enable_jito_sandwich_protection, false);
-        println!(
-            "✅ 默认配置下三明治防护应为禁用: {}",
-            config.enable_jito_sandwich_protection
-        );
+        assert!(!config.enable_jito_sandwich_protection);
+        println!("✅ 默认配置下三明治防护应为禁用: {}", config.enable_jito_sandwich_protection);
     }
 
     #[test]
@@ -526,11 +528,8 @@ mod sandwich_tests {
         )
         .with_jito_sandwich_protection(true);
 
-        assert_eq!(config.enable_jito_sandwich_protection, true);
-        println!(
-            "✅ 启用三明治防护配置: {}",
-            config.enable_jito_sandwich_protection
-        );
+        assert!(config.enable_jito_sandwich_protection);
+        println!("✅ 启用三明治防护配置: {}", config.enable_jito_sandwich_protection);
     }
 
     #[test]
@@ -552,14 +551,11 @@ mod sandwich_tests {
         .with_wsol_ata_config(false, false)
         .with_callback_execution_mode(CallbackExecutionMode::Sync);
 
-        assert_eq!(config.enable_jito_sandwich_protection, true);
-        assert_eq!(config.create_wsol_ata_on_startup, false);
-        assert_eq!(config.use_seed_optimize, false);
+        assert!(config.enable_jito_sandwich_protection);
+        assert!(!config.create_wsol_ata_on_startup);
+        assert!(!config.use_seed_optimize);
         println!("✅ 链式配置成功");
-        println!(
-            "   - 三明治防护: {}",
-            config.enable_jito_sandwich_protection
-        );
+        println!("   - 三明治防护: {}", config.enable_jito_sandwich_protection);
         println!("   - WSOL ATA 创建: {}", config.create_wsol_ata_on_startup);
         println!("   - 回调模式: {:?}", config.callback_execution_mode);
     }

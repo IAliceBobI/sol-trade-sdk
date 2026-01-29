@@ -3,7 +3,9 @@
 //! 本示例展示如何使用 Jito 三明治攻击防护功能
 
 use sol_trade_sdk::{
-    common::TradeConfig, swqos::{SwqosConfig, SwqosRegion}, TradingClient,
+    TradingClient,
+    common::TradeConfig,
+    swqos::{SwqosConfig, SwqosRegion},
 };
 use solana_commitment_config::CommitmentConfig;
 use solana_sdk::signature::Keypair;
@@ -19,7 +21,10 @@ async fn main() -> anyhow::Result<()> {
         vec![SwqosConfig::Jito("http://127.0.0.1:8899".to_string(), SwqosRegion::Default, None)],
         CommitmentConfig::confirmed(),
     );
-    println!("   enable_jito_sandwich_protection = {}\n", config_default.enable_jito_sandwich_protection);
+    println!(
+        "   enable_jito_sandwich_protection = {}\n",
+        config_default.enable_jito_sandwich_protection
+    );
 
     // 2. 创建启用防护的配置（全局启用）
     println!("2️⃣  创建启用防护的配置（全局启用）");
@@ -30,17 +35,20 @@ async fn main() -> anyhow::Result<()> {
     )
     .with_jito_sandwich_protection(true)
     .with_wsol_ata_config(false, false); // 禁用 WSOL ATA 自动创建（示例不需要实际交易）
-    println!("   enable_jito_sandwich_protection = {}\n", config_with_protection.enable_jito_sandwich_protection);
+    println!(
+        "   enable_jito_sandwich_protection = {}\n",
+        config_with_protection.enable_jito_sandwich_protection
+    );
 
     // 3. 创建客户端（使用全局配置）
     println!("3️⃣  创建客户端");
     let payer = Keypair::new();
-    let client = TradingClient::new(
-        std::sync::Arc::new(payer),
-        config_with_protection.clone(),
-    )
-    .await;
-    println!("   客户端全局配置: enable_jito_sandwich_protection = {}\n", client.enable_jito_sandwich_protection);
+    let client =
+        TradingClient::new(std::sync::Arc::new(payer), config_with_protection.clone()).await;
+    println!(
+        "   客户端全局配置: enable_jito_sandwich_protection = {}\n",
+        client.enable_jito_sandwich_protection
+    );
 
     // 4. 使用建议
     println!("4️⃣  使用建议\n");
@@ -70,7 +78,9 @@ async fn main() -> anyhow::Result<()> {
     // 6. 技术细节
     println!("6️⃣  技术细节");
     println!("   当启用防护时，SDK 会自动：");
-    println!("   - 在交易中添加 jitodontfront 账户（默认：jitodontfront111111111111111111111111111111）");
+    println!(
+        "   - 在交易中添加 jitodontfront 账户（默认：jitodontfront111111111111111111111111111111）"
+    );
     println!("   - 标记为只读账户（不消耗额外的 Compute Unit）");
     println!("   - 确保 Jito Block Engine 将此交易放在 Bundle 第一位");
     println!();

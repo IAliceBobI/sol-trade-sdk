@@ -112,6 +112,7 @@ async fn test_event_driven_fast_return() {
         close_input_token_ata: false,
         create_mint_ata: true,
         durable_nonce: None,
+        enable_jito_sandwich_protection: Some(false),
         fixed_output_token_amount: None,
         gas_fee_strategy: gas_fee_strategy.clone(),
         simulate: false,

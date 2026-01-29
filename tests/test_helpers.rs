@@ -387,6 +387,7 @@ pub async fn buy_pump_with_sol(
         close_input_token_ata: false, // 推荐：复用 ATA
         create_mint_ata: true,
         durable_nonce: None,
+        enable_jito_sandwich_protection: Some(false),
         fixed_output_token_amount: None,
         gas_fee_strategy,
         simulate: false,
@@ -485,6 +486,7 @@ pub async fn buy_pump_with_fixed_output(
         close_input_token_ata: false,
         create_mint_ata: true,
         durable_nonce: None,
+        enable_jito_sandwich_protection: Some(false),
         fixed_output_token_amount: Some(token_amount),
         gas_fee_strategy,
         simulate: false,

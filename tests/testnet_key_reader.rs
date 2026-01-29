@@ -4,9 +4,7 @@
 //! 并通过代理查询该地址在 testnet 上的余额
 
 use serde::{Deserialize, Serialize};
-use solana_sdk::{
-    signature::{EncodableKey, Keypair, Signer},
-};
+use solana_sdk::signature::{EncodableKey, Keypair, Signer};
 use std::env;
 
 #[tokio::test]
@@ -15,14 +13,12 @@ async fn test_read_key_and_check_balance() {
     println!("\n========== Testnet 密钥和余额查询测试 ==========\n");
 
     // 读取环境变量
-    let key_path = env::var("SOLANA_TEST_KEY_PATH")
-        .expect("SOLANA_TEST_KEY_PATH 环境变量未设置");
+    let key_path = env::var("SOLANA_TEST_KEY_PATH").expect("SOLANA_TEST_KEY_PATH 环境变量未设置");
 
     println!("📁 密钥路径: {}", key_path);
 
     // 读取密钥
-    let keypair = Keypair::read_from_file(&key_path)
-        .expect("无法读取密钥文件");
+    let keypair = Keypair::read_from_file(&key_path).expect("无法读取密钥文件");
 
     println!("📍 地址: {}", keypair.pubkey());
 
@@ -50,7 +46,7 @@ async fn test_read_key_and_check_balance() {
             } else {
                 println!("✅ 账户有余额，可以进行测试交易");
             }
-        }
+        },
         Err(e) => {
             println!("⚠️  查询余额失败: {}", e);
             println!("💡 可能的原因:");
@@ -60,7 +56,7 @@ async fn test_read_key_and_check_balance() {
             println!("   - 地址在 testnet 上不存在");
             println!("\n💡 请确保代理服务器正在运行:");
             println!("   curl -x http://127.0.0.1:7891 https://api.testnet.solana.com");
-        }
+        },
     }
 
     println!("\n=====================================================\n");
@@ -80,9 +76,7 @@ async fn get_balance_with_proxy(
     let proxy = Proxy::all(proxy_url)?;
 
     // 创建带有代理的 HTTP 客户端
-    let client = reqwest::Client::builder()
-        .proxy(proxy)
-        .build()?;
+    let client = reqwest::Client::builder().proxy(proxy).build()?;
 
     // 构造 RPC 请求
     let request = RpcRequest {
@@ -122,9 +116,8 @@ struct RpcRequest {
 /// RPC 参数（序列化为数组）
 #[derive(Serialize)]
 struct RpcParams(
-    String, // pubkey
-    #[serde(skip_serializing_if = "Option::is_none")]
-    Option<RpcConfig>, // config (可选)
+    String,                                                              // pubkey
+    #[serde(skip_serializing_if = "Option::is_none")] Option<RpcConfig>, // config (可选)
 );
 
 /// RPC 配置

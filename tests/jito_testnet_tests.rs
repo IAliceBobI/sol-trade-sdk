@@ -154,8 +154,7 @@ async fn test_jito_bundle_send_example() -> Result<(), Box<dyn std::error::Error
     println!("\n========== Jito Bundle Testnet 模拟测试 ==========\n");
 
     // ========== 1. 读取环境变量 ==========
-    let key_path = env::var("SOLANA_TEST_KEY_PATH")
-        .expect("SOLANA_TEST_KEY_PATH 环境变量未设置");
+    let key_path = env::var("SOLANA_TEST_KEY_PATH").expect("SOLANA_TEST_KEY_PATH 环境变量未设置");
 
     let proxy_url = env::var("PROXY_URL").unwrap_or("http://127.0.0.1:7891".to_string());
 
@@ -177,14 +176,13 @@ async fn test_jito_bundle_send_example() -> Result<(), Box<dyn std::error::Error
     use reqwest::Proxy;
 
     let proxy = Proxy::all(&proxy_url)?;
-    let http_client = reqwest::Client::builder()
-        .proxy(proxy)
-        .build()?;
+    let http_client = reqwest::Client::builder().proxy(proxy).build()?;
 
     println!("\n📡 正在查询账户余额...");
 
     // 查询余额
-    let balance = get_balance_with_proxy(&http_client, testnet_rpc, &payer.pubkey().to_string()).await?;
+    let balance =
+        get_balance_with_proxy(&http_client, testnet_rpc, &payer.pubkey().to_string()).await?;
     let sol_balance = balance as f64 / 1_000_000_000.0;
 
     println!("💰 账户余额: {:.9} SOL ({} lamports)", sol_balance, balance);
@@ -217,25 +215,35 @@ async fn test_jito_bundle_send_example() -> Result<(), Box<dyn std::error::Error
 
     println!("  ✓ 交易 1: 转账 {} lamports 到 receiver", transfer_amount);
     println!("  ✓ 交易 2: 转账 {} lamports 到 receiver", transfer_amount);
-    println!("  ✓ 交易 3: 转账 {} lamports 到 receiver + Tip {} lamports",
-             transfer_amount, tip_amount);
+    println!(
+        "  ✓ 交易 3: 转账 {} lamports 到 receiver + Tip {} lamports",
+        transfer_amount, tip_amount
+    );
 
     // ========== 8. 展示 Bundle 详情 ==========
     println!("\n📋 Bundle 结构详情:");
     println!("  ├─ 交易数量: 3 / 5 (最大)");
     println!("  ├─ 总转账: {} lamports", transfer_amount * 3);
-    println!("  ├─ 总 Tip: {} lamports ({:.6} SOL)", tip_amount, tip_amount as f64 / 1_000_000_000.0);
+    println!(
+        "  ├─ 总 Tip: {} lamports ({:.6} SOL)",
+        tip_amount,
+        tip_amount as f64 / 1_000_000_000.0
+    );
     println!("  ├─ 预估交易费: ~15,000 lamports (5,000 × 3)");
-    println!("  ├─ 预估总花费: {} lamports ({:.9} SOL)",
-             transfer_amount * 3 + tip_amount + 15_000,
-             (transfer_amount * 3 + tip_amount + 15_000) as f64 / 1_000_000_000.0);
+    println!(
+        "  ├─ 预估总花费: {} lamports ({:.9} SOL)",
+        transfer_amount * 3 + tip_amount + 15_000,
+        (transfer_amount * 3 + tip_amount + 15_000) as f64 / 1_000_000_000.0
+    );
     println!("  └─ 原子性: 是（全部成功或全部失败）");
 
     // ========== 9. 展示如何实际发送 ==========
     println!("\n💡 如果要实际发送 Bundle，需要:");
     println!("  1. 使用 SDK 创建 JitoClient:");
     println!("     ```rust");
-    println!("     use sol_trade_sdk::swqos::{{SwqosClientTrait, jito::{{JitoClient, JitoRegion}}}};");
+    println!(
+        "     use sol_trade_sdk::swqos::{{SwqosClientTrait, jito::{{JitoClient, JitoRegion}}}};"
+    );
     println!("     ");
     println!("     // 创建自定义 testnet client");
     println!("     let client = JitoClient::new(");
@@ -292,8 +300,8 @@ async fn test_jito_bundle_send_example() -> Result<(), Box<dyn std::error::Error
 #[ignore] // 默认忽略，需要网络连接
 async fn test_jito_dynamic_tip_floor() {
     use sol_trade_sdk::swqos::jito::{
-        dynamic_tip::{JitoTipFloorClient, TipPercentile},
         DynamicTipConfig,
+        dynamic_tip::{JitoTipFloorClient, TipPercentile},
     };
 
     println!("\n========== Jito 动态 Tip Floor 测试 ==========\n");
@@ -308,26 +316,11 @@ async fn test_jito_dynamic_tip_floor() {
             println!("✅ 成功获取 Tip Floor 数据!\n");
 
             println!("📊 Tip Floor 统计 (基于已成功的交易):");
-            println!(
-                "  ├─ P25:  {:.6} SOL (25% 的交易)",
-                tip_data.landed_tips_25th_percentile
-            );
-            println!(
-                "  ├─ P50:  {:.6} SOL (中位数)",
-                tip_data.landed_tips_50th_percentile
-            );
-            println!(
-                "  ├─ P75:  {:.6} SOL (75% 的交易)",
-                tip_data.landed_tips_75th_percentile
-            );
-            println!(
-                "  ├─ P95:  {:.6} SOL (95% 的交易)",
-                tip_data.landed_tips_95th_percentile
-            );
-            println!(
-                "  ├─ P99:  {:.6} SOL (99% 的交易)",
-                tip_data.landed_tips_99th_percentile
-            );
+            println!("  ├─ P25:  {:.6} SOL (25% 的交易)", tip_data.landed_tips_25th_percentile);
+            println!("  ├─ P50:  {:.6} SOL (中位数)", tip_data.landed_tips_50th_percentile);
+            println!("  ├─ P75:  {:.6} SOL (75% 的交易)", tip_data.landed_tips_75th_percentile);
+            println!("  ├─ P95:  {:.6} SOL (95% 的交易)", tip_data.landed_tips_95th_percentile);
+            println!("  ├─ P99:  {:.6} SOL (99% 的交易)", tip_data.landed_tips_99th_percentile);
             println!(
                 "  └─ EMA: {:.6} SOL (指数移动平均)",
                 tip_data.ema_landed_tips_50th_percentile
@@ -388,13 +381,13 @@ async fn test_jito_dynamic_tip_floor() {
                 let calculated_tip = tip_client.calculate_tip(&tip_data, &config);
                 println!("  - {}: {:.6} SOL", strategy_name, calculated_tip);
             }
-        }
+        },
         Err(e) => {
             println!("❌ 获取 Tip Floor 失败: {}", e);
             println!("💡 可能的原因:");
             println!("   - 网络连接问题");
             println!("   - Jito API 暂时不可用");
-        }
+        },
     }
 
     println!("\n============================================\n");

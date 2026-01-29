@@ -86,8 +86,9 @@ pub async fn build_transaction(
     // 如果启用了三明治防护，添加一个标记指令
     // 这个指令不执行任何操作，只是将 jitodontfront 账户包含在交易中
     if let Some(account_str) = dont_front_account {
-        let account = account_str.parse::<Pubkey>()
-            .map_err(|e| anyhow::anyhow!("无效的 jitodontfront 账户地址 '{}': {}", account_str, e))?;
+        let account = account_str.parse::<Pubkey>().map_err(|e| {
+            anyhow::anyhow!("无效的 jitodontfront 账户地址 '{}': {}", account_str, e)
+        })?;
 
         // System Program ID
         let system_program_id = Pubkey::from_str("11111111111111111111111111111111")
@@ -96,17 +97,15 @@ pub async fn build_transaction(
         // 创建一个无操作指令来携带 jitodontfront 账户
         // 我们使用 System Program 的 transfer 指令，但转账金额为 0
         // 这样就是一个安全的无操作指令，包含 jitodontfront 账户
-        instructions.push(
-            Instruction {
-                program_id: system_program_id,
-                // 将 jitodontfront 账户添加为只读账户
-                accounts: vec![
-                    solana_sdk::instruction::AccountMeta::new(payer.pubkey(), true),  // payer (签名者)
-                    solana_sdk::instruction::AccountMeta::new_readonly(account, false), // jitodontfront (只读)
-                ],
-                data: vec![0, 0, 0, 0], // System Program 的 transfer 指令，但 8 字节的 u64 金额为 0
-            }
-        );
+        instructions.push(Instruction {
+            program_id: system_program_id,
+            // 将 jitodontfront 账户添加为只读账户
+            accounts: vec![
+                solana_sdk::instruction::AccountMeta::new(payer.pubkey(), true), // payer (签名者)
+                solana_sdk::instruction::AccountMeta::new_readonly(account, false), // jitodontfront (只读)
+            ],
+            data: vec![0, 0, 0, 0], // System Program 的 transfer 指令，但 8 字节的 u64 金额为 0
+        });
     }
 
     // Add tip transfer instruction
