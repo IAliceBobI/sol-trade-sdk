@@ -57,7 +57,7 @@
 
 use solana_sdk::{
     pubkey::Pubkey,
-    signature::{Keypair, Signer},
+    signature::{EncodableKey, Keypair, Signer},
 };
 use std::str::FromStr;
 
@@ -228,60 +228,242 @@ fn test_jito_bundle_tip_amounts() {
     - 选择距离最近的地区端点（降低延迟）
 */
 
-/// 完整的 Jito Bundle 发送示例（概念演示）
+/// 完整的 Jito Bundle 发送示例（Testnet 模拟）
 ///
-/// 这个测试展示如何使用 JitoClient 发送 bundle 交易的概念
-/// 注意：这是概念性演示，不实际发送交易
+/// 这个测试展示如何在 Testnet 上模拟构建 Jito Bundle 交易
+/// 注意：这是模拟测试，不实际发送交易
+///
+/// ## 环境变量
+/// - `SOLANA_TEST_KEY_PATH`: Testnet 密钥文件路径
+/// - `PROXY_URL`: 代理 URL（可选，默认 http://127.0.0.1:7891）
+///
+/// ## 运行方式
+/// ```bash
+/// export SOLANA_TEST_KEY_PATH=/path/to/testnet-keypair.json
+/// cargo test --test jito_bundle_tests -- test_jito_bundle_send_example --exact --nocapture --ignored
+/// ```
 #[tokio::test]
-#[ignore] // 默认忽略，需要手动运行 `cargo test --test jito_bundle_tests -- --ignored`
-async fn test_jito_bundle_send_example() {
-    use sol_trade_sdk::swqos::{
-        SwqosClientTrait,
-        jito::{JitoClient, JitoRegion},
-    };
+#[ignore] // 默认忽略，需要手动运行
+async fn test_jito_bundle_send_example() -> Result<(), Box<dyn std::error::Error>> {
+    use std::env;
 
-    println!("\n========== Jito Bundle 发送流程演示 ==========\n");
+    println!("\n========== Jito Bundle Testnet 模拟测试 ==========\n");
 
-    // ========== 配置 ==========
-    // 亚洲用户推荐使用 Tokyo 区域
-    let jito_client = JitoClient::with_region(JitoRegion::Tokyo);
+    // ========== 1. 读取环境变量 ==========
+    let key_path = env::var("SOLANA_TEST_KEY_PATH")
+        .expect("SOLANA_TEST_KEY_PATH 环境变量未设置");
 
-    println!("🌍 Jito 区域: Tokyo");
-    println!("🔗 Endpoint: {}", jito_client.endpoint);
+    let proxy_url = env::var("PROXY_URL").unwrap_or("http://127.0.0.1:7891".to_string());
 
-    // ========== 创建钱包 ==========
-    let payer = Keypair::new();
+    println!("📁 密钥路径: {}", key_path);
+    println!("🔌 代理地址: {}", proxy_url);
+
+    // ========== 2. 读取密钥 ==========
+    let payer = Keypair::read_from_file(&key_path)?;
+    println!("📍 Payer 地址: {}", payer.pubkey());
+
+    // ========== 3. 配置 RPC ==========
+    let testnet_rpc = "https://api.testnet.solana.com";
+    let jito_testnet_endpoint = "https://dallas.testnet.block-engine.jito.wtf";
+
+    println!("\n🌐 Testnet RPC: {}", testnet_rpc);
+    println!("🚀 Jito Testnet: {}", jito_testnet_endpoint);
+
+    // ========== 4. 创建 RPC 客户端（通过代理） ==========
+    use reqwest::Proxy;
+
+    let proxy = Proxy::all(&proxy_url)?;
+    let http_client = reqwest::Client::builder()
+        .proxy(proxy)
+        .build()?;
+
+    println!("\n📡 正在查询账户余额...");
+
+    // 查询余额
+    let balance = get_balance_with_proxy(&http_client, testnet_rpc, &payer.pubkey().to_string()).await?;
+    let sol_balance = balance as f64 / 1_000_000_000.0;
+
+    println!("💰 账户余额: {:.9} SOL ({} lamports)", sol_balance, balance);
+
+    if balance < 5_000_000 {
+        println!("\n⚠️  余额不足（需要至少 0.005 SOL）");
+        println!("💡 请从以下地址获取测试 SOL:");
+        println!("   https://faucet.solana.com/");
+        return Err("余额不足".into());
+    }
+
+    // ========== 5. 获取 recent blockhash ==========
+    println!("\n📡 正在获取 recent blockhash...");
+
+    let blockhash = get_blockhash_with_proxy(&http_client, testnet_rpc).await?;
+    println!("✅ Blockhash: {}", blockhash);
+
+    // ========== 6. 创建 receiver 和 tip account ==========
     let receiver = Pubkey::from_str("GjJyeC3YDUU7TPCndhTUzbf3HqHYBH1JKQmWLH9nPqx").unwrap();
+    let tip_account = Pubkey::from_str("HFqU5x63VTqvQss8hp11i4wVV8bD44PvwucfZ2bU7gRe").unwrap();
 
-    println!("\n👤 Payer: {}", payer.pubkey());
-    println!("👤 Receiver: {}", receiver);
+    println!("\n👤 Receiver: {}", receiver);
+    println!("💰 Tip Account: {}", tip_account);
 
-    // ========== 获取 Jito tip account ==========
-    let tip_account_str = match jito_client.get_tip_account() {
-        Ok(account) => account,
-        Err(_) => "HFqU5x63VTqvQss8hp11i4wVV8bD44PvwucfZ2bU7gRe".to_string(),
-    };
-    let tip_account = Pubkey::from_str(&tip_account_str).unwrap();
+    // ========== 7. 展示 Bundle 结构 ==========
+    println!("\n📦 模拟构建 Bundle 交易（3 笔）...");
 
-    println!("\n💰 Tip Account: {}", tip_account);
+    let tip_amount = 10_000; // 0.00001 SOL
+    let transfer_amount = 1_000; // 每笔转账 0.000001 SOL
 
-    // ========== 展示 Bundle 结构 ==========
-    println!("\n📦 Bundle 结构（3 笔交易）:");
-    println!("  交易 1: 转账 1000 lamports");
-    println!("  交易 2: 转账 1000 lamports");
-    println!("  交易 3: 转账 1000 lamports + Tip 10000 lamports (0.00001 SOL)");
-    println!();
-    println!("  使用 P50 百分位的动态 tip: 0.00001 SOL");
+    println!("  ✓ 交易 1: 转账 {} lamports 到 receiver", transfer_amount);
+    println!("  ✓ 交易 2: 转账 {} lamports 到 receiver", transfer_amount);
+    println!("  ✓ 交易 3: 转账 {} lamports 到 receiver + Tip {} lamports",
+             transfer_amount, tip_amount);
 
-    println!("\n✅ Bundle 结构演示完成!");
-    println!("\n💡 实际使用时的完整流程:");
-    println!("  1. 从 Solana RPC 获取 recent_blockhash");
-    println!("  2. 创建多笔交易（最多 5 笔）");
-    println!("  3. 在最后一笔交易中添加 tip");
-    println!("  4. 调用 jito_client.send_transactions()");
-    println!("  5. 可选：在 Jito Explorer 查看状态");
+    // ========== 8. 展示 Bundle 详情 ==========
+    println!("\n📋 Bundle 结构详情:");
+    println!("  ├─ 交易数量: 3 / 5 (最大)");
+    println!("  ├─ 总转账: {} lamports", transfer_amount * 3);
+    println!("  ├─ 总 Tip: {} lamports ({:.6} SOL)", tip_amount, tip_amount as f64 / 1_000_000_000.0);
+    println!("  ├─ 预估交易费: ~15,000 lamports (5,000 × 3)");
+    println!("  ├─ 预估总花费: {} lamports ({:.9} SOL)",
+             transfer_amount * 3 + tip_amount + 15_000,
+             (transfer_amount * 3 + tip_amount + 15_000) as f64 / 1_000_000_000.0);
+    println!("  └─ 原子性: 是（全部成功或全部失败）");
 
-    println!("\n==========================================\n");
+    // ========== 9. 展示如何实际发送 ==========
+    println!("\n💡 如果要实际发送 Bundle，需要:");
+    println!("  1. 使用 SDK 创建 JitoClient:");
+    println!("     ```rust");
+    println!("     use sol_trade_sdk::swqos::{{SwqosClientTrait, jito::{{JitoClient, JitoRegion}}}};");
+    println!("     ");
+    println!("     // 创建自定义 testnet client");
+    println!("     let client = JitoClient::new(");
+    println!("         testnet_rpc.to_string(),");
+    println!("         JitoRegion::Custom(jito_testnet_endpoint),");
+    println!("         String::new(),");
+    println!("     );");
+    println!("     ```");
+    println!("\n  2. 构建交易并序列化:");
+    println!("     ```rust");
+    println!("     let transactions = vec![tx1, tx2, tx3];");
+    println!("     let txs_base64: Vec<String> = transactions");
+    println!("         .iter()");
+    println!("         .map(|tx| tx.to_base64_string())");
+    println!("         .collect();");
+    println!("     ```");
+    println!("\n  3. 发送到 Jito Testnet:");
+    println!("     ```rust");
+    println!("     client.send_transactions(");
+    println!("         TradeType::Buy,");
+    println!("         &transactions,");
+    println!("         false, // 不等待确认");
+    println!("     ).await?;");
+    println!("     ```");
+    println!("\n  或者使用 HTTP 直接发送:");
+    println!("     POST {}/api/v1/bundles", jito_testnet_endpoint);
+    println!("     Content-Type: application/json");
+    println!("     ");
+    println!("     {{");
+    println!("       \"jsonrpc\": \"2.0\",");
+    println!("       \"id\": 1,");
+    println!("       \"method\": \"sendBundle\",");
+    println!("       \"params\": [[tx1_base64, tx2_base64, tx3_base64]]");
+    println!("     }}");
+
+    println!("\n✅ 测试完成!");
+    println!("📝 注意: 这是模拟测试，展示了构建流程，但未实际发送交易");
+    println!("📝 所有交易使用相同的 blockhash: {}", blockhash);
+    println!("📝 Tip 必须在最后一笔交易中");
+    println!("\n============================================\n");
+
+    Ok(())
+}
+
+/// 通过代理查询余额
+async fn get_balance_with_proxy(
+    client: &reqwest::Client,
+    rpc_url: &str,
+    address: &str,
+) -> Result<u64, Box<dyn std::error::Error>> {
+    let request = serde_json::json!({
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "getBalance",
+        "params": [address, {"commitment": "confirmed"}]
+    });
+
+    let response = client
+        .post(rpc_url)
+        .header("Content-Type", "application/json")
+        .json(&request)
+        .send()
+        .await?;
+
+    let rpc_response: RpcResponseBalance = response.json().await?;
+
+    if let Some(error) = rpc_response.error {
+        Err(format!("RPC 错误: {}", error.message).into())
+    } else {
+        Ok(rpc_response.result.value)
+    }
+}
+
+/// 通过代理获取 blockhash
+async fn get_blockhash_with_proxy(
+    client: &reqwest::Client,
+    rpc_url: &str,
+) -> Result<String, Box<dyn std::error::Error>> {
+    let request = serde_json::json!({
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "getLatestBlockhash",
+        "params": [{"commitment": "confirmed"}]
+    });
+
+    let response = client
+        .post(rpc_url)
+        .header("Content-Type", "application/json")
+        .json(&request)
+        .send()
+        .await?;
+
+    let rpc_response: RpcResponseBlockhash = response.json().await?;
+
+    if let Some(error) = rpc_response.error {
+        Err(format!("RPC 错误: {}", error.message).into())
+    } else {
+        Ok(rpc_response.result.value.blockhash)
+    }
+}
+
+// RPC 响应结构
+#[derive(serde::Deserialize)]
+struct RpcResponseBalance {
+    result: BalanceResult,
+    error: Option<RpcError>,
+}
+
+#[derive(serde::Deserialize)]
+struct BalanceResult {
+    value: u64,
+}
+
+#[derive(serde::Deserialize)]
+struct RpcResponseBlockhash {
+    result: BlockhashResult,
+    error: Option<RpcError>,
+}
+
+#[derive(serde::Deserialize)]
+struct BlockhashResult {
+    value: BlockhashValue,
+}
+
+#[derive(serde::Deserialize)]
+struct BlockhashValue {
+    blockhash: String,
+}
+
+#[derive(serde::Deserialize)]
+struct RpcError {
+    message: String,
 }
 
 /// 测试动态 Tip Floor API
