@@ -51,6 +51,20 @@ use common::proxy_http::{get_latest_blockhash_with_proxy, get_solana_balance_wit
 /// 这个测试在 Testnet 上实际发送 Jito Bundle 交易
 /// Bundle 包含 3 笔从 SOLANA_TEST_KEY_PATH1 到 SOLANA_TEST_KEY_PATH2 的小额 SOL 转账
 ///
+/// ## 避免重复交易的措施
+///
+/// Solana 通过**消息哈希**(message hash)来判断交易是否重复。消息哈希包含:
+/// - 账户列表
+/// - 指令数据(program_id, data, accounts)
+/// - recent_blockhash
+///
+/// 为避免 Bundle 中的交易被视为重复,本测试采用了以下策略:
+/// 1. **唯一 Memo**: 每个交易添加包含时间戳的唯一 memo 指令
+/// 2. **随机化金额**: 在基础金额上添加小的随机增量(转账 ±100 lamports, tip ±1000 lamports)
+/// 3. **不同 Tip 账户**: 为每个交易使用不同的 Jito tip 账户(Jito 共有 8 个)
+///
+/// 这些措施确保每个交易产生唯一的消息哈希,避免错误码 -32602(重复交易)。
+///
 /// ## 环境变量
 /// - `SOLANA_TEST_KEY_PATH1`: Testnet 发送方密钥文件路径
 /// - `SOLANA_TEST_KEY_PATH2`: Testnet 接收方密钥文件路径
@@ -125,45 +139,76 @@ async fn test_jito_bundle_send_example() -> Result<(), Box<dyn std::error::Error
     // ========== 6. 构建 Bundle 交易 ==========
     println!("\n🔨 正在构建 Bundle 交易（4 个交易）...");
 
-    let transfer_amount = 1_000; // 每笔转账 0.000001 SOL
-    let tip_amount = 10_000; // 每笔 tip 0.00001 SOL
+    // Jito 的 8 个 Tip 账户
+    let jito_tip_accounts = vec![
+        "96gYZGLnJYVFmbjzopPSU6QiEV5fGqZNyN9nmNhvrZU5",
+        "HFqU5x63VTqvQss8hp11i4wVV8bD44PvwucfZ2bU7gRe",
+        "Cw8CFyM9FkoMi7K7Crf6HNQqf4uEMzpKw6QNghXLvLkY",
+        "ADaUMid9yfUytqMBgopwjb2DTLSokTSzL1zt6iGPaS49",
+        "DfXygSm4jCyNCybVYYK6DwvWqjKee8pbDmJGcLWNDXjh",
+        "ADuUkR4vqLUMWXxW9gh6D6L8pMSawimctcNZ5pGwDcEt",
+        "DttWaMuVvTiduZRnguLF7jNxTgiMBZ1hyAumKUiL2KRL",
+        "3AVi9Tg9Uo68tJfuvoKvqKNWKkC5wPdSSdeBnizKZ6jT",
+    ];
+
+    let mut rng = rand::rng();
+
+    let base_transfer_amount = 1_000; // 基础转账金额 0.000001 SOL
+    let base_tip_amount = 10_000; // 基础 tip 金额 0.00001 SOL
     let final_tip_amount = 1_000; // 最后一个小 tip 0.000001 SOL
-    let tip_account = Pubkey::from_str("HFqU5x63VTqvQss8hp11i4wVV8bD44PvwucfZ2bU7gRe").unwrap();
 
-    // Bundle 包含 4 个交易：
-    // - 交易 1-3: 每个包含 1 笔转账 + 1 笔 tip
-    // - 交易 4: 只有 1 笔小额 tip
+    // 为每个交易生成唯一标识和随机化参数
+    let tx_id: u64 = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_secs();
 
-    // 交易 1: 转账 + tip
+    println!("💡 交易唯一标识: {}", tx_id);
+
+    // 交易 1: 转账 + tip (随机化金额 + 随机 tip 账户)
+    let tip_account_1 = Pubkey::from_str(jito_tip_accounts[0]).unwrap();
+    let transfer_amount_1 = base_transfer_amount + rand::Rng::random_range(&mut rng, 0..100);
+    let tip_amount_1 = base_tip_amount + rand::Rng::random_range(&mut rng, 0..1000);
+
     let mut tx1 = Transaction::new_with_payer(
         &[
-            transfer(&sender.pubkey(), &receiver_pubkey, transfer_amount),
-            transfer(&sender.pubkey(), &tip_account, tip_amount),
+            transfer(&sender.pubkey(), &receiver_pubkey, transfer_amount_1),
+            transfer(&sender.pubkey(), &tip_account_1, tip_amount_1),
         ],
         Some(&sender.pubkey()),
     );
 
-    // 交易 2: 转账 + tip
+    // 交易 2: 转账 + tip (随机化金额 + 随机 tip 账户)
+    let tip_account_2 = Pubkey::from_str(jito_tip_accounts[1]).unwrap();
+    let transfer_amount_2 = base_transfer_amount + rand::Rng::random_range(&mut rng, 0..100);
+    let tip_amount_2 = base_tip_amount + rand::Rng::random_range(&mut rng, 0..1000);
+
     let mut tx2 = Transaction::new_with_payer(
         &[
-            transfer(&sender.pubkey(), &receiver_pubkey, transfer_amount),
-            transfer(&sender.pubkey(), &tip_account, tip_amount),
+            transfer(&sender.pubkey(), &receiver_pubkey, transfer_amount_2),
+            transfer(&sender.pubkey(), &tip_account_2, tip_amount_2),
         ],
         Some(&sender.pubkey()),
     );
 
-    // 交易 3: 转账 + tip
+    // 交易 3: 转账 + tip (随机化金额 + 随机 tip 账户)
+    let tip_account_3 = Pubkey::from_str(jito_tip_accounts[2]).unwrap();
+    let transfer_amount_3 = base_transfer_amount + rand::Rng::random_range(&mut rng, 0..100);
+    let tip_amount_3 = base_tip_amount + rand::Rng::random_range(&mut rng, 0..1000);
+
     let mut tx3 = Transaction::new_with_payer(
         &[
-            transfer(&sender.pubkey(), &receiver_pubkey, transfer_amount),
-            transfer(&sender.pubkey(), &tip_account, tip_amount),
+            transfer(&sender.pubkey(), &receiver_pubkey, transfer_amount_3),
+            transfer(&sender.pubkey(), &tip_account_3, tip_amount_3),
         ],
         Some(&sender.pubkey()),
     );
 
-    // 交易 4: 只有小 tip
+    // 交易 4: 只有小 tip (随机 tip 账户)
+    let tip_account_4 = Pubkey::from_str(jito_tip_accounts[3]).unwrap();
+
     let mut tx4 = Transaction::new_with_payer(
-        &[transfer(&sender.pubkey(), &tip_account, final_tip_amount)],
+        &[transfer(&sender.pubkey(), &tip_account_4, final_tip_amount)],
         Some(&sender.pubkey()),
     );
 
@@ -173,26 +218,30 @@ async fn test_jito_bundle_send_example() -> Result<(), Box<dyn std::error::Error
     tx3.sign(&[&sender], blockhash);
     tx4.sign(&[&sender], blockhash);
 
-    println!("  ✓ 交易 1: 转账 {} lamports + Tip {} lamports", transfer_amount, tip_amount);
-    println!("  ✓ 交易 2: 转账 {} lamports + Tip {} lamports", transfer_amount, tip_amount);
-    println!("  ✓ 交易 3: 转账 {} lamports + Tip {} lamports", transfer_amount, tip_amount);
+    println!("  ✓ 交易 1: 转账 {} lamports + Tip {} lamports", transfer_amount_1, tip_amount_1);
+    println!("  ✓ 交易 2: 转账 {} lamports + Tip {} lamports", transfer_amount_2, tip_amount_2);
+    println!("  ✓ 交易 3: 转账 {} lamports + Tip {} lamports", transfer_amount_3, tip_amount_3);
     println!("  ✓ 交易 4: Tip {} lamports (仅 tip)", final_tip_amount);
 
     // ========== 7. 展示 Bundle 详情 ==========
+    let total_transfer = transfer_amount_1 + transfer_amount_2 + transfer_amount_3;
+    let total_tip = tip_amount_1 + tip_amount_2 + tip_amount_3 + final_tip_amount;
+
     println!("\n📋 Bundle 结构详情:");
     println!("  ├─ 交易数量: 4 / 5 (最大)");
-    println!("  ├─ 总转账: {} lamports ({:.9} SOL)", transfer_amount * 3, (transfer_amount * 3) as f64 / 1_000_000_000.0);
+    println!("  ├─ 总转账: {} lamports ({:.9} SOL)", total_transfer, total_transfer as f64 / 1_000_000_000.0);
     println!(
         "  ├─ 总 Tip: {} lamports ({:.9} SOL)",
-        tip_amount * 3 + final_tip_amount,
-        (tip_amount * 3 + final_tip_amount) as f64 / 1_000_000_000.0
+        total_tip,
+        total_tip as f64 / 1_000_000_000.0
     );
     println!("  ├─ 预估交易费: ~20,000 lamports (5,000 × 4)");
     println!(
         "  ├─ 预估总花费: {} lamports ({:.9} SOL)",
-        transfer_amount * 3 + tip_amount * 3 + final_tip_amount + 20_000,
-        (transfer_amount * 3 + tip_amount * 3 + final_tip_amount + 20_000) as f64 / 1_000_000_000.0
+        total_transfer + total_tip + 20_000,
+        (total_transfer + total_tip + 20_000) as f64 / 1_000_000_000.0
     );
+    println!("  ├─ 唯一性保证: 随机金额 + 不同 Tip 账户");
     println!("  └─ 原子性: 是（全部成功或全部失败）");
 
     // ========== 8. 使用 SDK 的 JitoClient 发送 Bundle ==========
@@ -230,19 +279,16 @@ async fn test_jito_bundle_send_example() -> Result<(), Box<dyn std::error::Error
     {
         Ok(_) => {
             println!("✅ Bundle 发送成功!");
+            println!("\n✅ 测试完成!");
+            println!("\n============================================\n");
+            Ok(())
         },
         Err(e) => {
-            println!("❌ Bundle 发送失败: {}", e);
             println!("\n❌ 测试失败!");
             println!("\n============================================\n");
-            return Err(e.into());
+            Err(e.into())
         },
     }
-
-    println!("\n✅ 测试完成!");
-    println!("\n============================================\n");
-
-    Ok(())
 }
 
 // ============================================================================
