@@ -31,12 +31,16 @@
 //! - [Solana Testnet Faucet](https://faucet.solana.com/)
 
 use solana_sdk::{
+    instruction::{AccountMeta, Instruction},
     pubkey::Pubkey,
     signature::{EncodableKey, Keypair, Signer},
     transaction::Transaction,
 };
 use solana_system_interface::instruction::transfer;
 use std::str::FromStr;
+
+// Solana System Program ID
+const SYSTEM_PROGRAM_ID: &str = "11111111111111111111111111111111";
 
 // 导入公共代理库
 mod common;
@@ -139,23 +143,52 @@ async fn test_jito_bundle_send_example() -> Result<(), Box<dyn std::error::Error
     // ========== 6. 构建 Bundle 交易 ==========
     println!("\n🔨 正在构建 Bundle 交易（4 个交易）...");
 
-    // Jito 的 8 个 Tip 账户
+    // ⚠️ 重要：Jito Testnet 和 Mainnet 使用不同的 Tip 账户！
+    //
+    // **Testnet Tip Accounts**（从 Jito Testnet API 获取）:
+    //   获取方式: curl -X POST "https://dallas.testnet.block-engine.jito.wtf/api/v1/getTipAccounts" \
+    //               -H "Content-Type: application/json" \
+    //               -d '{"jsonrpc":"2.0","id":1,"method":"getTipAccounts","params":[]}'
+    //
+    // **Mainnet Tip Accounts**:
+    //   这些账户定义在 src/constants/swqos.rs 中的 JITO_TIP_ACCOUNTS
+    //   包括: 96gYZGLnJYVFmbjzopPSU6QiEV5fGqZNyN9nmNhvrZU5 等
+    //
+    // **为什么不同？**
+    //   - Jito Testnet 是独立的测试环境，使用自己的验证者和基础设施
+    //   - Testnet 的 tip 收益分配给 Testnet 验证者，而不是 Mainnet 验证者
+    //   - 使用错误的 tip accounts 会导致错误: "Bundles must write lock at least one tip account"
+    //
+    // **如何获取正确的 Tip Accounts？**
+    //   - Testnet: https://<region>.testnet.block-engine.jito.wtf/api/v1/getTipAccounts
+    //   - Mainnet: https://<region>.mainnet.block-engine.jito.wtf/api/v1/getTipAccounts
+    //
+    // **可用区域**:
+    //   - Testnet: Frankfurt, New York, Dallas
+    //   - Mainnet: Amsterdam, Dublin, Frankfurt, London, New York, Salt Lake City, Singapore, Tokyo
     let jito_tip_accounts = vec![
-        "96gYZGLnJYVFmbjzopPSU6QiEV5fGqZNyN9nmNhvrZU5",
-        "HFqU5x63VTqvQss8hp11i4wVV8bD44PvwucfZ2bU7gRe",
-        "Cw8CFyM9FkoMi7K7Crf6HNQqf4uEMzpKw6QNghXLvLkY",
-        "ADaUMid9yfUytqMBgopwjb2DTLSokTSzL1zt6iGPaS49",
-        "DfXygSm4jCyNCybVYYK6DwvWqjKee8pbDmJGcLWNDXjh",
-        "ADuUkR4vqLUMWXxW9gh6D6L8pMSawimctcNZ5pGwDcEt",
-        "DttWaMuVvTiduZRnguLF7jNxTgiMBZ1hyAumKUiL2KRL",
-        "3AVi9Tg9Uo68tJfuvoKvqKNWKkC5wPdSSdeBnizKZ6jT",
+        "7aewvu8fMf1DK4fKoMXKfs3h3wpAQ7r7D8T1C71LmMF",
+        "84DrGKhycCUGfLzw8hXsUYX9SnWdh2wW3ozsTPrC5xyg",
+        "BkMx5bRzQeP6tUZgzEs3xeDWJfQiLYvNDqSgmGZKYJDq",
+        "4uRnem4BfVpZBv7kShVxUYtcipscgZMSHi3B9CSL6gAA",
+        "G2d63CEgKBdgtpYT2BuheYQ9HFuFCenuHLNyKVpqAuSD",
+        "AzfhMPcx3qjbvCK3UUy868qmc5L451W341cpFqdL3EBe",
+        "F7ThiQUBYiEcyaxpmMuUeACdoiSLKg4SZZ8JSfpFNwAf",
+        "CwWZzvRgmxj9WLLhdoWUVrHZ1J8db3w2iptKuAitHqoC",
     ];
 
     let mut rng = rand::rng();
 
-    let base_transfer_amount = 1_000; // 基础转账金额 0.000001 SOL
-    let base_tip_amount = 10_000; // 基础 tip 金额 0.00001 SOL
-    let final_tip_amount = 1_000; // 最后一个小 tip 0.000001 SOL
+    // 💰 根据 tip_floor 数据调整 tip 金额
+    // Testnet tip_floor (2026-01-29):
+    //   - 50th percentile: ~1920 lamports
+    //   - 95th percentile: ~52000 lamports
+    //   - 99th percentile: 0.001 SOL (1000000 lamports)
+    //
+    // 为了提高成功率，我们使用较高的 tip 金额
+    let base_transfer_amount: u64 = 1_000; // 基础转账金额 0.000001 SOL
+    let base_tip_amount: u64 = 100_000; // 基础 tip 金额 0.0001 SOL (提高成功率)
+    let final_tip_amount: u64 = 50_000; // 最后一个 tip 0.00005 SOL
 
     // 为每个交易生成唯一标识和随机化参数
     let tx_id: u64 = std::time::SystemTime::now()
@@ -165,7 +198,7 @@ async fn test_jito_bundle_send_example() -> Result<(), Box<dyn std::error::Error
 
     println!("💡 交易唯一标识: {}", tx_id);
 
-    // 交易 1: 转账 + tip (随机化金额 + 随机 tip 账户)
+    // 交易 1: 转账 + tip (使用正确的 testnet tip 账户)
     let tip_account_1 = Pubkey::from_str(jito_tip_accounts[0]).unwrap();
     let transfer_amount_1 = base_transfer_amount + rand::Rng::random_range(&mut rng, 0..100);
     let tip_amount_1 = base_tip_amount + rand::Rng::random_range(&mut rng, 0..1000);
@@ -178,7 +211,7 @@ async fn test_jito_bundle_send_example() -> Result<(), Box<dyn std::error::Error
         Some(&sender.pubkey()),
     );
 
-    // 交易 2: 转账 + tip (随机化金额 + 随机 tip 账户)
+    // 交易 2: 转账 + tip
     let tip_account_2 = Pubkey::from_str(jito_tip_accounts[1]).unwrap();
     let transfer_amount_2 = base_transfer_amount + rand::Rng::random_range(&mut rng, 0..100);
     let tip_amount_2 = base_tip_amount + rand::Rng::random_range(&mut rng, 0..1000);
@@ -191,7 +224,7 @@ async fn test_jito_bundle_send_example() -> Result<(), Box<dyn std::error::Error
         Some(&sender.pubkey()),
     );
 
-    // 交易 3: 转账 + tip (随机化金额 + 随机 tip 账户)
+    // 交易 3: 转账 + tip
     let tip_account_3 = Pubkey::from_str(jito_tip_accounts[2]).unwrap();
     let transfer_amount_3 = base_transfer_amount + rand::Rng::random_range(&mut rng, 0..100);
     let tip_amount_3 = base_tip_amount + rand::Rng::random_range(&mut rng, 0..1000);
@@ -204,7 +237,7 @@ async fn test_jito_bundle_send_example() -> Result<(), Box<dyn std::error::Error
         Some(&sender.pubkey()),
     );
 
-    // 交易 4: 只有小 tip (随机 tip 账户)
+    // 交易 4: 仅 tip
     let tip_account_4 = Pubkey::from_str(jito_tip_accounts[3]).unwrap();
 
     let mut tx4 = Transaction::new_with_payer(
@@ -273,21 +306,90 @@ async fn test_jito_bundle_send_example() -> Result<(), Box<dyn std::error::Error
     );
 
     println!("\n📦 发送 Bundle 到 Jito...");
-    match jito_client
-        .send_transactions(TradeType::Buy, &versioned_transactions, false)
-        .await
-    {
-        Ok(_) => {
-            println!("✅ Bundle 发送成功!");
+
+    // 直接使用 HTTP 客户端调用 Jito API 以获取完整响应
+    use reqwest::Client;
+    use sol_trade_sdk::swqos::common::FormatBase64VersionedTransaction;
+
+    // 将交易转换为 base64
+    let txs_base64: Vec<String> = versioned_transactions
+        .iter()
+        .map(|tx| tx.to_base64_string())
+        .collect();
+
+    let body = serde_json::json!({
+        "jsonrpc": "2.0",
+        "method": "sendBundle",
+        "params": [
+            txs_base64,
+            { "encoding": "base64" }
+        ],
+        "id": 1,
+    });
+
+    let jito_endpoint = format!("{}/api/v1/bundles", jito_testnet_endpoint);
+
+    println!("📡 正在发送到: {}", jito_endpoint);
+    println!("📦 Bundle 大小: {} bytes", body.to_string().len());
+
+    let client = Client::new();
+    let response = client
+        .post(&jito_endpoint)
+        .header("Content-Type", "application/json")
+        .body(body.to_string())
+        .send()
+        .await?;
+
+    let status = response.status();
+    let response_text = response.text().await?;
+
+    println!("\n📥 Jito 响应状态: {}", status);
+    println!("📥 响应内容:");
+    println!("{}", serde_json::from_str::<serde_json::Value>(&response_text)
+        .map(|v| serde_json::to_string_pretty(&v).unwrap_or(response_text.clone()))
+        .unwrap_or(response_text.clone()));
+
+    // 解析响应
+    if let Ok(response_json) = serde_json::from_str::<serde_json::Value>(&response_text) {
+        if let Some(result) = response_json.get("result") {
+            println!("\n✅ Bundle 发送成功!");
+
+            // 提取 bundle 签名
+            if let Some(bundle_id) = result.get("bundle_id").and_then(|v| v.as_str()) {
+                println!("📦 Bundle ID: {}", bundle_id);
+
+                // 提取交易签名
+                if let Some(signatures) = result.get("signatures").and_then(|v| v.as_array()) {
+                    println!("📝 交易签名:");
+                    for (i, sig) in signatures.iter().enumerate() {
+                        if let Some(sig_str) = sig.as_str() {
+                            println!("   {}. {}", i + 1, sig_str);
+                        }
+                    }
+                }
+            }
+
+            println!("\n💡 提示: Bundle 可能需要几秒钟才能被确认");
+            println!("💡 你可以在 Jito Explorer 上查看 Bundle 状态");
+
             println!("\n✅ 测试完成!");
             println!("\n============================================\n");
             Ok(())
-        },
-        Err(e) => {
-            println!("\n❌ 测试失败!");
+        } else if let Some(error) = response_json.get("error") {
+            println!("\n❌ Jito 返回错误:");
+            println!("   错误码: {}", error.get("code").unwrap_or(&serde_json::json!("N/A")));
+            println!("   错误信息: {}", error.get("message").unwrap_or(&serde_json::json!("Unknown")));
             println!("\n============================================\n");
-            Err(e.into())
-        },
+            Err(format!("Jito error: {}", error).into())
+        } else {
+            println!("\n⚠️  未知响应格式");
+            println!("\n============================================\n");
+            Err("Unknown response format".into())
+        }
+    } else {
+        println!("\n❌ 无法解析响应 JSON");
+        println!("\n============================================\n");
+        Err("Failed to parse response".into())
     }
 }
 
