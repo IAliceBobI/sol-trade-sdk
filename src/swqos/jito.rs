@@ -268,11 +268,16 @@ impl JitoClient {
         if let Ok(response_json) = serde_json::from_str::<serde_json::Value>(&response_text) {
             if response_json.get("result").is_some() {
                 println!(" jito {} submitted: {:?}", trade_type, start_time.elapsed());
-            } else if let Some(_error) = response_json.get("error") {
-                eprintln!(" jito {} submission failed: {:?}", trade_type, _error);
+                Ok(())
+            } else if let Some(error) = response_json.get("error") {
+                let error_msg = error.to_string();
+                eprintln!(" jito {} submission failed: {}", trade_type, error_msg);
+                Err(anyhow::anyhow!("Jito {} submission failed: {}", trade_type, error_msg))
+            } else {
+                Err(anyhow::anyhow!("Jito {} submission failed: unknown response: {}", trade_type, response_text))
             }
+        } else {
+            Err(anyhow::anyhow!("Jito {} submission failed: invalid response: {}", trade_type, response_text))
         }
-
-        Ok(())
     }
 }

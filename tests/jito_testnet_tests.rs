@@ -5,14 +5,16 @@
 //! ## 测试环境要求
 //!
 //! ### 环境变量
-//! - `SOLANA_TEST_KEY_PATH`: Testnet 密钥文件路径（用于 test_jito_bundle_send_example）
+//! - `SOLANA_TEST_KEY_PATH1`: Testnet 发送方密钥文件路径（用于 test_jito_bundle_send_example）
+//! - `SOLANA_TEST_KEY_PATH2`: Testnet 接收方密钥文件路径（用于 test_jito_bundle_send_example）
 //! - `PROXY_URL`: 代理 URL（可选，默认 http://127.0.0.1:7891）
 //!
 //! ### 运行方式
 //!
 //! ```bash
 //! # 1. 设置环境变量
-//! export SOLANA_TEST_KEY_PATH=/path/to/testnet-keypair.json
+//! export SOLANA_TEST_KEY_PATH1=/path/to/sender-keypair.json
+//! export SOLANA_TEST_KEY_PATH2=/path/to/receiver-keypair.json
 //!
 //! # 2. 运行所有 testnet 测试
 //! cargo nextest run --test jito_testnet_tests -- --ignored
@@ -31,7 +33,9 @@
 use solana_sdk::{
     pubkey::Pubkey,
     signature::{EncodableKey, Keypair, Signer},
+    transaction::Transaction,
 };
+use solana_system_interface::instruction::transfer;
 use std::str::FromStr;
 
 // 导入公共代理库
@@ -42,38 +46,49 @@ use common::proxy_http::{get_latest_blockhash_with_proxy, get_solana_balance_wit
 // Test 1: Jito Bundle Testnet 模拟测试
 // ============================================================================
 
-/// 完整的 Jito Bundle 发送示例（Testnet 模拟）
+/// 完整的 Jito Bundle 发送示例（Testnet 实际测试）
 ///
-/// 这个测试展示如何在 Testnet 上模拟构建 Jito Bundle 交易
-/// 注意：这是模拟测试，不实际发送交易
+/// 这个测试在 Testnet 上实际发送 Jito Bundle 交易
+/// Bundle 包含 3 笔从 SOLANA_TEST_KEY_PATH1 到 SOLANA_TEST_KEY_PATH2 的小额 SOL 转账
 ///
 /// ## 环境变量
-/// - `SOLANA_TEST_KEY_PATH`: Testnet 密钥文件路径
+/// - `SOLANA_TEST_KEY_PATH1`: Testnet 发送方密钥文件路径
+/// - `SOLANA_TEST_KEY_PATH2`: Testnet 接收方密钥文件路径
 /// - `PROXY_URL`: 代理 URL（可选，默认 http://127.0.0.1:7891）
 ///
 /// ## 运行方式
 /// ```bash
-/// export SOLANA_TEST_KEY_PATH=/path/to/testnet-keypair.json
+/// export SOLANA_TEST_KEY_PATH1=/path/to/sender-keypair.json
+/// export SOLANA_TEST_KEY_PATH2=/path/to/receiver-keypair.json
 /// cargo test --test jito_testnet_tests -- test_jito_bundle_send_example --exact --nocapture --ignored
 /// ```
 #[tokio::test]
 #[ignore] // 默认忽略，需要手动运行
 async fn test_jito_bundle_send_example() -> Result<(), Box<dyn std::error::Error>> {
     use std::env;
+    use solana_sdk::hash::Hash;
 
-    println!("\n========== Jito Bundle Testnet 模拟测试 ==========\n");
+    println!("\n========== Jito Bundle Testnet 实际测试 ==========\n");
 
     // ========== 1. 读取环境变量 ==========
-    let key_path = env::var("SOLANA_TEST_KEY_PATH").expect("SOLANA_TEST_KEY_PATH 环境变量未设置");
+    let sender_key_path = env::var("SOLANA_TEST_KEY_PATH1")
+        .expect("SOLANA_TEST_KEY_PATH1 环境变量未设置");
+    let receiver_key_path = env::var("SOLANA_TEST_KEY_PATH2")
+        .expect("SOLANA_TEST_KEY_PATH2 环境变量未设置");
 
     let proxy_url = env::var("PROXY_URL").unwrap_or("http://127.0.0.1:7891".to_string());
 
-    println!("📁 密钥路径: {}", key_path);
+    println!("📁 发送方密钥路径: {}", sender_key_path);
+    println!("📁 接收方密钥路径: {}", receiver_key_path);
     println!("🔌 代理地址: {}", proxy_url);
 
     // ========== 2. 读取密钥 ==========
-    let payer = Keypair::read_from_file(&key_path)?;
-    println!("📍 Payer 地址: {}", payer.pubkey());
+    let sender = Keypair::read_from_file(&sender_key_path)?;
+    let receiver_keypair = Keypair::read_from_file(&receiver_key_path)?;
+    let receiver_pubkey = receiver_keypair.pubkey();
+
+    println!("\n📍 发送方地址: {}", sender.pubkey());
+    println!("📍 接收方地址: {}", receiver_pubkey);
 
     // ========== 3. 配置 RPC ==========
     let testnet_rpc = "https://api.testnet.solana.com";
@@ -85,110 +100,146 @@ async fn test_jito_bundle_send_example() -> Result<(), Box<dyn std::error::Error
     // ========== 4. 创建 RPC 客户端（通过代理） ==========
     println!("\n📡 正在查询账户余额...");
 
-    // 查询余额（使用公共代理库）
-    let balance =
-        get_solana_balance_with_proxy(testnet_rpc, Some(&proxy_url), &payer.pubkey().to_string())
+    // 查询发送方余额
+    let sender_balance =
+        get_solana_balance_with_proxy(testnet_rpc, Some(&proxy_url), &sender.pubkey().to_string())
             .await?;
-    let sol_balance = balance as f64 / 1_000_000_000.0;
+    let sender_sol_balance = sender_balance as f64 / 1_000_000_000.0;
 
-    println!("💰 账户余额: {:.9} SOL ({} lamports)", sol_balance, balance);
+    println!("💰 发送方余额: {:.9} SOL ({} lamports)", sender_sol_balance, sender_balance);
 
-    if balance < 5_000_000 {
-        println!("\n⚠️  余额不足（需要至少 0.005 SOL）");
+    if sender_balance < 10_000_000 {
+        println!("\n⚠️  发送方余额不足（需要至少 0.01 SOL）");
         println!("💡 请从以下地址获取测试 SOL:");
         println!("   https://faucet.solana.com/");
-        return Err("余额不足".into());
+        return Err("发送方余额不足".into());
     }
 
     // ========== 5. 获取 recent blockhash ==========
     println!("\n📡 正在获取 recent blockhash...");
 
-    let blockhash = get_latest_blockhash_with_proxy(testnet_rpc, Some(&proxy_url)).await?;
-    println!("✅ Blockhash: {}", blockhash);
+    let blockhash_str = get_latest_blockhash_with_proxy(testnet_rpc, Some(&proxy_url)).await?;
+    let blockhash = Hash::from_str(&blockhash_str)?;
+    println!("✅ Blockhash: {}", blockhash_str);
 
-    // ========== 6. 创建 receiver 和 tip account ==========
-    let receiver = Pubkey::from_str("GjJyeC3YDUU7TPCndhTUzbf3HqHYBH1JKQmWLH9nPqx").unwrap();
+    // ========== 6. 构建 Bundle 交易 ==========
+    println!("\n🔨 正在构建 Bundle 交易（4 个交易）...");
+
+    let transfer_amount = 1_000; // 每笔转账 0.000001 SOL
+    let tip_amount = 10_000; // 每笔 tip 0.00001 SOL
+    let final_tip_amount = 1_000; // 最后一个小 tip 0.000001 SOL
     let tip_account = Pubkey::from_str("HFqU5x63VTqvQss8hp11i4wVV8bD44PvwucfZ2bU7gRe").unwrap();
 
-    println!("\n👤 Receiver: {}", receiver);
-    println!("💰 Tip Account: {}", tip_account);
+    // Bundle 包含 4 个交易：
+    // - 交易 1-3: 每个包含 1 笔转账 + 1 笔 tip
+    // - 交易 4: 只有 1 笔小额 tip
 
-    // ========== 7. 展示 Bundle 结构 ==========
-    println!("\n📦 模拟构建 Bundle 交易（3 笔）...");
-
-    let tip_amount = 10_000; // 0.00001 SOL
-    let transfer_amount = 1_000; // 每笔转账 0.000001 SOL
-
-    println!("  ✓ 交易 1: 转账 {} lamports 到 receiver", transfer_amount);
-    println!("  ✓ 交易 2: 转账 {} lamports 到 receiver", transfer_amount);
-    println!(
-        "  ✓ 交易 3: 转账 {} lamports 到 receiver + Tip {} lamports",
-        transfer_amount, tip_amount
+    // 交易 1: 转账 + tip
+    let mut tx1 = Transaction::new_with_payer(
+        &[
+            transfer(&sender.pubkey(), &receiver_pubkey, transfer_amount),
+            transfer(&sender.pubkey(), &tip_account, tip_amount),
+        ],
+        Some(&sender.pubkey()),
     );
 
-    // ========== 8. 展示 Bundle 详情 ==========
+    // 交易 2: 转账 + tip
+    let mut tx2 = Transaction::new_with_payer(
+        &[
+            transfer(&sender.pubkey(), &receiver_pubkey, transfer_amount),
+            transfer(&sender.pubkey(), &tip_account, tip_amount),
+        ],
+        Some(&sender.pubkey()),
+    );
+
+    // 交易 3: 转账 + tip
+    let mut tx3 = Transaction::new_with_payer(
+        &[
+            transfer(&sender.pubkey(), &receiver_pubkey, transfer_amount),
+            transfer(&sender.pubkey(), &tip_account, tip_amount),
+        ],
+        Some(&sender.pubkey()),
+    );
+
+    // 交易 4: 只有小 tip
+    let mut tx4 = Transaction::new_with_payer(
+        &[transfer(&sender.pubkey(), &tip_account, final_tip_amount)],
+        Some(&sender.pubkey()),
+    );
+
+    // 签名所有交易
+    tx1.sign(&[&sender], blockhash);
+    tx2.sign(&[&sender], blockhash);
+    tx3.sign(&[&sender], blockhash);
+    tx4.sign(&[&sender], blockhash);
+
+    println!("  ✓ 交易 1: 转账 {} lamports + Tip {} lamports", transfer_amount, tip_amount);
+    println!("  ✓ 交易 2: 转账 {} lamports + Tip {} lamports", transfer_amount, tip_amount);
+    println!("  ✓ 交易 3: 转账 {} lamports + Tip {} lamports", transfer_amount, tip_amount);
+    println!("  ✓ 交易 4: Tip {} lamports (仅 tip)", final_tip_amount);
+
+    // ========== 7. 展示 Bundle 详情 ==========
     println!("\n📋 Bundle 结构详情:");
-    println!("  ├─ 交易数量: 3 / 5 (最大)");
-    println!("  ├─ 总转账: {} lamports", transfer_amount * 3);
+    println!("  ├─ 交易数量: 4 / 5 (最大)");
+    println!("  ├─ 总转账: {} lamports ({:.9} SOL)", transfer_amount * 3, (transfer_amount * 3) as f64 / 1_000_000_000.0);
     println!(
-        "  ├─ 总 Tip: {} lamports ({:.6} SOL)",
-        tip_amount,
-        tip_amount as f64 / 1_000_000_000.0
+        "  ├─ 总 Tip: {} lamports ({:.9} SOL)",
+        tip_amount * 3 + final_tip_amount,
+        (tip_amount * 3 + final_tip_amount) as f64 / 1_000_000_000.0
     );
-    println!("  ├─ 预估交易费: ~15,000 lamports (5,000 × 3)");
+    println!("  ├─ 预估交易费: ~20,000 lamports (5,000 × 4)");
     println!(
         "  ├─ 预估总花费: {} lamports ({:.9} SOL)",
-        transfer_amount * 3 + tip_amount + 15_000,
-        (transfer_amount * 3 + tip_amount + 15_000) as f64 / 1_000_000_000.0
+        transfer_amount * 3 + tip_amount * 3 + final_tip_amount + 20_000,
+        (transfer_amount * 3 + tip_amount * 3 + final_tip_amount + 20_000) as f64 / 1_000_000_000.0
     );
     println!("  └─ 原子性: 是（全部成功或全部失败）");
 
-    // ========== 9. 展示如何实际发送 ==========
-    println!("\n💡 如果要实际发送 Bundle，需要:");
-    println!("  1. 使用 SDK 创建 JitoClient:");
-    println!("     ```rust");
-    println!(
-        "     use sol_trade_sdk::swqos::{{SwqosClientTrait, jito::{{JitoClient, JitoRegion}}}};"
+    // ========== 8. 使用 SDK 的 JitoClient 发送 Bundle ==========
+    println!("\n🚀 正在发送 Bundle 到 Jito Testnet...");
+
+    // 将 Transaction 转换为 VersionedTransaction
+    use solana_sdk::transaction::VersionedTransaction;
+
+    let versioned_transactions: Vec<VersionedTransaction> = vec![
+        VersionedTransaction::from(tx1),
+        VersionedTransaction::from(tx2),
+        VersionedTransaction::from(tx3),
+        VersionedTransaction::from(tx4),
+    ];
+
+    println!("🔍 Bundle 包含 {} 笔交易", versioned_transactions.len());
+
+    // 使用 SDK 的 JitoClient
+    use sol_trade_sdk::swqos::{
+        jito::{JitoClient, JitoRegion},
+        SwqosClientTrait, TradeType,
+    };
+
+    // 创建 Jito client（使用 testnet endpoint）
+    let jito_client = JitoClient::new(
+        testnet_rpc.to_string(),
+        JitoRegion::Default, // 使用默认区域
+        String::new(), // 不需要 auth token
     );
-    println!("     ");
-    println!("     // 创建自定义 testnet client");
-    println!("     let client = JitoClient::new(");
-    println!("         testnet_rpc.to_string(),");
-    println!("         JitoRegion::Custom(jito_testnet_endpoint),");
-    println!("         String::new(),");
-    println!("     );");
-    println!("     ```");
-    println!("\n  2. 构建交易并序列化:");
-    println!("     ```rust");
-    println!("     let transactions = vec![tx1, tx2, tx3];");
-    println!("     let txs_base64: Vec<String> = transactions");
-    println!("         .iter()");
-    println!("         .map(|tx| tx.to_base64_string())");
-    println!("         .collect();");
-    println!("     ```");
-    println!("\n  3. 发送到 Jito Testnet:");
-    println!("     ```rust");
-    println!("     client.send_transactions(");
-    println!("         TradeType::Buy,");
-    println!("         &transactions,");
-    println!("         false, // 不等待确认");
-    println!("     ).await?;");
-    println!("     ```");
-    println!("\n  或者使用 HTTP 直接发送:");
-    println!("     POST {}/api/v1/bundles", jito_testnet_endpoint);
-    println!("     Content-Type: application/json");
-    println!("     ");
-    println!("     {{");
-    println!("       \"jsonrpc\": \"2.0\",");
-    println!("       \"id\": 1,");
-    println!("       \"method\": \"sendBundle\",");
-    println!("       \"params\": [[tx1_base64, tx2_base64, tx3_base64]]");
-    println!("     }}");
+
+    println!("\n📦 发送 Bundle 到 Jito...");
+    match jito_client
+        .send_transactions(TradeType::Buy, &versioned_transactions, false)
+        .await
+    {
+        Ok(_) => {
+            println!("✅ Bundle 发送成功!");
+        },
+        Err(e) => {
+            println!("❌ Bundle 发送失败: {}", e);
+            println!("\n❌ 测试失败!");
+            println!("\n============================================\n");
+            return Err(e.into());
+        },
+    }
 
     println!("\n✅ 测试完成!");
-    println!("📝 注意: 这是模拟测试，展示了构建流程，但未实际发送交易");
-    println!("📝 所有交易使用相同的 blockhash: {}", blockhash);
-    println!("📝 Tip 必须在最后一笔交易中");
     println!("\n============================================\n");
 
     Ok(())
