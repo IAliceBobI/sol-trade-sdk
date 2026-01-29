@@ -123,58 +123,8 @@ pub fn compute_swap_step(
 }
 
 // ============================================================================
-// 主入口函数 - 计算完整 swap 输出
+// 主入口函数 - 计算完整 swap 输出（完整版）
 // ============================================================================
-
-/// 计算 CLMM swap 的精确输出量（简化版本 - 不需要 tick arrays）
-///
-/// 注意：这是简化版本，假设在单个 tick 区间内完成交易
-/// 完整版本需要遍历多个 tick arrays
-pub fn calculate_swap_amount_simple(
-    input_amount: u64,
-    sqrt_price_x64: u128,
-    liquidity: u128,
-    tick_current: i32,
-    fee_rate: u32,
-    zero_for_one: bool,
-) -> Result<u64, &'static str> {
-    if input_amount == 0 {
-        return Err("Input amount must not be 0");
-    }
-
-    if liquidity == 0 {
-        return Err("Liquidity must not be 0");
-    }
-
-    // 设置价格限制
-    let sqrt_price_limit_x64 =
-        if zero_for_one { MIN_SQRT_PRICE_X64 + 1 } else { MAX_SQRT_PRICE_X64 - 1 };
-
-    // 初始化状态
-    let mut state = SwapState {
-        amount_specified_remaining: input_amount,
-        amount_calculated: 0,
-        sqrt_price_x64,
-        tick: tick_current,
-        liquidity,
-    };
-
-    // 简化版本：假设只需要一步即可完成
-    // 完整版本需要循环遍历多个 tick
-    let swap_step = compute_swap_step(
-        state.sqrt_price_x64,
-        sqrt_price_limit_x64,
-        state.liquidity,
-        state.amount_specified_remaining,
-        fee_rate,
-        true, // is_base_input
-        zero_for_one,
-    )?;
-
-    state.amount_calculated = swap_step.amount_out;
-
-    Ok(state.amount_calculated)
-}
 
 // ========================================
 // 完整的 tick-by-tick 遍历算法实现

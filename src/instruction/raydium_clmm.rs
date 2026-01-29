@@ -43,50 +43,33 @@ fn amount_with_slippage(amount: u64, slippage_bps: u16, round_up: bool) -> u64 {
     }
 }
 
-/// 简化算法降级方案
-fn fallback_simple_calculation(
+/// 价格计算降级方案（当无法获取 tick arrays 时使用）
+fn fallback_price_calculation(
     amount_in: u64,
     sqrt_price_x64: u128,
-    liquidity: u128,
-    tick_current: i32,
-    fee_rate: u32,
-    zero_for_one: bool,
     is_token0_in: bool,
     input_decimals: u8,
     output_decimals: u8,
     protocol_params: &RaydiumClmmParams,
 ) -> u64 {
-    // 尝试使用简单的 compute_swap_step
-    match clmm_math::calculate_swap_amount_simple(
-        amount_in,
-        sqrt_price_x64,
-        liquidity,
-        tick_current,
-        fee_rate,
-        zero_for_one,
-    ) {
-        Ok(amount) => amount,
-        Err(_e) => {
-            // 最后的降级：使用价格计算
-            let price = if is_token0_in {
-                price_token0_in_token1(
-                    sqrt_price_x64,
-                    protocol_params.token0_decimals,
-                    protocol_params.token1_decimals,
-                )
-            } else {
-                price_token1_in_token0(
-                    sqrt_price_x64,
-                    protocol_params.token0_decimals,
-                    protocol_params.token1_decimals,
-                )
-            };
+    // 使用价格计算作为降级方案
+    let price = if is_token0_in {
+        price_token0_in_token1(
+            sqrt_price_x64,
+            protocol_params.token0_decimals,
+            protocol_params.token1_decimals,
+        )
+    } else {
+        price_token1_in_token0(
+            sqrt_price_x64,
+            protocol_params.token0_decimals,
+            protocol_params.token1_decimals,
+        )
+    };
 
-            let input_amount_f64 = amount_in as f64 / 10f64.powi(input_decimals as i32);
-            let output_amount_f64 = input_amount_f64 * price;
-            (output_amount_f64 * 10f64.powi(output_decimals as i32)) as u64
-        },
-    }
+    let input_amount_f64 = amount_in as f64 / 10f64.powi(input_decimals as i32);
+    let output_amount_f64 = input_amount_f64 * price;
+    (output_amount_f64 * 10f64.powi(output_decimals as i32)) as u64
 }
 
 #[async_trait::async_trait]
@@ -291,14 +274,10 @@ impl InstructionBuilder for RaydiumClmmInstructionBuilder {
                             amount
                         },
                         Err(_e) => {
-                            // 降级到简化算法
-                            fallback_simple_calculation(
+                            // 降级到价格计算
+                            fallback_price_calculation(
                                 amount_in,
                                 pool_state.sqrt_price_x64,
-                                pool_state.liquidity,
-                                pool_state.tick_current,
-                                fee_rate,
-                                zero_for_one,
                                 is_token0_in,
                                 input_decimals,
                                 output_decimals,
@@ -308,14 +287,10 @@ impl InstructionBuilder for RaydiumClmmInstructionBuilder {
                     }
                 },
                 _ => {
-                    // 降级到简化算法
-                    fallback_simple_calculation(
+                    // 降级到价格计算
+                    fallback_price_calculation(
                         amount_in,
                         pool_state.sqrt_price_x64,
-                        pool_state.liquidity,
-                        pool_state.tick_current,
-                        fee_rate,
-                        zero_for_one,
                         is_token0_in,
                         input_decimals,
                         output_decimals,
@@ -325,13 +300,9 @@ impl InstructionBuilder for RaydiumClmmInstructionBuilder {
             }
         } else {
             // 降级到价格计算
-            fallback_simple_calculation(
+            fallback_price_calculation(
                 amount_in,
                 pool_state.sqrt_price_x64,
-                pool_state.liquidity,
-                pool_state.tick_current,
-                fee_rate,
-                zero_for_one,
                 is_token0_in,
                 input_decimals,
                 output_decimals,
@@ -735,14 +706,10 @@ impl InstructionBuilder for RaydiumClmmInstructionBuilder {
                             amount
                         },
                         Err(_e) => {
-                            // 降级到简化算法
-                            fallback_simple_calculation(
+                            // 降级到价格计算
+                            fallback_price_calculation(
                                 amount_in,
                                 pool_state.sqrt_price_x64,
-                                pool_state.liquidity,
-                                pool_state.tick_current,
-                                fee_rate,
-                                zero_for_one,
                                 is_token0_in,
                                 input_decimals,
                                 output_decimals,
@@ -752,14 +719,10 @@ impl InstructionBuilder for RaydiumClmmInstructionBuilder {
                     }
                 },
                 _ => {
-                    // 降级到简化算法
-                    fallback_simple_calculation(
+                    // 降级到价格计算
+                    fallback_price_calculation(
                         amount_in,
                         pool_state.sqrt_price_x64,
-                        pool_state.liquidity,
-                        pool_state.tick_current,
-                        fee_rate,
-                        zero_for_one,
                         is_token0_in,
                         input_decimals,
                         output_decimals,
@@ -768,14 +731,10 @@ impl InstructionBuilder for RaydiumClmmInstructionBuilder {
                 },
             }
         } else {
-            // 降级到简化算法
-            fallback_simple_calculation(
+            // 降级到价格计算
+            fallback_price_calculation(
                 amount_in,
                 pool_state.sqrt_price_x64,
-                pool_state.liquidity,
-                pool_state.tick_current,
-                fee_rate,
-                zero_for_one,
                 is_token0_in,
                 input_decimals,
                 output_decimals,

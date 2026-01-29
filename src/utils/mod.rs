@@ -1,6 +1,7 @@
 pub mod calc;
 pub mod price;
 pub mod quote;
+pub mod simulation_based_calc;
 pub mod token;
 use crate::TradingClient;
 use crate::trading;

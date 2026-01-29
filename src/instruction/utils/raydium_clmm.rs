@@ -944,72 +944,65 @@ pub async fn quote_exact_in(
 ) -> Result<crate::utils::quote::QuoteExactInResult, anyhow::Error> {
     let pool_state = get_pool_by_address(rpc, pool_address).await?;
 
-    // Read the current tick array account (best-effort) so higher layers can account for IO cost.
-    let start_index = get_tick_array_start_index(pool_state.tick_current, pool_state.tick_spacing);
-    if let Ok((tick_array_pda, _)) = get_tick_array_pda(pool_address, start_index) {
-        // ignore errors; quote can still be approximated from pool_state
-        let _ = rpc.get_account(&tick_array_pda).await;
-    }
+    // 获取费率
+    let amm_config = rpc.get_account(&pool_state.amm_config).await?;
+    let config = amm_config_decode(&amm_config.data)
+        .ok_or_else(|| anyhow!("Failed to decode amm config"))?;
+    let fee_rate = config.trade_fee_rate as u32;
 
-    // Swap math (Uniswap v3 style) in Q64.64 sqrt price space.
-    // We approximate: L constant, no tick crossing.
-    let l = pool_state.liquidity;
-    if l == 0 || amount_in == 0 {
-        return Ok(crate::utils::quote::QuoteExactInResult {
-            amount_out: 0,
-            fee_amount: 0,
-            price_impact_bps: None,
-            extra_accounts_read: 1,
-        });
-    }
+    // 获取 tick arrays（使用完整版计算）
+    let current_tick_array_start = get_tick_array_start_index(pool_state.tick_current, pool_state.tick_spacing);
 
-    // sqrt_price_x64 is Q64.64. We'll operate in u128.
-    let sqrt_p = pool_state.sqrt_price_x64;
-    // avoid division by zero
-    if sqrt_p == 0 {
-        return Ok(crate::utils::quote::QuoteExactInResult {
-            amount_out: 0,
-            fee_amount: 0,
-            price_impact_bps: None,
-            extra_accounts_read: 1,
-        });
-    }
-
-    // Helpers for fixed-point math: represent 1.0 as Q64.64 = 1<<64
-    const Q64: u128 = 1u128 << 64;
-
-    let amount_in_u128 = amount_in as u128;
-
-    let amount_out_u128 = if zero_for_one {
-        // token0 in, token1 out
-        // sqrtP_next = 1 / (1/sqrtP + amount0_in/L)
-        // 1/sqrtP in Q64.64: inv_sqrt = Q64^2 / sqrtP
-        let inv_sqrt = (Q64 * Q64) / sqrt_p;
-        // amount0_in / L in Q64.64: (amount0_in * Q64) / L
-        let delta = (amount_in_u128 * Q64) / l;
-        let inv_sqrt_next = inv_sqrt + delta;
-        let sqrt_p_next = (Q64 * Q64) / inv_sqrt_next;
-        // amount1_out = L * (sqrtP - sqrtP_next) / Q64
-        (l * (sqrt_p.saturating_sub(sqrt_p_next))) / Q64
+    // 计算需要获取的 tick arrays（当前 + 可能的下一个）
+    let mut start_indices = vec![current_tick_array_start];
+    if zero_for_one {
+        // token0 -> token1，价格下降，需要向左获取
+        start_indices.push(current_tick_array_start - (pool_state.tick_spacing as i32 * 60));
     } else {
-        // token1 in, token0 out
-        // sqrtP_next = sqrtP + amount1_in / L
-        // amount1_in / L in Q64.64: (amount1_in * Q64) / L
-        let delta = (amount_in_u128 * Q64) / l;
-        let sqrt_p_next = sqrt_p + delta;
-        // amount0_out = L * (1/sqrtP - 1/sqrtP_next)
-        let inv_sqrt = (Q64 * Q64) / sqrt_p;
-        let inv_sqrt_next = (Q64 * Q64) / sqrt_p_next;
-        // result in token0 units: L * (inv_sqrt - inv_sqrt_next) / Q64
-        (l * inv_sqrt.saturating_sub(inv_sqrt_next)) / Q64
-    };
+        // token1 -> token0，价格上涨，需要向右获取
+        start_indices.push(current_tick_array_start + (pool_state.tick_spacing as i32 * 60));
+    }
 
-    let amount_out = u64::try_from(amount_out_u128).unwrap_or(u64::MAX);
+    // 获取 tick arrays
+    let tick_array_states = get_tick_arrays(rpc, pool_address, &start_indices).await?;
+
+    // 转换为完整计算所需的格式
+    type TickData = (i32, Vec<(i32, i128, u128)>);
+    let mut tick_arrays: Vec<TickData> = Vec::new();
+
+    for (start_index, tick_array_state) in tick_array_states {
+        let ticks: Vec<(i32, i128, u128)> = tick_array_state.ticks
+            .to_vec()
+            .into_iter()
+            .filter_map(|tick_state| {
+                // 只返回已初始化的 tick
+                if tick_state.liquidity_gross > 0 {
+                    Some((tick_state.tick, tick_state.liquidity_net, tick_state.liquidity_gross))
+                } else {
+                    None
+                }
+            })
+            .collect();
+        tick_arrays.push((start_index, ticks));
+    }
+
+    // 使用完整版 CLMM 计算
+    let amount_out = crate::utils::calc::raydium_clmm::calculate_swap_amount_with_tick_arrays(
+        amount_in,
+        pool_state.sqrt_price_x64,
+        pool_state.liquidity,
+        pool_state.tick_current,
+        pool_state.tick_spacing,
+        fee_rate,
+        zero_for_one,
+        &tick_arrays,
+    ).map_err(|e| anyhow!("CLMM calculation failed: {}", e))?;
+
     Ok(crate::utils::quote::QuoteExactInResult {
         amount_out,
-        fee_amount: 0,          // TODO: integrate fee tier from config once available
-        price_impact_bps: None, // TODO: compute using execution price vs spot
-        extra_accounts_read: 1,
+        fee_amount: 0,          // TODO: 计算实际费用
+        price_impact_bps: None, // TODO: 使用执行价格 vs spot 价格计算
+        extra_accounts_read: tick_arrays.len(),
     })
 }
 
