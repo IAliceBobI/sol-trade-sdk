@@ -13,6 +13,8 @@ use solana_sdk::{
 
 /// 固定的测试模拟账户（已有 10 SOL 余额）
 /// 注意：这个账户是预先创建并空投过的，不需要在测试中重复空投
+///
+/// 地址: 8be6dbPmZH1URHXyFTbY876QuVunrD8wTZhHGXjEdrvj
 #[allow(dead_code)]
 pub const SIMULATION_TEST_KEYPAIR: &str = "2cUyNj1YLguzrU89Xu2AcnGZD9qcNjEJo5QTg4tBs9foVXzLF3fBdBXiUdMmb867T9EK8FfKUQCH8FR5oD3bYVew";
 
