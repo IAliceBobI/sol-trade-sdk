@@ -26,10 +26,7 @@ use solana_sdk::{
     transaction::Transaction,
 };
 use solana_transaction_status::{
-    UiTransactionEncoding,
-    UiInnerInstructions,
-    UiInstruction,
-    UiParsedInstruction,
+    UiInnerInstructions, UiInstruction, UiParsedInstruction, UiTransactionEncoding,
 };
 use std::sync::Arc;
 
@@ -70,7 +67,6 @@ pub struct SimulatedSwapResult {
     /// Vec<(parent_index, amount)>
     pub inner_instructions: Option<Vec<(u8, u64)>>,
 }
-
 
 /// 构造并模拟 swap 交易
 ///
@@ -148,32 +144,31 @@ pub async fn simulate_swap_transaction(
     // 方法 2: 解析 Program data（如果 inner instructions 不可用）
     // 方法 3: 解析日志中的 Token Transfer（备用方案）
 
-    let (actual_input_amount, actual_output_amount) =
-        if let Some(ref amounts) = transfer_amounts {
-            // 方法 1: 从 inner instructions 解析
-            if amounts.len() >= 2 {
-                // 假设第一条是输入，第二条是输出
-                (amounts[0].1, amounts[1].1)
-            } else if amounts.len() == 1 {
-                // 只有一条，可能是输出
-                (0, amounts[0].1)
-            } else {
-                (0, 0)
-            }
-        } else if let Some(logs) = &simulate_result.value.logs {
-            // 方法 2: 尝试从日志中解析 "Program data:"
-            parse_program_data_from_logs(logs).unwrap_or_else(|| {
-                // 方法 3: 如果没有 Program data，回退到解析 Token Transfer 日志
-                parse_transfer_amounts_from_logs(
-                    logs,
-                    &user_input_token_account,
-                    &user_output_token_account,
-                )
-                .unwrap_or((0, 0))
-            })
+    let (actual_input_amount, actual_output_amount) = if let Some(ref amounts) = transfer_amounts {
+        // 方法 1: 从 inner instructions 解析
+        if amounts.len() >= 2 {
+            // 假设第一条是输入，第二条是输出
+            (amounts[0].1, amounts[1].1)
+        } else if amounts.len() == 1 {
+            // 只有一条，可能是输出
+            (0, amounts[0].1)
         } else {
             (0, 0)
-        };
+        }
+    } else if let Some(logs) = &simulate_result.value.logs {
+        // 方法 2: 尝试从日志中解析 "Program data:"
+        parse_program_data_from_logs(logs).unwrap_or_else(|| {
+            // 方法 3: 如果没有 Program data，回退到解析 Token Transfer 日志
+            parse_transfer_amounts_from_logs(
+                logs,
+                &user_input_token_account,
+                &user_output_token_account,
+            )
+            .unwrap_or((0, 0))
+        })
+    } else {
+        (0, 0)
+    };
 
     // 模拟不改变链上状态，所以余额不变
     let input_balance_after = input_balance_before;
@@ -222,7 +217,9 @@ fn extract_transfer_amounts_from_parsed_inner_instructions(
                     match ui_parsed_instruction {
                         UiParsedInstruction::Parsed(_) => {
                             // 尝试从 UiParsedInstruction 中提取 amount
-                            if let Some(amount) = extract_amount_from_ui_parsed_instruction(ui_parsed_instruction) {
+                            if let Some(amount) =
+                                extract_amount_from_ui_parsed_instruction(ui_parsed_instruction)
+                            {
                                 amounts.push((outer_ix.index, amount));
                             }
                         },
@@ -233,11 +230,15 @@ fn extract_transfer_amounts_from_parsed_inner_instructions(
                 },
                 UiInstruction::Compiled(compiled) => {
                     // 解码 base64 编码的指令数据
-                    if let Ok(decoded) = base64::Engine::decode(&base64::engine::general_purpose::STANDARD, &compiled.data) {
+                    if let Ok(decoded) = base64::Engine::decode(
+                        &base64::engine::general_purpose::STANDARD,
+                        &compiled.data,
+                    ) {
                         // Transfer (0x03) 或 TransferChecked (0x0C)
                         if !decoded.is_empty() && (decoded[0] == 0x03 || decoded[0] == 0x0C) {
                             if decoded.len() >= 9 {
-                                if let Ok(amount) = decoded[1..9].try_into().map(u64::from_le_bytes) {
+                                if let Ok(amount) = decoded[1..9].try_into().map(u64::from_le_bytes)
+                                {
                                     amounts.push((outer_ix.index, amount));
                                 }
                             }
@@ -248,11 +249,7 @@ fn extract_transfer_amounts_from_parsed_inner_instructions(
         }
     }
 
-    if amounts.is_empty() {
-        None
-    } else {
-        Some(amounts)
-    }
+    if amounts.is_empty() { None } else { Some(amounts) }
 }
 
 /// 从 UiParsedInstruction 中提取 amount
@@ -360,9 +357,7 @@ fn parse_return_data(return_data_base64: &str) -> Option<(u64, u64)> {
     use base64::Engine;
 
     // 解码 base64
-    let data = base64::engine::general_purpose::STANDARD
-        .decode(return_data_base64)
-        .ok()?;
+    let data = base64::engine::general_purpose::STANDARD.decode(return_data_base64).ok()?;
 
     // 检查数据长度（至少需要 16 字节：2 个 u64）
     if data.len() < 16 {
