@@ -7,10 +7,10 @@
 
 use sol_trade_sdk::{
     common::SolanaRpcClient,
-    utils::simulation_based_calc::{simulate_swap_transaction, verify_calculation_accuracy},
-    instruction::utils::pumpswap::{get_pool_by_address},
+    instruction::utils::pumpswap::get_pool_by_address,
     trading::core::params::{PumpSwapParams, SwapParams},
     trading::core::traits::InstructionBuilder,
+    utils::simulation_based_calc::{simulate_swap_transaction, verify_calculation_accuracy},
 };
 use solana_sdk::{pubkey::Pubkey, signature::Keypair, signer::Signer};
 use std::str::FromStr;
@@ -70,7 +70,7 @@ async fn test_pumpswap_local_calc_vs_onchain_simulation() {
         Err(e) => {
             println!("❌ 获取 Pool 失败: {}\n", e);
             return;
-        }
+        },
     };
 
     println!("✅ Pool 状态获取成功");
@@ -100,7 +100,7 @@ async fn test_pumpswap_local_calc_vs_onchain_simulation() {
         _ => {
             println!("⚠️  无法查询 Reserve，使用默认值\n");
             (0u64, 0u64)
-        }
+        },
     };
 
     // ========================================
@@ -168,7 +168,9 @@ async fn test_pumpswap_local_calc_vs_onchain_simulation() {
         address_lookup_table_account: None,
         recent_blockhash: None,
         wait_transaction_confirmed: false,
-        protocol_params: sol_trade_sdk::trading::core::params::DexParamEnum::PumpSwap(pumpswap_params),
+        protocol_params: sol_trade_sdk::trading::core::params::DexParamEnum::PumpSwap(
+            pumpswap_params,
+        ),
         open_seed_optimize: false,
         swqos_clients: Vec::new(),
         middleware_manager: None,
@@ -201,20 +203,22 @@ async fn test_pumpswap_local_calc_vs_onchain_simulation() {
             println!("✅ 测试完成（指令构造失败）");
             println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
             return;
-        }
+        },
     };
 
     // 计算用户代币账户地址
-    let user_input_token_account = spl_associated_token_account::get_associated_token_address_with_program_id(
-        &payer.pubkey(),
-        &wsol_mint,
-        &spl_token::id(),
-    );
-    let user_output_token_account = spl_associated_token_account::get_associated_token_address_with_program_id(
-        &payer.pubkey(),
-        &pump_mint,
-        &spl_token::id(),
-    );
+    let user_input_token_account =
+        spl_associated_token_account::get_associated_token_address_with_program_id(
+            &payer.pubkey(),
+            &wsol_mint,
+            &spl_token::id(),
+        );
+    let user_output_token_account =
+        spl_associated_token_account::get_associated_token_address_with_program_id(
+            &payer.pubkey(),
+            &pump_mint,
+            &spl_token::id(),
+        );
 
     println!("输入代币账户: {}", user_input_token_account);
     println!("输出代币账户: {}\n", user_output_token_account);
@@ -239,7 +243,7 @@ async fn test_pumpswap_local_calc_vs_onchain_simulation() {
         Err(e) => {
             println!("❌ 模拟执行失败: {}\n", e);
             return;
-        }
+        },
     };
 
     if !simulation_result.success {
@@ -258,10 +262,7 @@ async fn test_pumpswap_local_calc_vs_onchain_simulation() {
 
     println!("✅ 模拟交易成功");
     println!("   交易费用: {} lamports", simulation_result.transaction_fee);
-    println!(
-        "   CU 消耗: {:?}\n",
-        simulation_result.units_consumed
-    );
+    println!("   CU 消耗: {:?}\n", simulation_result.units_consumed);
 
     // ========================================
     // 步骤 6: 解析模拟结果
@@ -291,12 +292,11 @@ async fn test_pumpswap_local_calc_vs_onchain_simulation() {
     if simulated_output > 0 {
         let diff = local_output.abs_diff(simulated_output);
 
-        let error_rate =
-            if simulated_output > 0 {
-                (diff as f64 / simulated_output as f64) * 100.0
-            } else {
-                0.0
-            };
+        let error_rate = if simulated_output > 0 {
+            (diff as f64 / simulated_output as f64) * 100.0
+        } else {
+            0.0
+        };
 
         println!("│ 差值:         {:>15} │", diff);
         println!("│ 误差率:      {:>13.4}% │", error_rate);
@@ -309,10 +309,10 @@ async fn test_pumpswap_local_calc_vs_onchain_simulation() {
         match verify_calculation_accuracy(local_output, simulated_output, 5.0) {
             Ok(_) => {
                 println!("✅ 验证通过：误差 < 5%");
-            }
+            },
             Err(e) => {
                 println!("❌ 验证失败: {}", e);
-            }
+            },
         }
     } else {
         println!("│                                     │");

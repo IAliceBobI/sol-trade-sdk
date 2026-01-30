@@ -6,18 +6,19 @@ pub mod proxy_http;
 
 use solana_rpc_client::nonblocking::rpc_client::RpcClient;
 use solana_sdk::{
-    native_token::LAMPORTS_PER_SOL,
-    pubkey::Pubkey,
-    signature::{Keypair, Signer},
-    instruction::Instruction,
+    instruction::Instruction, native_token::LAMPORTS_PER_SOL, pubkey::Pubkey, signature::Keypair,
 };
+
+/// 导入 WSOL 管理功能
+use sol_trade_sdk::trading::common::wsol_manager;
 
 /// 固定的测试模拟账户（已有 10 SOL 余额）
 /// 注意：这个账户是预先创建并空投过的，不需要在测试中重复空投
 ///
 /// 地址: 8be6dbPmZH1URHXyFTbY876QuVunrD8wTZhHGXjEdrvj
 #[allow(dead_code)]
-pub const SIMULATION_TEST_KEYPAIR: &str = "2cUyNj1YLguzrU89Xu2AcnGZD9qcNjEJo5QTg4tBs9foVXzLF3fBdBXiUdMmb867T9EK8FfKUQCH8FR5oD3bYVew";
+pub const SIMULATION_TEST_KEYPAIR: &str =
+    "2cUyNj1YLguzrU89Xu2AcnGZD9qcNjEJo5QTg4tBs9foVXzLF3fBdBXiUdMmb867T9EK8FfKUQCH8FR5oD3bYVew";
 
 /// 获取固定的模拟测试 Keypair
 #[allow(dead_code)]
@@ -57,7 +58,11 @@ pub async fn airdrop_and_wait(
                 match client.get_balance(payer).await {
                     Ok(balance) => {
                         if balance >= amount_lamports {
-                            println!("✅ 余额已到账: {} lamports ({:.2} SOL)\n", balance, balance as f64 / 1_000_000_000.0);
+                            println!(
+                                "✅ 余额已到账: {} lamports ({:.2} SOL)\n",
+                                balance,
+                                balance as f64 / 1_000_000_000.0
+                            );
                             return Ok(());
                         }
                         retries += 1;
@@ -67,13 +72,11 @@ pub async fn airdrop_and_wait(
                     },
                     Err(e) => {
                         return Err(format!("查询余额失败: {}", e));
-                    }
+                    },
                 }
             }
         },
-        Err(e) => {
-            Err(format!("空投失败: {}", e))
-        }
+        Err(e) => Err(format!("空投失败: {}", e)),
     }
 }
 
@@ -81,32 +84,45 @@ pub async fn airdrop_and_wait(
 ///
 /// 这个函数会：
 /// 1. 检查账户余额是否足够，不足则空投
-/// 2. 检查所需的 ATA 是否存在，不存在则创建
-/// 3. 返回是否需要创建 ATA 的指令列表（用于测试中的模拟）
-///
-/// 注意：实际创建 ATA 需要在测试中通过交易执行，这里只检查和返回指令
+/// 2. 检查所需的 ATA 是否存在，不存在则创建并充值
+/// 3. 对于 WSOL ATA，会自动 wrap SOL
+/// 4. 真实执行交易，而不是模拟
 ///
 /// # 参数
 /// * `rpc_client` - RPC 客户端
 /// * `rpc_url` - RPC URL（用于空投）
 /// * `payer` - 测试账户 Keypair
-/// * `mints` - 需要创建的代币 Mint 地址列表
+/// * `mints_with_amounts` - 需要创建/充值的代币 Mint 地址及充值金额列表
 /// * `min_balance_sol` - 最小余额要求（SOL）
 ///
 /// # 返回
-/// * `Ok(instructions)` - 需要创建的 ATA 指令列表（如果都已存在则为空）
+/// * `Ok(())` - 初始化成功
 /// * `Err(String)` - 初始化失败
+///
+/// # 示例
+/// ```ignore
+/// // 创建并充值 WSOL ATA（0.001 SOL）和 JUP ATA
+/// ensure_ata_with_balance(
+///     &rpc,
+///     &rpc_url,
+///     &payer,
+///     &[(wsol_mint, Some(1_000_000u64)), (jup_mint, None)],
+///     1,
+/// ).await?;
+/// ```
 #[allow(dead_code)]
-pub async fn init_test_account(
+pub async fn ensure_ata_with_balance(
     rpc_client: &sol_trade_sdk::common::SolanaRpcClient,
     rpc_url: &str,
     payer: &Keypair,
-    mints: &[Pubkey],
+    mints_with_amounts: &[(Pubkey, Option<u64>)],
     min_balance_sol: u64,
-) -> Result<Vec<Instruction>, String> {
+) -> Result<(), String> {
+    use solana_sdk::signature::Signer;
+    use solana_sdk::transaction::Transaction;
+
     let payer_pubkey = payer.pubkey();
     let min_balance_lamports = min_balance_sol * LAMPORTS_PER_SOL;
-
     println!("🔧 初始化测试账户: {}", payer_pubkey);
 
     // ========================================
@@ -118,55 +134,147 @@ pub async fn init_test_account(
         .map_err(|e| format!("查询余额失败: {}", e))?;
 
     if balance < min_balance_lamports {
-        println!("   💰 余额不足: {} lamports (需要至少 {} lamports)", balance, min_balance_lamports);
+        println!(
+            "   💰 余额不足: {} lamports (需要至少 {} lamports)",
+            balance, min_balance_lamports
+        );
         println!("   💰 正在空投 {} SOL...", min_balance_sol);
 
         // 使用空投函数
         airdrop_and_wait(rpc_url, &payer_pubkey, min_balance_sol).await?;
     } else {
-        println!("   ✅ 余额充足: {} lamports ({:.2} SOL)", balance, balance as f64 / 1_000_000_000.0);
+        println!(
+            "   ✅ 余额充足: {} lamports ({:.2} SOL)",
+            balance,
+            balance as f64 / 1_000_000_000.0
+        );
     }
 
     // ========================================
-    // 步骤 2: 检查并记录需要创建的 ATA
+    // 步骤 2: 检查并创建/充值 ATA
     // ========================================
-    let mut ata_instructions = Vec::new();
-    let mut existing_count = 0;
-    let mut create_count = 0;
+    let mut instructions = Vec::new();
 
-    for mint in mints {
-        let ata_address = spl_associated_token_account::get_associated_token_address_with_program_id(
-            &payer_pubkey,
-            mint,
-            &spl_token::id(),
-        );
+    for (mint, wrap_amount) in mints_with_amounts {
+        let ata_address =
+            spl_associated_token_account::get_associated_token_address_with_program_id(
+                &payer_pubkey,
+                mint,
+                &spl_token::id(),
+            );
 
         // 检查 ATA 是否存在
-        match rpc_client.get_token_account_balance(&ata_address).await {
-            Ok(_) => {
-                existing_count += 1;
-                println!("   ✅ ATA 已存在: {} (mint: {})", ata_address, mint);
-            }
-            Err(_) => {
-                create_count += 1;
-                println!("   📝 需要创建 ATA: {} (mint: {})", ata_address, mint);
+        let ata_exists = rpc_client.get_token_account_balance(&ata_address).await.is_ok();
 
-                // 创建 ATA 指令
-                let create_ix = spl_associated_token_account::instruction::create_associated_token_account(
+        if !ata_exists {
+            println!("   📝 创建 ATA: {} (mint: {})", ata_address, mint);
+
+            // 创建 ATA 指令
+            let create_ix =
+                spl_associated_token_account::instruction::create_associated_token_account(
                     &payer_pubkey,
                     &payer_pubkey,
                     mint,
                     &spl_token::id(),
                 );
-                ata_instructions.push(create_ix);
+            instructions.push(create_ix);
+
+            // 如果是 WSOL 且需要 wrap，添加 wrap SOL 指令
+            if let Some(amount) = wrap_amount {
+                if mint.to_string() == "So11111111111111111111111111111111111111112" {
+                    println!("   💰 Wrap SOL: {} lamports -> WSOL ATA", amount);
+
+                    // 使用 SDK 中现成的 wrap_sol_only 函数
+                    let wrap_instructions = wsol_manager::wrap_sol_only(&payer_pubkey, *amount);
+                    instructions.extend(wrap_instructions);
+                }
+            }
+        } else {
+            println!("   ✅ ATA 已存在: {} (mint: {})", ata_address, mint);
+
+            // ATA 已存在，检查是否需要充值（仅对 WSOL）
+            if let Some(amount) = wrap_amount {
+                if mint.to_string() == "So11111111111111111111111111111111111111112" {
+                    // 检查余额
+                    match rpc_client.get_token_account_balance(&ata_address).await {
+                        Ok(balance_info) => {
+                            let current_balance = balance_info.amount.parse::<u64>().unwrap_or(0);
+                            if current_balance < *amount {
+                                println!(
+                                    "   💰 充值 WSOL ATA: {} lamports",
+                                    amount - current_balance
+                                );
+
+                                let topup_amount = amount - current_balance;
+
+                                // 使用 SDK 中现成的 wrap_sol_only 函数
+                                let wrap_instructions =
+                                    wsol_manager::wrap_sol_only(&payer_pubkey, topup_amount);
+                                instructions.extend(wrap_instructions);
+                            } else {
+                                println!("   ✅ WSOL 余额充足: {} lamports", current_balance);
+                            }
+                        },
+                        Err(_) => {
+                            // ATA 存在但查询余额失败，尝试充值
+                            println!("   💰 充值 WSOL ATA: {} lamports", amount);
+
+                            // 使用 SDK 中现成的 wrap_sol_only 函数
+                            let wrap_instructions =
+                                wsol_manager::wrap_sol_only(&payer_pubkey, *amount);
+                            instructions.extend(wrap_instructions);
+                        },
+                    }
+                }
             }
         }
     }
 
-    println!("   📊 ATA 检查完成: {} 个已存在, {} 个需要创建", existing_count, create_count);
-    println!();
+    // ========================================
+    // 步骤 3: 执行交易（如果有需要执行的指令）
+    // ========================================
+    if !instructions.is_empty() {
+        println!("   📤 执行 {} 条指令...", instructions.len());
 
-    Ok(ata_instructions)
+        // 获取最新 blockhash
+        let recent_blockhash = rpc_client
+            .get_latest_blockhash()
+            .await
+            .map_err(|e| format!("获取 blockhash 失败: {}", e))?;
+
+        // 构造交易
+        let mut transaction = Transaction::new_with_payer(&instructions, Some(&payer_pubkey));
+        transaction.sign(&[payer], recent_blockhash);
+
+        // 发送交易
+        let signature = rpc_client
+            .send_transaction(&transaction)
+            .await
+            .map_err(|e| format!("发送交易失败: {}", e))?;
+
+        println!("   ✅ 交易发送成功: {}", signature);
+
+        // 等待交易确认
+        println!("   ⏳ 等待交易确认...");
+        tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
+
+        // 检查交易状态
+        match rpc_client.get_signature_status(&signature).await {
+            Ok(Some(result)) => {
+                if let Some(err) = result.err() {
+                    return Err(format!("交易执行失败: {:?}", err));
+                }
+                println!("   ✅ 交易确认成功\n");
+            },
+            _ => {
+                println!("   ⚠️  无法确认交易状态，但交易已发送\n");
+            },
+        }
+    } else {
+        println!("   ✅ 所有 ATA 已就绪，无需操作\n");
+    }
+
+    Ok(())
 }
 
 /// 批量创建 ATA 指令（如果不存在）
@@ -190,20 +298,22 @@ pub async fn create_ata_instructions_if_needed(
     let mut instructions = Vec::new();
 
     for mint in mints {
-        let ata_address = spl_associated_token_account::get_associated_token_address_with_program_id(
-            owner,
-            mint,
-            &spl_token::id(),
-        );
-
-        // 检查 ATA 是否存在
-        if rpc_client.get_token_account_balance(&ata_address).await.is_err() {
-            let create_ix = spl_associated_token_account::instruction::create_associated_token_account(
-                payer,
+        let ata_address =
+            spl_associated_token_account::get_associated_token_address_with_program_id(
                 owner,
                 mint,
                 &spl_token::id(),
             );
+
+        // 检查 ATA 是否存在
+        if rpc_client.get_token_account_balance(&ata_address).await.is_err() {
+            let create_ix =
+                spl_associated_token_account::instruction::create_associated_token_account(
+                    payer,
+                    owner,
+                    mint,
+                    &spl_token::id(),
+                );
             instructions.push(create_ix);
         }
     }

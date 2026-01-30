@@ -59,6 +59,8 @@ pub struct SimulatedSwapResult {
     pub units_consumed: Option<u64>,
     /// 错误信息（如果失败）
     pub error: Option<String>,
+    /// 交易日志（用于调试）
+    pub logs: Option<Vec<String>>,
 }
 
 /// 构造并模拟 swap 交易
@@ -108,7 +110,7 @@ pub async fn simulate_swap_transaction(
                 encoding: Some(UiTransactionEncoding::Base64),
                 accounts: None,
                 min_context_slot: None,
-                inner_instructions: true,  // 启用以获取内部指令（Token Transfer）
+                inner_instructions: true, // 启用以获取内部指令（Token Transfer）
             },
         )
         .await
@@ -123,6 +125,9 @@ pub async fn simulate_swap_transaction(
 
     let transaction_fee = simulate_result.value.fee.unwrap_or(5000);
 
+    // 保存日志用于调试
+    let logs = simulate_result.value.logs.clone();
+
     // 从日志中解析 Token Transfer 金额
     // Token Program 的日志格式：
     // "Program TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA invoke [1]"
@@ -130,12 +135,17 @@ pub async fn simulate_swap_transaction(
     // "Transfer 1234567890 tokens"
     // "Program TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA consumed 2916 of 200000 compute units"
 
-    let (actual_input_amount, actual_output_amount) = if let Some(logs) = &simulate_result.value.logs {
-        parse_transfer_amounts_from_logs(logs, &user_input_token_account, &user_output_token_account)
+    let (actual_input_amount, actual_output_amount) =
+        if let Some(logs) = &simulate_result.value.logs {
+            parse_transfer_amounts_from_logs(
+                logs,
+                &user_input_token_account,
+                &user_output_token_account,
+            )
             .unwrap_or((0, 0))
-    } else {
-        (0, 0)
-    };
+        } else {
+            (0, 0)
+        };
 
     // 模拟不改变链上状态，所以余额不变
     let input_balance_after = input_balance_before;
@@ -156,6 +166,7 @@ pub async fn simulate_swap_transaction(
         transaction_fee,
         units_consumed: simulate_result.value.units_consumed,
         error,
+        logs,
     })
 }
 
@@ -205,7 +216,8 @@ fn parse_transfer_amounts_from_logs(
                 if let Ok(num) = num_str.as_str().parse::<u64>() {
                     // 过滤掉明显不是转账金额的数字
                     // 例如：compute units (通常是几千到几十万)
-                    if num > 1_000_000 {  // 转账金额通常大于 100 万
+                    if num > 1_000_000 {
+                        // 转账金额通常大于 100 万
                         numbers.push(num);
                     }
                 }
@@ -224,7 +236,7 @@ fn parse_transfer_amounts_from_logs(
     } else if numbers.len() == 1 {
         // 只找到一个数字，可能是输出金额
         let output_amount = numbers[0];
-        Some((0, output_amount))  // 无法确定输入金额
+        Some((0, output_amount)) // 无法确定输入金额
     } else {
         // 没找到明显的转账金额
         None
