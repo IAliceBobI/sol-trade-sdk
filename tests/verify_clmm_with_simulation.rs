@@ -292,9 +292,34 @@ async fn test_clmm_local_calc_vs_onchain_simulation() {
     println!("   CU 消耗: {:?}\n", simulation_result.units_consumed);
 
     // ========================================
-    // 步骤 5: 解析模拟结果
+    // 步骤 5: 打印完整日志（用于调试）
     // ========================================
-    println!("📊 步骤 5: 解析模拟结果");
+    println!("📋 步骤 5: 模拟交易日志");
+
+    if let Some(logs) = &simulation_result.logs {
+        println!("   日志总数: {}\n", logs.len());
+        for (i, log) in logs.iter().enumerate() {
+            println!("   [{}] {}", i, log);
+        }
+        println!();
+    } else {
+        println!("   ⚠️  无日志\n");
+    }
+
+    // ========================================
+    // 步骤 6: 尝试解析 inner instructions
+    // ========================================
+    println!("📋 步骤 6: Inner Instructions 调试");
+    println!("   ⚠️  注意：当前模拟框架未返回 inner instructions");
+    println!("   需要修改代码以获取 inner instructions 中的 Token Transfer 数据\n");
+    println!("   Inner instructions 包含：");
+    println!("   - TransferChecked 指令的详细参数（amount, decimals 等）");
+    println!("   - 这是解析转账金额的最可靠方法\n");
+
+    // ========================================
+    // 步骤 7: 解析模拟结果
+    // ========================================
+    println!("📊 步骤 7: 解析模拟结果");
 
     let simulated_output = simulation_result.actual_output_amount;
 
@@ -314,9 +339,9 @@ async fn test_clmm_local_calc_vs_onchain_simulation() {
     }
 
     // ========================================
-    // 步骤 6: 结果对比
+    // 步骤 8: 结果对比
     // ========================================
-    println!("📊 步骤 6: 结果对比");
+    println!("📊 步骤 8: 结果对比");
 
     println!("┌─────────────────────────────────────┐");
     println!("│           结果对比                  │");
