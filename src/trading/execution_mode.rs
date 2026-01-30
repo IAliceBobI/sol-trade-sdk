@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 /// 交易执行模式
 ///
 /// 定义交易的执行方式，支持从快速估算到真实执行的完整流程
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
 pub enum ExecutionMode {
     /// 本地计算模式
     ///
@@ -35,6 +35,7 @@ pub enum ExecutionMode {
     /// }).await?;
     /// println!("预估获得: {} JUP", result.amount_out);
     /// ```
+    #[default]
     LocalCalculation,
 
     /// 链上模拟模式
@@ -130,13 +131,6 @@ impl ExecutionMode {
             ExecutionMode::Simulation => 2,
             ExecutionMode::RealExecution => 3,
         }
-    }
-}
-
-impl Default for ExecutionMode {
-    fn default() -> Self {
-        // 默认使用本地计算，提供最快的响应速度
-        ExecutionMode::LocalCalculation
     }
 }
 

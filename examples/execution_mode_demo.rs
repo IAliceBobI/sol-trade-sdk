@@ -6,12 +6,10 @@
 //!     cargo run --example execution_mode_demo
 
 use sol_trade_sdk::{
-    common::SolanaRpcClient,
-    instruction::utils::raydium_clmm::quote_exact_in,
+    DexType, common::SolanaRpcClient, instruction::utils::raydium_clmm::quote_exact_in,
     trading::ExecutionMode,
-    DexType,
 };
-use solana_sdk::{pubkey::Pubkey};
+use solana_sdk::pubkey::Pubkey;
 use std::str::FromStr;
 use std::sync::Arc;
 
@@ -49,7 +47,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let start = std::time::Instant::now();
 
     // 获取 Pool 状态
-    let pool_state = sol_trade_sdk::instruction::utils::raydium_clmm::get_pool_by_address(&rpc, &pool_address).await?;
+    let pool_state =
+        sol_trade_sdk::instruction::utils::raydium_clmm::get_pool_by_address(&rpc, &pool_address)
+            .await?;
 
     // 计算交易方向
     let zero_for_one = wsol_mint.to_string() == pool_state.token_mint0.to_string();
