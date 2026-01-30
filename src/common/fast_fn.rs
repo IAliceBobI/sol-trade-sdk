@@ -1,3 +1,9 @@
+// 允许在此模块中使用 expect，因为：
+// 1. Seed-based 地址计算对有效 Pubkey 不应该失败
+// 2. 如果失败表示 bug，应该 panic
+// 3. 参数在调用前已经过验证
+#![allow(clippy::expect_used)]
+
 use dashmap::DashMap;
 use once_cell::sync::Lazy;
 use solana_sdk::{

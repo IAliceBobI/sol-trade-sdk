@@ -9,6 +9,11 @@
 //! - 系统调用拦截与优化
 //! - 直接硬件访问
 
+// 允许在此模块中使用 unwrap，因为：
+// 1. LazyLock 初始化的 mutex 不应该被 poisoned
+// 2. 如果被 poisoned 表示严重错误，应该 panic
+#![allow(clippy::unwrap_used)]
+
 #[allow(unused_imports)]
 use std::fs::OpenOptions;
 use std::sync::Arc;

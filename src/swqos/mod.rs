@@ -1,3 +1,10 @@
+// 允许在整个 SWQOS 模块中使用 unwrap，因为：
+// 1. MEV 服务配置和响应经过验证
+// 2. 网络请求失败是应该 panic 的严重错误
+// 3. 这些是外部服务集成，参数在调用前已验证
+#![allow(clippy::unwrap_used)]
+#![allow(clippy::expect_used)]
+
 pub mod astralane;
 pub mod blockrazor;
 pub mod bloxroute;

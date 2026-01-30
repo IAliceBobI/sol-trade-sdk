@@ -237,7 +237,11 @@ pub async fn execute_parallel(
         return Err(anyhow!("No Rpc Default Swqos configured."));
     }
 
-    let cores = core_affinity::get_core_ids().unwrap();
+    let cores = core_affinity::get_core_ids().unwrap_or_else(|| {
+        // 如果无法获取 CPU 核心，使用默认配置（所有核心）
+        log::warn!("Failed to get CPU core IDs, using default configuration");
+        vec![]
+    });
     let instructions = Arc::new(instructions);
 
     // 预先计算所有有效的组合

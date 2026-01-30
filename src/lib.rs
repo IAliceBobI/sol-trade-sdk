@@ -1,3 +1,8 @@
+// 允许在库初始化代码中使用 expect，因为：
+// 1. 关键资源初始化失败是严重错误，应该 panic
+// 2. 用户提供的配置已经在其他地方验证
+#![allow(clippy::expect_used)]
+
 pub mod common;
 pub mod constants;
 pub mod instruction;
@@ -8,7 +13,6 @@ pub mod trading;
 pub mod utils;
 
 // 导出交易执行模式
-pub use trading::ExecutionMode;
 use crate::common::CallbackExecutionMode;
 use crate::common::GasFeeStrategy;
 use crate::common::InfrastructureConfig;
@@ -46,6 +50,7 @@ use solana_sdk::message::AddressLookupTableAccount;
 use solana_sdk::signer::Signer;
 use solana_sdk::{pubkey::Pubkey, signature::Keypair, signature::Signature};
 use std::sync::Arc;
+pub use trading::ExecutionMode;
 
 /// Type of the token to buy
 #[derive(Clone, PartialEq)]

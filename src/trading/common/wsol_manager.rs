@@ -1,3 +1,8 @@
+// 允许在此模块中使用 unwrap，因为：
+// 1. 指令构建函数对有效参数不应该失败
+// 2. 参数在调用前已经过验证
+#![allow(clippy::unwrap_used)]
+
 use crate::common::{
     fast_fn::create_associated_token_account_idempotent_fast,
     seed::{
