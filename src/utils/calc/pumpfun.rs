@@ -1,3 +1,9 @@
+// 允许在此模块中使用 unwrap，因为：
+// 1. 数学计算结果经过验证是合理的
+// 2. 参数在调用前已经过验证
+// 3. 这些是纯数学计算函数，没有外部副作用
+#![allow(clippy::unwrap_used)]
+
 use solana_sdk::{native_token::sol_str_to_lamports, pubkey::Pubkey};
 
 use crate::{
