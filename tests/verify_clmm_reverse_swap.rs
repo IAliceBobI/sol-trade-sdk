@@ -34,7 +34,6 @@ async fn test_clmm_reverse_swap_jup_to_wsol() {
 
     // Pool 地址和代币 Mint
     let pool_address = Pubkey::from_str(WSOL_JUP_POOL).unwrap();
-    let wsol_mint = Pubkey::from_str(WSOL_MINT).unwrap();
     let jup_mint = Pubkey::from_str(JUP_MINT).unwrap();
 
     // 测试金额：1000 JUP（卖出 JUP，换取 WSOL）

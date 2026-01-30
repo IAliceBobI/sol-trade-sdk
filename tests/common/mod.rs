@@ -361,7 +361,7 @@ pub async fn create_ata_instructions_if_needed(
 #[allow(dead_code)]
 pub async fn mint_token_to(
     rpc_client: &sol_trade_sdk::common::SolanaRpcClient,
-    rpc_url: &str,
+    _rpc_url: &str,
     mint_authority: &Keypair,
     mint: &Pubkey,
     recipient: &Pubkey,
@@ -471,7 +471,7 @@ pub async fn mint_token_to(
 #[allow(dead_code)]
 pub async fn transfer_token_to(
     rpc_client: &sol_trade_sdk::common::SolanaRpcClient,
-    rpc_url: &str,
+    _rpc_url: &str,
     payer: &Keypair,
     mint: &Pubkey,
     from: &Pubkey,

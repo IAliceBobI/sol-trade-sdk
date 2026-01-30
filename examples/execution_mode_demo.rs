@@ -6,7 +6,7 @@
 //!     cargo run --example execution_mode_demo
 
 use sol_trade_sdk::{
-    DexType, common::SolanaRpcClient, instruction::utils::raydium_clmm::quote_exact_in,
+    common::SolanaRpcClient, instruction::utils::raydium_clmm::quote_exact_in,
     trading::ExecutionMode,
 };
 use solana_sdk::pubkey::Pubkey;
@@ -33,7 +33,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let pool_address = Pubkey::from_str(WSOL_JUP_POOL)?;
     let wsol_mint = Pubkey::from_str(WSOL_MINT)?;
-    let jup_mint = Pubkey::from_str(JUP_MINT)?;
 
     let amount_in = 100_000_000u64; // 0.1 SOL
 
