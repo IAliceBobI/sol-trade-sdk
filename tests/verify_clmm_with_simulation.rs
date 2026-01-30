@@ -14,9 +14,13 @@ use sol_trade_sdk::{
     trading::core::params::{RaydiumClmmParams, SwapParams},
     trading::core::traits::InstructionBuilder,
 };
-use solana_sdk::{pubkey::Pubkey, signature::Keypair, signer::Signer};
+use solana_sdk::{pubkey::Pubkey, signer::Signer};
 use std::str::FromStr;
 use std::sync::Arc;
+
+// 导入公共模块
+mod common;
+use common::get_simulation_test_keypair;
 
 /// WSOL-JUP CLMM Pool
 const WSOL_JUP_POOL: &str = "EZVkeboWeXygtq8LMyENHyXdF5wpYrtExRNH9UwB1qYw";
@@ -44,9 +48,10 @@ async fn test_clmm_local_calc_vs_onchain_simulation() {
     let rpc_url = "http://127.0.0.1:8899".to_string();
     let rpc = Arc::new(SolanaRpcClient::new(rpc_url.clone()));
 
-    // 测试账户（不需要真实余额）
-    let payer = Arc::new(Keypair::new());
-    println!("📍 测试账户: {}\n", payer.pubkey());
+    // 使用固定的测试账户（已有 10 SOL 余额）
+    let payer = Arc::new(get_simulation_test_keypair());
+    println!("📍 测试账户: {}", payer.pubkey());
+    println!("✅ 使用预设账户（已有余额，无需空投）\n");
 
     // Pool 地址
     let pool_address = Pubkey::from_str(WSOL_JUP_POOL).unwrap();
@@ -253,11 +258,7 @@ async fn test_clmm_local_calc_vs_onchain_simulation() {
     println!("│ 链上模拟:     {:>15} │", simulated_output);
 
     if simulated_output > 0 {
-        let diff = if local_output > simulated_output {
-            local_output - simulated_output
-        } else {
-            simulated_output - local_output
-        };
+        let diff = local_output.abs_diff(simulated_output);
 
         let error_rate =
             if simulated_output > 0 {

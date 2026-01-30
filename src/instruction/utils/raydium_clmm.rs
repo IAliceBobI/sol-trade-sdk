@@ -976,7 +976,6 @@ pub async fn quote_exact_in(
             .ticks
             .iter()
             .cloned()
-            .into_iter()
             .filter_map(|tick_state| {
                 // 只返回已初始化的 tick
                 if tick_state.liquidity_gross > 0 {

@@ -4,4 +4,72 @@
 
 pub mod proxy_http;
 
+use solana_rpc_client::nonblocking::rpc_client::RpcClient;
+use solana_sdk::{
+    native_token::LAMPORTS_PER_SOL,
+    pubkey::Pubkey,
+    signature::Keypair,
+};
+
+/// 固定的测试模拟账户（已有 10 SOL 余额）
+/// 注意：这个账户是预先创建并空投过的，不需要在测试中重复空投
+pub const SIMULATION_TEST_KEYPAIR: &str = "2cUyNj1YLguzrU89Xu2AcnGZD9qcNjEJo5QTg4tBs9foVXzLF3fBdBXiUdMmb867T9EK8FfKUQCH8FR5oD3bYVew";
+
+/// 获取固定的模拟测试 Keypair
+pub fn get_simulation_test_keypair() -> Keypair {
+    Keypair::from_base58_string(SIMULATION_TEST_KEYPAIR)
+}
+
+/// 为测试账户空投 SOL 并循环等待到账
+///
+/// # 参数
+/// * `rpc_url` - RPC URL
+/// * `payer` - 账户公钥
+/// * `amount_sol` - 空投的 SOL 数量
+///
+/// # 返回
+/// * `Ok(())` - 空投成功
+/// * `Err(String)` - 空投失败
+#[allow(dead_code)]
+pub async fn airdrop_and_wait(
+    rpc_url: &str,
+    payer: &Pubkey,
+    amount_sol: u64,
+) -> Result<(), String> {
+    let client = RpcClient::new(rpc_url.to_string());
+    let amount_lamports = amount_sol * LAMPORTS_PER_SOL;
+
+    // 尝试空投
+    println!("💰 空投 {} SOL 到测试账户...", amount_sol);
+    match client.request_airdrop(payer, amount_lamports).await {
+        Ok(sig) => {
+            println!("✅ 空投成功，签名: {}", sig);
+            // 循环等待余额到账
+            println!("⏳ 等待余额到账...");
+            let mut retries = 0;
+            loop {
+                tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+                match client.get_balance(payer).await {
+                    Ok(balance) => {
+                        if balance >= amount_lamports {
+                            println!("✅ 余额已到账: {} lamports ({:.2} SOL)\n", balance, balance as f64 / 1_000_000_000.0);
+                            return Ok(());
+                        }
+                        retries += 1;
+                        if retries > 20 {
+                            return Err(format!("等待超时，当前余额: {} lamports", balance));
+                        }
+                    },
+                    Err(e) => {
+                        return Err(format!("查询余额失败: {}", e));
+                    }
+                }
+            }
+        },
+        Err(e) => {
+            Err(format!("空投失败: {}", e))
+        }
+    }
+}
+
 // 重新导出常用的类型和函数
