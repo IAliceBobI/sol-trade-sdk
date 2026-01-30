@@ -132,7 +132,7 @@ async fn test_clmm_zero_for_one_calculation() {
     println!("   输出代币: JUP");
     println!("   zero_for_one = {}", zero_for_one_1);
     println!("   预期: false (token1 -> token0)");
-    assert_eq!(zero_for_one_1, false, "WSOL -> JUP 应该是 zero_for_one = false");
+    assert!(!zero_for_one_1, "WSOL -> JUP 应该是 zero_for_one = false");
     println!("   ✅ 正确\n");
 
     // 场景 2: JUP -> WSOL（卖出 JUP）
@@ -142,7 +142,7 @@ async fn test_clmm_zero_for_one_calculation() {
     println!("   输出代币: WSOL");
     println!("   zero_for_one = {}", zero_for_one_2);
     println!("   预期: true (token0 -> token1)");
-    assert_eq!(zero_for_one_2, true, "JUP -> WSOL 应该是 zero_for_one = true");
+    assert!(zero_for_one_2, "JUP -> WSOL 应该是 zero_for_one = true");
     println!("   ✅ 正确\n");
 
     println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
