@@ -20,6 +20,7 @@ const WSOL_JUP_POOL: &str = "EZVkeboWeXygtq8LMyENHyXdF5wpYrtExRNH9UwB1qYw";
 const WSOL_MINT: &str = "So11111111111111111111111111111111111111112";
 
 /// JUP Mint
+#[allow(dead_code)]
 const JUP_MINT: &str = "JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN";
 
 #[tokio::main]
