@@ -1,9 +1,11 @@
 pub mod common;
 pub mod core;
+pub mod error;
 pub mod execution_mode;
 pub mod factory;
 pub mod lifecycle;
 pub mod middleware;
+pub mod results;
 
 pub use core::params::SwapParams;
 pub use core::traits::InstructionBuilder;

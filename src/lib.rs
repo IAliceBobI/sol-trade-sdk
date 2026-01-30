@@ -41,7 +41,9 @@ use crate::trading::core::params::MeteoraDammV2Params;
 use crate::trading::core::params::PumpFunParams;
 use crate::trading::core::params::PumpSwapParams;
 use crate::trading::core::params::{RaydiumAmmV4Params, RaydiumClmmParams, RaydiumCpmmParams};
+pub use crate::trading::error::{Result as UnifiedResult, TradingError as UnifiedTradingError};
 pub use crate::trading::factory::DexType;
+pub use crate::trading::results::{QuoteResult, SimulationResult};
 use common::SolanaRpcClient;
 use parking_lot::Mutex;
 use rustls::crypto::{CryptoProvider, ring::default_provider};
@@ -497,6 +499,242 @@ impl TradingClient {
             .clone()
     }
 
+    /// 本地计算（快速估算）
+    ///
+    /// 提供快速的本地价格估算，不发送交易到链上。
+    /// 支持的 DEX：Raydium CLMM, Raydium CPMM, Raydium AMM V4, PumpSwap
+    ///
+    /// # 参数
+    ///
+    /// * `params` - 交易参数
+    ///
+    /// # 返回
+    ///
+    /// 返回 `QuoteResult` 包含预期的输出金额、手续费等信息
+    pub async fn buy_quote(&self, params: TradeBuyParams) -> UnifiedResult<QuoteResult> {
+        let start = std::time::Instant::now();
+
+        // 1. 参数验证
+        if params.input_token_amount == 0 {
+            return Err(UnifiedTradingError::InvalidParameters("amount must be > 0".into()));
+        }
+
+        if !Self::supports_quote(&params.dex_type) {
+            return Err(UnifiedTradingError::UnsupportedDex(params.dex_type));
+        }
+
+        // 2. 获取 input_mint
+        let input_mint = Self::get_input_mint(&params.input_token_type);
+
+        // 3. 根据 DEX 类型调用对应的 quote_exact_in
+        let (amount_out, fee_amount) = match &params.extension_params {
+            DexParamEnum::RaydiumClmm(clmm_params) => {
+                // 推断方向：input_mint 是否是 token0
+                let zero_for_one = input_mint == clmm_params.token0_mint;
+
+                let quote = crate::instruction::utils::raydium_clmm::quote_exact_in(
+                    &self.rpc,
+                    &clmm_params.pool_state,
+                    params.input_token_amount,
+                    zero_for_one,
+                )
+                .await
+                .map_err(|e| UnifiedTradingError::QuoteFailed(e.to_string()))?;
+                (quote.amount_out, quote.fee_amount)
+            },
+
+            DexParamEnum::RaydiumCpmm(cpmm_params) => {
+                let is_token0_in = input_mint == cpmm_params.base_mint;
+
+                let quote = crate::instruction::utils::raydium_cpmm::quote_exact_in(
+                    &self.rpc,
+                    &cpmm_params.pool_state,
+                    params.input_token_amount,
+                    is_token0_in,
+                )
+                .await
+                .map_err(|e| UnifiedTradingError::QuoteFailed(e.to_string()))?;
+                (quote.amount_out, quote.fee_amount)
+            },
+
+            DexParamEnum::RaydiumAmmV4(amm_params) => {
+                let is_coin_in = input_mint == amm_params.coin_mint;
+
+                let quote = crate::instruction::utils::raydium_amm_v4::quote_exact_in(
+                    &self.rpc,
+                    &amm_params.amm,
+                    params.input_token_amount,
+                    is_coin_in,
+                )
+                .await
+                .map_err(|e| UnifiedTradingError::QuoteFailed(e.to_string()))?;
+                (quote.amount_out, quote.fee_amount)
+            },
+
+            DexParamEnum::PumpSwap(pump_params) => {
+                let is_base_in = input_mint == pump_params.base_mint;
+
+                let quote = crate::instruction::utils::pumpswap::quote_exact_in(
+                    &self.rpc,
+                    &pump_params.pool,
+                    params.input_token_amount,
+                    is_base_in,
+                )
+                .await
+                .map_err(|e| UnifiedTradingError::QuoteFailed(e.to_string()))?;
+                (quote.amount_out, quote.fee_amount)
+            },
+
+            _ => return Err(UnifiedTradingError::UnsupportedDex(params.dex_type)),
+        };
+
+        Ok(QuoteResult {
+            amount_out,
+            fee_amount,
+            price_impact_bps: None,
+            calculation_time_ms: start.elapsed().as_millis() as u64,
+            dex_type: params.dex_type,
+        })
+    }
+
+    /// 链上模拟（准确验证）
+    ///
+    /// 通过链上模拟提供准确的交易结果，不发送真实交易。
+    /// 支持所有 DEX。
+    ///
+    /// # 参数
+    ///
+    /// * `params` - 交易参数
+    ///
+    /// # 返回
+    ///
+    /// 返回 `SimulationResult` 包含模拟的输出金额、CU 消耗、交易费用等
+    pub async fn buy_simulate(&self, params: TradeBuyParams) -> UnifiedResult<SimulationResult> {
+        // 1. 参数验证（复用 buy 中的逻辑）
+        if params.input_token_amount == 0 {
+            return Err(UnifiedTradingError::InvalidParameters("amount must be > 0".into()));
+        }
+
+        if params.input_token_type == TradeTokenType::USD1 && params.dex_type != DexType::Bonk {
+            return Err(UnifiedTradingError::InvalidParameters(
+                "USD1 only supported on Bonk".into(),
+            ));
+        }
+
+        // 2. 获取 input_mint
+        let input_mint = Self::get_input_mint(&params.input_token_type);
+
+        // 3. 构建 SwapParams（完全复用 buy 中的逻辑）
+        let protocol_params = params.extension_params;
+
+        let swap_params = SwapParams {
+            rpc: Some(self.rpc.clone()),
+            payer: self.payer.clone(),
+            trade_type: TradeType::Buy,
+            input_mint,
+            output_mint: params.mint,
+            input_token_program: None,
+            output_token_program: None,
+            input_amount: Some(params.input_token_amount),
+            slippage_basis_points: params.slippage_basis_points,
+            address_lookup_table_account: params.address_lookup_table_account,
+            recent_blockhash: params.recent_blockhash,
+            wait_transaction_confirmed: false, // 模拟不需要等待确认
+            protocol_params: protocol_params.clone(),
+            open_seed_optimize: self.use_seed_optimize,
+            swqos_clients: self.swqos_clients.clone(),
+            middleware_manager: self.middleware_manager.clone(),
+            durable_nonce: params.durable_nonce,
+            with_tip: true,
+            create_input_mint_ata: params.create_input_token_ata,
+            close_input_mint_ata: params.close_input_token_ata,
+            create_output_mint_ata: params.create_mint_ata,
+            close_output_mint_ata: false,
+            fixed_output_amount: params.fixed_output_token_amount,
+            gas_fee_strategy: params.gas_fee_strategy,
+            simulate: true, // 关键：设置模拟模式
+            on_transaction_signed: None,
+            callback_execution_mode: None,
+            enable_jito_sandwich_protection: None,
+        };
+
+        // 4. 构建指令（根据 DEX 类型使用对应的 InstructionBuilder）
+        use crate::trading::core::traits::InstructionBuilder;
+        let instructions = match params.dex_type {
+            DexType::RaydiumClmm => {
+                crate::instruction::raydium_clmm::RaydiumClmmInstructionBuilder
+                    .build_buy_instructions(&swap_params)
+                    .await
+            },
+            DexType::RaydiumCpmm => {
+                crate::instruction::raydium_cpmm::RaydiumCpmmInstructionBuilder
+                    .build_buy_instructions(&swap_params)
+                    .await
+            },
+            DexType::RaydiumAmmV4 => {
+                crate::instruction::raydium_amm_v4::RaydiumAmmV4InstructionBuilder
+                    .build_buy_instructions(&swap_params)
+                    .await
+            },
+            DexType::PumpSwap => {
+                crate::instruction::pumpswap::PumpSwapInstructionBuilder
+                    .build_buy_instructions(&swap_params)
+                    .await
+            },
+            DexType::PumpFun => {
+                crate::instruction::pumpfun::PumpFunInstructionBuilder
+                    .build_buy_instructions(&swap_params)
+                    .await
+            },
+            DexType::Bonk => {
+                crate::instruction::bonk::BonkInstructionBuilder
+                    .build_buy_instructions(&swap_params)
+                    .await
+            },
+            DexType::MeteoraDammV2 => {
+                crate::instruction::meteora_damm_v2::MeteoraDammV2InstructionBuilder
+                    .build_buy_instructions(&swap_params)
+                    .await
+            },
+        }
+        .map_err(|e| UnifiedTradingError::TransactionBuildError(e.to_string()))?;
+
+        // 5. 获取用户 ATA
+        let user_input_ata = spl_associated_token_account::get_associated_token_address(
+            &self.payer.pubkey(),
+            &input_mint,
+        );
+        let user_output_ata = spl_associated_token_account::get_associated_token_address(
+            &self.payer.pubkey(),
+            &params.mint,
+        );
+
+        // 6. 调用链上模拟
+        let sim_result = crate::utils::simulation_based_calc::simulate_swap_transaction(
+            &self.rpc,
+            &self.payer,
+            instructions,
+            user_input_ata,
+            user_output_ata,
+            input_mint,
+            params.mint,
+        )
+        .await
+        .map_err(|e| UnifiedTradingError::SimulationFailed(e.to_string()))?;
+
+        // 7. 转换返回值
+        Ok(SimulationResult {
+            amount_out: sim_result.actual_output_amount,
+            fee_amount: 0, // TODO: 从 sim_result 计算
+            compute_units: sim_result.units_consumed.unwrap_or(0),
+            transaction_fee: sim_result.transaction_fee,
+            success: sim_result.success,
+            error: sim_result.error,
+            logs: sim_result.logs,
+            dex_type: params.dex_type,
+        })
+    }
+
     /// Execute a buy order for a specified token
     ///
     /// 🔧 修复：返回Vec<Signature>支持多SWQOS并发交易
@@ -731,6 +969,24 @@ impl TradingClient {
         let swap_result = executor.swap(sell_params).await;
 
         swap_result.map(|(success, sigs, err)| (success, sigs, err.map(TradeError::from)))
+    }
+
+    // 辅助函数：获取 input token 的 mint 地址
+    fn get_input_mint(input_token_type: &TradeTokenType) -> Pubkey {
+        match input_token_type {
+            TradeTokenType::SOL => SOL_TOKEN_ACCOUNT,
+            TradeTokenType::WSOL => WSOL_TOKEN_ACCOUNT,
+            TradeTokenType::USDC => USDC_TOKEN_ACCOUNT,
+            TradeTokenType::USD1 => USD1_TOKEN_ACCOUNT,
+        }
+    }
+
+    // 辅助函数：检查 DEX 是否支持 quote
+    fn supports_quote(dex_type: &DexType) -> bool {
+        matches!(
+            dex_type,
+            DexType::RaydiumClmm | DexType::RaydiumCpmm | DexType::RaydiumAmmV4 | DexType::PumpSwap
+        )
     }
 
     /// Execute a sell order for a percentage of the specified token amount
