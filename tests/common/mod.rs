@@ -321,4 +321,250 @@ pub async fn create_ata_instructions_if_needed(
     instructions
 }
 
+/// Mint token 到指定账户（仅用于测试环境）
+///
+/// **⚠️ 重要**: 此函数仅用于测试环境！
+/// - 只有当你拥有 mint authority 时才能使用
+/// - 不要在主网或生产环境使用
+///
+/// # 参数
+/// * `rpc_client` - RPC 客户端
+/// * `rpc_url` - RPC URL（用于获取 blockhash）
+/// * `mint_authority` - Mint authority 的 Keypair（必须有权 mint 此 token）
+/// * `mint` - Token mint 地址
+/// * `recipient` - 接收 token 的账户地址
+/// * `amount` - 要 mint 的数量（raw units）
+///
+/// # 返回
+/// * `Ok(())` - Mint 成功
+/// * `Err(String)` - Mint 失败
+///
+/// # 示例
+/// ```ignore
+/// // 假设你有一个测试 token 的 mint authority
+/// use solana_sdk::signer::Signer;
+///
+/// let mint_authority = Keypair::new(); // 测试用的 mint authority
+/// let mint = Pubkey::from_str("...").unwrap(); // 测试 token mint
+/// let recipient = pubkey(); // 接收地址
+///
+/// // Mint 1000 个 token（假设 decimals = 6）
+/// mint_token_to(
+///     &rpc,
+///     "http://127.0.0.1:8899",
+///     &mint_authority,
+///     &mint,
+///     &recipient,
+///     1_000_000_000, // 1000 tokens (6 decimals)
+/// ).await?;
+/// ```
+#[allow(dead_code)]
+pub async fn mint_token_to(
+    rpc_client: &sol_trade_sdk::common::SolanaRpcClient,
+    rpc_url: &str,
+    mint_authority: &Keypair,
+    mint: &Pubkey,
+    recipient: &Pubkey,
+    amount: u64,
+) -> Result<(), String> {
+    use solana_sdk::signature::Signer;
+    use solana_sdk::transaction::Transaction;
+
+    let mint_pubkey = mint_authority.pubkey();
+    println!("💰 Minting token:");
+    println!("   Mint: {}", mint);
+    println!("   Mint Authority: {}", mint_pubkey);
+    println!("   Recipient: {}", recipient);
+    println!("   Amount: {} (raw units)", amount);
+
+    // 1. 确保接收者的 ATA 存在
+    let recipient_ata =
+        spl_associated_token_account::get_associated_token_address_with_program_id(
+            recipient,
+            mint,
+            &spl_token::id(),
+        );
+
+    // 检查 ATA 是否存在
+    let ata_exists = rpc_client.get_token_account_balance(&recipient_ata).await.is_ok();
+
+    let mut instructions = Vec::new();
+
+    if !ata_exists {
+        println!("   📝 创建 recipient ATA: {}", recipient_ata);
+        let create_ata_ix =
+            spl_associated_token_account::instruction::create_associated_token_account(
+                &mint_pubkey,
+                recipient,
+                mint,
+                &spl_token::id(),
+            );
+        instructions.push(create_ata_ix);
+    }
+
+    // 2. 创建 MintTo 指令
+    let mint_to_ix = spl_token::instruction::mint_to(
+        &spl_token::id(),
+        mint,
+        &recipient_ata,
+        &mint_pubkey,
+        &[&mint_pubkey],
+        amount,
+    )
+    .map_err(|e| format!("创建 MintTo 指令失败: {}", e))?;
+
+    instructions.push(mint_to_ix);
+
+    // 3. 获取最新 blockhash
+    let recent_blockhash = rpc_client
+        .get_latest_blockhash()
+        .await
+        .map_err(|e| format!("获取 blockhash 失败: {}", e))?;
+
+    // 4. 构造交易
+    let mut transaction = Transaction::new_with_payer(&instructions, Some(&mint_pubkey));
+    transaction.sign(&[mint_authority], recent_blockhash);
+
+    // 5. 发送交易
+    let signature = rpc_client
+        .send_transaction(&transaction)
+        .await
+        .map_err(|e| format!("发送交易失败: {}", e))?;
+
+    println!("   ✅ Mint 交易发送成功: {}", signature);
+
+    // 6. 等待交易确认
+    println!("   ⏳ 等待交易确认...");
+    tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
+
+    // 7. 检查交易状态
+    match rpc_client.get_signature_status(&signature).await {
+        Ok(Some(result)) => {
+            if let Some(err) = result.err() {
+                return Err(format!("交易执行失败: {:?}", err));
+            }
+            println!("   ✅ 交易确认成功\n");
+        },
+        _ => {
+            println!("   ⚠️  无法确认交易状态，但交易已发送\n");
+        },
+    }
+
+    Ok(())
+}
+
+/// 转移 token 到指定账户
+///
+/// 从发送者的 ATA 转移 token 到接收者的 ATA
+///
+/// # 参数
+/// * `rpc_client` - RPC 客户端
+/// * `rpc_url` - RPC URL
+/// * `payer` - 支付交易费用的账户（通常是发送者）
+/// * `mint` - Token mint 地址
+/// * `from` - 发送者账户地址
+/// * `to` - 接收者账户地址
+/// * `amount` - 要转移的数量（raw units）
+///
+/// # 返回
+/// * `Ok(())` - 转移成功
+/// * `Err(String)` - 转移失败
+#[allow(dead_code)]
+pub async fn transfer_token_to(
+    rpc_client: &sol_trade_sdk::common::SolanaRpcClient,
+    rpc_url: &str,
+    payer: &Keypair,
+    mint: &Pubkey,
+    from: &Pubkey,
+    to: &Pubkey,
+    amount: u64,
+) -> Result<(), String> {
+    use solana_sdk::signature::Signer;
+    use solana_sdk::transaction::Transaction;
+
+    let payer_pubkey = payer.pubkey();
+    println!("💸 转移 token:");
+    println!("   Mint: {}", mint);
+    println!("   From: {}", from);
+    println!("   To: {}", to);
+    println!("   Amount: {} (raw units)", amount);
+
+    // 1. 计算发送者和接收者的 ATA
+    let from_ata = spl_associated_token_account::get_associated_token_address_with_program_id(
+        from, mint, &spl_token::id(),
+    );
+    let to_ata = spl_associated_token_account::get_associated_token_address_with_program_id(
+        to, mint, &spl_token::id(),
+    );
+
+    // 2. 检查接收者 ATA 是否存在，不存在则创建
+    let ata_exists = rpc_client.get_token_account_balance(&to_ata).await.is_ok();
+
+    let mut instructions = Vec::new();
+
+    if !ata_exists {
+        println!("   📝 创建接收者 ATA: {}", to_ata);
+        let create_ata_ix =
+            spl_associated_token_account::instruction::create_associated_token_account(
+                &payer_pubkey,
+                to,
+                mint,
+                &spl_token::id(),
+            );
+        instructions.push(create_ata_ix);
+    }
+
+    // 3. 创建 TransferChecked 指令
+    let transfer_ix = spl_token::instruction::transfer_checked(
+        &spl_token::id(),
+        &from_ata,
+        mint,
+        &to_ata,
+        from,
+        &[],
+        amount,
+        0, // Decimals (从 mint 账户获取，但这里传 0 也可以)
+    )
+    .map_err(|e| format!("创建 TransferChecked 指令失败: {}", e))?;
+
+    instructions.push(transfer_ix);
+
+    // 4. 获取最新 blockhash
+    let recent_blockhash = rpc_client
+        .get_latest_blockhash()
+        .await
+        .map_err(|e| format!("获取 blockhash 失败: {}", e))?;
+
+    // 5. 构造交易
+    let mut transaction = Transaction::new_with_payer(&instructions, Some(&payer_pubkey));
+    transaction.sign(&[payer], recent_blockhash);
+
+    // 6. 发送交易
+    let signature = rpc_client
+        .send_transaction(&transaction)
+        .await
+        .map_err(|e| format!("发送交易失败: {}", e))?;
+
+    println!("   ✅ 转移交易发送成功: {}", signature);
+
+    // 7. 等待交易确认
+    println!("   ⏳ 等待交易确认...");
+    tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
+
+    // 8. 检查交易状态
+    match rpc_client.get_signature_status(&signature).await {
+        Ok(Some(result)) => {
+            if let Some(err) = result.err() {
+                return Err(format!("交易执行失败: {:?}", err));
+            }
+            println!("   ✅ 交易确认成功\n");
+        },
+        _ => {
+            println!("   ⚠️  无法确认交易状态，但交易已发送\n");
+        },
+    }
+
+    Ok(())
+}
+
 // 重新导出常用的类型和函数
