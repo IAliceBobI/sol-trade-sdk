@@ -378,12 +378,11 @@ pub async fn mint_token_to(
     println!("   Amount: {} (raw units)", amount);
 
     // 1. 确保接收者的 ATA 存在
-    let recipient_ata =
-        spl_associated_token_account::get_associated_token_address_with_program_id(
-            recipient,
-            mint,
-            &spl_token::id(),
-        );
+    let recipient_ata = spl_associated_token_account::get_associated_token_address_with_program_id(
+        recipient,
+        mint,
+        &spl_token::id(),
+    );
 
     // 检查 ATA 是否存在
     let ata_exists = rpc_client.get_token_account_balance(&recipient_ata).await.is_ok();
@@ -491,10 +490,14 @@ pub async fn transfer_token_to(
 
     // 1. 计算发送者和接收者的 ATA
     let from_ata = spl_associated_token_account::get_associated_token_address_with_program_id(
-        from, mint, &spl_token::id(),
+        from,
+        mint,
+        &spl_token::id(),
     );
     let to_ata = spl_associated_token_account::get_associated_token_address_with_program_id(
-        to, mint, &spl_token::id(),
+        to,
+        mint,
+        &spl_token::id(),
     );
 
     // 2. 检查接收者 ATA 是否存在，不存在则创建

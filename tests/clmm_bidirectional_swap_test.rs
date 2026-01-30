@@ -11,11 +11,7 @@ use sol_trade_sdk::{
     common::SolanaRpcClient,
     instruction::utils::raydium_clmm::{get_pool_by_address, quote_exact_in},
 };
-use solana_sdk::{
-    native_token::LAMPORTS_PER_SOL,
-    pubkey::Pubkey,
-    signature::Signer,
-};
+use solana_sdk::{native_token::LAMPORTS_PER_SOL, pubkey::Pubkey, signature::Signer};
 use std::str::FromStr;
 use std::sync::Arc;
 
@@ -75,7 +71,11 @@ async fn test_clmm_complete_bidirectional_swap() {
         tokio::time::sleep(tokio::time::Duration::from_secs(3)).await;
 
         let new_balance = rpc.get_balance(&payer_pubkey).await.unwrap();
-        println!("✅ 空投完成，新余额: {} lamports ({:.6} SOL)\n", new_balance, new_balance as f64 / 1e9);
+        println!(
+            "✅ 空投完成，新余额: {} lamports ({:.6} SOL)\n",
+            new_balance,
+            new_balance as f64 / 1e9
+        );
     } else {
         println!("✅ 余额充足\n");
     }
@@ -146,8 +146,11 @@ async fn test_clmm_complete_bidirectional_swap() {
     let local_sell_output = quote_exact_in(&rpc, &pool_address, sell_amount_jup, zero_for_one_sell)
         .await
         .unwrap();
-    println!("   ✅ 本地计算输出: {} lamports ({:.6} SOL)\n",
-        local_sell_output.amount_out, local_sell_output.amount_out as f64 / 1e9);
+    println!(
+        "   ✅ 本地计算输出: {} lamports ({:.6} SOL)\n",
+        local_sell_output.amount_out,
+        local_sell_output.amount_out as f64 / 1e9
+    );
 
     // ========================================
     // 步骤 4: 双向交易总结
@@ -164,8 +167,11 @@ async fn test_clmm_complete_bidirectional_swap() {
 
     println!("\n   2️⃣  卖出 JUP:");
     println!("      输入: {} JUP (买入量的一半)", sell_amount_jup);
-    println!("      输出: {} lamports ({:.6} SOL)",
-        local_sell_output.amount_out, local_sell_output.amount_out as f64 / 1e9);
+    println!(
+        "      输出: {} lamports ({:.6} SOL)",
+        local_sell_output.amount_out,
+        local_sell_output.amount_out as f64 / 1e9
+    );
     println!("      zero_for_one = {}", zero_for_one_sell);
 
     println!("\n   📊 双向交易汇总:");
@@ -174,10 +180,19 @@ async fn test_clmm_complete_bidirectional_swap() {
     let final_jup_held = local_buy_output.amount_out - sell_amount_jup;
     let sol_profit = total_output_sol as i128 - total_input_sol as i128;
 
-    println!("      总输入 SOL: {} lamports ({:.6} SOL)", total_input_sol, total_input_sol as f64 / 1e9);
-    println!("      总输出 SOL: {} lamports ({:.6} SOL)", total_output_sol, total_output_sol as f64 / 1e9);
+    println!(
+        "      总输入 SOL: {} lamports ({:.6} SOL)",
+        total_input_sol,
+        total_input_sol as f64 / 1e9
+    );
+    println!(
+        "      总输出 SOL: {} lamports ({:.6} SOL)",
+        total_output_sol,
+        total_output_sol as f64 / 1e9
+    );
     println!("      持有 JUP: {} (raw units)", final_jup_held);
-    println!("      SOL 盈亏: {} lamports ({:.6} SOL) {}",
+    println!(
+        "      SOL 盈亏: {} lamports ({:.6} SOL) {}",
         sol_profit,
         sol_profit as f64 / 1e9,
         if sol_profit >= 0 { "✅" } else { "❌" }

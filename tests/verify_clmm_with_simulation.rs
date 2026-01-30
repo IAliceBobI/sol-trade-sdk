@@ -110,10 +110,12 @@ async fn test_clmm_local_calc_vs_onchain_simulation() {
     // - zero_for_one = false: token1 -> token0 (卖出 WSOL，换 JUP)
     // 我们要 WSOL -> JUP，所以 zero_for_one = false
     let zero_for_one = wsol_mint.to_string() == pool_state.token_mint0.to_string();
-    println!("交易方向: zero_for_one = {} (WSOL 是 token{}, {} JUP)",
+    println!(
+        "交易方向: zero_for_one = {} (WSOL 是 token{}, {} JUP)",
         zero_for_one,
         if zero_for_one { 1 } else { 0 },
-        if zero_for_one { "卖出" } else { "买入" });
+        if zero_for_one { "卖出" } else { "买入" }
+    );
     println!();
 
     let local_output = match quote_exact_in(&rpc, &pool_address, amount_in, zero_for_one).await {

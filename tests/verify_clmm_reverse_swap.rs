@@ -9,7 +9,7 @@ use sol_trade_sdk::{
     common::SolanaRpcClient,
     instruction::utils::raydium_clmm::{get_pool_by_address, quote_exact_in},
 };
-use solana_sdk::{pubkey::Pubkey};
+use solana_sdk::pubkey::Pubkey;
 use std::str::FromStr;
 use std::sync::Arc;
 
@@ -63,10 +63,12 @@ async fn test_clmm_reverse_swap_jup_to_wsol() {
     // - JUP -> WSOL 是 token0 -> token1，所以 zero_for_one = true
     // - WSOL -> JUP 是 token1 -> token0，所以 zero_for_one = false
     let zero_for_one = jup_mint.to_string() == pool_state.token_mint0.to_string();
-    println!("交易方向: zero_for_one = {} (JUP 是 token{}, {} WSOL)",
+    println!(
+        "交易方向: zero_for_one = {} (JUP 是 token{}, {} WSOL)",
         zero_for_one,
         if zero_for_one { 0 } else { 1 },
-        if zero_for_one { "卖出" } else { "买入" });
+        if zero_for_one { "卖出" } else { "买入" }
+    );
     println!();
 
     let local_output = match quote_exact_in(&rpc, &pool_address, amount_in, zero_for_one).await {
@@ -77,8 +79,11 @@ async fn test_clmm_reverse_swap_jup_to_wsol() {
         },
     };
 
-    println!("✅ 本地计算结果: {} WSOL lamports ({:.6} SOL)\n",
-        local_output, local_output as f64 / 1e9);
+    println!(
+        "✅ 本地计算结果: {} WSOL lamports ({:.6} SOL)\n",
+        local_output,
+        local_output as f64 / 1e9
+    );
 
     // ========================================
     // 步骤 2: 链上模拟验证
