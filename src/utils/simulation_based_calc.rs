@@ -192,18 +192,21 @@ fn parse_transfer_amounts_from_logs(
     // 尝试从日志中提取所有数字
     let mut numbers: Vec<u64> = Vec::new();
 
+    // 在循环外编译 regex
+    let Ok(re) = Regex::new(r"\b\d{8,}\b") else {
+        return None;
+    };
+
     for log in logs {
         // 查找包含大数字的日志（转账金额通常很大）
         // 使用正则表达式提取数字
-        if let Ok(re) = Regex::new(r"\b\d{8,}\b") {
-            for cap in re.captures_iter(log) {
-                if let Some(num_str) = cap.get(0) {
-                    if let Ok(num) = num_str.as_str().parse::<u64>() {
-                        // 过滤掉明显不是转账金额的数字
-                        // 例如：compute units (通常是几千到几十万)
-                        if num > 1_000_000 {  // 转账金额通常大于 100 万
-                            numbers.push(num);
-                        }
+        for cap in re.captures_iter(log) {
+            if let Some(num_str) = cap.get(0) {
+                if let Ok(num) = num_str.as_str().parse::<u64>() {
+                    // 过滤掉明显不是转账金额的数字
+                    // 例如：compute units (通常是几千到几十万)
+                    if num > 1_000_000 {  // 转账金额通常大于 100 万
+                        numbers.push(num);
                     }
                 }
             }

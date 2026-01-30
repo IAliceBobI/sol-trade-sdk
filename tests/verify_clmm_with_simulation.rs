@@ -20,7 +20,7 @@ use std::sync::Arc;
 
 // 导入公共模块
 mod common;
-use common::get_simulation_test_keypair;
+use common::{get_simulation_test_keypair, init_test_account};
 
 /// WSOL-JUP CLMM Pool
 const WSOL_JUP_POOL: &str = "EZVkeboWeXygtq8LMyENHyXdF5wpYrtExRNH9UwB1qYw";
@@ -48,18 +48,40 @@ async fn test_clmm_local_calc_vs_onchain_simulation() {
     let rpc_url = "http://127.0.0.1:8899".to_string();
     let rpc = Arc::new(SolanaRpcClient::new(rpc_url.clone()));
 
-    // 使用固定的测试账户（已有 10 SOL 余额）
-    let payer = Arc::new(get_simulation_test_keypair());
-    println!("📍 测试账户: {}", payer.pubkey());
-    println!("✅ 使用预设账户（已有余额，无需空投）\n");
-
-    // Pool 地址
+    // Pool 地址和代币 Mint（需要在初始化前定义）
     let pool_address = Pubkey::from_str(WSOL_JUP_POOL).unwrap();
     let wsol_mint = Pubkey::from_str(WSOL_MINT).unwrap();
     let jup_mint = Pubkey::from_str(JUP_MINT).unwrap();
 
     // 测试金额：0.001 SOL
     let amount_in = 1_000_000u64;
+
+    // 使用固定的测试账户（已有 10 SOL 余额）
+    let payer = Arc::new(get_simulation_test_keypair());
+    println!("📍 测试账户: {}\n", payer.pubkey());
+
+    // ========================================
+    // 初始化：检查余额和 ATA（一次性）
+    // ========================================
+    println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+    println!("🔧 初始化测试环境");
+    println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
+
+    let ata_instructions = match init_test_account(
+        &rpc,
+        &rpc_url,
+        &payer,
+        &[wsol_mint, jup_mint],
+        1,  // 最小 1 SOL
+    ).await {
+        Ok(instructions) => instructions,
+        Err(e) => {
+            println!("❌ 初始化失败: {}\n", e);
+            return;
+        }
+    };
+
+    println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
 
     println!("📊 测试配置:");
     println!("Pool 地址: {}", pool_address);
@@ -182,14 +204,32 @@ async fn test_clmm_local_calc_vs_onchain_simulation() {
     println!("输出代币账户: {}\n", user_output_token_account);
 
     // ========================================
-    // 步骤 3: 链上模拟执行
+    // 步骤 3: 组合指令（ATA 创建 + Swap）
     // ========================================
-    println!("📡 步骤 3: 链上模拟执行");
+    println!("📦 步骤 3: 组合指令");
+
+    let mut instructions_with_ata = instructions;
+
+    if ata_instructions.is_empty() {
+        println!("   ✅ 所有 ATA 已存在，无需创建\n");
+    } else {
+        println!("   ✅ 添加 {} 条 ATA 创建指令\n", ata_instructions.len());
+
+        // 将 ATA 创建指令插入到指令列表的最前面
+        for ix in ata_instructions.into_iter().rev() {
+            instructions_with_ata.insert(0, ix);
+        }
+    }
+
+    // ========================================
+    // 步骤 4: 链上模拟执行
+    // ========================================
+    println!("📡 步骤 4: 链上模拟执行");
 
     let simulation_result = match simulate_swap_transaction(
         &rpc,
         &payer,
-        instructions,
+        instructions_with_ata,
         user_input_token_account,
         user_output_token_account,
         wsol_mint,
@@ -226,9 +266,9 @@ async fn test_clmm_local_calc_vs_onchain_simulation() {
     );
 
     // ========================================
-    // 步骤 4: 解析模拟结果
+    // 步骤 5: 解析模拟结果
     // ========================================
-    println!("📊 步骤 4: 解析模拟结果");
+    println!("📊 步骤 5: 解析模拟结果");
 
     let simulated_output = simulation_result.actual_output_amount;
 
@@ -247,9 +287,9 @@ async fn test_clmm_local_calc_vs_onchain_simulation() {
     }
 
     // ========================================
-    // 步骤 5: 结果对比
+    // 步骤 6: 结果对比
     // ========================================
-    println!("📊 步骤 5: 结果对比");
+    println!("📊 步骤 6: 结果对比");
 
     println!("┌─────────────────────────────────────┐");
     println!("│           结果对比                  │");

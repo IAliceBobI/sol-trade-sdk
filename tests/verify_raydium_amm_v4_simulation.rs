@@ -272,11 +272,7 @@ async fn test_raydium_amm_v4_local_calc_vs_onchain_simulation() {
     println!("│ 链上模拟:     {:>15} │", simulated_output);
 
     if simulated_output > 0 {
-        let diff = if local_output > simulated_output {
-            local_output - simulated_output
-        } else {
-            simulated_output - local_output
-        };
+        let diff = local_output.abs_diff(simulated_output);
 
         let error_rate =
             if simulated_output > 0 {

@@ -179,7 +179,7 @@ async fn test_jito_bundle_send_example() -> Result<(), Box<dyn std::error::Error
     // **可用区域**:
     //   - Testnet: Frankfurt, New York, Dallas
     //   - Mainnet: Amsterdam, Dublin, Frankfurt, London, New York, Salt Lake City, Singapore, Tokyo
-    let jito_tip_accounts = vec![
+    let jito_tip_accounts = [
         "7aewvu8fMf1DK4fKoMXKfs3h3wpAQ7r7D8T1C71LmMF",
         "84DrGKhycCUGfLzw8hXsUYX9SnWdh2wW3ozsTPrC5xyg",
         "BkMx5bRzQeP6tUZgzEs3xeDWJfQiLYvNDqSgmGZKYJDq",
@@ -578,7 +578,7 @@ async fn test_simulate_bundle() -> Result<(), Box<dyn std::error::Error>> {
     // ========== 6. 构建测试 Bundle（2 个简单交易）==========
     println!("\n🔨 正在构建测试 Bundle...");
 
-    let jito_tip_accounts = vec![
+    let jito_tip_accounts = [
         "7aewvu8fMf1DK4fKoMXKfs3H3wpAQ7r7D8T1C71LmMF",
         "84DrGKhycCUGfLzw8hXsUYX9SnWdh2wW3ozsTPrC5xyg",
     ];
@@ -955,7 +955,8 @@ async fn test_query_bundle_status() -> Result<(), Box<dyn std::error::Error>> {
     // 根据网络选择 API endpoint
     let (api_endpoint, network_name) = match network.to_lowercase().as_str() {
         "mainnet" => ("https://mainnet.block-engine.jito.wtf/api/v1", "Jito Mainnet"),
-        "testnet" | _ => ("https://dallas.testnet.block-engine.jito.wtf/api/v1", "Jito Testnet"),
+        "testnet" => ("https://dallas.testnet.block-engine.jito.wtf/api/v1", "Jito Testnet"),
+        _ => ("https://dallas.testnet.block-engine.jito.wtf/api/v1", "Jito Testnet"),
     };
 
     println!("📦 Bundle ID: {}", bundle_id);
