@@ -98,6 +98,7 @@ pub fn create_proxy_client_with_url(
 ///
 /// ## 返回
 /// 返回余额（单位：lamports）
+#[allow(dead_code)]
 pub async fn get_solana_balance_with_proxy(
     rpc_url: &str,
     proxy_url: Option<&str>,
@@ -141,6 +142,7 @@ pub async fn get_solana_balance_with_proxy(
 ///
 /// ## 返回
 /// 返回最新的 blockhash（base58 编码）
+#[allow(dead_code)]
 pub async fn get_latest_blockhash_with_proxy(
     rpc_url: &str,
     proxy_url: Option<&str>,
@@ -227,6 +229,7 @@ pub async fn send_rpc_request_with_proxy(
 
 /// RPC 响应结构（getBalance）
 #[derive(Deserialize)]
+#[allow(dead_code)]
 struct RpcResponseBalance {
     result: BalanceResult,
     error: Option<RpcError>,
@@ -234,6 +237,7 @@ struct RpcResponseBalance {
 
 /// RPC 响应结构（getLatestBlockhash）
 #[derive(Deserialize)]
+#[allow(dead_code)]
 struct RpcResponseBlockhash {
     result: BlockhashResult,
     error: Option<RpcError>,
@@ -241,6 +245,7 @@ struct RpcResponseBlockhash {
 
 /// 余额结果
 #[derive(Deserialize)]
+#[allow(dead_code)]
 struct BalanceResult {
     #[allow(dead_code)]
     context: Option<Context>,
@@ -249,6 +254,7 @@ struct BalanceResult {
 
 /// Blockhash 结果
 #[derive(Deserialize)]
+#[allow(dead_code)]
 struct BlockhashResult {
     #[allow(dead_code)]
     context: Option<Context>,
@@ -257,6 +263,7 @@ struct BlockhashResult {
 
 /// 上下文
 #[derive(Deserialize)]
+#[allow(dead_code)]
 struct Context {
     #[serde(default, rename = "apiVersion")]
     #[allow(dead_code)]
@@ -268,6 +275,7 @@ struct Context {
 
 /// Blockhash 值
 #[derive(Deserialize)]
+#[allow(dead_code)]
 struct BlockhashValue {
     blockhash: String,
     #[serde(default, rename = "lastValidBlockHeight")]
@@ -277,6 +285,7 @@ struct BlockhashValue {
 
 /// RPC 错误
 #[derive(Deserialize)]
+#[allow(dead_code)]
 struct RpcError {
     message: String,
 }
