@@ -6,6 +6,9 @@ pub mod perf;
 pub mod swqos;
 pub mod trading;
 pub mod utils;
+
+// 导出交易执行模式
+pub use trading::ExecutionMode;
 use crate::common::CallbackExecutionMode;
 use crate::common::GasFeeStrategy;
 use crate::common::InfrastructureConfig;
