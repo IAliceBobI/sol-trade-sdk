@@ -1,3 +1,8 @@
+// 允许在此模块中使用 unwrap，因为：
+// 1. PDA 地址计算对有效输入不应该失败
+// 2. 参数在调用前已经过验证
+#![allow(clippy::unwrap_used)]
+
 use crate::{
     constants::trade_consts::DEFAULT_SLIPPAGE,
     instruction::utils::bonk::{

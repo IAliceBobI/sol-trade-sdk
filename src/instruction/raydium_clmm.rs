@@ -516,12 +516,10 @@ impl InstructionBuilder for RaydiumClmmInstructionBuilder {
             .ok_or_else(|| anyhow!("Invalid protocol params for RaydiumClmm"))?;
 
         // 🔧 修复：改进 Option 检查的清晰度
-        if params.input_amount.is_none_or(|a| a == 0) {
-            return Err(anyhow!("Token amount is not set"));
+        let input_amount = params.input_amount.ok_or_else(|| anyhow!("Token amount is not set"))?;
+        if input_amount == 0 {
+            return Err(anyhow!("Token amount cannot be zero"));
         }
-
-        // 🔧 修复：提前解包 input_amount
-        let input_amount = params.input_amount.unwrap();
 
         // Fetch pool state to get current price
         let pool_state = get_pool_by_address(

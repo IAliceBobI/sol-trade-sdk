@@ -1,3 +1,8 @@
+// 允许在此模块中使用 unwrap，因为：
+// 1. PDA 地址计算对有效输入不应该失败
+// 2. 这些函数是工具函数，调用者负责验证输入
+#![allow(clippy::unwrap_used)]
+
 use crate::{
     common::SolanaRpcClient,
     instruction::utils::bonk_types::{PoolState, pool_state_decode},

@@ -1,3 +1,8 @@
+// 允许在此模块中使用 unwrap，因为：
+// 1. PDA 地址计算对有效输入不应该失败
+// 2. 参数在调用前已经过验证
+#![allow(clippy::unwrap_used)]
+
 use crate::{
     common::fast_fn::get_associated_token_address_with_program_id_fast_use_seed,
     constants::trade_consts::DEFAULT_SLIPPAGE,
