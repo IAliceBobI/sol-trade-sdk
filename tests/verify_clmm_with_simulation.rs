@@ -105,8 +105,16 @@ async fn test_clmm_local_calc_vs_onchain_simulation() {
         },
     };
 
-    let zero_for_one = pool_state.token_mint1.to_string() == WSOL_MINT;
-    println!("交易方向: zero_for_one = {}\n", zero_for_one);
+    // 判断交易方向：
+    // - zero_for_one = true: token0 -> token1 (卖出 JUP，换 WSOL)
+    // - zero_for_one = false: token1 -> token0 (卖出 WSOL，换 JUP)
+    // 我们要 WSOL -> JUP，所以 zero_for_one = false
+    let zero_for_one = wsol_mint.to_string() == pool_state.token_mint0.to_string();
+    println!("交易方向: zero_for_one = {} (WSOL 是 token{}, {} JUP)",
+        zero_for_one,
+        if zero_for_one { 1 } else { 0 },
+        if zero_for_one { "卖出" } else { "买入" });
+    println!();
 
     let local_output = match quote_exact_in(&rpc, &pool_address, amount_in, zero_for_one).await {
         Ok(quote) => quote.amount_out,
@@ -117,6 +125,17 @@ async fn test_clmm_local_calc_vs_onchain_simulation() {
     };
 
     println!("✅ 本地计算结果: {} JUP tokens\n", local_output);
+
+    // 🔍 调试：打印 Pool 状态
+    println!("🔍 Pool 状态调试信息:");
+    println!("   sqrt_price_x64: {}", pool_state.sqrt_price_x64);
+    println!("   liquidity: {}", pool_state.liquidity);
+    println!("   tick_current: {}", pool_state.tick_current);
+    println!("   tick_spacing: {}", pool_state.tick_spacing);
+    println!("   token0_mint: {}", pool_state.token_mint0);
+    println!("   token1_mint: {}", pool_state.token_mint1);
+    println!("   amm_config: {}", pool_state.amm_config);
+    println!("   observation_key: {}\n", pool_state.observation_key);
 
     // ========================================
     // 步骤 2: 构造真实的 CLMM Swap 指令

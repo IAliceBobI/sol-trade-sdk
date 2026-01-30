@@ -1,6 +1,7 @@
 use sol_trade_sdk::{
     DexType, TradeBuyParams, TradeSellParams, TradeTokenType,
     common::GasFeeStrategy,
+    instruction::utils::raydium_clmm::get_pool_by_address,
     parser::DexParser,
     trading::core::params::{DexParamEnum, RaydiumClmmParams},
 };
@@ -66,6 +67,18 @@ async fn test_raydium_clmm_buy_and_sell_jup() {
     println!("Pool 配置:");
     println!("  token0_mint: {}", clmm_params.token0_mint);
     println!("  token1_mint: {}", clmm_params.token1_mint);
+
+    // 🔍 调试：打印详细的 Pool 状态
+    println!("\n🔍 详细 Pool 状态:");
+    if let Ok(pool_state) = get_pool_by_address(&client.rpc, &pool_address).await {
+        println!("   sqrt_price_x64: {}", pool_state.sqrt_price_x64);
+        println!("   liquidity: {}", pool_state.liquidity);
+        println!("   tick_current: {}", pool_state.tick_current);
+        println!("   tick_spacing: {}", pool_state.tick_spacing);
+        println!("   tick_array_bitmap: {:?}", pool_state.tick_array_bitmap);
+        println!("   observation_key: {}", pool_state.observation_key);
+    }
+    println!();
 
     // ===== 步骤 4: 买入 JUP =====
     println!("\n💰 步骤 4: 买入 JUP token");
