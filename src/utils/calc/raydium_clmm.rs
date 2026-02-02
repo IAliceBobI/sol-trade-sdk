@@ -391,3 +391,131 @@ mod tests {
         // 这里只验证计算不出错
     }
 }
+
+// ============================================================================
+// Exact Out Quote - 支持指定输出金额的计算
+// ============================================================================
+
+/// Result of an exact-out swap calculation
+#[derive(Debug, Clone)]
+pub struct QuoteExactOutResult {
+    /// Required input amount (including fees)
+    pub amount_in: u64,
+    /// Fee amount charged
+    pub fee_amount: u64,
+    /// Price impact in basis points (optional)
+    pub price_impact_bps: Option<u64>,
+}
+
+/// Quote an exact-out swap against a Raydium CLMM pool (简化版本)
+///
+/// 计算获得指定输出金额所需的输入金额。
+///
+/// # Arguments
+///
+/// * `sqrt_price_x64` - Current sqrt price
+/// * `liquidity` - Current pool liquidity
+/// * `amount_out` - Desired output amount
+/// * `zero_for_one` - Direction of swap (true = token0->token1, false = token1->token0)
+/// * `fee_rate` - Fee rate (as u64)
+///
+/// # Returns
+///
+/// Returns `QuoteExactOutResult` containing the required input amount and fees
+///
+/// # Errors
+///
+/// Returns error if:
+/// - Insufficient liquidity
+/// - Calculation overflow
+///
+/// # Limitations
+///
+/// 这是一个简化实现，假设交易不会跨越 tick array 边界。
+/// 对于大额交易，请使用 exact_in 模式或实现完整的 tick array 遍历。
+pub fn quote_exact_out_simplified(
+    sqrt_price_x64: u128,
+    liquidity: u128,
+    amount_out: u64,
+    zero_for_one: bool,
+    fee_rate: u64,
+) -> Result<QuoteExactOutResult, String> {
+    if liquidity == 0 {
+        return Err("No liquidity available in the pool".to_string());
+    }
+
+    // 使用 get_next_sqrt_price_from_output 计算价格移动
+    let next_sqrt_price = get_next_sqrt_price_from_output(
+        sqrt_price_x64,
+        liquidity,
+        amount_out,
+        zero_for_one,
+    );
+
+    // 计算输入金额（使用 sqrt_price 数学）
+    let sqrt_price_start = sqrt_price_x64;
+    let sqrt_price_end = next_sqrt_price;
+
+    let amount_in = if zero_for_one {
+        // token0 -> token1: 价格下降
+        if sqrt_price_end >= sqrt_price_start {
+            return Err("Price should decrease for zero_for_one".to_string());
+        }
+
+        let numerator = U256::from(liquidity)
+            .checked_mul(U256::from(sqrt_price_start - sqrt_price_end))
+            .ok_or_else(|| "Overflow in amount_in calculation".to_string())?;
+
+        let denominator = U256::from(sqrt_price_start)
+            .checked_mul(U256::from(sqrt_price_end))
+            .ok_or_else(|| "Overflow in sqrt_price multiplication".to_string())?;
+
+        numerator
+            .checked_div(denominator)
+            .ok_or_else(|| "Division error in amount_in calculation".to_string())?
+            .as_u64()
+    } else {
+        // token1 -> token0: 价格上升
+        if sqrt_price_end <= sqrt_price_start {
+            return Err("Price should increase for one_for_zero".to_string());
+        }
+
+        let numerator = U256::from(liquidity)
+            .checked_mul(U256::from(sqrt_price_end - sqrt_price_start))
+            .ok_or_else(|| "Overflow in amount_in calculation".to_string())?;
+
+        let denominator = U256::from(sqrt_price_start)
+            .checked_mul(U256::from(sqrt_price_end))
+            .ok_or_else(|| "Overflow in sqrt_price multiplication".to_string())?;
+
+        numerator
+            .checked_div(denominator)
+            .ok_or_else(|| "Division error in amount_in calculation".to_string())?
+            .as_u64()
+    };
+
+    // 计算手续费
+    let fee_amount = (amount_in as u128)
+        .checked_mul(fee_rate as u128)
+        .and_then(|p| p.checked_div(FEE_RATE_DENOMINATOR_VALUE as u128))
+        .ok_or_else(|| "Fee calculation overflow".to_string())? as u64;
+
+    let total_amount_in = amount_in
+        .checked_add(fee_amount)
+        .ok_or_else(|| "Total amount overflow".to_string())?;
+
+    // 价格影响（简化：输出金额占总流动性比例）
+    let price_impact_bps = match (amount_out as u128)
+        .checked_mul(10_000u128)
+        .and_then(|p| p.checked_div(liquidity))
+    {
+        Some(impact) => Some(impact as u64),
+        None => None,
+    };
+
+    Ok(QuoteExactOutResult {
+        amount_in: total_amount_in,
+        fee_amount,
+        price_impact_bps,
+    })
+}
