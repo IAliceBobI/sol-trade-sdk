@@ -17,6 +17,7 @@
 
 use sol_trade_sdk::{
     common::SolanaRpcClient,
+    constants::{TOKEN_PROGRAM, TOKEN_2022_PROGRAM},
     instruction::utils::pumpswap::{get_pool_by_address, quote_exact_in, quote_exact_out},
     trading::core::params::{PumpSwapParams, SwapParams},
     trading::core::traits::InstructionBuilder,
@@ -38,6 +39,20 @@ const PUMP_MINT: &str = "pumpCmXqMfrsAkQ5r49WcJnRayYRqmXz6ae8H7H9Dfn";
 
 /// WSOL Mint
 const WSOL_MINT: &str = "So11111111111111111111111111111111111111112";
+
+/// 从 mint 地址获取 Token Program（mint 的 owner 就是 Token Program）
+async fn get_token_program_for_mint(
+    rpc: &SolanaRpcClient,
+    mint: &Pubkey,
+) -> Result<Pubkey, String> {
+    let account = rpc
+        .get_account(mint)
+        .await
+        .map_err(|e| format!("RPC error: {}", e))?;
+
+    // Mint 账户的 owner 就是该 Token 使用的 Token Program
+    Ok(account.owner)
+}
 
 // ========================================
 // Test 1: Exact In Buy (WSOL -> PUMP)
@@ -125,6 +140,29 @@ async fn test_pumpswap_exact_in_buy_with_simulation() {
         (pool_state.quote_mint, pool_state.base_mint)
     };
 
+    // 🔧 自动从 mint 获取 Token Program（不需要手动记忆）
+    let base_token_program = match get_token_program_for_mint(&rpc, &base_mint).await {
+        Ok(program) => {
+            println!("✅ 自动检测 base_mint ({}) Token Program: {}", base_mint, program);
+            program
+        },
+        Err(e) => {
+            println!("⚠️  无法获取 base_mint Token Program，使用默认值: {}", e);
+            TOKEN_PROGRAM
+        },
+    };
+
+    let quote_token_program = match get_token_program_for_mint(&rpc, &quote_mint).await {
+        Ok(program) => {
+            println!("✅ 自动检测 quote_mint ({}) Token Program: {}", quote_mint, program);
+            program
+        },
+        Err(e) => {
+            println!("⚠️  无法获取 quote_mint Token Program，使用默认值: {}", e);
+            TOKEN_PROGRAM
+        },
+    };
+
     // 构造指令
     let pumpswap_params = PumpSwapParams {
         pool: pool_address,
@@ -136,8 +174,8 @@ async fn test_pumpswap_exact_in_buy_with_simulation() {
         pool_quote_token_reserves: quote_reserve,
         coin_creator_vault_ata: Pubkey::default(),
         coin_creator_vault_authority: Pubkey::default(),
-        base_token_program: spl_token::id(),
-        quote_token_program: spl_token::id(),
+        base_token_program,   // 自动获取
+        quote_token_program,  // 自动获取
         is_mayhem_mode: pool_state.is_mayhem_mode,
     };
 
@@ -345,6 +383,29 @@ async fn test_pumpswap_exact_in_sell_with_simulation() {
         (pool_state.quote_mint, pool_state.base_mint)
     };
 
+    // 🔧 自动从 mint 获取 Token Program（不需要手动记忆）
+    let base_token_program = match get_token_program_for_mint(&rpc, &base_mint).await {
+        Ok(program) => {
+            println!("✅ 自动检测 base_mint ({}) Token Program: {}", base_mint, program);
+            program
+        },
+        Err(e) => {
+            println!("⚠️  无法获取 base_mint Token Program，使用默认值: {}", e);
+            TOKEN_PROGRAM
+        },
+    };
+
+    let quote_token_program = match get_token_program_for_mint(&rpc, &quote_mint).await {
+        Ok(program) => {
+            println!("✅ 自动检测 quote_mint ({}) Token Program: {}", quote_mint, program);
+            program
+        },
+        Err(e) => {
+            println!("⚠️  无法获取 quote_mint Token Program，使用默认值: {}", e);
+            TOKEN_PROGRAM
+        },
+    };
+
     // 构造指令
     let pumpswap_params = PumpSwapParams {
         pool: pool_address,
@@ -356,8 +417,8 @@ async fn test_pumpswap_exact_in_sell_with_simulation() {
         pool_quote_token_reserves: quote_reserve,
         coin_creator_vault_ata: Pubkey::default(),
         coin_creator_vault_authority: Pubkey::default(),
-        base_token_program: spl_token::id(),
-        quote_token_program: spl_token::id(),
+        base_token_program,   // 自动获取
+        quote_token_program,  // 自动获取
         is_mayhem_mode: pool_state.is_mayhem_mode,
     };
 
@@ -566,8 +627,8 @@ async fn test_pumpswap_exact_out_buy_with_simulation() {
         pool_quote_token_reserves: quote_reserve,
         coin_creator_vault_ata: Pubkey::default(),
         coin_creator_vault_authority: Pubkey::default(),
-        base_token_program: spl_token::id(),
-        quote_token_program: spl_token::id(),
+        base_token_program: TOKEN_PROGRAM,         // WSOL 使用旧 Token Program
+        quote_token_program: TOKEN_2022_PROGRAM,   // PUMP 使用 Token-2022
         is_mayhem_mode: pool_state.is_mayhem_mode,
     };
 
@@ -788,8 +849,8 @@ async fn test_pumpswap_exact_out_sell_with_simulation() {
         pool_quote_token_reserves: quote_reserve,
         coin_creator_vault_ata: Pubkey::default(),
         coin_creator_vault_authority: Pubkey::default(),
-        base_token_program: spl_token::id(),
-        quote_token_program: spl_token::id(),
+        base_token_program: TOKEN_PROGRAM,         // WSOL 使用旧 Token Program
+        quote_token_program: TOKEN_2022_PROGRAM,   // PUMP 使用 Token-2022
         is_mayhem_mode: pool_state.is_mayhem_mode,
     };
 
