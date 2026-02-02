@@ -725,6 +725,7 @@ impl TradingClient {
         // 7. 转换返回值
         Ok(SimulationResult {
             amount_out: sim_result.actual_output_amount,
+            amount_in: params.input_token_amount, // 添加此行：支持 exact_out 模式
             fee_amount: 0, // TODO: 从 sim_result 计算
             compute_units: sim_result.units_consumed.unwrap_or(0),
             transaction_fee: sim_result.transaction_fee,

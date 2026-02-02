@@ -27,11 +27,18 @@ pub struct QuoteResult {
 
 /// 链上模拟结果
 ///
-/// 由 `buy_simulate` 返回，提供准确的链上验证结果
+/// 由 `buy_simulate` 和 `sell_simulate` 返回，提供准确的链上验证结果
 #[derive(Debug, Clone)]
 pub struct SimulationResult {
-    /// 模拟的输出金额
+    /// 输出金额
+    /// - exact_in 模式：计算得到的输出
+    /// - exact_out 模式：用户请求的输出
     pub amount_out: u64,
+
+    /// 新增：输入金额
+    /// - exact_in 模式：用户输入
+    /// - exact_out 模式：计算得到的输入
+    pub amount_in: u64,
 
     /// 手续费金额
     pub fee_amount: u64,
