@@ -105,26 +105,28 @@ async fn test_raydium_cpmm_exact_in_buy_with_simulation() {
 
     // 🔧 自动从 Pool 获取 mint 并检测 Token Program
     let (token0_mint, token1_mint) = (pool_state.token0_mint, pool_state.token1_mint);
-    let base_token_program = match sol_trade_sdk::utils::token::get_token_program_with_cache(&rpc, &token0_mint).await {
-        Ok(program) => {
-            println!("✅ 自动检测 token0_mint ({}) Token Program: {}", token0_mint, program);
-            program
-        },
-        Err(e) => {
-            println!("⚠️  无法获取 token0_mint Token Program，使用默认值: {}", e);
-            spl_token::id()
-        },
-    };
-    let quote_token_program = match sol_trade_sdk::utils::token::get_token_program_with_cache(&rpc, &token1_mint).await {
-        Ok(program) => {
-            println!("✅ 自动检测 token1_mint ({}) Token Program: {}", token1_mint, program);
-            program
-        },
-        Err(e) => {
-            println!("⚠️  无法获取 token1_mint Token Program，使用默认值: {}", e);
-            spl_token::id()
-        },
-    };
+    let base_token_program =
+        match sol_trade_sdk::utils::token::get_token_program_with_cache(&rpc, &token0_mint).await {
+            Ok(program) => {
+                println!("✅ 自动检测 token0_mint ({}) Token Program: {}", token0_mint, program);
+                program
+            },
+            Err(e) => {
+                println!("⚠️  无法获取 token0_mint Token Program，使用默认值: {}", e);
+                spl_token::id()
+            },
+        };
+    let quote_token_program =
+        match sol_trade_sdk::utils::token::get_token_program_with_cache(&rpc, &token1_mint).await {
+            Ok(program) => {
+                println!("✅ 自动检测 token1_mint ({}) Token Program: {}", token1_mint, program);
+                program
+            },
+            Err(e) => {
+                println!("⚠️  无法获取 token1_mint Token Program，使用默认值: {}", e);
+                spl_token::id()
+            },
+        };
     println!();
 
     // 获取储备余额
@@ -338,26 +340,28 @@ async fn test_raydium_cpmm_exact_in_sell_with_simulation() {
 
     // 🔧 自动从 Pool 获取 mint 并检测 Token Program
     let (token0_mint, token1_mint) = (pool_state.token0_mint, pool_state.token1_mint);
-    let base_token_program = match sol_trade_sdk::utils::token::get_token_program_with_cache(&rpc, &token0_mint).await {
-        Ok(program) => {
-            println!("✅ 自动检测 token0_mint ({}) Token Program: {}", token0_mint, program);
-            program
-        },
-        Err(e) => {
-            println!("⚠️  无法获取 token0_mint Token Program，使用默认值: {}", e);
-            spl_token::id()
-        },
-    };
-    let quote_token_program = match sol_trade_sdk::utils::token::get_token_program_with_cache(&rpc, &token1_mint).await {
-        Ok(program) => {
-            println!("✅ 自动检测 token1_mint ({}) Token Program: {}", token1_mint, program);
-            program
-        },
-        Err(e) => {
-            println!("⚠️  无法获取 token1_mint Token Program，使用默认值: {}", e);
-            spl_token::id()
-        },
-    };
+    let base_token_program =
+        match sol_trade_sdk::utils::token::get_token_program_with_cache(&rpc, &token0_mint).await {
+            Ok(program) => {
+                println!("✅ 自动检测 token0_mint ({}) Token Program: {}", token0_mint, program);
+                program
+            },
+            Err(e) => {
+                println!("⚠️  无法获取 token0_mint Token Program，使用默认值: {}", e);
+                spl_token::id()
+            },
+        };
+    let quote_token_program =
+        match sol_trade_sdk::utils::token::get_token_program_with_cache(&rpc, &token1_mint).await {
+            Ok(program) => {
+                println!("✅ 自动检测 token1_mint ({}) Token Program: {}", token1_mint, program);
+                program
+            },
+            Err(e) => {
+                println!("⚠️  无法获取 token1_mint Token Program，使用默认值: {}", e);
+                spl_token::id()
+            },
+        };
     println!();
 
     // 获取储备余额
@@ -577,26 +581,28 @@ async fn test_raydium_cpmm_exact_out_buy_with_simulation() {
 
     // 🔧 自动从 Pool 获取 mint 并检测 Token Program
     let (token0_mint, token1_mint) = (pool_state.token0_mint, pool_state.token1_mint);
-    let base_token_program = match sol_trade_sdk::utils::token::get_token_program_with_cache(&rpc, &token0_mint).await {
-        Ok(program) => {
-            println!("✅ 自动检测 token0_mint ({}) Token Program: {}", token0_mint, program);
-            program
-        },
-        Err(e) => {
-            println!("⚠️  无法获取 token0_mint Token Program，使用默认值: {}", e);
-            spl_token::id()
-        },
-    };
-    let quote_token_program = match sol_trade_sdk::utils::token::get_token_program_with_cache(&rpc, &token1_mint).await {
-        Ok(program) => {
-            println!("✅ 自动检测 token1_mint ({}) Token Program: {}", token1_mint, program);
-            program
-        },
-        Err(e) => {
-            println!("⚠️  无法获取 token1_mint Token Program，使用默认值: {}", e);
-            spl_token::id()
-        },
-    };
+    let base_token_program =
+        match sol_trade_sdk::utils::token::get_token_program_with_cache(&rpc, &token0_mint).await {
+            Ok(program) => {
+                println!("✅ 自动检测 token0_mint ({}) Token Program: {}", token0_mint, program);
+                program
+            },
+            Err(e) => {
+                println!("⚠️  无法获取 token0_mint Token Program，使用默认值: {}", e);
+                spl_token::id()
+            },
+        };
+    let quote_token_program =
+        match sol_trade_sdk::utils::token::get_token_program_with_cache(&rpc, &token1_mint).await {
+            Ok(program) => {
+                println!("✅ 自动检测 token1_mint ({}) Token Program: {}", token1_mint, program);
+                program
+            },
+            Err(e) => {
+                println!("⚠️  无法获取 token1_mint Token Program，使用默认值: {}", e);
+                spl_token::id()
+            },
+        };
     println!();
 
     // 获取储备余额
@@ -812,26 +818,28 @@ async fn test_raydium_cpmm_exact_out_sell_with_simulation() {
 
     // 🔧 自动从 Pool 获取 mint 并检测 Token Program
     let (token0_mint, token1_mint) = (pool_state.token0_mint, pool_state.token1_mint);
-    let base_token_program = match sol_trade_sdk::utils::token::get_token_program_with_cache(&rpc, &token0_mint).await {
-        Ok(program) => {
-            println!("✅ 自动检测 token0_mint ({}) Token Program: {}", token0_mint, program);
-            program
-        },
-        Err(e) => {
-            println!("⚠️  无法获取 token0_mint Token Program，使用默认值: {}", e);
-            spl_token::id()
-        },
-    };
-    let quote_token_program = match sol_trade_sdk::utils::token::get_token_program_with_cache(&rpc, &token1_mint).await {
-        Ok(program) => {
-            println!("✅ 自动检测 token1_mint ({}) Token Program: {}", token1_mint, program);
-            program
-        },
-        Err(e) => {
-            println!("⚠️  无法获取 token1_mint Token Program，使用默认值: {}", e);
-            spl_token::id()
-        },
-    };
+    let base_token_program =
+        match sol_trade_sdk::utils::token::get_token_program_with_cache(&rpc, &token0_mint).await {
+            Ok(program) => {
+                println!("✅ 自动检测 token0_mint ({}) Token Program: {}", token0_mint, program);
+                program
+            },
+            Err(e) => {
+                println!("⚠️  无法获取 token0_mint Token Program，使用默认值: {}", e);
+                spl_token::id()
+            },
+        };
+    let quote_token_program =
+        match sol_trade_sdk::utils::token::get_token_program_with_cache(&rpc, &token1_mint).await {
+            Ok(program) => {
+                println!("✅ 自动检测 token1_mint ({}) Token Program: {}", token1_mint, program);
+                program
+            },
+            Err(e) => {
+                println!("⚠️  无法获取 token1_mint Token Program，使用默认值: {}", e);
+                spl_token::id()
+            },
+        };
     println!();
 
     // 获取储备余额

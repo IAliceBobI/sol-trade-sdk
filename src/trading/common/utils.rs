@@ -1,10 +1,7 @@
 use solana_sdk::{pubkey::Pubkey, signature::Keypair, signer::Signer, transaction::Transaction};
 use solana_system_interface::instruction::transfer;
 
-use crate::common::{
-    SolanaRpcClient, auto_mock_rpc::PoolRpcClient,
-    spl_token::close_account,
-};
+use crate::common::{SolanaRpcClient, auto_mock_rpc::PoolRpcClient, spl_token::close_account};
 use anyhow::anyhow;
 
 /// Get the balances of two tokens in the pool（泛型版本，支持 Auto Mock）
@@ -137,13 +134,8 @@ pub async fn close_token_account(
         .unwrap_or(crate::constants::TOKEN_PROGRAM);
 
     // Build close account instruction
-    let close_account_ix = close_account(
-        &token_program,
-        &ata,
-        &payer.pubkey(),
-        &payer.pubkey(),
-        &[&payer.pubkey()],
-    )?;
+    let close_account_ix =
+        close_account(&token_program, &ata, &payer.pubkey(), &payer.pubkey(), &[&payer.pubkey()])?;
 
     // Build transaction
     let recent_blockhash = rpc.get_latest_blockhash().await?;

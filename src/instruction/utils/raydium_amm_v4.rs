@@ -64,11 +64,13 @@ static MINT_TO_POOLS_LIST_CACHE: Lazy<DashMap<Pubkey, Vec<(Pubkey, AmmInfo)>>> =
     Lazy::new(|| DashMap::with_capacity(MAX_CACHE_SIZE));
 
 /// 从缓存中获取 Pool 信息
+#[allow(dead_code)]
 pub(crate) fn get_cached_pool_by_address(pool_address: &Pubkey) -> Option<AmmInfo> {
     POOL_DATA_CACHE.get(pool_address).map(|p| p.clone())
 }
 
 /// 将 Pool 信息写入缓存
+#[allow(dead_code)]
 pub(crate) fn cache_pool_by_address(pool_address: &Pubkey, amm_info: &AmmInfo) {
     POOL_DATA_CACHE.insert(*pool_address, amm_info.clone());
 }
@@ -123,8 +125,8 @@ pub async fn get_pool_by_address<T: PoolRpcClient + ?Sized>(
         return Err(anyhow!("Account is not owned by Raydium AMM V4 program"));
     }
     // 使用修改后的 amm_info_decode（传入 program_id）
-    let amm_info =
-        amm_info_decode(&account.data, account.owner).ok_or_else(|| anyhow!("Failed to decode amm info"))?;
+    let amm_info = amm_info_decode(&account.data, account.owner)
+        .ok_or_else(|| anyhow!("Failed to decode amm info"))?;
 
     // 不写入缓存
     Ok(amm_info)

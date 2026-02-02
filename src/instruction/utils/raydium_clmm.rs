@@ -431,7 +431,8 @@ async fn find_pools_by_mint_offset_collect<T: PoolRpcClient + ?Sized>(
                     };
                     if data_bytes.len() > 8 {
                         // 使用 program_id (所有账户都属于 RAYDIUM_CLMM)
-                        pool_state_decode(&data_bytes[8..], accounts::RAYDIUM_CLMM).map(|pool| (addr_pubkey, pool))
+                        pool_state_decode(&data_bytes[8..], accounts::RAYDIUM_CLMM)
+                            .map(|pool| (addr_pubkey, pool))
                     } else {
                         None
                     }
@@ -450,7 +451,8 @@ async fn find_pools_by_mint_offset_collect<T: PoolRpcClient + ?Sized>(
                     };
                     if data_bytes.len() > 8 {
                         // 使用 program_id (所有账户都属于 RAYDIUM_CLMM)
-                        pool_state_decode(&data_bytes[8..], accounts::RAYDIUM_CLMM).map(|pool| (addr_pubkey, pool))
+                        pool_state_decode(&data_bytes[8..], accounts::RAYDIUM_CLMM)
+                            .map(|pool| (addr_pubkey, pool))
                     } else {
                         None
                     }

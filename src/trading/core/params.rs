@@ -741,11 +741,9 @@ impl RaydiumClmmParams {
         // 获取 Token Program（使用缓存，避免重复 RPC 调用）
         // Mint 的 owner 永远不变，首次查询后会永久缓存
         let token0_program =
-            crate::utils::token::get_token_program_with_cache(rpc, &pool_state.token_mint0)
-                .await?;
+            crate::utils::token::get_token_program_with_cache(rpc, &pool_state.token_mint0).await?;
         let token1_program =
-            crate::utils::token::get_token_program_with_cache(rpc, &pool_state.token_mint1)
-                .await?;
+            crate::utils::token::get_token_program_with_cache(rpc, &pool_state.token_mint1).await?;
 
         // Observation state is stored in pool_state.observation_key
 
@@ -809,11 +807,9 @@ impl MeteoraDammV2Params {
 
         // 获取 Token Program（使用缓存，避免重复 RPC 调用）
         let token_a_program =
-            crate::utils::token::get_token_program_with_cache(rpc, &pool_data.token_a_mint)
-                .await?;
+            crate::utils::token::get_token_program_with_cache(rpc, &pool_data.token_a_mint).await?;
         let token_b_program =
-            crate::utils::token::get_token_program_with_cache(rpc, &pool_data.token_b_mint)
-                .await?;
+            crate::utils::token::get_token_program_with_cache(rpc, &pool_data.token_b_mint).await?;
 
         Ok(Self {
             pool: *pool_address,

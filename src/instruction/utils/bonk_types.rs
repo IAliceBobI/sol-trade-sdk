@@ -337,23 +337,15 @@ pub fn pool_state_decode(data: &[u8], program_id: Pubkey) -> Option<PoolState> {
 
     // 设置元数据
     let (dex_name, dex_display_name) = match DexProtocol::from_program_id(&program_id) {
-        Some(protocol) => (
-            protocol.name().to_string(),
-            protocol.display_name().to_string(),
-        ),
+        Some(protocol) => (protocol.name().to_string(), protocol.display_name().to_string()),
         None => {
             // 未知 DEX，使用 fallback
             let fallback = "unknown".to_string();
             (fallback.clone(), fallback)
-        }
+        },
     };
 
-    Some(PoolState {
-        program_id,
-        dex_name,
-        dex_display_name,
-        ..pool_state
-    })
+    Some(PoolState { program_id, dex_name, dex_display_name, ..pool_state })
 }
 
 /// Decode BONKswap format pool state using manual deserialization（内部实现）

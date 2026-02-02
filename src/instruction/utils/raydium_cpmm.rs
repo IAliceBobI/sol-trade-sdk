@@ -514,7 +514,8 @@ async fn find_pools_by_mint_offset_collect<T: PoolRpcClient + ?Sized>(
             };
             if data_bytes.len() > 8 {
                 // 使用 program_id (所有账户都属于 RAYDIUM_CPMM)
-                pool_state_decode(&data_bytes[8..], accounts::RAYDIUM_CPMM).map(|pool| (pubkey, pool))
+                pool_state_decode(&data_bytes[8..], accounts::RAYDIUM_CPMM)
+                    .map(|pool| (pubkey, pool))
             } else {
                 None
             }

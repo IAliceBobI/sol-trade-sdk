@@ -34,10 +34,12 @@ fn get_input_token_program(is_wsol: bool) -> &'static solana_sdk::pubkey::Pubkey
         // USDC: 使用 calculate_ata_sync 的内部逻辑
         // 优先从缓存获取，缓存未命中则使用白名单（TOKEN_PROGRAM）
         crate::utils::token::get_token_program_cached(&crate::constants::USDC_TOKEN_ACCOUNT)
-            .map(|program| if program == crate::constants::TOKEN_PROGRAM_2022 {
-                &crate::constants::TOKEN_PROGRAM_2022
-            } else {
-                &crate::constants::TOKEN_PROGRAM
+            .map(|program| {
+                if program == crate::constants::TOKEN_PROGRAM_2022 {
+                    &crate::constants::TOKEN_PROGRAM_2022
+                } else {
+                    &crate::constants::TOKEN_PROGRAM
+                }
             })
             .unwrap_or(&crate::constants::TOKEN_PROGRAM)
     }
@@ -177,10 +179,8 @@ impl InstructionBuilder for RaydiumCpmmInstructionBuilder {
         }
 
         // Create buy instruction
-        let input_token_program_meta = AccountMeta::new_readonly(
-            *get_input_token_program(is_wsol),
-            false,
-        );
+        let input_token_program_meta =
+            AccountMeta::new_readonly(*get_input_token_program(is_wsol), false);
         let accounts: [AccountMeta; 13] = [
             AccountMeta::new(params.payer.pubkey(), true), // Payer (signer)
             accounts::AUTHORITY_META,                      // Authority (readonly)
@@ -331,10 +331,8 @@ impl InstructionBuilder for RaydiumCpmmInstructionBuilder {
         }
 
         // Create sell instruction
-        let output_token_program_meta = AccountMeta::new_readonly(
-            *get_input_token_program(is_wsol),
-            false,
-        );
+        let output_token_program_meta =
+            AccountMeta::new_readonly(*get_input_token_program(is_wsol), false);
         let accounts: [AccountMeta; 13] = [
             AccountMeta::new(params.payer.pubkey(), true), // Payer (signer)
             accounts::AUTHORITY_META,                      // Authority (readonly)

@@ -70,7 +70,7 @@ pub async fn get_token_program_with_cache(
     // 通过 MintInfo 缓存来存储 Token Program 信息
     let is_token2022 = program == crate::constants::TOKEN_PROGRAM_2022;
     let info = MintInfo {
-        decimals: 0, // 占位，实际 decimals 已在 get_mint_info 中缓存
+        decimals: 0,           // 占位，实际 decimals 已在 get_mint_info 中缓存
         symbol: String::new(), // 占位，实际 symbol 已在 get_mint_info 中缓存
         is_token2022,
         token_program: program,
@@ -102,7 +102,7 @@ pub async fn get_token_program_with_cache_client<T: PoolRpcClient + ?Sized>(
     // 通过 MintInfo 缓存来存储 Token Program 信息
     let is_token2022 = program == crate::constants::TOKEN_PROGRAM_2022;
     let info = MintInfo {
-        decimals: 0, // 占位，实际 decimals 已在 get_mint_info 中缓存
+        decimals: 0,           // 占位，实际 decimals 已在 get_mint_info 中缓存
         symbol: String::new(), // 占位，实际 symbol 已在 get_mint_info 中缓存
         is_token2022,
         token_program: program,
@@ -370,9 +370,8 @@ pub fn calculate_ata_sync(owner: &Pubkey, mint: &Pubkey) -> Pubkey {
             // 缓存未命中，使用白名单兜底
             // 注意：如果这是 Token-2022 代币且不在白名单中，ATA 地址会计算错误
             // 调用者应确保预热缓存
-            get_known_token_program(mint)
-                .unwrap_or(crate::constants::TOKEN_PROGRAM)
-        }
+            get_known_token_program(mint).unwrap_or(crate::constants::TOKEN_PROGRAM)
+        },
     };
 
     // 使用 fast_fn 计算 ATA（自动缓存，lock-free DashMap）

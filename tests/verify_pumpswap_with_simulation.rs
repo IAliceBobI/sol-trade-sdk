@@ -128,27 +128,29 @@ async fn test_pumpswap_exact_in_buy_with_simulation() {
     };
 
     // 🔧 自动从 mint 获取 Token Program（不需要手动记忆）
-    let base_token_program = match sol_trade_sdk::utils::token::get_token_program_with_cache(&rpc, &base_mint).await {
-        Ok(program) => {
-            println!("✅ 自动检测 base_mint ({}) Token Program: {}", base_mint, program);
-            program
-        },
-        Err(e) => {
-            println!("⚠️  无法获取 base_mint Token Program，使用默认值: {}", e);
-            TOKEN_PROGRAM
-        },
-    };
+    let base_token_program =
+        match sol_trade_sdk::utils::token::get_token_program_with_cache(&rpc, &base_mint).await {
+            Ok(program) => {
+                println!("✅ 自动检测 base_mint ({}) Token Program: {}", base_mint, program);
+                program
+            },
+            Err(e) => {
+                println!("⚠️  无法获取 base_mint Token Program，使用默认值: {}", e);
+                TOKEN_PROGRAM
+            },
+        };
 
-    let quote_token_program = match sol_trade_sdk::utils::token::get_token_program_with_cache(&rpc, &quote_mint).await {
-        Ok(program) => {
-            println!("✅ 自动检测 quote_mint ({}) Token Program: {}", quote_mint, program);
-            program
-        },
-        Err(e) => {
-            println!("⚠️  无法获取 quote_mint Token Program，使用默认值: {}", e);
-            TOKEN_PROGRAM
-        },
-    };
+    let quote_token_program =
+        match sol_trade_sdk::utils::token::get_token_program_with_cache(&rpc, &quote_mint).await {
+            Ok(program) => {
+                println!("✅ 自动检测 quote_mint ({}) Token Program: {}", quote_mint, program);
+                program
+            },
+            Err(e) => {
+                println!("⚠️  无法获取 quote_mint Token Program，使用默认值: {}", e);
+                TOKEN_PROGRAM
+            },
+        };
 
     // 构造指令
     let pumpswap_params = PumpSwapParams {
@@ -369,27 +371,29 @@ async fn test_pumpswap_exact_in_sell_with_simulation() {
     };
 
     // 🔧 自动从 mint 获取 Token Program（不需要手动记忆）
-    let base_token_program = match sol_trade_sdk::utils::token::get_token_program_with_cache(&rpc, &base_mint).await {
-        Ok(program) => {
-            println!("✅ 自动检测 base_mint ({}) Token Program: {}", base_mint, program);
-            program
-        },
-        Err(e) => {
-            println!("⚠️  无法获取 base_mint Token Program，使用默认值: {}", e);
-            TOKEN_PROGRAM
-        },
-    };
+    let base_token_program =
+        match sol_trade_sdk::utils::token::get_token_program_with_cache(&rpc, &base_mint).await {
+            Ok(program) => {
+                println!("✅ 自动检测 base_mint ({}) Token Program: {}", base_mint, program);
+                program
+            },
+            Err(e) => {
+                println!("⚠️  无法获取 base_mint Token Program，使用默认值: {}", e);
+                TOKEN_PROGRAM
+            },
+        };
 
-    let quote_token_program = match sol_trade_sdk::utils::token::get_token_program_with_cache(&rpc, &quote_mint).await {
-        Ok(program) => {
-            println!("✅ 自动检测 quote_mint ({}) Token Program: {}", quote_mint, program);
-            program
-        },
-        Err(e) => {
-            println!("⚠️  无法获取 quote_mint Token Program，使用默认值: {}", e);
-            TOKEN_PROGRAM
-        },
-    };
+    let quote_token_program =
+        match sol_trade_sdk::utils::token::get_token_program_with_cache(&rpc, &quote_mint).await {
+            Ok(program) => {
+                println!("✅ 自动检测 quote_mint ({}) Token Program: {}", quote_mint, program);
+                program
+            },
+            Err(e) => {
+                println!("⚠️  无法获取 quote_mint Token Program，使用默认值: {}", e);
+                TOKEN_PROGRAM
+            },
+        };
 
     // 构造指令
     let pumpswap_params = PumpSwapParams {

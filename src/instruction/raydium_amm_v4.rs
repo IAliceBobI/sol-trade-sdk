@@ -24,10 +24,12 @@ fn get_input_token_program(is_wsol: bool) -> &'static solana_sdk::pubkey::Pubkey
         // USDC: 使用 calculate_ata_sync 的内部逻辑
         // 优先从缓存获取，缓存未命中则使用白名单（TOKEN_PROGRAM）
         crate::utils::token::get_token_program_cached(&crate::constants::USDC_TOKEN_ACCOUNT)
-            .map(|program| if program == crate::constants::TOKEN_PROGRAM_2022 {
-                &crate::constants::TOKEN_PROGRAM_2022
-            } else {
-                &crate::constants::TOKEN_PROGRAM
+            .map(|program| {
+                if program == crate::constants::TOKEN_PROGRAM_2022 {
+                    &crate::constants::TOKEN_PROGRAM_2022
+                } else {
+                    &crate::constants::TOKEN_PROGRAM
+                }
             })
             .unwrap_or(&crate::constants::TOKEN_PROGRAM)
     }
@@ -107,8 +109,9 @@ impl InstructionBuilder for RaydiumAmmV4InstructionBuilder {
                 params.open_seed_optimize,
             );
         // 获取输出 token 的 program（支持 Token-2022）
-        let output_token_program = crate::utils::token::get_token_program_cached(&params.output_mint)
-            .unwrap_or(crate::constants::TOKEN_PROGRAM);
+        let output_token_program =
+            crate::utils::token::get_token_program_cached(&params.output_mint)
+                .unwrap_or(crate::constants::TOKEN_PROGRAM);
         let user_destination_token_account =
             crate::common::fast_fn::get_associated_token_address_with_program_id_fast_use_seed(
                 &params.payer.pubkey(),

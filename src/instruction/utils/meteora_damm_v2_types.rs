@@ -164,15 +164,12 @@ pub fn pool_decode(data: &[u8], program_id: Pubkey) -> Option<Pool> {
     // 2. 从 DexProtocol 获取名称信息
     use crate::constants::dex_protocols::DexProtocol;
     let (dex_name, dex_display_name) = match DexProtocol::from_program_id(&program_id) {
-        Some(protocol) => (
-            protocol.name().to_string(),
-            protocol.display_name().to_string(),
-        ),
+        Some(protocol) => (protocol.name().to_string(), protocol.display_name().to_string()),
         None => {
             // 未知 DEX，使用 fallback
             let fallback = "unknown".to_string();
             (fallback.clone(), fallback)
-        }
+        },
     };
 
     // 3. 构建完整的 Pool

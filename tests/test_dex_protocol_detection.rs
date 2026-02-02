@@ -2,10 +2,10 @@
 //!
 //! 通过 Pool 地址识别 DEX 协议
 
+use sol_trade_sdk::common::SolanaRpcClient;
+use sol_trade_sdk::constants::DexProtocol;
 use solana_sdk::pubkey::Pubkey;
 use std::str::FromStr;
-use sol_trade_sdk::constants::DexProtocol;
-use sol_trade_sdk::common::SolanaRpcClient;
 
 #[tokio::test]
 async fn test_detect_dex_from_pool_address() {
@@ -15,15 +15,35 @@ async fn test_detect_dex_from_pool_address() {
     // 测试各个 DEX 的 Pool 地址
     let test_pools = vec![
         // PumpSwap Pool: WIF-SOL
-        ("pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA", "EKzQ98GWgoQ8hWqiSToQpLduuGjX5MFdB6vXJNTkCepD", DexProtocol::PumpSwap),
+        (
+            "pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA",
+            "EKzQ98GWgoQ8hWqiSToQpLduuGjX5MFdB6vXJNTkCepD",
+            DexProtocol::PumpSwap,
+        ),
         // Raydium CLMM Pool: WSOL-USDT
-        ("CAMMCzo5YL8w4VFF8KVHrK22GGUsp5VTaW7grrKgrWqK", "ExcBWu8fGPdJiaF1b1z3iEef38sjQJks8xvj6M85pPY6", DexProtocol::RaydiumClmm),
+        (
+            "CAMMCzo5YL8w4VFF8KVHrK22GGUsp5VTaW7grrKgrWqK",
+            "ExcBWu8fGPdJiaF1b1z3iEef38sjQJks8xvj6M85pPY6",
+            DexProtocol::RaydiumClmm,
+        ),
         // Raydium AMM V4 Pool: USDC-WSOL
-        ("675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8", "58L7CzkRV5qD1owUPurbAC7gUNV1kSzwj2TMkvgEpbjZ", DexProtocol::RaydiumAmmV4),
+        (
+            "675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8",
+            "58L7CzkRV5qD1owUPurbAC7gUNV1kSzwj2TMkvgEpbjZ",
+            DexProtocol::RaydiumAmmV4,
+        ),
         // Raydium CPMM Pool: RAY-SOL
-        ("CPMMoo8L3F4NbTegBCKVNunggL7H1ZpdTHKxQB5qKP1C", "DQfGJgjYcGSonFj6QoiQSYRmSMdnFM8NkYGXdHU7KNnB", DexProtocol::RaydiumCpmm),
+        (
+            "CPMMoo8L3F4NbTegBCKVNunggL7H1ZpdTHKxQB5qKP1C",
+            "DQfGJgjYcGSonFj6QoiQSYRmSMdnFM8NkYGXdHU7KNnB",
+            DexProtocol::RaydiumCpmm,
+        ),
         // Meteora DAMM V2 Pool: USDC-WSOL
-        ("cpamdpZCGKUy5JxQXB4dcpGPiikHawvSWAd6mEn1sGG", "4C3JRBp4Bycs3jQTuJVEL6kVAWJMhNUshaD5GmwcEaMu", DexProtocol::MeteoraDammV2),
+        (
+            "cpamdpZCGKUy5JxQXB4dcpGPiikHawvSWAd6mEn1sGG",
+            "4C3JRBp4Bycs3jQTuJVEL6kVAWJMhNUshaD5GmwcEaMu",
+            DexProtocol::MeteoraDammV2,
+        ),
     ];
 
     println!("\n🔍 测试从 Pool 地址识别 DEX 协议\n");
@@ -44,23 +64,24 @@ async fn test_detect_dex_from_pool_address() {
                     Some(detected_protocol) => {
                         println!("   识别结果: {}", detected_protocol.name());
                         assert_eq!(
-                            detected_protocol, expected_protocol,
+                            detected_protocol,
+                            expected_protocol,
                             "DEX 识别不匹配: 预期 {}, 实际 {}",
                             expected_protocol.name(),
                             detected_protocol.name()
                         );
                         println!("   ✅ 识别成功\n");
-                    }
+                    },
                     None => {
                         panic!("❌ 无法识别 Program ID: {}", program_id);
-                    }
+                    },
                 }
-            }
+            },
             Err(e) => {
                 println!("   ⚠️  获取账户失败: {}\n", e);
                 // 在测试环境中某些池可能不存在，跳过而不是失败
                 continue;
-            }
+            },
         }
     }
 

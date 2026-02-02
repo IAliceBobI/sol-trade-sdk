@@ -1019,16 +1019,16 @@ pub fn build_initialize_instruction(
     // 🔧 修复：使用动态 Token Program（支持 Token-2022）
     // Build accounts (order matters!)
     let accounts = vec![
-        AccountMeta::new(*payer, true),                     // payer
-        AccountMeta::new_readonly(*creator, false),         // creator
-        AccountMeta::new_readonly(*global_config, false),   // global_config
-        AccountMeta::new_readonly(*platform_config, false), // platform_config
-        AccountMeta::new_readonly(authority, false),        // authority
-        AccountMeta::new(pool_state, false),                // pool_state
-        AccountMeta::new(*mint, true),                      // base_mint (signer!)
-        AccountMeta::new_readonly(*quote_mint, false),      // quote_mint
-        AccountMeta::new(base_vault, false),                // base_vault
-        AccountMeta::new(quote_vault, false),               // quote_vault
+        AccountMeta::new(*payer, true),                                // payer
+        AccountMeta::new_readonly(*creator, false),                    // creator
+        AccountMeta::new_readonly(*global_config, false),              // global_config
+        AccountMeta::new_readonly(*platform_config, false),            // platform_config
+        AccountMeta::new_readonly(authority, false),                   // authority
+        AccountMeta::new(pool_state, false),                           // pool_state
+        AccountMeta::new(*mint, true),                                 // base_mint (signer!)
+        AccountMeta::new_readonly(*quote_mint, false),                 // quote_mint
+        AccountMeta::new(base_vault, false),                           // base_vault
+        AccountMeta::new(quote_vault, false),                          // quote_vault
         AccountMeta::new(metadata_account, false), // metadata_account (PDA, may not exist yet)
         AccountMeta::new_readonly(*base_token_program, false), // base_token_program
         AccountMeta::new_readonly(*quote_token_program, false), // quote_token_program
@@ -1254,7 +1254,11 @@ pub async fn find_cpswap_config(rpc: &SolanaRpcClient) -> Result<(Pubkey, Pubkey
                             _ => continue,
                         };
                         if data_bytes.len() > 8
-                            && let Some(pool_state) = pool_state_decode(&data_bytes[8..], crate::constants::dex_protocols::DexProtocol::RaydiumCpmm.program_id_pubkey())
+                            && let Some(pool_state) = pool_state_decode(
+                                &data_bytes[8..],
+                                crate::constants::dex_protocols::DexProtocol::RaydiumCpmm
+                                    .program_id_pubkey(),
+                            )
                         {
                             let cpswap_config = pool_state.amm_config;
                             let cpswap_create_pool_fee = accounts::CPMM_CREATE_POOL_FEE;

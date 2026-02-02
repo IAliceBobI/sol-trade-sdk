@@ -77,10 +77,12 @@ pub(crate) mod bonk_cache {
     pub(crate) static POOL_DATA_CACHE: Lazy<DashMap<Pubkey, PoolState>> =
         Lazy::new(|| DashMap::with_capacity(MAX_CACHE_SIZE));
 
+    #[allow(dead_code)]
     pub(crate) fn get_cached_pool_by_address(pool_address: &Pubkey) -> Option<PoolState> {
         POOL_DATA_CACHE.get(pool_address).map(|p| p.clone())
     }
 
+    #[allow(dead_code)]
     pub(crate) fn cache_pool_by_address(pool_address: &Pubkey, pool: &PoolState) {
         POOL_DATA_CACHE.insert(*pool_address, pool.clone());
     }

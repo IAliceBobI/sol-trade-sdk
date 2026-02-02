@@ -49,10 +49,12 @@ pub(crate) mod meteora_cache {
     pub(crate) static POOL_DATA_CACHE: Lazy<DashMap<Pubkey, Pool>> =
         Lazy::new(|| DashMap::with_capacity(MAX_CACHE_SIZE));
 
+    #[allow(dead_code)]
     pub(crate) fn get_cached_pool_by_address(pool_address: &Pubkey) -> Option<Pool> {
         POOL_DATA_CACHE.get(pool_address).map(|p| p.clone())
     }
 
+    #[allow(dead_code)]
     pub(crate) fn cache_pool_by_address(pool_address: &Pubkey, pool: &Pool) {
         POOL_DATA_CACHE.insert(*pool_address, pool.clone());
     }
@@ -72,7 +74,8 @@ pub async fn get_pool_by_address(
         return Err(anyhow!("Account is not owned by Meteora Damm V2 program"));
     }
     // 使用修改后的 pool_decode（传入 program_id）
-    let pool = pool_decode(&account.data[8..], account.owner).ok_or_else(|| anyhow!("Failed to decode pool"))?;
+    let pool = pool_decode(&account.data[8..], account.owner)
+        .ok_or_else(|| anyhow!("Failed to decode pool"))?;
     // 不写入缓存
     Ok(pool)
 }
