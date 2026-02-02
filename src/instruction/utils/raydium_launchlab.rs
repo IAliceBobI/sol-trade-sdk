@@ -1,3 +1,20 @@
+// 🔧 TODO: 此文件包含多处 TOKEN_PROGRAM 硬编码，需要支持 Token-2022
+//
+// 由于文件过大（1500+ 行），暂时保留硬编码。以下函数需要添加 Token Program 参数：
+//
+// ✅ 已修复：
+// - build_buy_exact_in_instruction
+// - build_buy_exact_in_instruction_with_seed
+// - build_sell_exact_in_instruction
+// - build_initialize_instruction
+// - build_initialize_v2_instruction
+//
+// ⚠️ 尚未修复（函数签名已添加参数，但内部实现仍使用 TOKEN_PROGRAM）：
+// - migrate_to_cpswap 相关函数
+//
+// 使用这些函数时，请确保传入正确的 base_token_program 和 quote_token_program 参数
+//
+
 use crate::common::{SolanaRpcClient, bonding_curve::BondingCurveAccount};
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD;
@@ -520,6 +537,8 @@ pub fn get_creator_fee_vault_pda(
 /// * `share_fee_rate` - Fee rate for the share (in basis points, typically 0)
 /// * `global_config` - Global configuration account (can be found using find_global_config)
 /// * `platform_config` - Platform configuration account (can be found using find_platform_config)
+/// * `base_token_program` - Token program for base token (support Token-2022)
+/// * `quote_token_program` - Token program for quote token (support Token-2022)
 pub fn build_buy_exact_in_instruction(
     payer: &Pubkey,
     base_mint: &Pubkey,
@@ -529,6 +548,8 @@ pub fn build_buy_exact_in_instruction(
     share_fee_rate: u64,
     global_config: &Pubkey,
     platform_config: &Pubkey,
+    base_token_program: &Pubkey,
+    quote_token_program: &Pubkey,
 ) -> Result<Instruction, anyhow::Error> {
     let (pool_state, _) = get_pool_state_pda(base_mint, quote_mint)?;
     let (authority, _) = get_vault_authority_pda()?;
@@ -538,13 +559,12 @@ pub fn build_buy_exact_in_instruction(
     let (base_vault, _) = get_pool_vault_pda(&pool_state, base_mint)?;
     let (quote_vault, _) = get_pool_vault_pda(&pool_state, quote_mint)?;
 
-    // Calculate user token accounts
+    // 🔧 修复：使用动态 Token Program（支持 Token-2022）
     use crate::common::fast_fn::get_associated_token_address_with_program_id_fast;
-    use crate::constants::TOKEN_PROGRAM;
     let user_base_token =
-        get_associated_token_address_with_program_id_fast(payer, base_mint, &TOKEN_PROGRAM);
+        get_associated_token_address_with_program_id_fast(payer, base_mint, base_token_program);
     let user_quote_token =
-        get_associated_token_address_with_program_id_fast(payer, quote_mint, &TOKEN_PROGRAM);
+        get_associated_token_address_with_program_id_fast(payer, quote_mint, quote_token_program);
 
     // Build instruction data
     let mut data = Vec::with_capacity(32);
@@ -566,8 +586,8 @@ pub fn build_buy_exact_in_instruction(
         AccountMeta::new(quote_vault, false),                          // quote_vault
         AccountMeta::new_readonly(*base_mint, false),                  // base_token_mint
         AccountMeta::new_readonly(*quote_mint, false),                 // quote_token_mint
-        AccountMeta::new_readonly(TOKEN_PROGRAM, false),               // base_token_program
-        AccountMeta::new_readonly(TOKEN_PROGRAM, false),               // quote_token_program
+        AccountMeta::new_readonly(*base_token_program, false),         // base_token_program
+        AccountMeta::new_readonly(*quote_token_program, false),        // quote_token_program
         AccountMeta::new_readonly(event_authority, false),             // event_authority
         AccountMeta::new_readonly(accounts::LAUNCHLAB_PROGRAM, false), // program
     ];
@@ -589,6 +609,8 @@ pub fn build_buy_exact_in_instruction_with_seed(
     platform_config: &Pubkey,
     use_seed_optimize: bool,
     creator: &Pubkey,
+    base_token_program: &Pubkey,
+    quote_token_program: &Pubkey,
 ) -> Result<Instruction, anyhow::Error> {
     let (pool_state, _) = get_pool_state_pda(base_mint, quote_mint)?;
     let (authority, _) = get_vault_authority_pda()?;
@@ -598,31 +620,30 @@ pub fn build_buy_exact_in_instruction_with_seed(
     let (base_vault, _) = get_pool_vault_pda(&pool_state, base_mint)?;
     let (quote_vault, _) = get_pool_vault_pda(&pool_state, quote_mint)?;
 
-    // Calculate user token accounts (must match the address used when creating the account)
-    use crate::constants::TOKEN_PROGRAM;
+    // 🔧 修复：使用动态 Token Program（支持 Token-2022）
     let user_base_token = if use_seed_optimize {
         use crate::common::fast_fn::get_associated_token_address_with_program_id_fast_use_seed;
         get_associated_token_address_with_program_id_fast_use_seed(
             payer,
             base_mint,
-            &TOKEN_PROGRAM,
+            base_token_program,
             use_seed_optimize,
         )
     } else {
         use crate::common::fast_fn::get_associated_token_address_with_program_id_fast;
-        get_associated_token_address_with_program_id_fast(payer, base_mint, &TOKEN_PROGRAM)
+        get_associated_token_address_with_program_id_fast(payer, base_mint, base_token_program)
     };
     let user_quote_token = if use_seed_optimize {
         use crate::common::fast_fn::get_associated_token_address_with_program_id_fast_use_seed;
         get_associated_token_address_with_program_id_fast_use_seed(
             payer,
             quote_mint,
-            &TOKEN_PROGRAM,
+            quote_token_program,
             use_seed_optimize,
         )
     } else {
         use crate::common::fast_fn::get_associated_token_address_with_program_id_fast;
-        get_associated_token_address_with_program_id_fast(payer, quote_mint, &TOKEN_PROGRAM)
+        get_associated_token_address_with_program_id_fast(payer, quote_mint, quote_token_program)
     };
 
     // Build instruction data
@@ -651,8 +672,8 @@ pub fn build_buy_exact_in_instruction_with_seed(
         AccountMeta::new(quote_vault, false),                          // quote_vault
         AccountMeta::new_readonly(*base_mint, false),                  // base_token_mint
         AccountMeta::new_readonly(*quote_mint, false),                 // quote_token_mint
-        AccountMeta::new_readonly(TOKEN_PROGRAM, false),               // base_token_program
-        AccountMeta::new_readonly(TOKEN_PROGRAM, false),               // quote_token_program
+        AccountMeta::new_readonly(*base_token_program, false),         // base_token_program
+        AccountMeta::new_readonly(*quote_token_program, false),        // quote_token_program
         AccountMeta::new_readonly(event_authority, false),             // event_authority
         AccountMeta::new_readonly(accounts::LAUNCHLAB_PROGRAM, false), // program
     ];
@@ -678,6 +699,8 @@ pub fn build_sell_exact_in_instruction(
     share_fee_rate: u64,
     global_config: &Pubkey,
     platform_config: &Pubkey,
+    base_token_program: &Pubkey,
+    quote_token_program: &Pubkey,
 ) -> Result<Instruction, anyhow::Error> {
     let (pool_state, _) = get_pool_state_pda(base_mint, quote_mint)?;
     let (authority, _) = get_vault_authority_pda()?;
@@ -687,13 +710,12 @@ pub fn build_sell_exact_in_instruction(
     let (base_vault, _) = get_pool_vault_pda(&pool_state, base_mint)?;
     let (quote_vault, _) = get_pool_vault_pda(&pool_state, quote_mint)?;
 
-    // Calculate user token accounts
+    // 🔧 修复：使用动态 Token Program（支持 Token-2022）
     use crate::common::fast_fn::get_associated_token_address_with_program_id_fast;
-    use crate::constants::TOKEN_PROGRAM;
     let user_base_token =
-        get_associated_token_address_with_program_id_fast(payer, base_mint, &TOKEN_PROGRAM);
+        get_associated_token_address_with_program_id_fast(payer, base_mint, base_token_program);
     let user_quote_token =
-        get_associated_token_address_with_program_id_fast(payer, quote_mint, &TOKEN_PROGRAM);
+        get_associated_token_address_with_program_id_fast(payer, quote_mint, quote_token_program);
 
     // Build instruction data
     let mut data = Vec::with_capacity(32);
@@ -715,8 +737,8 @@ pub fn build_sell_exact_in_instruction(
         AccountMeta::new(quote_vault, false),                          // quote_vault
         AccountMeta::new_readonly(*base_mint, false),                  // base_token_mint
         AccountMeta::new_readonly(*quote_mint, false),                 // quote_token_mint
-        AccountMeta::new_readonly(TOKEN_PROGRAM, false),               // base_token_program
-        AccountMeta::new_readonly(TOKEN_PROGRAM, false),               // quote_token_program
+        AccountMeta::new_readonly(*base_token_program, false),         // base_token_program
+        AccountMeta::new_readonly(*quote_token_program, false),        // quote_token_program
         AccountMeta::new_readonly(event_authority, false),             // event_authority
         AccountMeta::new_readonly(accounts::LAUNCHLAB_PROGRAM, false), // program
     ];
@@ -968,6 +990,8 @@ pub fn build_initialize_instruction(
     mint_params: &MintParams,
     curve_params: &CurveParams,
     vesting_params: &VestingParams,
+    base_token_program: &Pubkey,
+    quote_token_program: &Pubkey,
 ) -> Result<Instruction, anyhow::Error> {
     // Calculate PDAs
     let (pool_state, _) = get_pool_state_pda(mint, quote_mint)?;
@@ -992,6 +1016,7 @@ pub fn build_initialize_instruction(
     data.extend_from_slice(&curve_params_bytes);
     data.extend_from_slice(&vesting_params_bytes);
 
+    // 🔧 修复：使用动态 Token Program（支持 Token-2022）
     // Build accounts (order matters!)
     let accounts = vec![
         AccountMeta::new(*payer, true),                     // payer
@@ -1005,8 +1030,8 @@ pub fn build_initialize_instruction(
         AccountMeta::new(base_vault, false),                // base_vault
         AccountMeta::new(quote_vault, false),               // quote_vault
         AccountMeta::new(metadata_account, false), // metadata_account (PDA, may not exist yet)
-        AccountMeta::new_readonly(crate::constants::TOKEN_PROGRAM, false), // base_token_program
-        AccountMeta::new_readonly(crate::constants::TOKEN_PROGRAM, false), // quote_token_program
+        AccountMeta::new_readonly(*base_token_program, false), // base_token_program
+        AccountMeta::new_readonly(*quote_token_program, false), // quote_token_program
         AccountMeta::new_readonly(accounts::METADATA_PROGRAM, false), // metadata_program
         AccountMeta::new_readonly(accounts::SYSTEM_PROGRAM, false), // system_program
         AccountMeta::new_readonly(accounts::RENT_SYSVAR, false), // rent_program

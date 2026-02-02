@@ -526,7 +526,7 @@ fn print_summary_report(all_results: &Vec<TestResult>) {
         std::collections::HashMap::new();
 
     for result in all_results {
-        dex_groups.entry(result.dex_name.clone()).or_insert_with(Vec::new).push(result);
+        dex_groups.entry(result.dex_name.clone()).or_default().push(result);
     }
 
     for dex in &["CLMM".to_string(), "CPMM".to_string(), "AMM V4".to_string()] {

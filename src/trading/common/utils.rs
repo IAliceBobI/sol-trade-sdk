@@ -3,7 +3,7 @@ use solana_system_interface::instruction::transfer;
 
 use crate::common::{
     SolanaRpcClient, auto_mock_rpc::PoolRpcClient,
-    fast_fn::get_associated_token_address_with_program_id_fast, spl_token::close_account,
+    spl_token::close_account,
 };
 use anyhow::anyhow;
 
@@ -54,11 +54,8 @@ pub async fn get_token_balance(
     payer: &Pubkey,
     mint: &Pubkey,
 ) -> Result<u64, anyhow::Error> {
-    let ata = crate::common::fast_fn::get_associated_token_address_with_program_id_fast(
-        payer,
-        mint,
-        &crate::constants::TOKEN_PROGRAM,
-    );
+    // 🔧 修复：使用 calculate_ata_sync 自动检测 Token Program
+    let ata = crate::utils::token::calculate_ata_sync(payer, mint);
     let balance = rpc.get_token_account_balance(&ata).await?;
     let balance_u64 = balance
         .amount
@@ -126,12 +123,8 @@ pub async fn close_token_account(
     payer: &Keypair,
     mint: &Pubkey,
 ) -> Result<(), anyhow::Error> {
-    // Get associated token account address
-    let ata = get_associated_token_address_with_program_id_fast(
-        &payer.pubkey(),
-        mint,
-        &crate::constants::TOKEN_PROGRAM,
-    );
+    // 🔧 修复：使用 calculate_ata_sync 自动检测 Token Program
+    let ata = crate::utils::token::calculate_ata_sync(&payer.pubkey(), mint);
 
     // Check if account exists
     let account_exists = rpc.get_account(&ata).await.is_ok();
@@ -139,9 +132,13 @@ pub async fn close_token_account(
         return Ok(()); // If account doesn't exist, return success directly
     }
 
+    // 🔧 修复：使用 get_token_program_cached 动态获取 Token Program
+    let token_program = crate::utils::token::get_token_program_cached(mint)
+        .unwrap_or(crate::constants::TOKEN_PROGRAM);
+
     // Build close account instruction
     let close_account_ix = close_account(
-        &crate::constants::TOKEN_PROGRAM,
+        &token_program,
         &ata,
         &payer.pubkey(),
         &payer.pubkey(),
