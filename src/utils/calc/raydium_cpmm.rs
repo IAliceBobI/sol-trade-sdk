@@ -194,3 +194,100 @@ pub fn compute_swap_amount(
         fee: swap_result.trade_fee,
     }
 }
+
+/// Result of an exact-out swap calculation
+#[derive(Debug, Clone)]
+pub struct QuoteExactOutResult {
+    /// Required input amount (including fees)
+    pub amount_in: u64,
+    /// Fee amount charged
+    pub fee_amount: u64,
+    /// Price impact in basis points (optional)
+    pub price_impact_bps: Option<u64>,
+}
+
+/// Quote an exact-out swap against a Raydium CPMM pool
+///
+/// Calculates the required input amount to obtain a specific output amount.
+///
+/// # Arguments
+///
+/// * `base_reserve` - Current reserve of base token in the pool
+/// * `quote_reserve` - Current reserve of quote token in the pool
+/// * `amount_out` - Desired output amount
+/// * `is_base_in` - true if base token is the input, false if quote token is the input
+///
+/// # Returns
+///
+/// Returns `QuoteExactOutResult` containing the required input amount and fees
+///
+/// # Errors
+///
+/// Returns error if:
+/// - Insufficient liquidity (amount_out >= output reserve)
+/// - Calculation overflow
+pub fn quote_exact_out(
+    base_reserve: u64,
+    quote_reserve: u64,
+    amount_out: u64,
+    is_base_in: bool,
+) -> Result<QuoteExactOutResult, String> {
+    let (reserve_in, reserve_out) =
+        if is_base_in { (base_reserve, quote_reserve) } else { (quote_reserve, base_reserve) };
+
+    // 流动性检查
+    if amount_out >= reserve_out {
+        return Err(format!(
+            "Insufficient liquidity: requested={}, available={}",
+            amount_out, reserve_out
+        ));
+    }
+
+    // 恒定乘积公式: (reserve_in + amount_in) * (reserve_out - amount_out) = reserve_in * reserve_out
+    // 反解: amount_in = (reserve_in * amount_out) / (reserve_out - amount_out)
+
+    let numerator = (reserve_in as u128)
+        .checked_mul(amount_out as u128)
+        .ok_or_else(|| "Calculation overflow in numerator".to_string())?;
+
+    let denominator = (reserve_out as u128)
+        .checked_sub(amount_out as u128)
+        .ok_or_else(|| "Invalid reserve calculation".to_string())?;
+
+    let amount_in = numerator
+        .checked_div(denominator)
+        .ok_or_else(|| "Calculation overflow in division".to_string())?
+        as u64;
+
+    // 计算手续费 (使用现有的 trade_fee_rate)
+    let trade_fee = compute_trading_fee(amount_in, TRADE_FEE_RATE);
+    let protocol_fee = compute_protocol_fund_fee(amount_in, PROTOCOL_FEE_RATE);
+    let fund_fee = compute_protocol_fund_fee(amount_in, FUND_FEE_RATE);
+    let creator_fee = compute_creator_fee_new(amount_in, CREATOR_FEE_RATE);
+
+    let total_fee = trade_fee
+        .saturating_add(protocol_fee)
+        .saturating_add(fund_fee)
+        .saturating_add(creator_fee);
+
+    let total_amount_in = amount_in
+        .checked_add(total_fee)
+        .ok_or_else(|| "Total amount calculation overflow".to_string())?;
+
+    // 计算价格影响
+    let price_impact_bps = if reserve_out > 0 {
+        let impact = (amount_out as u128)
+            .checked_mul(10_000u128)
+            .and_then(|p| p.checked_div(reserve_out as u128))
+            .unwrap_or(0);
+        Some(impact as u64)
+    } else {
+        None
+    };
+
+    Ok(QuoteExactOutResult {
+        amount_in: total_amount_in,
+        fee_amount: total_fee,
+        price_impact_bps,
+    })
+}
