@@ -1090,7 +1090,8 @@ pub async fn quote_exact_out(
         fee_rate,
         zero_for_one,
         &tick_arrays,
-    ).map_err(|e| anyhow!("CLMM exact_out calculation failed: {}", e))?;
+    )
+    .map_err(|e| anyhow!("CLMM exact_out calculation failed: {}", e))?;
 
     Ok(result)
 }

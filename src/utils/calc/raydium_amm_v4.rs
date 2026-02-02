@@ -229,8 +229,7 @@ pub fn quote_exact_out(
 
     let amount_in = numerator
         .checked_div(denominator)
-        .ok_or_else(|| "Calculation overflow in division".to_string())?
-        as u64;
+        .ok_or_else(|| "Calculation overflow in division".to_string())? as u64;
 
     // 计算手续费
     let trade_fee = compute_trading_fee(amount_in, TRADE_FEE_NUMERATOR, TRADE_FEE_DENOMINATOR);
@@ -258,4 +257,3 @@ pub fn quote_exact_out(
         price_impact_bps,
     })
 }
-

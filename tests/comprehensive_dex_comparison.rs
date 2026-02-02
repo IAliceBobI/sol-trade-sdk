@@ -35,18 +35,19 @@ const CLMM_WSOL_JUP_POOL: &str = "EZVkeboWeXygtq8LMyENHyXdF5wpYrtExRNH9UwB1qYw";
 const CPMM_PIPE_WSOL_POOL: &str = "BnYsRpYvJpz6biY3hV6U9smChVePCJ6YyupVDfcnXpTp";
 const AMM_V4_SOL_USDC_POOL: &str = "58oQChx4yWmvKdwLLZzBi4ChoCc2fqCUWBkwMihLYQo2";
 const WSOL_MINT: &str = "So11111111111111111111111111111111111111112";
-const JUP_MINT: &str = "JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN";
 
 #[derive(Debug)]
 struct TestResult {
     dex_name: String,
     mode: String,
     direction: String,
+    #[allow(dead_code)]
     calc_type: String,
     input_amount: u64,
     output_amount: u64,
     fee_amount: u64,
     success: bool,
+    #[allow(dead_code)]
     error: Option<String>,
 }
 
