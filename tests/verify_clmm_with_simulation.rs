@@ -14,12 +14,12 @@
 //! └─────────────┴──────────────┴─────────────────┘
 
 use sol_trade_sdk::{
+    TradingClient,
     common::{GasFeeStrategy, SolanaRpcClient, TradeConfig},
     instruction::utils::raydium_clmm::{get_pool_by_address, quote_exact_in, quote_exact_out},
     trading::core::params::{RaydiumClmmParams, SwapParams},
     trading::core::traits::InstructionBuilder,
     utils::simulation_based_calc::{simulate_swap_transaction, verify_calculation_accuracy},
-    TradingClient,
 };
 use solana_commitment_config::CommitmentConfig;
 use solana_sdk::{pubkey::Pubkey, signer::Signer};

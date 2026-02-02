@@ -16,13 +16,13 @@
 //! 注意：PumpSwap 使用恒定乘积 (Constant Product AMM)
 
 use sol_trade_sdk::{
+    TradingClient,
     common::{GasFeeStrategy, SolanaRpcClient, TradeConfig},
     constants::{TOKEN_2022_PROGRAM, TOKEN_PROGRAM},
     instruction::utils::pumpswap::{get_pool_by_address, quote_exact_in, quote_exact_out},
     trading::core::params::{PumpSwapParams, SwapParams},
     trading::core::traits::InstructionBuilder,
     utils::simulation_based_calc::{simulate_swap_transaction, verify_calculation_accuracy},
-    TradingClient,
 };
 use solana_commitment_config::CommitmentConfig;
 use solana_sdk::{pubkey::Pubkey, signer::Signer};
