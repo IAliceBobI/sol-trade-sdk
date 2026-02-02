@@ -94,16 +94,30 @@ async fn test_get_pool_by_address() {
     assert!(quote_balance > 0, "Quote balance should be positive");
     println!("✅ 基本字段验证通过");
 
-    // 第二次调用（应该从缓存读取）
-    println!("\n第二次调用（从缓存读取）...");
+    // 验证元数据字段（新增）
+    println!("\n验证元数据字段...");
+    use sol_trade_sdk::instruction::utils::pumpswap::accounts;
+    assert_eq!(pool_state.program_id, accounts::AMM_PROGRAM, "Program ID should match");
+    assert_eq!(pool_state.dex_name, "pumpswap", "DEX name should be 'pumpswap'");
+    assert_eq!(pool_state.dex_display_name, "PumpSwap", "DEX display name should be 'PumpSwap'");
+    println!("✅ 元数据字段验证通过");
+    println!("  Program ID: {}", pool_state.program_id);
+    println!("  DEX Name: {}", pool_state.dex_name);
+    println!("  DEX Display Name: {}", pool_state.dex_display_name);
+
+    // 第二次调用（不缓存，每次都从链上获取最新数据）
+    println!("\n第二次调用（不缓存，从链上获取）...");
     let result2 = get_pool_by_address(&rpc, &pool_address).await;
-    assert!(result2.is_ok(), "Failed to get pool from cache: {:?}", result2.err());
+    assert!(result2.is_ok(), "Failed to get pool: {:?}", result2.err());
 
     let pool_state2 = result2.unwrap();
-    assert_eq!(pool_state.base_mint, pool_state2.base_mint, "Cached pool should match");
-    assert_eq!(pool_state.quote_mint, pool_state2.quote_mint, "Cached pool should match");
-    assert_eq!(pool_state.lp_supply, pool_state2.lp_supply, "Cached pool should match");
-    println!("✅ 缓存验证通过（数据一致）");
+    // 数据应该一致（因为是同一个 Pool）
+    assert_eq!(pool_state.base_mint, pool_state2.base_mint, "Pool data should match");
+    assert_eq!(pool_state.quote_mint, pool_state2.quote_mint, "Pool data should match");
+    // 元数据也应该一致
+    assert_eq!(pool_state.program_id, pool_state2.program_id, "Program ID should match");
+    assert_eq!(pool_state.dex_name, pool_state2.dex_name, "DEX name should match");
+    println!("✅ 无缓存验证通过（数据一致）");
 }
 
 /// 测试：获取 PumpSwap token 的 USD 价格（使用 Auto Mock 加速）
@@ -188,4 +202,104 @@ async fn test_get_pool_by_address_with_auto_mock() {
     println!("✅ 首次运行：从 RPC 获取并保存（约 1-2 秒）");
     println!("✅ 后续运行：从缓存加载（约 0.01 秒）");
     println!("✅ 速度提升：约 100-200 倍！");
+}
+
+/// 测试：get_pool_by_mint 的缓存行为
+///
+/// 验证 get_pool_by_mint 使用缓存，第二次调用应该更快。
+#[tokio::test]
+#[serial_test::serial(global_dex_cache)]
+async fn test_get_pool_by_mint_caching() {
+    println!("=== 测试：get_pool_by_mint 的缓存行为 ===");
+
+    // 清空缓存
+    clear_pool_cache();
+
+    let mint = Pubkey::from_str(PUMP_MINT).unwrap();
+    let rpc_url = "http://127.0.0.1:8899";
+
+    let rpc = AutoMockRpcClient::new_with_namespace(
+        rpc_url.to_string(),
+        Some("pumpswap_pool_tests".to_string()),
+    );
+
+    use sol_trade_sdk::instruction::utils::pumpswap::get_pool_by_mint;
+    use std::time::Instant;
+
+    // 第一次调用（未命中缓存）
+    println!("第一次调用（未命中缓存）...");
+    let start1 = Instant::now();
+    let result1 = get_pool_by_mint(&rpc, &mint).await;
+    let duration1 = start1.elapsed();
+
+    assert!(result1.is_ok(), "Failed to get pool by mint: {:?}", result1.err());
+    let (addr1, pool1) = result1.unwrap();
+    println!("✅ 第一次调用成功，耗时: {:?}", duration1);
+    println!("  Pool 地址: {}", addr1);
+    println!("  DEX Name: {}", pool1.dex_name);
+
+    // 第二次调用（应该命中缓存）
+    println!("\n第二次调用（应该命中缓存）...");
+    let start2 = Instant::now();
+    let result2 = get_pool_by_mint(&rpc, &mint).await;
+    let duration2 = start2.elapsed();
+
+    assert!(result2.is_ok(), "Failed to get pool from cache: {:?}", result2.err());
+    let (addr2, pool2) = result2.unwrap();
+    println!("✅ 第二次调用成功，耗时: {:?}", duration2);
+
+    // 验证结果一致
+    assert_eq!(addr1, addr2, "Pool address should match");
+    assert_eq!(pool1.base_mint, pool2.base_mint, "Pool data should match");
+    assert_eq!(pool1.program_id, pool2.program_id, "Program ID should match");
+    assert_eq!(pool1.dex_name, pool2.dex_name, "DEX name should match");
+    println!("✅ 缓存数据验证通过");
+
+    // 验证缓存确实更快（至少快 10 倍，或 < 10ms）
+    if duration1 > std::time::Duration::from_millis(10) {
+        assert!(
+            duration2 < duration1 / 10,
+            "Cached call should be at least 10x faster: {:?} vs {:?}",
+            duration2,
+            duration1
+        );
+        println!("✅ 缓存加速验证通过（至少 10x）");
+    } else {
+        println!("⚠️  第一次调用太快（< 10ms），无法验证缓存加速");
+    }
+}
+
+/// 测试：get_pool_by_mint_force 强制刷新缓存
+#[tokio::test]
+#[serial_test::serial(global_dex_cache)]
+async fn test_get_pool_by_mint_force_refresh() {
+    println!("=== 测试：get_pool_by_mint_force 强制刷新 ===");
+
+    use sol_trade_sdk::instruction::utils::pumpswap::get_pool_by_mint_force;
+
+    let mint = Pubkey::from_str(PUMP_MINT).unwrap();
+    let rpc_url = "http://127.0.0.1:8899";
+
+    let rpc = AutoMockRpcClient::new_with_namespace(
+        rpc_url.to_string(),
+        Some("pumpswap_pool_tests".to_string()),
+    );
+
+    // 先缓存
+    println!("首次调用（建立缓存）...");
+    let result1 = get_pool_by_mint_force(&rpc, &mint).await;
+    assert!(result1.is_ok(), "Failed to get pool: {:?}", result1.err());
+    let (addr1, pool1) = result1.unwrap();
+    println!("✅ 缓存建立成功");
+
+    // 强制刷新
+    println!("\n强制刷新...");
+    let result2 = get_pool_by_mint_force(&rpc, &mint).await;
+    assert!(result2.is_ok(), "Failed to force refresh: {:?}", result2.err());
+    let (addr2, pool2) = result2.unwrap();
+
+    // 验证数据一致
+    assert_eq!(addr1, addr2, "Pool address should match");
+    assert_eq!(pool1.dex_name, pool2.dex_name, "DEX name should match");
+    println!("✅ 强制刷新验证通过");
 }

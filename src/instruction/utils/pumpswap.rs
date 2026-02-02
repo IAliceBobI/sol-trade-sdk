@@ -234,18 +234,14 @@ pub fn get_global_volume_accumulator_pda() -> Option<Pubkey> {
     pda.map(|pubkey| pubkey.0)
 }
 
-/// 获取指定地址的 Pool（支持 Auto Mock）
+/// 获取指定地址的 Pool（不缓存，每次从链上获取最新数据）
 ///
 /// 支持 PoolRpcClient trait，可以接受 AutoMockRpcClient 或标准 RpcClient。
 pub async fn get_pool_by_address<T: PoolRpcClient + ?Sized>(
     rpc: &T,
     pool_address: &Pubkey,
 ) -> Result<Pool, anyhow::Error> {
-    // 1. 检查缓存
-    if let Some(pool) = pump_swap_cache::get_cached_pool_by_address(pool_address) {
-        return Ok(pool);
-    }
-    // 2. RPC 查询
+    // RPC 查询
     let account = rpc
         .get_account(pool_address)
         .await
@@ -253,9 +249,10 @@ pub async fn get_pool_by_address<T: PoolRpcClient + ?Sized>(
     if account.owner != accounts::AMM_PROGRAM {
         return Err(anyhow!("Account is not owned by PumpSwap program"));
     }
-    let pool = pool_decode(&account.data[8..]).ok_or_else(|| anyhow!("Failed to decode pool"))?;
-    // 3. 写入缓存
-    pump_swap_cache::cache_pool_by_address(pool_address, &pool);
+    // 使用修改后的 pool_decode（传入 program_id）
+    let pool = pool_decode(&account.data[8..], account.owner)
+        .ok_or_else(|| anyhow!("Failed to decode pool"))?;
+    // 不写入缓存
     Ok(pool)
 }
 
@@ -400,7 +397,8 @@ async fn find_pools_by_mint_offset_collect<T: PoolRpcClient + ?Sized>(
                 _ => return None,
             };
             if data_bytes.len() > 8 {
-                pool_decode(&data_bytes[8..]).map(|pool| (addr_pubkey, pool))
+                // 使用 program_id (所有账户都属于 AMM_PROGRAM)
+                pool_decode(&data_bytes[8..], accounts::AMM_PROGRAM).map(|pool| (addr_pubkey, pool))
             } else {
                 None
             }
