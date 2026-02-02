@@ -94,19 +94,15 @@ pub async fn get_pool_by_address(
     rpc: &SolanaRpcClient,
     pool_address: &Pubkey,
 ) -> Result<PoolState, anyhow::Error> {
-    // 1. 检查缓存
-    if let Some(pool) = bonk_cache::get_cached_pool_by_address(pool_address) {
-        return Ok(pool);
-    }
-    // 2. RPC 查询
+    // RPC 查询（不缓存，每次获取最新数据）
     let account = rpc.get_account(pool_address).await?;
     if account.owner != accounts::BONK {
         return Err(anyhow!("Account is not owned by Bonk program"));
     }
-    let pool_state = pool_state_decode(&account.data[8..])
+    // 使用修改后的 pool_state_decode（传入 program_id）
+    let pool_state = pool_state_decode(&account.data[8..], account.owner)
         .ok_or_else(|| anyhow!("Failed to decode pool state"))?;
-    // 3. 写入缓存
-    bonk_cache::cache_pool_by_address(pool_address, &pool_state);
+    // 不写入缓存
     Ok(pool_state)
 }
 
@@ -114,7 +110,7 @@ pub async fn get_pool_by_address_force(
     rpc: &SolanaRpcClient,
     pool_address: &Pubkey,
 ) -> Result<PoolState, anyhow::Error> {
-    bonk_cache::POOL_DATA_CACHE.remove(pool_address);
+    // 强制刷新：虽然主函数不缓存，但保留接口以保持兼容性
     get_pool_by_address(rpc, pool_address).await
 }
 

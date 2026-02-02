@@ -2,6 +2,9 @@ use borsh::BorshDeserialize;
 use serde::{Deserialize, Serialize};
 use solana_sdk::pubkey::Pubkey;
 
+// 用于 DEX 协议识别
+use crate::constants::dex_protocols::DexProtocol;
+
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, BorshDeserialize)]
 pub enum TradeDirection {
     #[default]
@@ -126,7 +129,17 @@ impl borsh::BorshDeserialize for Product {
 /// BONKswap Pool State (from official IDL)
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PoolState {
-    // New field names (from official BONKswap IDL)
+    // ===== 元数据字段 =====
+    /// DEX Program ID（从账户 owner 自动填充）
+    pub program_id: Pubkey,
+
+    /// DEX 协议名称（如 "bonk"）
+    pub dex_name: String,
+
+    /// DEX 显示名称（如 "Bonk"）
+    pub dex_display_name: String,
+
+    // ===== 链上数据字段（New field names from official BONKswap IDL） =====
     pub token_x: Pubkey,              // 0:  Token X mint
     pub token_y: Pubkey,              // 32: Token Y mint
     pub pool_x_account: Pubkey,       // 64: Pool's Token X account
@@ -216,6 +229,11 @@ impl PoolState {
 impl borsh::BorshDeserialize for PoolState {
     fn deserialize_reader<R: std::io::Read>(reader: &mut R) -> std::io::Result<Self> {
         let mut state = Self {
+            // 元数据字段（临时默认值，会被外部函数覆盖）
+            program_id: Pubkey::default(),
+            dex_name: String::default(),
+            dex_display_name: String::default(),
+            // 链上数据字段
             token_x: Pubkey::deserialize_reader(reader)?,
             token_y: Pubkey::deserialize_reader(reader)?,
             pool_x_account: Pubkey::deserialize_reader(reader)?,
@@ -303,27 +321,49 @@ pub const BONK_POOL_STATE_SIZE: usize = 345;
 pub const OLD_POOL_STATE_SIZE: usize = 8 + 5 + 8 * 10 + 32 * 7 + 8 * 8 + 8 * 5;
 
 /// Try to decode pool state, supporting both BONKswap and old formats
-pub fn pool_state_decode(data: &[u8]) -> Option<PoolState> {
-    if data.len() < OLD_POOL_STATE_SIZE {
+pub fn pool_state_decode(data: &[u8], program_id: Pubkey) -> Option<PoolState> {
+    // 先尝试反序列化数据，然后设置元数据
+    let pool_state = if data.len() < OLD_POOL_STATE_SIZE {
         // Try BONKswap format first if data is large enough
         if data.len() >= BONK_POOL_STATE_SIZE {
-            return pool_state_decode_bonkswap(data);
+            pool_state_decode_bonkswap_impl(data)?
+        } else {
+            return None;
         }
-        return None;
-    }
+    } else {
+        // If data is large enough for old format, try it
+        pool_state_decode_old_impl(data)?
+    };
 
-    // If data is large enough for old format, try it
-    pool_state_decode_old(data)
+    // 设置元数据
+    let (dex_name, dex_display_name) = match DexProtocol::from_program_id(&program_id) {
+        Some(protocol) => (
+            protocol.name().to_string(),
+            protocol.display_name().to_string(),
+        ),
+        None => {
+            // 未知 DEX，使用 fallback
+            let fallback = "unknown".to_string();
+            (fallback.clone(), fallback)
+        }
+    };
+
+    Some(PoolState {
+        program_id,
+        dex_name,
+        dex_display_name,
+        ..pool_state
+    })
 }
 
-/// Decode BONKswap format pool state using manual deserialization
-fn pool_state_decode_bonkswap(data: &[u8]) -> Option<PoolState> {
+/// Decode BONKswap format pool state using manual deserialization（内部实现）
+fn pool_state_decode_bonkswap_impl(data: &[u8]) -> Option<PoolState> {
     let mut reader = std::io::Cursor::new(data);
     PoolState::deserialize_reader(&mut reader).ok()
 }
 
-/// Decode old format pool state
-fn pool_state_decode_old(data: &[u8]) -> Option<PoolState> {
+/// Decode old format pool state（内部实现）
+fn pool_state_decode_old_impl(data: &[u8]) -> Option<PoolState> {
     if data.len() < OLD_POOL_STATE_SIZE {
         return None;
     }
@@ -332,6 +372,11 @@ fn pool_state_decode_old(data: &[u8]) -> Option<PoolState> {
 
     // Convert old format to new format
     Some(PoolState {
+        // 元数据字段（临时默认值，会被外部函数覆盖）
+        program_id: Pubkey::default(),
+        dex_name: String::default(),
+        dex_display_name: String::default(),
+        // 链上数据字段
         token_x: old.base_mint,
         token_y: old.quote_mint,
         pool_x_account: old.base_vault,
