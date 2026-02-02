@@ -13,7 +13,8 @@
 //! │ Sell        │ ✅ Test 2    │
 //! └─────────────┴──────────────┘
 //!
-//! 注意：PumpSwap 使用 Bonding Curve，不支持 Exact Out 模式
+//! 注意：PumpSwap 使用恒定乘积 (Constant Product AMM)
+//! 目前仅实现了 Exact In 模式
 
 use sol_trade_sdk::{
     common::SolanaRpcClient,
