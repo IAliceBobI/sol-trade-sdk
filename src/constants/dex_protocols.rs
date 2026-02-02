@@ -133,8 +133,13 @@ mod tests {
 
     #[test]
     fn test_unknown_program_id() {
-        let unknown = pubkey!("Unknown1111111111111111111111111111111111111");
-        assert!(DexProtocol::from_program_id(&unknown).is_none());
+        // 测试字符串版本
+        let unknown_str = "Unknown1111111111111111111111111111111111111";
+        assert!(DexProtocol::from_program_id_str(unknown_str).is_none());
+
+        // 测试随机的有效 base58 字符串但不是已知 Program ID
+        let random_valid_id = "1111111111111111111111111111111111111111";
+        assert!(DexProtocol::from_program_id_str(random_valid_id).is_none());
     }
 
     #[test]
