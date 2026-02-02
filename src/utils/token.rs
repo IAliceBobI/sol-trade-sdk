@@ -316,6 +316,73 @@ pub async fn calculate_ata(
     Ok(ata)
 }
 
+/// 获取已知代币的 Token Program（白名单兜底）
+///
+/// 用于常见代币的快速识别，避免 RPC 调用
+fn get_known_token_program(mint: &Pubkey) -> Option<Pubkey> {
+    // WSOL 永远使用传统 Token 程序
+    if *mint == crate::constants::WSOL_TOKEN_ACCOUNT {
+        return Some(crate::constants::TOKEN_PROGRAM);
+    }
+
+    // USDC (当前使用传统 Token 程序)
+    if *mint == crate::constants::USDC_TOKEN_ACCOUNT {
+        return Some(crate::constants::TOKEN_PROGRAM);
+    }
+
+    // USDT (当前使用传统 Token 程序)
+    if *mint == crate::constants::USDT_MINT {
+        return Some(crate::constants::TOKEN_PROGRAM);
+    }
+
+    None
+}
+
+/// 计算 ATA 地址（同步版本，自动检测 Token Program）
+///
+/// # 工作原理
+/// 1. 优先从 MintInfo 缓存获取 Token Program（零开销）
+/// 2. 缓存未命中则使用白名单（WSOL/USDC/USDT 等常见代币）
+/// 3. 白名单也没有则默认使用 TOKEN_PROGRAM（保守策略）
+///
+/// # 性能
+/// - 首次预热后: O(1) 哈希查询 + 二次 ATA 缓存（fast_fn）
+/// - 无需 RPC 调用（纯内存操作）
+///
+/// # 使用建议
+/// 在 TradingClient 层面调用 `get_token_program_with_cache()` 预热后，
+/// 指令构建器可直接使用此函数（同步调用，无需 await）。
+///
+/// # 示例
+/// ```rust
+/// // 在 TradingClient 中预热
+/// get_token_program_with_cache(&rpc, &mint).await?;
+///
+/// // 在指令构建器中使用（同步）
+/// let ata = calculate_ata_sync(&payer, &mint);
+/// ```
+#[inline]
+pub fn calculate_ata_sync(owner: &Pubkey, mint: &Pubkey) -> Pubkey {
+    // 尝试从缓存获取 Token Program
+    let token_program = match get_token_program_cached(mint) {
+        Some(program) => program,
+        None => {
+            // 缓存未命中，使用白名单兜底
+            // 注意：如果这是 Token-2022 代币且不在白名单中，ATA 地址会计算错误
+            // 调用者应确保预热缓存
+            get_known_token_program(mint)
+                .unwrap_or(crate::constants::TOKEN_PROGRAM)
+        }
+    };
+
+    // 使用 fast_fn 计算 ATA（自动缓存，lock-free DashMap）
+    crate::common::fast_fn::get_associated_token_address_with_program_id_fast(
+        owner,
+        mint,
+        &token_program,
+    )
+}
+
 /// 获取已知代币的 Symbol（硬编码兜底方案）
 ///
 /// 当链上无法获取 symbol 时（如传统 SPL Token），使用此函数作为兜底

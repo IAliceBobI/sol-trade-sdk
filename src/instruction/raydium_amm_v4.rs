@@ -13,6 +13,26 @@ use solana_sdk::{
     signer::Signer,
 };
 
+/// 获取输入 Token（WSOL/USDC）的 Token Program
+///
+/// WSOL 固定使用 TOKEN_PROGRAM
+/// USDC 自动检测（支持 Token-2022）
+fn get_input_token_program(is_wsol: bool) -> &'static solana_sdk::pubkey::Pubkey {
+    if is_wsol {
+        &crate::constants::TOKEN_PROGRAM
+    } else {
+        // USDC: 使用 calculate_ata_sync 的内部逻辑
+        // 优先从缓存获取，缓存未命中则使用白名单（TOKEN_PROGRAM）
+        crate::utils::token::get_token_program_cached(&crate::constants::USDC_TOKEN_ACCOUNT)
+            .map(|program| if program == crate::constants::TOKEN_PROGRAM_2022 {
+                &crate::constants::TOKEN_PROGRAM_2022
+            } else {
+                &crate::constants::TOKEN_PROGRAM
+            })
+            .unwrap_or(&crate::constants::TOKEN_PROGRAM)
+    }
+}
+
 /// Instruction builder for Raydium AMM V4 (Raydium Liquidity Pool V4) protocol
 ///
 /// Raydium AMM V4 使用恒定乘积公式（x * y = k）进行流动性提供和交易
@@ -83,14 +103,17 @@ impl InstructionBuilder for RaydiumAmmV4InstructionBuilder {
                 } else {
                     &crate::constants::USDC_TOKEN_ACCOUNT
                 },
-                &crate::constants::TOKEN_PROGRAM,
+                get_input_token_program(is_wsol),
                 params.open_seed_optimize,
             );
+        // 获取输出 token 的 program（支持 Token-2022）
+        let output_token_program = crate::utils::token::get_token_program_cached(&params.output_mint)
+            .unwrap_or(crate::constants::TOKEN_PROGRAM);
         let user_destination_token_account =
             crate::common::fast_fn::get_associated_token_address_with_program_id_fast_use_seed(
                 &params.payer.pubkey(),
                 &params.output_mint,
-                &crate::constants::TOKEN_PROGRAM,
+                &output_token_program,
                 params.open_seed_optimize,
             );
 
@@ -110,7 +133,7 @@ impl InstructionBuilder for RaydiumAmmV4InstructionBuilder {
                     &params.payer.pubkey(),
                     &params.payer.pubkey(),
                     &params.output_mint,
-                    &crate::constants::TOKEN_PROGRAM,
+                    &output_token_program,
                     params.open_seed_optimize,
                 ),
             );
@@ -207,11 +230,14 @@ impl InstructionBuilder for RaydiumAmmV4InstructionBuilder {
             None => swap_result.min_amount_out,
         };
 
+        // 获取输入 token 的 program（支持 Token-2022）
+        let input_token_program = crate::utils::token::get_token_program_cached(&params.input_mint)
+            .unwrap_or(crate::constants::TOKEN_PROGRAM);
         let user_source_token_account =
             crate::common::fast_fn::get_associated_token_address_with_program_id_fast_use_seed(
                 &params.payer.pubkey(),
                 &params.input_mint,
-                &crate::constants::TOKEN_PROGRAM,
+                &input_token_program,
                 params.open_seed_optimize,
             );
         let user_destination_token_account =
@@ -222,7 +248,7 @@ impl InstructionBuilder for RaydiumAmmV4InstructionBuilder {
                 } else {
                     &crate::constants::USDC_TOKEN_ACCOUNT
                 },
-                &crate::constants::TOKEN_PROGRAM,
+                get_input_token_program(is_wsol),
                 params.open_seed_optimize,
             );
 

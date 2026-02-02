@@ -23,6 +23,26 @@ use solana_sdk::{
     signer::Signer,
 };
 
+/// 获取输入 Token（WSOL/USDC）的 Token Program
+///
+/// WSOL 固定使用 TOKEN_PROGRAM
+/// USDC 自动检测（支持 Token-2022）
+fn get_input_token_program(is_wsol: bool) -> &'static solana_sdk::pubkey::Pubkey {
+    if is_wsol {
+        &crate::constants::TOKEN_PROGRAM
+    } else {
+        // USDC: 使用 calculate_ata_sync 的内部逻辑
+        // 优先从缓存获取，缓存未命中则使用白名单（TOKEN_PROGRAM）
+        crate::utils::token::get_token_program_cached(&crate::constants::USDC_TOKEN_ACCOUNT)
+            .map(|program| if program == crate::constants::TOKEN_PROGRAM_2022 {
+                &crate::constants::TOKEN_PROGRAM_2022
+            } else {
+                &crate::constants::TOKEN_PROGRAM
+            })
+            .unwrap_or(&crate::constants::TOKEN_PROGRAM)
+    }
+}
+
 /// Instruction builder for RaydiumCpmm protocol
 pub struct RaydiumCpmmInstructionBuilder;
 
@@ -106,7 +126,7 @@ impl InstructionBuilder for RaydiumCpmmInstructionBuilder {
             } else {
                 &crate::constants::USDC_TOKEN_ACCOUNT
             },
-            &crate::constants::TOKEN_PROGRAM,
+            get_input_token_program(is_wsol),
             params.open_seed_optimize,
         );
         let output_token_account = get_associated_token_address_with_program_id_fast_use_seed(
@@ -157,6 +177,10 @@ impl InstructionBuilder for RaydiumCpmmInstructionBuilder {
         }
 
         // Create buy instruction
+        let input_token_program_meta = AccountMeta::new_readonly(
+            *get_input_token_program(is_wsol),
+            false,
+        );
         let accounts: [AccountMeta; 13] = [
             AccountMeta::new(params.payer.pubkey(), true), // Payer (signer)
             accounts::AUTHORITY_META,                      // Authority (readonly)
@@ -166,7 +190,7 @@ impl InstructionBuilder for RaydiumCpmmInstructionBuilder {
             AccountMeta::new(output_token_account, false), // Output Token Account
             AccountMeta::new(input_vault_account, false),  // Input Vault Account
             AccountMeta::new(output_vault_account, false), // Output Vault Account
-            crate::constants::TOKEN_PROGRAM_META,          // Input Token Program (readonly)
+            input_token_program_meta,                      // Input Token Program (readonly)
             AccountMeta::new_readonly(mint_token_program, false), // Output Token Program (readonly)
             if is_wsol {
                 crate::constants::WSOL_TOKEN_ACCOUNT_META
@@ -269,7 +293,7 @@ impl InstructionBuilder for RaydiumCpmmInstructionBuilder {
             } else {
                 &crate::constants::USDC_TOKEN_ACCOUNT
             },
-            &crate::constants::TOKEN_PROGRAM,
+            get_input_token_program(is_wsol),
             params.open_seed_optimize,
         );
         let input_token_account = get_associated_token_address_with_program_id_fast_use_seed(
@@ -307,6 +331,10 @@ impl InstructionBuilder for RaydiumCpmmInstructionBuilder {
         }
 
         // Create sell instruction
+        let output_token_program_meta = AccountMeta::new_readonly(
+            *get_input_token_program(is_wsol),
+            false,
+        );
         let accounts: [AccountMeta; 13] = [
             AccountMeta::new(params.payer.pubkey(), true), // Payer (signer)
             accounts::AUTHORITY_META,                      // Authority (readonly)
@@ -317,7 +345,7 @@ impl InstructionBuilder for RaydiumCpmmInstructionBuilder {
             AccountMeta::new(input_vault_account, false),  // Input Vault Account
             AccountMeta::new(output_vault_account, false), // Output Vault Account
             AccountMeta::new_readonly(mint_token_program, false), // Input Token Program (readonly)
-            crate::constants::TOKEN_PROGRAM_META,          // Output Token Program (readonly)
+            output_token_program_meta,                     // Output Token Program (readonly)
             AccountMeta::new_readonly(params.input_mint, false), // Input token mint (readonly)
             if is_wsol {
                 crate::constants::WSOL_TOKEN_ACCOUNT_META

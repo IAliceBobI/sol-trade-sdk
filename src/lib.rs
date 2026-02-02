@@ -992,6 +992,12 @@ impl TradingClient {
             return Err(anyhow::anyhow!("Invalid protocol params for Trade"));
         }
 
+        // 🔧 预热 Token Program 缓存（确保 calculate_ata_sync 能命中缓存）
+        // 这是一次性操作，后续交易会使用缓存
+        use crate::utils::token::get_token_program_with_cache;
+        get_token_program_with_cache(&self.rpc, &input_token_mint).await?;
+        get_token_program_with_cache(&self.rpc, &params.mint).await?;
+
         let swap_result = executor.swap(buy_params).await;
 
         swap_result.map(|(success, sigs, err)| (success, sigs, err.map(TradeError::from)))
@@ -1109,6 +1115,12 @@ impl TradingClient {
         if !is_valid_params {
             return Err(anyhow::anyhow!("Invalid protocol params for Trade"));
         }
+
+        // 🔧 预热 Token Program 缓存（确保 calculate_ata_sync 能命中缓存）
+        // 这是一次性操作，后续交易会使用缓存
+        use crate::utils::token::get_token_program_with_cache;
+        get_token_program_with_cache(&self.rpc, &params.mint).await?;
+        get_token_program_with_cache(&self.rpc, &output_token_mint).await?;
 
         // Execute sell based on tip preference
         let swap_result = executor.swap(sell_params).await;
