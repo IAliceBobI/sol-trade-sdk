@@ -164,14 +164,77 @@ pub async fn get_token_program_for_mint(
 
 ### 各 DEX 的 Pool Mint 字段
 
-| DEX | Pool 类型 | Mint 字段名 | 测试文件 |
-|-----|----------|------------|---------|
-| **PumpSwap** | `Pool` | `base_mint`, `quote_mint` | `verify_pumpswap_with_simulation.rs` |
-| **Raydium CPMM** | `PoolState` | `token0_mint`, `token1_mint` | `verify_raydium_cpmm_with_simulation.rs` |
-| **Raydium AMM V4** | `PoolState` | `coin_mint`, `pc_mint` | `verify_raydium_amm_v4_with_simulation.rs` |
-| **Raydium CLMM** | `PoolState` | `token_mint0`, `token_mint1` | `verify_clmm_with_simulation.rs` |
+| DEX | Pool 类型 | Mint 字段名 | 命名约定 | 测试文件 |
+|-----|----------|------------|---------|---------|
+| **PumpSwap** | `Pool` | `base_mint`, `quote_mint` | ✅ base/quote (有语义) | `verify_pumpswap_with_simulation.rs` |
+| **Raydium CPMM** | `PoolState` | `token0_mint`, `token1_mint` | ❌ token0/token1 (无语义，仅索引) | `verify_raydium_cpmm_with_simulation.rs` |
+| **Raydium AMM V4** | `AmmInfo` | `coin_mint`, `pc_mint` | ❌ coin/pc (price currency) | `verify_raydium_amm_v4_with_simulation.rs` |
+| **Raydium CLMM** | `PoolState` | `token_mint0`, `token_mint1` | ❌ token_mint0/token_mint1 (无语义，仅索引) | `verify_clmm_with_simulation.rs` |
 
 **关键发现**：✅ 每个 Pool 都包含 mint 字段，可以直接从 Pool 获取 mint 地址，无需硬编码！
+
+### 📊 Pool 字段命名约定分析
+
+**重要发现**：各个 DEX 的 Pool 字段命名**并不统一**，只有 PumpSwap 使用了有明确语义的 base/quote 命名。
+
+#### 命名约定对比
+
+| DEX | 命名方式 | 语义含义 | 说明 |
+|-----|---------|---------|------|
+| **PumpSwap** | `base_mint` / `quote_mint` | ✅ 有明确语义 | base = 交易对基础币，quote = 计价币（如 SOL/USDC 中 SOL 是 base，USDC 是 quote） |
+| **Raydium CPMM** | `token0_mint` / `token1_mint` | ❌ 无语义，仅索引 | 0 和 1 只代表顺序，不包含交易方向信息 |
+| **Raydium AMM V4** | `coin_mint` / `pc_mint` | ⚠️ 部分语义 | coin ≈ base，pc = price currency ≈ quote（类似股票中的 "币种/计价币"） |
+| **Raydium CLMM** | `token_mint0` / `token_mint1` | ❌ 无语义，仅索引 | 同 CPMM，0 和 1 只是索引 |
+
+#### 源码位置
+
+```rust
+// PumpSwap (src/instruction/utils/pumpswap_types.rs:6)
+pub struct Pool {
+    pub base_mint: Pubkey,    // ✅ 明确的 base token
+    pub quote_mint: Pubkey,   // ✅ 明确的 quote token
+}
+
+// Raydium CPMM (src/instruction/utils/raydium_cpmm_types.rs:29)
+pub struct PoolState {
+    pub token0_mint: Pubkey,  // ❌ token0 (无语义，只是索引)
+    pub token1_mint: Pubkey,  // ❌ token1 (无语义，只是索引)
+}
+
+// Raydium AMM V4 (src/instruction/utils/raydium_amm_v4_types.rs:55)
+pub struct AmmInfo {
+    pub coin_mint: Pubkey,    // ⚠️ coin (类似于 base)
+    pub pc_mint: Pubkey,      // ⚠️ pc = price currency (类似于 quote)
+}
+
+// Raydium CLMM (src/instruction/utils/raydium_clmm_types.rs:72)
+pub struct PoolState {
+    pub token_mint0: Pubkey,  // ❌ token_mint0 (无语义，只是索引)
+    pub token_mint1: Pubkey,  // ❌ token_mint1 (无语义，只是索引)
+}
+```
+
+#### 💡 实际影响
+
+由于字段命名不包含明确的交易方向语义，在构建交易参数时需要：
+
+1. **PumpSwap**: 可以直接使用 `base_mint` 和 `quote_mint`
+2. **Raydium 系列**: 需要根据交易类型（买入/卖出）判断哪个 token 是输入/输出
+3. **不建议依赖字段名**来判断交易方向，应该在参数构建时明确指定
+
+#### ✅ 推荐做法
+
+```rust
+// ❌ 不推荐：依赖字段名推断
+let is_base_token = true; // 假设 token0 是 base
+
+// ✅ 推荐：根据交易类型明确指定
+let (input_mint, output_mint) = if is_buying {
+    (pool_state.token_mint1, pool_state.token_mint0)  // 用 quote 买 base
+} else {
+    (pool_state.token_mint0, pool_state.token_mint1)  // 卖 base 换 quote
+};
+```
 
 ### 使用示例（以 Raydium CLMM 为例）
 
