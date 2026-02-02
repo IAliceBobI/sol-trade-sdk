@@ -570,4 +570,202 @@ pub async fn transfer_token_to(
     Ok(())
 }
 
+// ========================================
+// 代币余额设置功能（用于测试）
+// ========================================
+
+use solana_sdk::signature::Signer;
+
+/// Mint 信息
+struct MintInfo {
+    decimals: u8,
+    token_program: Pubkey,
+}
+
+/// 查询 mint 的 decimals 和 token_program
+async fn get_mint_info(
+    rpc_client: &sol_trade_sdk::common::SolanaRpcClient,
+    mint: &Pubkey,
+) -> Result<MintInfo, String> {
+    // 获取 mint 账户
+    let mint_account = rpc_client
+        .get_account(mint)
+        .await
+        .map_err(|e| format!("RPC error: {}", e))?;
+
+    // Token program 就是 mint 账户的 owner
+    let token_program = mint_account.owner;
+
+    // 解析 mint 数据获取 decimals
+    // Mint 数据结构: https://docs.rs/spl-token/latest/spl-token/state/struct.Mint.html
+    let data = mint_account.data;
+    if data.len() < 82 {
+        return Err(format!(
+            "Invalid mint account data: expected at least 82 bytes, got {} bytes, mint={}",
+            data.len(),
+            mint
+        ));
+    }
+
+    // decimals 在 offset 44 位置 (u8)
+    let decimals = data
+        .get(44)
+        .copied()
+        .ok_or_else(|| format!("无法访问 decimals 字段：数据长度不足，mint={}", mint))?;
+
+    Ok(MintInfo { decimals, token_program })
+}
+
+/// 将格式化的 amount 字符串（如 "1.22"）转换为原始单位（u64）
+///
+/// 支持两种格式：
+/// 1. 小数格式（如 "1.22"）- 会被转换为 1.22 * 10^decimals
+/// 2. 原始单位格式（如 "2000000" 或 "2_000_000"）- 直接使用该数值
+fn parse_formatted_amount(amount_str: &str, decimals: u8) -> Result<u64, String> {
+    // 先尝试解析为小数格式（如 "1.22"）
+    if let Ok(amount) = amount_str.parse::<f64>() {
+        if amount < 0.0 {
+            return Err("Amount cannot be negative".to_string());
+        }
+
+        let multiplier = 10_f64.powi(decimals as i32);
+        let amount_u64 = (amount * multiplier).round() as u64;
+        return Ok(amount_u64);
+    }
+
+    // 如果小数解析失败，尝试解析为原始单位格式（如 "2000000" 或 "2_000_000"）
+    // 去掉所有下划线后再解析
+    let cleaned_str = amount_str.replace('_', "");
+    let amount_u64 = cleaned_str.parse::<u64>().map_err(|e| {
+        format!(
+            "Invalid amount format: {} (expected decimal like '1.22' or raw units like '2000000')",
+            e
+        )
+    })?;
+
+    Ok(amount_u64)
+}
+
+/// 调用 surfnet_setTokenAccount RPC 方法设置代币余额
+async fn call_surfnet_set_token_account(
+    rpc_url: &str,
+    owner: &str,
+    mint: &str,
+    amount: u64,
+    token_program: Option<&str>,
+) -> Result<(), String> {
+    let http_client = reqwest::Client::new();
+
+    let request_body = serde_json::json!({
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "surfnet_setTokenAccount",
+        "params": [
+            owner,
+            mint,
+            {
+                "amount": amount,
+                "state": "initialized",
+                "closeAuthority": null,
+                "delegate": null,
+                "delegatedAmount": null,
+            },
+            token_program,
+        ]
+    });
+
+    let response = http_client
+        .post(rpc_url)
+        .json(&request_body)
+        .send()
+        .await
+        .map_err(|e| format!("HTTP request failed: {}", e))?;
+
+    let response_text = response
+        .text()
+        .await
+        .map_err(|e| format!("Failed to read response: {}", e))?;
+    let response_json: serde_json::Value = serde_json::from_str(&response_text)
+        .map_err(|e| format!("Failed to parse JSON: {}", e))?;
+
+    if let Some(error) = response_json.get("error") {
+        return Err(format!("RPC error: {}", error));
+    }
+
+    Ok(())
+}
+
+/// 设置测试账户的代币余额（使用 surfnet_setTokenAccount RPC）
+///
+/// # 参数
+/// * `rpc_client` - RPC 客户端
+/// * `rpc_url` - RPC URL
+/// * `payer` - 测试账户
+/// * `mint` - 代币 mint 地址
+/// * `amount_formatted` - 格式化的金额（如 "1.22" 表示 1.22 个代币）
+///
+/// # 示例
+/// ```ignore
+/// // 设置测试账户的 JUP 余额为 100 JUP
+/// set_token_balance(
+///     &rpc,
+///     &rpc_url,
+///     &payer,
+///     &jup_mint,
+///     "100",
+/// ).await?;
+/// ```
+#[allow(dead_code)]
+pub async fn set_token_balance(
+    rpc_client: &sol_trade_sdk::common::SolanaRpcClient,
+    rpc_url: &str,
+    payer: &Keypair,
+    mint: &Pubkey,
+    amount_formatted: &str,
+) -> Result<(), String> {
+    use spl_associated_token_account::get_associated_token_address_with_program_id;
+
+    let payer_pubkey = payer.pubkey();
+
+    // 查询 mint 信息
+    let mint_info = get_mint_info(rpc_client, mint).await?;
+
+    println!(
+        "💰 设置代币余额: address={}, mint={}, amount={}",
+        payer_pubkey, mint, amount_formatted
+    );
+    println!(
+        "   查询到 mint info: decimals={}, token_program={}",
+        mint_info.decimals, mint_info.token_program
+    );
+
+    // 解析格式化的金额
+    let amount_u64 = parse_formatted_amount(amount_formatted, mint_info.decimals)?;
+
+    println!(
+        "   转换金额: {} -> {} raw units (decimals={})",
+        amount_formatted, amount_u64, mint_info.decimals
+    );
+
+    // 计算 ATA 地址
+    let ata_address =
+        get_associated_token_address_with_program_id(&payer_pubkey, mint, &mint_info.token_program);
+
+    println!("   计算 ATA 地址: {}", ata_address);
+
+    // 调用 surfnet_setTokenAccount
+    call_surfnet_set_token_account(
+        rpc_url,
+        &payer_pubkey.to_string(),
+        &mint.to_string(),
+        amount_u64,
+        Some(&mint_info.token_program.to_string()),
+    )
+    .await?;
+
+    println!("   ✅ 设置成功\n");
+
+    Ok(())
+}
+
 // 重新导出常用的类型和函数
