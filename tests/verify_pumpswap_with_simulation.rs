@@ -29,7 +29,7 @@ use std::sync::Arc;
 
 // 导入公共模块
 mod common;
-use common::{ensure_ata_with_balance, get_simulation_test_keypair};
+use common::{ensure_ata_with_balance, get_simulation_test_keypair, get_token_program_for_mint};
 
 /// PUMP Token Pool
 const PUMP_POOL: &str = "539m4mVWt6iduB6W8rDGPMarzNCMesuqY5eUTiiYHAgR";
@@ -39,20 +39,6 @@ const PUMP_MINT: &str = "pumpCmXqMfrsAkQ5r49WcJnRayYRqmXz6ae8H7H9Dfn";
 
 /// WSOL Mint
 const WSOL_MINT: &str = "So11111111111111111111111111111111111111112";
-
-/// 从 mint 地址获取 Token Program（mint 的 owner 就是 Token Program）
-async fn get_token_program_for_mint(
-    rpc: &SolanaRpcClient,
-    mint: &Pubkey,
-) -> Result<Pubkey, String> {
-    let account = rpc
-        .get_account(mint)
-        .await
-        .map_err(|e| format!("RPC error: {}", e))?;
-
-    // Mint 账户的 owner 就是该 Token 使用的 Token Program
-    Ok(account.owner)
-}
 
 // ========================================
 // Test 1: Exact In Buy (WSOL -> PUMP)

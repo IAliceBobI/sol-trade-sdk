@@ -28,7 +28,7 @@ use std::sync::Arc;
 
 // 导入公共模块
 mod common;
-use common::{ensure_ata_with_balance, get_simulation_test_keypair};
+use common::{ensure_ata_with_balance, get_simulation_test_keypair, get_token_program_for_mint};
 
 /// PIPE-WSOL CPMM Pool
 const PIPE_WSOL_POOL: &str = "BnYsRpYvJpz6biY3hV6U9smChVePCJ6YyupVDfcnXpTp";
@@ -102,6 +102,30 @@ async fn test_raydium_cpmm_exact_in_buy_with_simulation() {
 
     println!("✅ 本地计算: {} PIPE\n", local_output);
 
+    // 🔧 自动从 Pool 获取 mint 并检测 Token Program
+    let (token0_mint, token1_mint) = (pool_state.token0_mint, pool_state.token1_mint);
+    let base_token_program = match get_token_program_for_mint(&rpc, &token0_mint).await {
+        Ok(program) => {
+            println!("✅ 自动检测 token0_mint ({}) Token Program: {}", token0_mint, program);
+            program
+        },
+        Err(e) => {
+            println!("⚠️  无法获取 token0_mint Token Program，使用默认值: {}", e);
+            spl_token::id()
+        },
+    };
+    let quote_token_program = match get_token_program_for_mint(&rpc, &token1_mint).await {
+        Ok(program) => {
+            println!("✅ 自动检测 token1_mint ({}) Token Program: {}", token1_mint, program);
+            program
+        },
+        Err(e) => {
+            println!("⚠️  无法获取 token1_mint Token Program，使用默认值: {}", e);
+            spl_token::id()
+        },
+    };
+    println!();
+
     // 获取储备余额
     let token0_balance = rpc.get_token_account_balance(&pool_state.token0_vault).await;
     let token1_balance = rpc.get_token_account_balance(&pool_state.token1_vault).await;
@@ -128,8 +152,8 @@ async fn test_raydium_cpmm_exact_in_buy_with_simulation() {
         quote_reserve: token1_reserve,
         base_vault: pool_state.token0_vault,
         quote_vault: pool_state.token1_vault,
-        base_token_program: spl_token::id(),
-        quote_token_program: spl_token::id(),
+        base_token_program,
+        quote_token_program,
         observation_state: pool_state.observation_key,
     };
 
@@ -138,9 +162,9 @@ async fn test_raydium_cpmm_exact_in_buy_with_simulation() {
         payer: payer.clone(),
         trade_type: sol_trade_sdk::swqos::TradeType::Buy,
         input_mint: wsol_mint,
-        input_token_program: Some(spl_token::id()),
+        input_token_program: Some(base_token_program),
         output_mint: pipe_mint,
-        output_token_program: Some(spl_token::id()),
+        output_token_program: Some(quote_token_program),
         input_amount: Some(amount_in),
         slippage_basis_points: Some(1000),
         address_lookup_table_account: None,
@@ -313,6 +337,30 @@ async fn test_raydium_cpmm_exact_in_sell_with_simulation() {
 
     println!("✅ 本地计算: {} WSOL (lamports)\n", local_output);
 
+    // 🔧 自动从 Pool 获取 mint 并检测 Token Program
+    let (token0_mint, token1_mint) = (pool_state.token0_mint, pool_state.token1_mint);
+    let base_token_program = match get_token_program_for_mint(&rpc, &token0_mint).await {
+        Ok(program) => {
+            println!("✅ 自动检测 token0_mint ({}) Token Program: {}", token0_mint, program);
+            program
+        },
+        Err(e) => {
+            println!("⚠️  无法获取 token0_mint Token Program，使用默认值: {}", e);
+            spl_token::id()
+        },
+    };
+    let quote_token_program = match get_token_program_for_mint(&rpc, &token1_mint).await {
+        Ok(program) => {
+            println!("✅ 自动检测 token1_mint ({}) Token Program: {}", token1_mint, program);
+            program
+        },
+        Err(e) => {
+            println!("⚠️  无法获取 token1_mint Token Program，使用默认值: {}", e);
+            spl_token::id()
+        },
+    };
+    println!();
+
     // 获取储备余额
     let token0_balance = rpc.get_token_account_balance(&pool_state.token0_vault).await;
     let token1_balance = rpc.get_token_account_balance(&pool_state.token1_vault).await;
@@ -339,8 +387,8 @@ async fn test_raydium_cpmm_exact_in_sell_with_simulation() {
         quote_reserve: token1_reserve,
         base_vault: pool_state.token0_vault,
         quote_vault: pool_state.token1_vault,
-        base_token_program: spl_token::id(),
-        quote_token_program: spl_token::id(),
+        base_token_program,
+        quote_token_program,
         observation_state: pool_state.observation_key,
     };
 
@@ -349,9 +397,9 @@ async fn test_raydium_cpmm_exact_in_sell_with_simulation() {
         payer: payer.clone(),
         trade_type: sol_trade_sdk::swqos::TradeType::Sell,
         input_mint: pipe_mint,
-        input_token_program: Some(spl_token::id()),
+        input_token_program: Some(base_token_program),
         output_mint: wsol_mint,
-        output_token_program: Some(spl_token::id()),
+        output_token_program: Some(quote_token_program),
         input_amount: Some(amount_in),
         slippage_basis_points: Some(1000),
         address_lookup_table_account: None,
@@ -514,6 +562,30 @@ async fn test_raydium_cpmm_exact_out_buy_with_simulation() {
     println!("  期望输出: {} PIPE", amount_out);
     println!("  需要输入: {} WSOL (lamports)\n", local_calc.amount_in);
 
+    // 🔧 自动从 Pool 获取 mint 并检测 Token Program
+    let (token0_mint, token1_mint) = (pool_state.token0_mint, pool_state.token1_mint);
+    let base_token_program = match get_token_program_for_mint(&rpc, &token0_mint).await {
+        Ok(program) => {
+            println!("✅ 自动检测 token0_mint ({}) Token Program: {}", token0_mint, program);
+            program
+        },
+        Err(e) => {
+            println!("⚠️  无法获取 token0_mint Token Program，使用默认值: {}", e);
+            spl_token::id()
+        },
+    };
+    let quote_token_program = match get_token_program_for_mint(&rpc, &token1_mint).await {
+        Ok(program) => {
+            println!("✅ 自动检测 token1_mint ({}) Token Program: {}", token1_mint, program);
+            program
+        },
+        Err(e) => {
+            println!("⚠️  无法获取 token1_mint Token Program，使用默认值: {}", e);
+            spl_token::id()
+        },
+    };
+    println!();
+
     // 获取储备余额
     let token0_balance = rpc.get_token_account_balance(&pool_state.token0_vault).await;
     let token1_balance = rpc.get_token_account_balance(&pool_state.token1_vault).await;
@@ -540,8 +612,8 @@ async fn test_raydium_cpmm_exact_out_buy_with_simulation() {
         quote_reserve: token1_reserve,
         base_vault: pool_state.token0_vault,
         quote_vault: pool_state.token1_vault,
-        base_token_program: spl_token::id(),
-        quote_token_program: spl_token::id(),
+        base_token_program,
+        quote_token_program,
         observation_state: pool_state.observation_key,
     };
 
@@ -550,9 +622,9 @@ async fn test_raydium_cpmm_exact_out_buy_with_simulation() {
         payer: payer.clone(),
         trade_type: sol_trade_sdk::swqos::TradeType::Buy,
         input_mint: wsol_mint,
-        input_token_program: Some(spl_token::id()),
+        input_token_program: Some(base_token_program),
         output_mint: pipe_mint,
-        output_token_program: Some(spl_token::id()),
+        output_token_program: Some(quote_token_program),
         input_amount: Some(local_calc.amount_in), // 使用计算出的输入
         slippage_basis_points: Some(1000),
         address_lookup_table_account: None,
@@ -727,6 +799,30 @@ async fn test_raydium_cpmm_exact_out_sell_with_simulation() {
     println!("  期望输出: {} WSOL (lamports)", amount_out);
     println!("  需要输入: {} PIPE\n", local_calc.amount_in);
 
+    // 🔧 自动从 Pool 获取 mint 并检测 Token Program
+    let (token0_mint, token1_mint) = (pool_state.token0_mint, pool_state.token1_mint);
+    let base_token_program = match get_token_program_for_mint(&rpc, &token0_mint).await {
+        Ok(program) => {
+            println!("✅ 自动检测 token0_mint ({}) Token Program: {}", token0_mint, program);
+            program
+        },
+        Err(e) => {
+            println!("⚠️  无法获取 token0_mint Token Program，使用默认值: {}", e);
+            spl_token::id()
+        },
+    };
+    let quote_token_program = match get_token_program_for_mint(&rpc, &token1_mint).await {
+        Ok(program) => {
+            println!("✅ 自动检测 token1_mint ({}) Token Program: {}", token1_mint, program);
+            program
+        },
+        Err(e) => {
+            println!("⚠️  无法获取 token1_mint Token Program，使用默认值: {}", e);
+            spl_token::id()
+        },
+    };
+    println!();
+
     // 获取储备余额
     let token0_balance = rpc.get_token_account_balance(&pool_state.token0_vault).await;
     let token1_balance = rpc.get_token_account_balance(&pool_state.token1_vault).await;
@@ -753,8 +849,8 @@ async fn test_raydium_cpmm_exact_out_sell_with_simulation() {
         quote_reserve: token1_reserve,
         base_vault: pool_state.token0_vault,
         quote_vault: pool_state.token1_vault,
-        base_token_program: spl_token::id(),
-        quote_token_program: spl_token::id(),
+        base_token_program,
+        quote_token_program,
         observation_state: pool_state.observation_key,
     };
 
@@ -763,9 +859,9 @@ async fn test_raydium_cpmm_exact_out_sell_with_simulation() {
         payer: payer.clone(),
         trade_type: sol_trade_sdk::swqos::TradeType::Sell,
         input_mint: pipe_mint,
-        input_token_program: Some(spl_token::id()),
+        input_token_program: Some(base_token_program),
         output_mint: wsol_mint,
-        output_token_program: Some(spl_token::id()),
+        output_token_program: Some(quote_token_program),
         input_amount: Some(local_calc.amount_in), // 使用计算出的输入
         slippage_basis_points: Some(1000),
         address_lookup_table_account: None,

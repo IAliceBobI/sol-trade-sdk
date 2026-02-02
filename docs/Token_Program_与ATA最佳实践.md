@@ -139,37 +139,85 @@ println!("✅ 自动检测 {} Token Program: {}", mint, token_program);
 
 ## 相关代码示例
 
-### PumpSwap 测试中的自动检测
+### 公共工具函数
 
-文件：`tests/verify_pumpswap_with_simulation.rs`
+所有测试现在都使用公共模块中的 `get_token_program_for_mint()` 函数：
 
 ```rust
+// 文件：tests/common/mod.rs
+
 /// 从 mint 地址获取 Token Program（mint 的 owner 就是 Token Program）
-async fn get_token_program_for_mint(
-    rpc: &SolanaRpcClient,
+pub async fn get_token_program_for_mint(
+    rpc_client: &SolanaRpcClient,
     mint: &Pubkey,
 ) -> Result<Pubkey, String> {
-    let account = rpc
+    // 获取 mint 账户
+    let mint_account = rpc_client
         .get_account(mint)
         .await
         .map_err(|e| format!("RPC error: {}", e))?;
 
     // Mint 账户的 owner 就是该 Token 使用的 Token Program
-    Ok(account.owner)
+    Ok(mint_account.owner)
 }
+```
 
-// 在测试中使用
-let base_token_program = match get_token_program_for_mint(&rpc, &base_mint).await {
+### 各 DEX 的 Pool Mint 字段
+
+| DEX | Pool 类型 | Mint 字段名 | 测试文件 |
+|-----|----------|------------|---------|
+| **PumpSwap** | `Pool` | `base_mint`, `quote_mint` | `verify_pumpswap_with_simulation.rs` |
+| **Raydium CPMM** | `PoolState` | `token0_mint`, `token1_mint` | `verify_raydium_cpmm_with_simulation.rs` |
+| **Raydium AMM V4** | `PoolState` | `coin_mint`, `pc_mint` | `verify_raydium_amm_v4_with_simulation.rs` |
+| **Raydium CLMM** | `PoolState` | `token_mint0`, `token_mint1` | `verify_clmm_with_simulation.rs` |
+
+**关键发现**：✅ 每个 Pool 都包含 mint 字段，可以直接从 Pool 获取 mint 地址，无需硬编码！
+
+### 使用示例（以 Raydium CLMM 为例）
+
+```rust
+// 🔧 自动从 Pool 获取 mint 并检测 Token Program
+let (token0_mint, token1_mint) = (pool_state.token_mint0, pool_state.token_mint1);
+let token0_program = match get_token_program_for_mint(&rpc, &token0_mint).await {
     Ok(program) => {
-        println!("✅ 自动检测 base_mint ({}) Token Program: {}", base_mint, program);
+        println!("✅ 自动检测 token0_mint ({}) Token Program: {}", token0_mint, program);
         program
     },
     Err(e) => {
-        println!("⚠️  无法获取 base_mint Token Program，使用默认值: {}", e);
-        TOKEN_PROGRAM
+        println!("⚠️  无法获取 token0_mint Token Program，使用默认值: {}", e);
+        spl_token::id()
     },
 };
+let token1_program = match get_token_program_for_mint(&rpc, &token1_mint).await {
+    Ok(program) => {
+        println!("✅ 自动检测 token1_mint ({}) Token Program: {}", token1_mint, program);
+        program
+    },
+    Err(e) => {
+        println!("⚠️  无法获取 token1_mint Token Program，使用默认值: {}", e);
+        spl_token::id()
+    },
+};
+println!();
+
+// 使用自动检测到的 Token Program
+let clmm_params = RaydiumClmmParams {
+    // ... 其他字段
+    token0_program,
+    token1_program,
+};
 ```
+
+### 推广效果
+
+✅ **所有 `verify_*_with_simulation` 测试文件均已应用自动检测**：
+
+1. `tests/verify_pumpswap_with_simulation.rs` - 4 个测试函数
+2. `tests/verify_raydium_cpmm_with_simulation.rs` - 4 个测试函数
+3. `tests/verify_raydium_amm_v4_with_simulation.rs` - 4 个测试函数
+4. `tests/verify_clmm_with_simulation.rs` - 4 个测试函数
+
+**总计**：16 个测试函数，全部实现了 Token Program 自动检测！
 
 ## 参考
 

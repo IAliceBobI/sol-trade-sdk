@@ -28,7 +28,7 @@ use std::sync::Arc;
 
 // 导入公共模块
 mod common;
-use common::{ensure_ata_with_balance, get_simulation_test_keypair};
+use common::{ensure_ata_with_balance, get_simulation_test_keypair, get_token_program_for_mint};
 
 /// WSOL-USDC Pool on Raydium AMM V4
 const SOL_USDC_POOL: &str = "58oQChx4yWmvKdwLLZzBi4ChoCc2fqCUWBkwMihLYQo2";
@@ -104,6 +104,30 @@ async fn test_raydium_amm_v4_exact_in_buy_with_simulation() {
 
     println!("✅ 本地计算: {} USDC (smallest unit)\n", local_output);
 
+    // 🔧 自动从 Pool 获取 mint 并检测 Token Program
+    let (coin_mint, pc_mint) = (pool_state.coin_mint, pool_state.pc_mint);
+    let coin_token_program = match get_token_program_for_mint(&rpc, &coin_mint).await {
+        Ok(program) => {
+            println!("✅ 自动检测 coin_mint ({}) Token Program: {}", coin_mint, program);
+            program
+        },
+        Err(e) => {
+            println!("⚠️  无法获取 coin_mint Token Program，使用默认值: {}", e);
+            spl_token::id()
+        },
+    };
+    let pc_token_program = match get_token_program_for_mint(&rpc, &pc_mint).await {
+        Ok(program) => {
+            println!("✅ 自动检测 pc_mint ({}) Token Program: {}", pc_mint, program);
+            program
+        },
+        Err(e) => {
+            println!("⚠️  无法获取 pc_mint Token Program，使用默认值: {}", e);
+            spl_token::id()
+        },
+    };
+    println!();
+
     // 获取储备余额
     let coin_balance = rpc.get_token_account_balance(&pool_state.token_coin).await;
     let pc_balance = rpc.get_token_account_balance(&pool_state.token_pc).await;
@@ -136,9 +160,9 @@ async fn test_raydium_amm_v4_exact_in_buy_with_simulation() {
         payer: payer.clone(),
         trade_type: sol_trade_sdk::swqos::TradeType::Buy,
         input_mint: wsol_mint,
-        input_token_program: Some(spl_token::id()),
+        input_token_program: Some(coin_token_program),
         output_mint: usdc_mint,
-        output_token_program: Some(spl_token::id()),
+        output_token_program: Some(pc_token_program),
         input_amount: Some(amount_in),
         slippage_basis_points: Some(1000),
         address_lookup_table_account: None,
@@ -311,6 +335,30 @@ async fn test_raydium_amm_v4_exact_in_sell_with_simulation() {
 
     println!("✅ 本地计算: {} WSOL (lamports)\n", local_output);
 
+    // 🔧 自动从 Pool 获取 mint 并检测 Token Program
+    let (coin_mint, pc_mint) = (pool_state.coin_mint, pool_state.pc_mint);
+    let coin_token_program = match get_token_program_for_mint(&rpc, &coin_mint).await {
+        Ok(program) => {
+            println!("✅ 自动检测 coin_mint ({}) Token Program: {}", coin_mint, program);
+            program
+        },
+        Err(e) => {
+            println!("⚠️  无法获取 coin_mint Token Program，使用默认值: {}", e);
+            spl_token::id()
+        },
+    };
+    let pc_token_program = match get_token_program_for_mint(&rpc, &pc_mint).await {
+        Ok(program) => {
+            println!("✅ 自动检测 pc_mint ({}) Token Program: {}", pc_mint, program);
+            program
+        },
+        Err(e) => {
+            println!("⚠️  无法获取 pc_mint Token Program，使用默认值: {}", e);
+            spl_token::id()
+        },
+    };
+    println!();
+
     // 获取储备余额
     let coin_balance = rpc.get_token_account_balance(&pool_state.token_coin).await;
     let pc_balance = rpc.get_token_account_balance(&pool_state.token_pc).await;
@@ -343,9 +391,9 @@ async fn test_raydium_amm_v4_exact_in_sell_with_simulation() {
         payer: payer.clone(),
         trade_type: sol_trade_sdk::swqos::TradeType::Sell,
         input_mint: usdc_mint,
-        input_token_program: Some(spl_token::id()),
+        input_token_program: Some(pc_token_program),
         output_mint: wsol_mint,
-        output_token_program: Some(spl_token::id()),
+        output_token_program: Some(coin_token_program),
         input_amount: Some(amount_in),
         slippage_basis_points: Some(1000),
         address_lookup_table_account: None,
@@ -509,6 +557,30 @@ async fn test_raydium_amm_v4_exact_out_buy_with_simulation() {
     println!("  期望输出: {} USDC (smallest unit)", amount_out);
     println!("  需要输入: {} WSOL (lamports)\n", local_calc.amount_in);
 
+    // 🔧 自动从 Pool 获取 mint 并检测 Token Program
+    let (coin_mint, pc_mint) = (pool_state.coin_mint, pool_state.pc_mint);
+    let coin_token_program = match get_token_program_for_mint(&rpc, &coin_mint).await {
+        Ok(program) => {
+            println!("✅ 自动检测 coin_mint ({}) Token Program: {}", coin_mint, program);
+            program
+        },
+        Err(e) => {
+            println!("⚠️  无法获取 coin_mint Token Program，使用默认值: {}", e);
+            spl_token::id()
+        },
+    };
+    let pc_token_program = match get_token_program_for_mint(&rpc, &pc_mint).await {
+        Ok(program) => {
+            println!("✅ 自动检测 pc_mint ({}) Token Program: {}", pc_mint, program);
+            program
+        },
+        Err(e) => {
+            println!("⚠️  无法获取 pc_mint Token Program，使用默认值: {}", e);
+            spl_token::id()
+        },
+    };
+    println!();
+
     // 获取储备余额
     let coin_balance = rpc.get_token_account_balance(&pool_state.token_coin).await;
     let pc_balance = rpc.get_token_account_balance(&pool_state.token_pc).await;
@@ -541,9 +613,9 @@ async fn test_raydium_amm_v4_exact_out_buy_with_simulation() {
         payer: payer.clone(),
         trade_type: sol_trade_sdk::swqos::TradeType::Buy,
         input_mint: wsol_mint,
-        input_token_program: Some(spl_token::id()),
+        input_token_program: Some(coin_token_program),
         output_mint: usdc_mint,
-        output_token_program: Some(spl_token::id()),
+        output_token_program: Some(pc_token_program),
         input_amount: Some(local_calc.amount_in), // 使用计算出的输入
         slippage_basis_points: Some(1000),
         address_lookup_table_account: None,
@@ -718,6 +790,30 @@ async fn test_raydium_amm_v4_exact_out_sell_with_simulation() {
     println!("  期望输出: {} WSOL (lamports)", amount_out);
     println!("  需要输入: {} USDC (smallest unit)\n", local_calc.amount_in);
 
+    // 🔧 自动从 Pool 获取 mint 并检测 Token Program
+    let (coin_mint, pc_mint) = (pool_state.coin_mint, pool_state.pc_mint);
+    let coin_token_program = match get_token_program_for_mint(&rpc, &coin_mint).await {
+        Ok(program) => {
+            println!("✅ 自动检测 coin_mint ({}) Token Program: {}", coin_mint, program);
+            program
+        },
+        Err(e) => {
+            println!("⚠️  无法获取 coin_mint Token Program，使用默认值: {}", e);
+            spl_token::id()
+        },
+    };
+    let pc_token_program = match get_token_program_for_mint(&rpc, &pc_mint).await {
+        Ok(program) => {
+            println!("✅ 自动检测 pc_mint ({}) Token Program: {}", pc_mint, program);
+            program
+        },
+        Err(e) => {
+            println!("⚠️  无法获取 pc_mint Token Program，使用默认值: {}", e);
+            spl_token::id()
+        },
+    };
+    println!();
+
     // 获取储备余额
     let coin_balance = rpc.get_token_account_balance(&pool_state.token_coin).await;
     let pc_balance = rpc.get_token_account_balance(&pool_state.token_pc).await;
@@ -750,9 +846,9 @@ async fn test_raydium_amm_v4_exact_out_sell_with_simulation() {
         payer: payer.clone(),
         trade_type: sol_trade_sdk::swqos::TradeType::Sell,
         input_mint: usdc_mint,
-        input_token_program: Some(spl_token::id()),
+        input_token_program: Some(pc_token_program),
         output_mint: wsol_mint,
-        output_token_program: Some(spl_token::id()),
+        output_token_program: Some(coin_token_program),
         input_amount: Some(local_calc.amount_in), // 使用计算出的输入
         slippage_basis_points: Some(1000),
         address_lookup_table_account: None,

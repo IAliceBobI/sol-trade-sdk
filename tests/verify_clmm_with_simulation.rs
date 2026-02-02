@@ -26,7 +26,7 @@ use std::sync::Arc;
 
 // 导入公共模块
 mod common;
-use common::{ensure_ata_with_balance, get_simulation_test_keypair};
+use common::{ensure_ata_with_balance, get_simulation_test_keypair, get_token_program_for_mint};
 
 /// WSOL-JUP CLMM Pool
 const WSOL_JUP_POOL: &str = "EZVkeboWeXygtq8LMyENHyXdF5wpYrtExRNH9UwB1qYw";
@@ -106,6 +106,30 @@ async fn test_clmm_exact_in_buy_with_simulation() {
 
     println!("✅ 本地计算: {} JUP\n", local_output);
 
+    // 🔧 自动从 Pool 获取 mint 并检测 Token Program
+    let (token0_mint, token1_mint) = (pool_state.token_mint0, pool_state.token_mint1);
+    let token0_program = match get_token_program_for_mint(&rpc, &token0_mint).await {
+        Ok(program) => {
+            println!("✅ 自动检测 token0_mint ({}) Token Program: {}", token0_mint, program);
+            program
+        },
+        Err(e) => {
+            println!("⚠️  无法获取 token0_mint Token Program，使用默认值: {}", e);
+            spl_token::id()
+        },
+    };
+    let token1_program = match get_token_program_for_mint(&rpc, &token1_mint).await {
+        Ok(program) => {
+            println!("✅ 自动检测 token1_mint ({}) Token Program: {}", token1_mint, program);
+            program
+        },
+        Err(e) => {
+            println!("⚠️  无法获取 token1_mint Token Program，使用默认值: {}", e);
+            spl_token::id()
+        },
+    };
+    println!();
+
     // 构造指令
     let clmm_params = RaydiumClmmParams {
         pool_state: pool_address,
@@ -117,8 +141,8 @@ async fn test_clmm_exact_in_buy_with_simulation() {
         observation_state: pool_state.observation_key,
         token0_decimals: pool_state.mint_decimals0,
         token1_decimals: pool_state.mint_decimals1,
-        token0_program: spl_token::id(),
-        token1_program: spl_token::id(),
+        token0_program,
+        token1_program,
     };
 
     let swap_params = SwapParams {
@@ -310,6 +334,30 @@ async fn test_clmm_exact_in_sell_with_simulation() {
 
     println!("✅ 本地计算: {} WSOL (lamports)\n", local_output);
 
+    // 🔧 自动从 Pool 获取 mint 并检测 Token Program
+    let (token0_mint, token1_mint) = (pool_state.token_mint0, pool_state.token_mint1);
+    let token0_program = match get_token_program_for_mint(&rpc, &token0_mint).await {
+        Ok(program) => {
+            println!("✅ 自动检测 token0_mint ({}) Token Program: {}", token0_mint, program);
+            program
+        },
+        Err(e) => {
+            println!("⚠️  无法获取 token0_mint Token Program，使用默认值: {}", e);
+            spl_token::id()
+        },
+    };
+    let token1_program = match get_token_program_for_mint(&rpc, &token1_mint).await {
+        Ok(program) => {
+            println!("✅ 自动检测 token1_mint ({}) Token Program: {}", token1_mint, program);
+            program
+        },
+        Err(e) => {
+            println!("⚠️  无法获取 token1_mint Token Program，使用默认值: {}", e);
+            spl_token::id()
+        },
+    };
+    println!();
+
     // 构造指令
     let clmm_params = RaydiumClmmParams {
         pool_state: pool_address,
@@ -321,8 +369,8 @@ async fn test_clmm_exact_in_sell_with_simulation() {
         observation_state: pool_state.observation_key,
         token0_decimals: pool_state.mint_decimals0,
         token1_decimals: pool_state.mint_decimals1,
-        token0_program: spl_token::id(),
-        token1_program: spl_token::id(),
+        token0_program,
+        token1_program,
     };
 
     let swap_params = SwapParams {
@@ -330,9 +378,9 @@ async fn test_clmm_exact_in_sell_with_simulation() {
         payer: payer.clone(),
         trade_type: sol_trade_sdk::swqos::TradeType::Sell,
         input_mint: jup_mint,  // 注意：卖出 JUP
-        input_token_program: Some(spl_token::id()),
+        input_token_program: Some(token0_program),
         output_mint: wsol_mint,
-        output_token_program: Some(spl_token::id()),
+        output_token_program: Some(token1_program),
         input_amount: Some(amount_in),
         slippage_basis_points: Some(1000),
         address_lookup_table_account: None,
@@ -502,6 +550,30 @@ async fn test_clmm_exact_out_buy_with_simulation() {
     println!("  期望输出: {} JUP", amount_out);
     println!("  需要输入: {} WSOL (lamports)\n", local_calc.amount_in);
 
+    // 🔧 自动从 Pool 获取 mint 并检测 Token Program
+    let (token0_mint, token1_mint) = (pool_state.token_mint0, pool_state.token_mint1);
+    let token0_program = match get_token_program_for_mint(&rpc, &token0_mint).await {
+        Ok(program) => {
+            println!("✅ 自动检测 token0_mint ({}) Token Program: {}", token0_mint, program);
+            program
+        },
+        Err(e) => {
+            println!("⚠️  无法获取 token0_mint Token Program，使用默认值: {}", e);
+            spl_token::id()
+        },
+    };
+    let token1_program = match get_token_program_for_mint(&rpc, &token1_mint).await {
+        Ok(program) => {
+            println!("✅ 自动检测 token1_mint ({}) Token Program: {}", token1_mint, program);
+            program
+        },
+        Err(e) => {
+            println!("⚠️  无法获取 token1_mint Token Program，使用默认值: {}", e);
+            spl_token::id()
+        },
+    };
+    println!();
+
     // 构造指令 (使用 fixed_output_amount)
     let clmm_params = RaydiumClmmParams {
         pool_state: pool_address,
@@ -513,8 +585,8 @@ async fn test_clmm_exact_out_buy_with_simulation() {
         observation_state: pool_state.observation_key,
         token0_decimals: pool_state.mint_decimals0,
         token1_decimals: pool_state.mint_decimals1,
-        token0_program: spl_token::id(),
-        token1_program: spl_token::id(),
+        token0_program,
+        token1_program,
     };
 
     let swap_params = SwapParams {
@@ -522,9 +594,9 @@ async fn test_clmm_exact_out_buy_with_simulation() {
         payer: payer.clone(),
         trade_type: sol_trade_sdk::swqos::TradeType::Buy,
         input_mint: wsol_mint,
-        input_token_program: Some(spl_token::id()),
+        input_token_program: Some(token0_program),
         output_mint: jup_mint,
-        output_token_program: Some(spl_token::id()),
+        output_token_program: Some(token1_program),
         input_amount: Some(local_calc.amount_in), // 使用计算出的输入
         slippage_basis_points: Some(1000),
         address_lookup_table_account: None,
@@ -706,6 +778,30 @@ async fn test_clmm_exact_out_sell_with_simulation() {
     println!("  期望输出: {} WSOL (lamports)", amount_out);
     println!("  需要输入: {} JUP\n", local_calc.amount_in);
 
+    // 🔧 自动从 Pool 获取 mint 并检测 Token Program
+    let (token0_mint, token1_mint) = (pool_state.token_mint0, pool_state.token_mint1);
+    let token0_program = match get_token_program_for_mint(&rpc, &token0_mint).await {
+        Ok(program) => {
+            println!("✅ 自动检测 token0_mint ({}) Token Program: {}", token0_mint, program);
+            program
+        },
+        Err(e) => {
+            println!("⚠️  无法获取 token0_mint Token Program，使用默认值: {}", e);
+            spl_token::id()
+        },
+    };
+    let token1_program = match get_token_program_for_mint(&rpc, &token1_mint).await {
+        Ok(program) => {
+            println!("✅ 自动检测 token1_mint ({}) Token Program: {}", token1_mint, program);
+            program
+        },
+        Err(e) => {
+            println!("⚠️  无法获取 token1_mint Token Program，使用默认值: {}", e);
+            spl_token::id()
+        },
+    };
+    println!();
+
     // 构造指令 (使用 fixed_output_amount)
     let clmm_params = RaydiumClmmParams {
         pool_state: pool_address,
@@ -717,8 +813,8 @@ async fn test_clmm_exact_out_sell_with_simulation() {
         observation_state: pool_state.observation_key,
         token0_decimals: pool_state.mint_decimals0,
         token1_decimals: pool_state.mint_decimals1,
-        token0_program: spl_token::id(),
-        token1_program: spl_token::id(),
+        token0_program,
+        token1_program,
     };
 
     let swap_params = SwapParams {
@@ -726,9 +822,9 @@ async fn test_clmm_exact_out_sell_with_simulation() {
         payer: payer.clone(),
         trade_type: sol_trade_sdk::swqos::TradeType::Sell,
         input_mint: jup_mint,  // 注意：卖出 JUP
-        input_token_program: Some(spl_token::id()),
+        input_token_program: Some(token0_program),
         output_mint: wsol_mint,
-        output_token_program: Some(spl_token::id()),
+        output_token_program: Some(token1_program),
         input_amount: Some(local_calc.amount_in), // 使用计算出的输入
         slippage_basis_points: Some(1000),
         address_lookup_table_account: None,
