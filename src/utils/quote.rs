@@ -14,3 +14,15 @@ pub struct QuoteExactInResult {
     /// Number of extra on-chain accounts read to produce this quote.
     pub extra_accounts_read: usize,
 }
+
+#[derive(Debug, Clone, Copy, Default)]
+pub struct QuoteExactOutResult {
+    /// Required input amount for an exact-out swap (in smallest units).
+    pub amount_in: u64,
+    /// Total fee amount paid (in input token units, smallest units).
+    pub fee_amount: u64,
+    /// Optional price impact estimation in basis points.
+    pub price_impact_bps: Option<u64>,
+    /// Number of extra on-chain accounts read to produce this quote.
+    pub extra_accounts_read: usize,
+}

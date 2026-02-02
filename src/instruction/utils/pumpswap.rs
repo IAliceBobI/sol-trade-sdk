@@ -716,6 +716,75 @@ pub async fn quote_exact_in(
     }
 }
 
+/// Quote an exact-out swap against a PumpSwap pool.
+///
+/// - If `is_base_in=true`: base -> quote (卖出 base)
+/// - If `is_base_in=false`: quote -> base (买入 base)
+///
+/// # Arguments
+///
+/// * `rpc` - RPC 客户端
+/// * `pool_address` - Pool 地址
+/// * `amount_out` - 期望的输出金额（固定）
+/// * `is_base_in` - 是否 base 为输入代币
+///
+/// # Returns
+///
+/// 返回 `QuoteExactOutResult` 包含所需的输入金额和手续费
+pub async fn quote_exact_out(
+    rpc: &SolanaRpcClient,
+    pool_address: &Pubkey,
+    amount_out: u64,
+    is_base_in: bool,
+) -> Result<crate::utils::quote::QuoteExactOutResult, anyhow::Error> {
+    let pool = get_pool_by_address(rpc, pool_address).await?;
+    let (base_reserve, quote_reserve) = get_token_balances(&pool, rpc).await?;
+
+    if is_base_in {
+        // base -> quote (卖出 base，获得指定数量的 quote)
+        // 使用 sell_quote_input_internal 进行逆向计算
+        let r = crate::utils::calc::pumpswap::sell_quote_input_internal(
+            amount_out,
+            0, // slippage 在 quote 中不计算
+            base_reserve,
+            quote_reserve,
+            &pool.coin_creator,
+        )
+        .map_err(|e| anyhow::anyhow!(e))?;
+
+        // 计算费用：总输入 - 净输出
+        let fee_amount = r.internal_raw_quote.saturating_sub(amount_out);
+
+        Ok(crate::utils::quote::QuoteExactOutResult {
+            amount_in: r.internal_raw_quote,
+            fee_amount,
+            price_impact_bps: None,
+            extra_accounts_read: 2,
+        })
+    } else {
+        // quote -> base (买入 base，获得指定数量的 base)
+        // 使用 buy_base_input_internal 进行逆向计算
+        let r = crate::utils::calc::pumpswap::buy_base_input_internal(
+            amount_out,
+            0, // slippage 在 quote 中不计算
+            base_reserve,
+            quote_reserve,
+            &pool.coin_creator,
+        )
+        .map_err(|e| anyhow::anyhow!(e))?;
+
+        // 费用包含在 ui_quote 中，需要减去 internal_quote_amount
+        let fee_amount = r.ui_quote.saturating_sub(r.internal_quote_amount);
+
+        Ok(crate::utils::quote::QuoteExactOutResult {
+            amount_in: r.ui_quote,
+            fee_amount,
+            price_impact_bps: None,
+            extra_accounts_read: 2,
+        })
+    }
+}
+
 /// 获取任意 Token 在 PumpSwap 上的 USD 价格（通过 X-WSOL 池 + Raydium CLMM WSOL-USD 锚定池）
 ///
 /// 价格计算路径：Token X -> WSOL -> USD
