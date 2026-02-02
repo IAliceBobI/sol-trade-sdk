@@ -78,12 +78,20 @@ impl InstructionBuilder for RaydiumClmmInstructionBuilder {
         // ========================================
         // Parameter validation and basic data preparation
         // ========================================
-        // 🔧 修复：显式检查 Option 以提高代码清晰度
-        let input_amount =
-            params.input_amount.ok_or_else(|| anyhow!("Input amount is required"))?;
-        if input_amount == 0 {
-            return Err(anyhow!("Amount cannot be zero"));
-        }
+        // 检查是否为 exact_out 模式
+        let has_fixed_output = params.fixed_output_amount.is_some();
+
+        let input_amount = if !has_fixed_output {
+            // exact_in 模式：需要 input_amount
+            let amount = params.input_amount.ok_or_else(|| anyhow!("Input amount is required"))?;
+            if amount == 0 {
+                return Err(anyhow!("Amount cannot be zero"));
+            }
+            amount
+        } else {
+            // exact_out 模式：稍后计算
+            0
+        };
 
         let protocol_params = params
             .protocol_params
@@ -506,6 +514,15 @@ impl InstructionBuilder for RaydiumClmmInstructionBuilder {
     }
 
     async fn build_sell_instructions(&self, params: &SwapParams) -> Result<Vec<Instruction>> {
+        // 检查是否为 exact_out 模式
+        let has_fixed_output = params.fixed_output_amount.is_some();
+
+        if !has_fixed_output {
+            // exact_in 模式：需要 input_amount
+            if params.input_amount.is_none_or(|a| a == 0) {
+                return Err(anyhow!("Token amount is not set"));
+            }
+        }
         // ========================================
         // Parameter validation and basic data preparation
         // ========================================
