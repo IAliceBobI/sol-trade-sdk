@@ -491,13 +491,32 @@ impl InstructionBuilder for RaydiumClmmInstructionBuilder {
         // IMPORTANT: is_base_input 的含义：
         // - true: 指定输入金额，计算输出金额 (amount = input, other_amount_threshold = min output)
         // - false: 指定输出金额，计算输入金额 (amount = output, other_amount_threshold = max input)
-        // 买入场景：输入固定，输出浮动，所以 is_base_input = true
+        //
+        // exact_in 模式：输入固定，输出浮动
+        // exact_out 模式：输出固定，输入浮动
+        let (swap_amount, other_threshold, is_base_input) = if has_fixed_output {
+            // exact_out 模式
+            let fixed_out = params.fixed_output_amount.unwrap();
+            // 从 params.input_amount 获取计算出的输入（由 quote_exact_out 计算）
+            let max_in = params.input_amount.unwrap_or(0);
+            // 加上滑点：max_in * (1 + slippage)，round_up=true
+            let max_in_with_slippage = if max_in > 0 {
+                amount_with_slippage(max_in, slippage as u16, true)
+            } else {
+                0
+            };
+            (fixed_out, max_in_with_slippage, 0) // is_base_input = false
+        } else {
+            // exact_in 模式
+            (amount_in, minimum_amount_out, 1) // is_base_input = true
+        };
+
         let mut data = vec![0u8; 41];
         data[0..8].copy_from_slice(SWAP_V2_DISCRIMINATOR);
-        data[8..16].copy_from_slice(&amount_in.to_le_bytes());
-        data[16..24].copy_from_slice(&minimum_amount_out.to_le_bytes());
+        data[8..16].copy_from_slice(&swap_amount.to_le_bytes());
+        data[16..24].copy_from_slice(&other_threshold.to_le_bytes());
         data[24..40].copy_from_slice(&sqrt_price_limit_x64.to_le_bytes());
-        data[40] = 1; // is_base_input = true (买入场景：输入固定)
+        data[40] = is_base_input;
 
         instructions.push(Instruction::new_with_bytes(
             accounts::RAYDIUM_CLMM,
@@ -895,12 +914,32 @@ impl InstructionBuilder for RaydiumClmmInstructionBuilder {
 
         // Create instruction data: discriminator (8 bytes) + amount (u64) + other_amount_threshold (u64) + sqrt_price_limit_x64 (u128) + is_base_input (bool)
         // 使用 SwapV2 指令 discriminator
+        //
+        // exact_in 模式：输入固定，输出浮动
+        // exact_out 模式：输出固定，输入浮动
+        let (swap_amount, other_threshold, is_base_input_val) = if has_fixed_output {
+            // exact_out 模式
+            let fixed_out = params.fixed_output_amount.unwrap();
+            // 从 params.input_amount 获取计算出的输入（由 quote_exact_out 计算）
+            let max_in = params.input_amount.unwrap_or(0);
+            // 加上滑点：max_in * (1 + slippage)
+            let max_in_with_slippage = if max_in > 0 {
+                ((max_in as f64) * (1.0 + (slippage as f64) / 10000.0)) as u64
+            } else {
+                0
+            };
+            (fixed_out, max_in_with_slippage, 0) // is_base_input = false
+        } else {
+            // exact_in 模式
+            (amount_in, minimum_amount_out, if is_token0_in { 1 } else { 0 })
+        };
+
         let mut data = vec![0u8; 41];
         data[0..8].copy_from_slice(SWAP_V2_DISCRIMINATOR);
-        data[8..16].copy_from_slice(&amount_in.to_le_bytes());
-        data[16..24].copy_from_slice(&minimum_amount_out.to_le_bytes());
+        data[8..16].copy_from_slice(&swap_amount.to_le_bytes());
+        data[16..24].copy_from_slice(&other_threshold.to_le_bytes());
         data[24..40].copy_from_slice(&sqrt_price_limit_x64.to_le_bytes());
-        data[40] = if is_token0_in { 1 } else { 0 }; // is_base_input
+        data[40] = is_base_input_val;
 
         instructions.push(Instruction::new_with_bytes(
             accounts::RAYDIUM_CLMM,

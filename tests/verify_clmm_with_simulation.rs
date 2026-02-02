@@ -184,7 +184,20 @@ async fn test_clmm_exact_in_buy_with_simulation() {
     };
 
     if !simulation_result.success {
-        println!("❌ 模拟交易失败\n");
+        println!("❌ 模拟交易失败");
+        if let Some(ref error) = simulation_result.error {
+            println!("错误信息: {}\n", error);
+        }
+        if let Some(ref logs) = simulation_result.logs {
+            println!("=== 交易日志 ===");
+            for log in logs.iter().take(50) { // 只显示前 50 行
+                println!("{}", log);
+            }
+            if logs.len() > 50 {
+                println!("... (还有 {} 行)", logs.len() - 50);
+            }
+            println!("=================\n");
+        }
         return;
     }
 
@@ -375,7 +388,20 @@ async fn test_clmm_exact_in_sell_with_simulation() {
     };
 
     if !simulation_result.success {
-        println!("❌ 模拟交易失败\n");
+        println!("❌ 模拟交易失败");
+        if let Some(ref error) = simulation_result.error {
+            println!("错误信息: {}\n", error);
+        }
+        if let Some(ref logs) = simulation_result.logs {
+            println!("=== 交易日志 ===");
+            for log in logs.iter().take(50) { // 只显示前 50 行
+                println!("{}", log);
+            }
+            if logs.len() > 50 {
+                println!("... (还有 {} 行)", logs.len() - 50);
+            }
+            println!("=================\n");
+        }
         return;
     }
 
@@ -554,7 +580,20 @@ async fn test_clmm_exact_out_buy_with_simulation() {
     };
 
     if !simulation_result.success {
-        println!("❌ 模拟交易失败\n");
+        println!("❌ 模拟交易失败");
+        if let Some(ref error) = simulation_result.error {
+            println!("错误信息: {}\n", error);
+        }
+        if let Some(ref logs) = simulation_result.logs {
+            println!("=== 交易日志 ===");
+            for log in logs.iter().take(50) { // 只显示前 50 行
+                println!("{}", log);
+            }
+            if logs.len() > 50 {
+                println!("... (还有 {} 行)", logs.len() - 50);
+            }
+            println!("=================\n");
+        }
         return;
     }
 
@@ -745,7 +784,20 @@ async fn test_clmm_exact_out_sell_with_simulation() {
     };
 
     if !simulation_result.success {
-        println!("❌ 模拟交易失败\n");
+        println!("❌ 模拟交易失败");
+        if let Some(ref error) = simulation_result.error {
+            println!("错误信息: {}\n", error);
+        }
+        if let Some(ref logs) = simulation_result.logs {
+            println!("=== 交易日志 ===");
+            for log in logs.iter().take(50) { // 只显示前 50 行
+                println!("{}", log);
+            }
+            if logs.len() > 50 {
+                println!("... (还有 {} 行)", logs.len() - 50);
+            }
+            println!("=================\n");
+        }
         return;
     }
 
