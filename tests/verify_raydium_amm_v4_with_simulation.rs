@@ -16,12 +16,14 @@
 //! 注意：Raydium AMM V4 使用恒定乘积 (Constant Product AMM)
 
 use sol_trade_sdk::{
-    common::SolanaRpcClient,
+    common::{GasFeeStrategy, SolanaRpcClient, TradeConfig},
     instruction::utils::raydium_amm_v4::{get_pool_by_address, quote_exact_in, quote_exact_out},
     trading::core::params::{RaydiumAmmV4Params, SwapParams},
     trading::core::traits::InstructionBuilder,
     utils::simulation_based_calc::{simulate_swap_transaction, verify_calculation_accuracy},
+    TradingClient,
 };
+use solana_commitment_config::CommitmentConfig;
 use solana_sdk::{pubkey::Pubkey, signer::Signer};
 use std::str::FromStr;
 use std::sync::Arc;
@@ -325,9 +327,44 @@ async fn test_raydium_amm_v4_exact_in_sell_with_simulation() {
 
     println!("交易方向: USDC -> WSOL (卖出 USDC)\n");
 
-    // 本地计算
-    let local_output = match quote_exact_in(&rpc, &pool_address, amount_in, true).await {
-        // true: pc -> coin (USDC 是 pc, WSOL 是 coin)
+    // 使用 TradingClient::sell_quote() 进行本地计算
+    let trade_config = TradeConfig::new(rpc_url.clone(), vec![], CommitmentConfig::confirmed());
+    let client = TradingClient::new(payer.clone(), trade_config).await;
+
+    let sell_params = sol_trade_sdk::TradeSellParams {
+        dex_type: sol_trade_sdk::DexType::RaydiumAmmV4,
+        output_token_type: sol_trade_sdk::TradeTokenType::WSOL,
+        mint: usdc_mint,
+        input_token_amount: amount_in,
+        slippage_basis_points: Some(1000),
+        recent_blockhash: None,
+        with_tip: false,
+        extension_params: sol_trade_sdk::trading::core::params::DexParamEnum::RaydiumAmmV4(
+            RaydiumAmmV4Params {
+                amm: pool_address,
+                coin_mint: pool_state.coin_mint,
+                pc_mint: pool_state.pc_mint,
+                token_coin: pool_state.token_coin,
+                token_pc: pool_state.token_pc,
+                coin_reserve: 0, // quote 不需要 reserve
+                pc_reserve: 0,
+            },
+        ),
+        address_lookup_table_account: None,
+        wait_transaction_confirmed: false,
+        create_output_token_ata: false,
+        close_output_token_ata: false,
+        close_mint_token_ata: false,
+        durable_nonce: None,
+        fixed_output_token_amount: None,
+        gas_fee_strategy: GasFeeStrategy::default(),
+        simulate: false,
+        on_transaction_signed: None,
+        callback_execution_mode: None,
+        enable_jito_sandwich_protection: None,
+    };
+
+    let local_output = match client.sell_quote(sell_params).await {
         Ok(quote) => quote.amount_out,
         Err(e) => {
             println!("❌ 本地计算失败: {}\n", e);
@@ -335,7 +372,7 @@ async fn test_raydium_amm_v4_exact_in_sell_with_simulation() {
         },
     };
 
-    println!("✅ 本地计算: {} WSOL (lamports)\n", local_output);
+    println!("✅ 本地计算 (使用 TradingClient::sell_quote()): {} WSOL (lamports)\n", local_output);
 
     // 🔧 自动从 Pool 获取 mint 并检测 Token Program
     let (coin_mint, pc_mint) = (pool_state.coin_mint, pool_state.pc_mint);
