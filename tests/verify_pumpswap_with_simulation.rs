@@ -29,7 +29,7 @@ use std::sync::Arc;
 
 // 导入公共模块
 mod common;
-use common::{ensure_ata_with_balance, get_simulation_test_keypair, get_token_program_for_mint};
+use common::{ensure_ata_with_balance, get_simulation_test_keypair};
 
 /// PUMP Token Pool
 const PUMP_POOL: &str = "539m4mVWt6iduB6W8rDGPMarzNCMesuqY5eUTiiYHAgR";
@@ -128,7 +128,7 @@ async fn test_pumpswap_exact_in_buy_with_simulation() {
     };
 
     // 🔧 自动从 mint 获取 Token Program（不需要手动记忆）
-    let base_token_program = match get_token_program_for_mint(&rpc, &base_mint).await {
+    let base_token_program = match sol_trade_sdk::utils::token::get_token_program_with_cache(&rpc, &base_mint).await {
         Ok(program) => {
             println!("✅ 自动检测 base_mint ({}) Token Program: {}", base_mint, program);
             program
@@ -139,7 +139,7 @@ async fn test_pumpswap_exact_in_buy_with_simulation() {
         },
     };
 
-    let quote_token_program = match get_token_program_for_mint(&rpc, &quote_mint).await {
+    let quote_token_program = match sol_trade_sdk::utils::token::get_token_program_with_cache(&rpc, &quote_mint).await {
         Ok(program) => {
             println!("✅ 自动检测 quote_mint ({}) Token Program: {}", quote_mint, program);
             program
@@ -369,7 +369,7 @@ async fn test_pumpswap_exact_in_sell_with_simulation() {
     };
 
     // 🔧 自动从 mint 获取 Token Program（不需要手动记忆）
-    let base_token_program = match get_token_program_for_mint(&rpc, &base_mint).await {
+    let base_token_program = match sol_trade_sdk::utils::token::get_token_program_with_cache(&rpc, &base_mint).await {
         Ok(program) => {
             println!("✅ 自动检测 base_mint ({}) Token Program: {}", base_mint, program);
             program
@@ -380,7 +380,7 @@ async fn test_pumpswap_exact_in_sell_with_simulation() {
         },
     };
 
-    let quote_token_program = match get_token_program_for_mint(&rpc, &quote_mint).await {
+    let quote_token_program = match sol_trade_sdk::utils::token::get_token_program_with_cache(&rpc, &quote_mint).await {
         Ok(program) => {
             println!("✅ 自动检测 quote_mint ({}) Token Program: {}", quote_mint, program);
             program

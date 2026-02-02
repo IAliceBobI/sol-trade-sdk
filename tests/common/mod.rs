@@ -576,9 +576,6 @@ pub async fn transfer_token_to(
 
 use solana_sdk::signature::Signer;
 
-// 重新导出 SDK 的 token 工具函数，提供别名以保持兼容性
-pub use sol_trade_sdk::utils::token::get_token_program_with_cache as get_token_program_for_mint;
-
 /// 查询 mint 的 decimals 和 token_program（包装 SDK 函数以适配测试代码的错误类型）
 pub async fn get_mint_info(
     rpc_client: &sol_trade_sdk::common::SolanaRpcClient,

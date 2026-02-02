@@ -26,7 +26,7 @@ use std::sync::Arc;
 
 // 导入公共模块
 mod common;
-use common::{ensure_ata_with_balance, get_simulation_test_keypair, get_token_program_for_mint};
+use common::{ensure_ata_with_balance, get_simulation_test_keypair};
 
 /// WSOL-JUP CLMM Pool
 const WSOL_JUP_POOL: &str = "EZVkeboWeXygtq8LMyENHyXdF5wpYrtExRNH9UwB1qYw";
@@ -110,7 +110,7 @@ async fn test_clmm_exact_in_buy_with_simulation() {
 
     // 🔧 自动从 Pool 获取 mint 并检测 Token Program
     let (token0_mint, token1_mint) = (pool_state.token_mint0, pool_state.token_mint1);
-    let token0_program = match get_token_program_for_mint(&rpc, &token0_mint).await {
+    let token0_program = match sol_trade_sdk::utils::token::get_token_program_with_cache(&rpc, &token0_mint).await {
         Ok(program) => {
             println!("✅ 自动检测 token0_mint ({}) Token Program: {}", token0_mint, program);
             program
@@ -120,7 +120,7 @@ async fn test_clmm_exact_in_buy_with_simulation() {
             spl_token::id()
         },
     };
-    let token1_program = match get_token_program_for_mint(&rpc, &token1_mint).await {
+    let token1_program = match sol_trade_sdk::utils::token::get_token_program_with_cache(&rpc, &token1_mint).await {
         Ok(program) => {
             println!("✅ 自动检测 token1_mint ({}) Token Program: {}", token1_mint, program);
             program
@@ -338,7 +338,7 @@ async fn test_clmm_exact_in_sell_with_simulation() {
 
     // 🔧 自动从 Pool 获取 mint 并检测 Token Program
     let (token0_mint, token1_mint) = (pool_state.token_mint0, pool_state.token_mint1);
-    let token0_program = match get_token_program_for_mint(&rpc, &token0_mint).await {
+    let token0_program = match sol_trade_sdk::utils::token::get_token_program_with_cache(&rpc, &token0_mint).await {
         Ok(program) => {
             println!("✅ 自动检测 token0_mint ({}) Token Program: {}", token0_mint, program);
             program
@@ -348,7 +348,7 @@ async fn test_clmm_exact_in_sell_with_simulation() {
             spl_token::id()
         },
     };
-    let token1_program = match get_token_program_for_mint(&rpc, &token1_mint).await {
+    let token1_program = match sol_trade_sdk::utils::token::get_token_program_with_cache(&rpc, &token1_mint).await {
         Ok(program) => {
             println!("✅ 自动检测 token1_mint ({}) Token Program: {}", token1_mint, program);
             program
@@ -570,7 +570,7 @@ async fn test_clmm_exact_out_buy_with_simulation() {
 
     // 🔧 自动从 Pool 获取 mint 并检测 Token Program
     let (token0_mint, token1_mint) = (pool_state.token_mint0, pool_state.token_mint1);
-    let token0_program = match get_token_program_for_mint(&rpc, &token0_mint).await {
+    let token0_program = match sol_trade_sdk::utils::token::get_token_program_with_cache(&rpc, &token0_mint).await {
         Ok(program) => {
             println!("✅ 自动检测 token0_mint ({}) Token Program: {}", token0_mint, program);
             program
@@ -580,7 +580,7 @@ async fn test_clmm_exact_out_buy_with_simulation() {
             spl_token::id()
         },
     };
-    let token1_program = match get_token_program_for_mint(&rpc, &token1_mint).await {
+    let token1_program = match sol_trade_sdk::utils::token::get_token_program_with_cache(&rpc, &token1_mint).await {
         Ok(program) => {
             println!("✅ 自动检测 token1_mint ({}) Token Program: {}", token1_mint, program);
             program
@@ -798,7 +798,7 @@ async fn test_clmm_exact_out_sell_with_simulation() {
 
     // 🔧 自动从 Pool 获取 mint 并检测 Token Program
     let (token0_mint, token1_mint) = (pool_state.token_mint0, pool_state.token_mint1);
-    let token0_program = match get_token_program_for_mint(&rpc, &token0_mint).await {
+    let token0_program = match sol_trade_sdk::utils::token::get_token_program_with_cache(&rpc, &token0_mint).await {
         Ok(program) => {
             println!("✅ 自动检测 token0_mint ({}) Token Program: {}", token0_mint, program);
             program
@@ -808,7 +808,7 @@ async fn test_clmm_exact_out_sell_with_simulation() {
             spl_token::id()
         },
     };
-    let token1_program = match get_token_program_for_mint(&rpc, &token1_mint).await {
+    let token1_program = match sol_trade_sdk::utils::token::get_token_program_with_cache(&rpc, &token1_mint).await {
         Ok(program) => {
             println!("✅ 自动检测 token1_mint ({}) Token Program: {}", token1_mint, program);
             program
