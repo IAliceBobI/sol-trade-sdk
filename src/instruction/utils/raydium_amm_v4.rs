@@ -986,3 +986,60 @@ pub async fn quote_exact_in(
         extra_accounts_read: 2,
     })
 }
+
+/// Quote an exact-out swap against a Raydium AMM V4 pool.
+///
+/// Calculates the required input amount to obtain a specific output amount.
+///
+/// # Arguments
+///
+/// * `rpc` - RPC client
+/// * `pool_address` - Pool address
+/// * `amount_out` - Desired output amount (in smallest units)
+/// * `is_coin_in` - true if coin token is the input, false if PC token is the input
+///
+/// # Returns
+///
+/// Returns `QuoteExactOutResult` containing the required input amount and fees
+///
+/// # Example
+/// ```ignore
+/// let quote = quote_exact_out(&rpc, &pool, 1_000_000, true).await?;
+/// println!("需要输入: {} lamports", quote.amount_in);
+/// ```
+pub async fn quote_exact_out(
+    rpc: &SolanaRpcClient,
+    pool_address: &Pubkey,
+    amount_out: u64,
+    is_coin_in: bool,
+) -> Result<crate::utils::quote::QuoteExactOutResult, anyhow::Error> {
+    use crate::utils::calc::raydium_amm_v4::quote_exact_out as calc_quote_exact_out;
+
+    // 1. 获取 Pool 状态
+    let amm_info = get_pool_by_address(rpc, pool_address).await?;
+
+    // 2. 获取实时储备余额
+    let coin_balance = rpc.get_token_account_balance(&amm_info.token_coin).await?;
+    let pc_balance = rpc.get_token_account_balance(&amm_info.token_pc).await?;
+
+    let coin_reserve = coin_balance
+        .amount
+        .parse::<u64>()
+        .map_err(|_| anyhow!("Failed to parse coin reserve"))?;
+    let pc_reserve = pc_balance
+        .amount
+        .parse::<u64>()
+        .map_err(|_| anyhow!("Failed to parse pc reserve"))?;
+
+    // 3. 使用数学计算函数
+    let result = calc_quote_exact_out(coin_reserve, pc_reserve, amount_out, is_coin_in)
+        .map_err(|e| anyhow!("Quote exact out failed: {}", e))?;
+
+    // 4. 返回统一格式
+    Ok(crate::utils::quote::QuoteExactOutResult {
+        amount_in: result.amount_in,
+        fee_amount: result.fee_amount,
+        price_impact_bps: result.price_impact_bps,
+        extra_accounts_read: 2,
+    })
+}

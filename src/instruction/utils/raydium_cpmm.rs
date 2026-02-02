@@ -422,6 +422,57 @@ pub async fn quote_exact_in(
     })
 }
 
+/// Quote an exact-out swap against a Raydium CPMM pool.
+///
+/// Calculates the required input amount to obtain a specific output amount.
+///
+/// # Arguments
+///
+/// * `rpc` - RPC client
+/// * `pool_address` - Pool address
+/// * `amount_out` - Desired output amount (in smallest units)
+/// * `is_token0_in` - true if token0 is the input, false if token1 is the input
+///
+/// # Returns
+///
+/// Returns `QuoteExactOutResult` containing the required input amount and fees
+///
+/// # Example
+/// ```ignore
+/// let quote = quote_exact_out(&rpc, &pool, 1_000_000, true).await?;
+/// println!("需要输入: {} tokens", quote.amount_in);
+/// ```
+pub async fn quote_exact_out(
+    rpc: &SolanaRpcClient,
+    pool_address: &Pubkey,
+    amount_out: u64,
+    is_token0_in: bool,
+) -> Result<crate::utils::quote::QuoteExactOutResult, anyhow::Error> {
+    let pool_state = get_pool_by_address(rpc, pool_address).await?;
+    let (token0_reserve, token1_reserve) = get_pool_token_balances(
+        rpc,
+        pool_address,
+        &pool_state.token0_mint,
+        &pool_state.token1_mint,
+    )
+    .await?;
+
+    let result = crate::utils::calc::raydium_cpmm::quote_exact_out(
+        token0_reserve,
+        token1_reserve,
+        amount_out,
+        is_token0_in,
+    )
+    .map_err(|e| anyhow!("Quote exact out failed: {}", e))?;
+
+    Ok(crate::utils::quote::QuoteExactOutResult {
+        amount_in: result.amount_in,
+        fee_amount: result.fee_amount,
+        price_impact_bps: result.price_impact_bps,
+        extra_accounts_read: 2,
+    })
+}
+
 /// 内部实现：通过 offset 查找所有 Pool
 /// 通过 offset 查找所有 Pool（支持 Auto Mock）
 async fn find_pools_by_mint_offset_collect<T: PoolRpcClient + ?Sized>(
