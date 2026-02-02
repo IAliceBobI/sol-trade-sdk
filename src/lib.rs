@@ -982,6 +982,16 @@ impl TradingClient {
         }
     }
 
+    /// 获取输出代币的 mint 地址
+    fn get_output_mint(output_type: &TradeTokenType) -> Pubkey {
+        match output_type {
+            TradeTokenType::SOL => SOL_TOKEN_ACCOUNT,
+            TradeTokenType::WSOL => WSOL_TOKEN_ACCOUNT,
+            TradeTokenType::USDC => USDC_TOKEN_ACCOUNT,
+            TradeTokenType::USD1 => USD1_TOKEN_ACCOUNT,
+        }
+    }
+
     // 辅助函数：检查 DEX 是否支持 quote
     fn supports_quote(dex_type: &DexType) -> bool {
         matches!(
