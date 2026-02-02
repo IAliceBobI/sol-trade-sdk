@@ -242,12 +242,13 @@ impl TradeConfig {
     ///
     /// ```rust,no_run
     /// use sol_trade_sdk::TradingClient;
+    /// # use sol_trade_sdk::common::TradeConfig;
     ///
     /// // 普通交易（不需要防护）
-    /// let config = TradeConfig::new(...);
+    /// # let config = TradeConfig::default();
     ///
     /// // 套利交易（需要防护）
-    /// let config = TradeConfig::new(...)
+    /// # let config = TradeConfig::default()
     ///     .with_jito_sandwich_protection(true);
     /// ```
     ///

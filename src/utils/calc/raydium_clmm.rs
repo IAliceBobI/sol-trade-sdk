@@ -444,63 +444,75 @@ pub fn quote_exact_out_simplified(
         return Err("No liquidity available in the pool".to_string());
     }
 
-    // 使用 get_next_sqrt_price_from_output 计算价格移动
-    let next_sqrt_price = get_next_sqrt_price_from_output(
-        sqrt_price_x64,
-        liquidity,
-        amount_out,
-        zero_for_one,
-    );
+    if amount_out == 0 {
+        return Err("amount_out must be greater than 0".to_string());
+    }
 
-    // 计算输入金额（使用 sqrt_price 数学）
-    let sqrt_price_start = sqrt_price_x64;
-    let sqrt_price_end = next_sqrt_price;
+    // 简化实现：使用恒定乘积公式近似计算
+    // CLMM 可以近似看作 CPMM，价格 p = sqrt_price^2 / 2^128
+    // token1/token0 = p，因此 token0 = token1 / p
 
+    // 计算归一化价格（避免溢出）
+    // normalized_price = (sqrt_price / 2^32)^2 = sqrt_price^2 / 2^64
+    let price_shifted = sqrt_price_x64 >> 32; // 除以 2^32
+    let normalized_price = (price_shifted as u128)
+        .checked_mul(price_shifted as u128)
+        .ok_or_else(|| "Price calculation overflow".to_string())?;
+
+    // 根据方向计算输入金额
     let amount_in = if zero_for_one {
-        // token0 -> token1: 价格下降
-        if sqrt_price_end >= sqrt_price_start {
-            return Err("Price should decrease for zero_for_one".to_string());
+        // token0 -> token1: 输入 token0，输出 token1
+        // amount_in = amount_out / price
+        // 为了精确计算，使用：amount_in = (amount_out * SCALE) / price
+        const SCALE: u128 = 1_000_000_000_000;
+
+        let amount_scaled = (amount_out as u128)
+            .checked_mul(SCALE)
+            .ok_or_else(|| "Amount scaling overflow".to_string())?;
+
+        // 确保 price != 0
+        if normalized_price == 0 {
+            return Err("Invalid price: price is zero".to_string());
         }
 
-        let numerator = U256::from(liquidity)
-            .checked_mul(U256::from(sqrt_price_start - sqrt_price_end))
-            .ok_or_else(|| "Overflow in amount_in calculation".to_string())?;
-
-        let denominator = U256::from(sqrt_price_start)
-            .checked_mul(U256::from(sqrt_price_end))
-            .ok_or_else(|| "Overflow in sqrt_price multiplication".to_string())?;
-
-        numerator
-            .checked_div(denominator)
-            .ok_or_else(|| "Division error in amount_in calculation".to_string())?
-            .as_u64()
+        amount_scaled
+            .checked_div(normalized_price)
+            .ok_or_else(|| "Amount division error".to_string())?
     } else {
-        // token1 -> token0: 价格上升
-        if sqrt_price_end <= sqrt_price_start {
-            return Err("Price should increase for one_for_zero".to_string());
-        }
-
-        let numerator = U256::from(liquidity)
-            .checked_mul(U256::from(sqrt_price_end - sqrt_price_start))
-            .ok_or_else(|| "Overflow in amount_in calculation".to_string())?;
-
-        let denominator = U256::from(sqrt_price_start)
-            .checked_mul(U256::from(sqrt_price_end))
-            .ok_or_else(|| "Overflow in sqrt_price multiplication".to_string())?;
-
-        numerator
-            .checked_div(denominator)
-            .ok_or_else(|| "Division error in amount_in calculation".to_string())?
-            .as_u64()
+        // token1 -> token0: 输入 token1，输出 token0
+        // amount_in = amount_out * price
+        (amount_out as u128)
+            .checked_mul(normalized_price)
+            .ok_or_else(|| "Amount multiplication overflow".to_string())?
     };
+
+    // 转换回原始 scale（对于 zero_for_one 的情况）
+    let amount_in = if zero_for_one {
+        amount_in
+            .checked_div(1_000_000_000_000u128)
+            .ok_or_else(|| "Amount descaling overflow".to_string())?
+    } else {
+        amount_in
+    };
+
+    // 确保计算结果合理
+    if amount_in == 0 {
+        return Err("Calculated amount_in is zero, insufficient liquidity or invalid price".to_string());
+    }
+
+    // 检查是否超过流动性限制
+    if amount_in as u64 > amount_out * 1000 {
+        // 如果输入金额是输出金额的 1000 倍以上，可能流动性不足
+        return Err("Insufficient liquidity for this trade".to_string());
+    }
 
     // 计算手续费
     let fee_amount = (amount_in as u128)
         .checked_mul(fee_rate as u128)
-        .and_then(|p| p.checked_div(FEE_RATE_DENOMINATOR_VALUE as u128))
+        .and_then(|p: u128| p.checked_div(FEE_RATE_DENOMINATOR_VALUE as u128))
         .ok_or_else(|| "Fee calculation overflow".to_string())? as u64;
 
-    let total_amount_in = amount_in
+    let total_amount_in = (amount_in as u64)
         .checked_add(fee_amount)
         .ok_or_else(|| "Total amount overflow".to_string())?;
 

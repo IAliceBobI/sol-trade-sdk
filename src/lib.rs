@@ -170,13 +170,13 @@ pub struct TradingClient {
     /// # use sol_trade_sdk::TradingClient;
     /// # use sol_trade_sdk::TradeConfig;
     /// // 全局禁用（默认）
-    /// let config = TradeConfig::new(...);
+    /// # let config = TradeConfig::default();
     ///
     /// // 全局启用
-    /// let config = TradeConfig::new(...).with_jito_sandwich_protection(true);
+    /// # let config = TradeConfig::default().with_jito_sandwich_protection(true);
     ///
     /// // 单次交易覆盖全局配置
-    /// let mut buy_params = TradeBuyParams::new(...);
+    /// # let mut buy_params = TradeBuyParams::default();
     /// buy_params.enable_jito_sandwich_protection = Some(true); // 强制启用
     /// ```
     pub enable_jito_sandwich_protection: bool,
