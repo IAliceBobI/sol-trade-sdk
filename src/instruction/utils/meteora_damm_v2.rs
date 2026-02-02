@@ -66,18 +66,14 @@ pub async fn get_pool_by_address(
     rpc: &SolanaRpcClient,
     pool_address: &Pubkey,
 ) -> Result<Pool, anyhow::Error> {
-    // 1. 检查缓存
-    if let Some(pool) = meteora_cache::get_cached_pool_by_address(pool_address) {
-        return Ok(pool);
-    }
-    // 2. RPC 查询
+    // RPC 查询（不缓存，每次获取最新数据）
     let account = rpc.get_account(pool_address).await?;
     if account.owner != accounts::METEORA_DAMM_V2 {
         return Err(anyhow!("Account is not owned by Meteora Damm V2 program"));
     }
-    let pool = pool_decode(&account.data[8..]).ok_or_else(|| anyhow!("Failed to decode pool"))?;
-    // 3. 写入缓存
-    meteora_cache::cache_pool_by_address(pool_address, &pool);
+    // 使用修改后的 pool_decode（传入 program_id）
+    let pool = pool_decode(&account.data[8..], account.owner).ok_or_else(|| anyhow!("Failed to decode pool"))?;
+    // 不写入缓存
     Ok(pool)
 }
 

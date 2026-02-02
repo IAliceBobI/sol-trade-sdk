@@ -128,11 +128,7 @@ pub async fn get_pool_by_address<T: PoolRpcClient + ?Sized>(
     rpc: &T,
     pool_address: &Pubkey,
 ) -> Result<PoolState, anyhow::Error> {
-    // 1. 检查缓存（仅对非 AutoMock 客户端使用缓存）
-    if let Some(pool) = raydium_cpmm_cache::get_cached_pool_by_address(pool_address) {
-        return Ok(pool);
-    }
-    // 2. RPC 查询
+    // RPC 查询（不缓存，每次获取最新数据）
     let account = rpc
         .get_account(pool_address)
         .await
@@ -140,10 +136,10 @@ pub async fn get_pool_by_address<T: PoolRpcClient + ?Sized>(
     if account.owner != accounts::RAYDIUM_CPMM {
         return Err(anyhow!("Account is not owned by Raydium Cpmm program"));
     }
-    let pool_state = pool_state_decode(&account.data[8..])
+    // 使用修改后的 pool_state_decode（传入 program_id）
+    let pool_state = pool_state_decode(&account.data[8..], account.owner)
         .ok_or_else(|| anyhow!("Failed to decode pool state"))?;
-    // 3. 写入缓存
-    raydium_cpmm_cache::cache_pool_by_address(pool_address, &pool_state);
+    // 不写入缓存
     Ok(pool_state)
 }
 
@@ -517,7 +513,8 @@ async fn find_pools_by_mint_offset_collect<T: PoolRpcClient + ?Sized>(
                 _ => return None,
             };
             if data_bytes.len() > 8 {
-                pool_state_decode(&data_bytes[8..]).map(|pool| (pubkey, pool))
+                // 使用 program_id (所有账户都属于 RAYDIUM_CPMM)
+                pool_state_decode(&data_bytes[8..], accounts::RAYDIUM_CPMM).map(|pool| (pubkey, pool))
             } else {
                 None
             }

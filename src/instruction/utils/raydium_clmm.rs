@@ -200,11 +200,7 @@ pub async fn get_pool_by_address<T: PoolRpcClient + ?Sized>(
     rpc: &T,
     pool_address: &Pubkey,
 ) -> Result<PoolState, anyhow::Error> {
-    // 1. 检查缓存
-    if let Some(pool) = raydium_clmm_cache::get_cached_pool_by_address(pool_address) {
-        return Ok(pool);
-    }
-    // 2. RPC 查询
+    // RPC 查询（不缓存，每次获取最新数据）
     let account = rpc
         .get_account(pool_address)
         .await
@@ -212,10 +208,10 @@ pub async fn get_pool_by_address<T: PoolRpcClient + ?Sized>(
     if account.owner != accounts::RAYDIUM_CLMM {
         return Err(anyhow!("Account is not owned by Raydium CLMM program"));
     }
-    let pool_state = pool_state_decode(&account.data[8..])
+    // 使用修改后的 pool_state_decode（传入 program_id）
+    let pool_state = pool_state_decode(&account.data[8..], account.owner)
         .ok_or_else(|| anyhow!("Failed to decode pool state"))?;
-    // 3. 写入缓存
-    raydium_clmm_cache::cache_pool_by_address(pool_address, &pool_state);
+    // 不写入缓存
     Ok(pool_state)
 }
 
@@ -434,7 +430,8 @@ async fn find_pools_by_mint_offset_collect<T: PoolRpcClient + ?Sized>(
                         _ => return None,
                     };
                     if data_bytes.len() > 8 {
-                        pool_state_decode(&data_bytes[8..]).map(|pool| (addr_pubkey, pool))
+                        // 使用 program_id (所有账户都属于 RAYDIUM_CLMM)
+                        pool_state_decode(&data_bytes[8..], accounts::RAYDIUM_CLMM).map(|pool| (addr_pubkey, pool))
                     } else {
                         None
                     }
@@ -452,7 +449,8 @@ async fn find_pools_by_mint_offset_collect<T: PoolRpcClient + ?Sized>(
                         _ => return None,
                     };
                     if data_bytes.len() > 8 {
-                        pool_state_decode(&data_bytes[8..]).map(|pool| (addr_pubkey, pool))
+                        // 使用 program_id (所有账户都属于 RAYDIUM_CLMM)
+                        pool_state_decode(&data_bytes[8..], accounts::RAYDIUM_CLMM).map(|pool| (addr_pubkey, pool))
                     } else {
                         None
                     }

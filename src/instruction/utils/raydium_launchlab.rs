@@ -1254,7 +1254,7 @@ pub async fn find_cpswap_config(rpc: &SolanaRpcClient) -> Result<(Pubkey, Pubkey
                             _ => continue,
                         };
                         if data_bytes.len() > 8
-                            && let Some(pool_state) = pool_state_decode(&data_bytes[8..])
+                            && let Some(pool_state) = pool_state_decode(&data_bytes[8..], crate::constants::dex_protocols::DexProtocol::RaydiumCpmm.program_id_pubkey())
                         {
                             let cpswap_config = pool_state.amm_config;
                             let cpswap_create_pool_fee = accounts::CPMM_CREATE_POOL_FEE;

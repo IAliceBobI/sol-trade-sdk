@@ -114,12 +114,7 @@ pub async fn get_pool_by_address<T: PoolRpcClient + ?Sized>(
     rpc: &T,
     pool_address: &Pubkey,
 ) -> Result<AmmInfo, anyhow::Error> {
-    // 1. 检查缓存
-    if let Some(amm_info) = get_cached_pool_by_address(pool_address) {
-        return Ok(amm_info);
-    }
-
-    // 2. RPC 查询
+    // RPC 查询（不缓存，每次获取最新数据）
     let account = rpc
         .get_account(pool_address)
         .await
@@ -127,12 +122,11 @@ pub async fn get_pool_by_address<T: PoolRpcClient + ?Sized>(
     if account.owner != accounts::RAYDIUM_AMM_V4 {
         return Err(anyhow!("Account is not owned by Raydium AMM V4 program"));
     }
+    // 使用修改后的 amm_info_decode（传入 program_id）
     let amm_info =
-        amm_info_decode(&account.data).ok_or_else(|| anyhow!("Failed to decode amm info"))?;
+        amm_info_decode(&account.data, account.owner).ok_or_else(|| anyhow!("Failed to decode amm info"))?;
 
-    // 3. 写入缓存
-    cache_pool_by_address(pool_address, &amm_info);
-
+    // 不写入缓存
     Ok(amm_info)
 }
 
@@ -354,7 +348,8 @@ async fn find_pools_by_mint_offset_collect<T: PoolRpcClient + ?Sized>(
                 },
                 _ => return None,
             };
-            amm_info_decode(&data_bytes).map(|amm| (addr_pubkey, amm))
+            // 使用 program_id (所有账户都属于 RAYDIUM_AMM_V4)
+            amm_info_decode(&data_bytes, accounts::RAYDIUM_AMM_V4).map(|amm| (addr_pubkey, amm))
         })
         .collect();
 
