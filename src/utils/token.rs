@@ -23,6 +23,8 @@ pub struct MintInfo {
     pub symbol: String,
     /// 是否为 Token2022
     pub is_token2022: bool,
+    /// Token Program 地址
+    pub token_program: Pubkey,
 }
 
 /// 全局 MintInfo 缓存（包含 decimals、symbol、is_token2022）
@@ -71,6 +73,7 @@ pub async fn get_token_program_with_cache(
         decimals: 0, // 占位，实际 decimals 已在 get_mint_info 中缓存
         symbol: String::new(), // 占位，实际 symbol 已在 get_mint_info 中缓存
         is_token2022,
+        token_program: program,
     };
     MINT_INFO_CACHE.insert(*mint, info);
 
@@ -102,6 +105,7 @@ pub async fn get_token_program_with_cache_client<T: PoolRpcClient + ?Sized>(
         decimals: 0, // 占位，实际 decimals 已在 get_mint_info 中缓存
         symbol: String::new(), // 占位，实际 symbol 已在 get_mint_info 中缓存
         is_token2022,
+        token_program: program,
     };
     MINT_INFO_CACHE.insert(*mint, info);
 
@@ -116,7 +120,8 @@ pub async fn get_mint_info(
     mint: &Pubkey,
 ) -> Result<MintInfo> {
     let account = rpc.get_account(mint).await?;
-    let is_token2022 = account.owner == spl_token_2022::ID;
+    let token_program = account.owner;
+    let is_token2022 = token_program == spl_token_2022::ID;
 
     // 尝试解析为传统 Token 程序的 Mint
     if !is_token2022 && let Ok(mint_account) = Mint::unpack(&account.data) {
@@ -124,6 +129,7 @@ pub async fn get_mint_info(
             decimals: mint_account.decimals,
             symbol: get_known_token_symbol(mint),
             is_token2022: false,
+            token_program,
         };
         MINT_INFO_CACHE.insert(*mint, info.clone());
         return Ok(info);
@@ -146,7 +152,7 @@ pub async fn get_mint_info(
                 get_known_token_symbol(mint)
             };
 
-            let info = MintInfo { decimals, symbol, is_token2022: true };
+            let info = MintInfo { decimals, symbol, is_token2022: true, token_program };
             MINT_INFO_CACHE.insert(*mint, info.clone());
             return Ok(info);
         }
@@ -171,7 +177,8 @@ pub async fn get_mint_info_with_client<T: PoolRpcClient + ?Sized>(
         .get_account(mint)
         .await
         .map_err(|e| anyhow::anyhow!("RPC 调用失败: {}", e))?;
-    let is_token2022 = account.owner == spl_token_2022::ID;
+    let token_program = account.owner;
+    let is_token2022 = token_program == spl_token_2022::ID;
 
     // 尝试解析为传统 Token 程序的 Mint
     if !is_token2022 && let Ok(mint_account) = Mint::unpack(&account.data) {
@@ -179,6 +186,7 @@ pub async fn get_mint_info_with_client<T: PoolRpcClient + ?Sized>(
             decimals: mint_account.decimals,
             symbol: get_known_token_symbol(mint),
             is_token2022: false,
+            token_program,
         };
         MINT_INFO_CACHE.insert(*mint, info.clone());
         return Ok(info);
@@ -201,7 +209,7 @@ pub async fn get_mint_info_with_client<T: PoolRpcClient + ?Sized>(
                 get_known_token_symbol(mint)
             };
 
-            let info = MintInfo { decimals, symbol, is_token2022: true };
+            let info = MintInfo { decimals, symbol, is_token2022: true, token_program };
             MINT_INFO_CACHE.insert(*mint, info.clone());
             return Ok(info);
         }

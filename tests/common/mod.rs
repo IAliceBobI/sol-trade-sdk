@@ -576,74 +576,21 @@ pub async fn transfer_token_to(
 
 use solana_sdk::signature::Signer;
 
-/// Mint 信息
-#[derive(Debug, Clone)]
-pub struct MintInfo {
-    pub decimals: u8,
-    pub token_program: Pubkey,
-}
+// 重新导出 SDK 的 token 工具函数，提供别名以保持兼容性
+pub use sol_trade_sdk::utils::token::get_token_program_with_cache as get_token_program_for_mint;
 
-/// 查询 mint 的 decimals 和 token_program
+/// 查询 mint 的 decimals 和 token_program（包装 SDK 函数以适配测试代码的错误类型）
 pub async fn get_mint_info(
     rpc_client: &sol_trade_sdk::common::SolanaRpcClient,
     mint: &Pubkey,
 ) -> Result<MintInfo, String> {
-    // 获取 mint 账户
-    let mint_account =
-        rpc_client.get_account(mint).await.map_err(|e| format!("RPC error: {}", e))?;
-
-    // Token program 就是 mint 账户的 owner
-    let token_program = mint_account.owner;
-
-    // 解析 mint 数据获取 decimals
-    // Mint 数据结构: https://docs.rs/spl-token/latest/spl-token/state/struct.Mint.html
-    let data = mint_account.data;
-    if data.len() < 82 {
-        return Err(format!(
-            "Invalid mint account data: expected at least 82 bytes, got {} bytes, mint={}",
-            data.len(),
-            mint
-        ));
-    }
-
-    // decimals 在 offset 44 位置 (u8)
-    let decimals = data
-        .get(44)
-        .copied()
-        .ok_or_else(|| format!("无法访问 decimals 字段：数据长度不足，mint={}", mint))?;
-
-    Ok(MintInfo { decimals, token_program })
+    sol_trade_sdk::utils::token::get_mint_info(rpc_client, mint)
+        .await
+        .map_err(|e| format!("获取 mint 信息失败: {}", e))
 }
 
-/// 从 mint 地址获取 Token Program（mint 的 owner 就是 Token Program）
-///
-/// 这是一个便捷函数，直接返回 Token Program ID，不需要 decimals 信息
-///
-/// # 参数
-/// * `rpc_client` - RPC 客户端
-/// * `mint` - Token mint 地址
-///
-/// # 返回
-/// * `Ok(Pubkey)` - Token Program ID（旧版或 Token-2022）
-/// * `Err(String)` - 查询失败
-///
-/// # 示例
-/// ```ignore
-/// let token_program = get_token_program_for_mint(&rpc, &pump_mint).await?;
-/// println!("PUMP token 使用的 Token Program: {:?}", token_program);
-/// ```
-#[allow(dead_code)]
-pub async fn get_token_program_for_mint(
-    rpc_client: &sol_trade_sdk::common::SolanaRpcClient,
-    mint: &Pubkey,
-) -> Result<Pubkey, String> {
-    // 获取 mint 账户
-    let mint_account =
-        rpc_client.get_account(mint).await.map_err(|e| format!("RPC error: {}", e))?;
-
-    // Mint 账户的 owner 就是该 Token 使用的 Token Program
-    Ok(mint_account.owner)
-}
+/// Mint 信息（重新导出 SDK 的 MintInfo）
+pub use sol_trade_sdk::utils::token::MintInfo;
 
 /// 将格式化的 amount 字符串（如 "1.22"）转换为原始单位（u64）
 ///
