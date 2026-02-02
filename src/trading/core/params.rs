@@ -1,8 +1,6 @@
 use crate::common::bonding_curve::BondingCurveAccount;
 use crate::common::nonce_cache::DurableNonceInfo;
-use crate::common::spl_associated_token_account::get_associated_token_address_with_program_id;
 use crate::common::{GasFeeStrategy, SolanaRpcClient, auto_mock_rpc::PoolRpcClient};
-use crate::constants::TOKEN_PROGRAM;
 use crate::instruction::utils::pumpfun::global_constants::MAYHEM_FEE_RECIPIENT;
 use crate::instruction::utils::pumpswap::accounts::MAYHEM_FEE_RECIPIENT as MAYHEM_FEE_RECIPIENT_SWAP;
 use crate::swqos::{SwqosClient, TradeType};
@@ -319,16 +317,11 @@ impl PumpSwapParams {
         let coin_creator_vault_authority =
             crate::instruction::utils::pumpswap::coin_creator_vault_authority(creator);
 
-        let base_token_program_ata = get_associated_token_address_with_program_id(
-            pool_address,
-            &pool_data.base_mint,
-            &crate::constants::TOKEN_PROGRAM,
-        );
-        let quote_token_program_ata = get_associated_token_address_with_program_id(
-            pool_address,
-            &pool_data.quote_mint,
-            &crate::constants::TOKEN_PROGRAM,
-        );
+        // 获取 Token Program（使用缓存，避免重复 RPC 调用）
+        let base_token_program =
+            crate::utils::token::get_token_program_with_cache(rpc, &pool_data.base_mint).await?;
+        let quote_token_program =
+            crate::utils::token::get_token_program_with_cache(rpc, &pool_data.quote_mint).await?;
 
         Ok(Self {
             pool: *pool_address,
@@ -340,16 +333,8 @@ impl PumpSwapParams {
             pool_quote_token_reserves,
             coin_creator_vault_ata,
             coin_creator_vault_authority,
-            base_token_program: if pool_data.pool_base_token_account == base_token_program_ata {
-                crate::constants::TOKEN_PROGRAM
-            } else {
-                crate::constants::TOKEN_PROGRAM_2022
-            },
-            quote_token_program: if pool_data.pool_quote_token_account == quote_token_program_ata {
-                crate::constants::TOKEN_PROGRAM
-            } else {
-                crate::constants::TOKEN_PROGRAM_2022
-            },
+            base_token_program,
+            quote_token_program,
             is_mayhem_mode: pool_data.is_mayhem_mode,
         })
     }
@@ -753,20 +738,14 @@ impl RaydiumClmmParams {
         let pool_state =
             crate::instruction::utils::raydium_clmm::get_pool_by_address(rpc, pool_address).await?;
 
-        // Determine token programs by querying mint accounts
-        let token0_account = rpc.get_account(&pool_state.token_mint0).await?;
-        let token0_program = if token0_account.owner == crate::constants::TOKEN_PROGRAM_2022 {
-            crate::constants::TOKEN_PROGRAM_2022
-        } else {
-            TOKEN_PROGRAM
-        };
-
-        let token1_account = rpc.get_account(&pool_state.token_mint1).await?;
-        let token1_program = if token1_account.owner == crate::constants::TOKEN_PROGRAM_2022 {
-            crate::constants::TOKEN_PROGRAM_2022
-        } else {
-            TOKEN_PROGRAM
-        };
+        // 获取 Token Program（使用缓存，避免重复 RPC 调用）
+        // Mint 的 owner 永远不变，首次查询后会永久缓存
+        let token0_program =
+            crate::utils::token::get_token_program_with_cache(rpc, &pool_state.token_mint0)
+                .await?;
+        let token1_program =
+            crate::utils::token::get_token_program_with_cache(rpc, &pool_state.token_mint1)
+                .await?;
 
         // Observation state is stored in pool_state.observation_key
 
@@ -827,14 +806,23 @@ impl MeteoraDammV2Params {
         let pool_data =
             crate::instruction::utils::meteora_damm_v2::get_pool_by_address(rpc, pool_address)
                 .await?;
+
+        // 获取 Token Program（使用缓存，避免重复 RPC 调用）
+        let token_a_program =
+            crate::utils::token::get_token_program_with_cache(rpc, &pool_data.token_a_mint)
+                .await?;
+        let token_b_program =
+            crate::utils::token::get_token_program_with_cache(rpc, &pool_data.token_b_mint)
+                .await?;
+
         Ok(Self {
             pool: *pool_address,
             token_a_vault: pool_data.token_a_vault,
             token_b_vault: pool_data.token_b_vault,
             token_a_mint: pool_data.token_a_mint,
             token_b_mint: pool_data.token_b_mint,
-            token_a_program: TOKEN_PROGRAM,
-            token_b_program: TOKEN_PROGRAM,
+            token_a_program,
+            token_b_program,
         })
     }
 }

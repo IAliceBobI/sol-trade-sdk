@@ -34,6 +34,80 @@ pub fn get_cached_mint_info(mint: &Pubkey) -> Option<MintInfo> {
     MINT_INFO_CACHE.get(mint).map(|info| info.clone())
 }
 
+/// 获取 Token Program（仅从缓存，无需 RPC 调用）
+///
+/// Mint 的 owner（Token Program）永远不变，所以可以从 MintInfo 缓存中获取
+/// 如果缓存未命中，返回 None
+pub fn get_token_program_cached(mint: &Pubkey) -> Option<Pubkey> {
+    get_cached_mint_info(mint).map(|info| {
+        if info.is_token2022 {
+            crate::constants::TOKEN_PROGRAM_2022
+        } else {
+            crate::constants::TOKEN_PROGRAM
+        }
+    })
+}
+
+/// 获取 Token Program（带缓存，缓存未命中时才查询链上）
+///
+/// Mint 的 owner（Token Program）永远不变，首次查询后会永久缓存
+/// 后续调用直接从缓存读取，无需额外 RPC 调用
+pub async fn get_token_program_with_cache(
+    rpc: &crate::common::SolanaRpcClient,
+    mint: &Pubkey,
+) -> Result<Pubkey> {
+    // 检查缓存
+    if let Some(program) = get_token_program_cached(mint) {
+        return Ok(program);
+    }
+
+    // 缓存未命中，查询 mint 账户
+    let account = rpc.get_account(mint).await?;
+    let program = account.owner;
+
+    // 通过 MintInfo 缓存来存储 Token Program 信息
+    let is_token2022 = program == crate::constants::TOKEN_PROGRAM_2022;
+    let info = MintInfo {
+        decimals: 0, // 占位，实际 decimals 已在 get_mint_info 中缓存
+        symbol: String::new(), // 占位，实际 symbol 已在 get_mint_info 中缓存
+        is_token2022,
+    };
+    MINT_INFO_CACHE.insert(*mint, info);
+
+    Ok(program)
+}
+
+/// 获取 Token Program（泛型版本，支持 Auto Mock）
+///
+/// Mint 的 owner（Token Program）永远不变，首次查询后会永久缓存
+pub async fn get_token_program_with_cache_client<T: PoolRpcClient + ?Sized>(
+    rpc: &T,
+    mint: &Pubkey,
+) -> Result<Pubkey> {
+    // 检查缓存
+    if let Some(program) = get_token_program_cached(mint) {
+        return Ok(program);
+    }
+
+    // 缓存未命中，查询 mint 账户
+    let account = rpc
+        .get_account(mint)
+        .await
+        .map_err(|e| anyhow::anyhow!("RPC 调用失败: {}", e))?;
+    let program = account.owner;
+
+    // 通过 MintInfo 缓存来存储 Token Program 信息
+    let is_token2022 = program == crate::constants::TOKEN_PROGRAM_2022;
+    let info = MintInfo {
+        decimals: 0, // 占位，实际 decimals 已在 get_mint_info 中缓存
+        symbol: String::new(), // 占位，实际 symbol 已在 get_mint_info 中缓存
+        is_token2022,
+    };
+    MINT_INFO_CACHE.insert(*mint, info);
+
+    Ok(program)
+}
+
 /// 获取 Mint 账户的完整信息（统一实现，支持 Token 和 Token2022）
 ///
 /// 使用全局缓存减少 RPC 调用
