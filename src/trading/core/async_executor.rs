@@ -489,11 +489,11 @@ pub async fn execute_parallel(
     // All tasks spawned
 
     if !wait_transaction_confirmed {
-        // 🔧 事件驱动：等待第一个结果，最多等待 100ms
-        // 相比固定等待 10ms，这种方式：
+        // 🔧 事件驱动：等待第一个结果，最多等待 3 秒
+        // 考虑到 RPC 调用延迟（特别是 frpc 转发的远端节点）：
         // 1. 结果到达立即返回（更快）
-        // 2. 给足够时间等待 MEV 服务响应（更可靠）
-        let timeout = std::time::Duration::from_millis(100);
+        // 2. 给足够时间等待 RPC 响应（更可靠）
+        let timeout = std::time::Duration::from_millis(3000);
         match collector.wait_for_first(timeout).await {
             Some(result) => return Ok(result),
             None => {
