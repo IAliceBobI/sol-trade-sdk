@@ -589,10 +589,8 @@ pub async fn get_mint_info(
     mint: &Pubkey,
 ) -> Result<MintInfo, String> {
     // 获取 mint 账户
-    let mint_account = rpc_client
-        .get_account(mint)
-        .await
-        .map_err(|e| format!("RPC error: {}", e))?;
+    let mint_account =
+        rpc_client.get_account(mint).await.map_err(|e| format!("RPC error: {}", e))?;
 
     // Token program 就是 mint 账户的 owner
     let token_program = mint_account.owner;
@@ -640,10 +638,8 @@ pub async fn get_token_program_for_mint(
     mint: &Pubkey,
 ) -> Result<Pubkey, String> {
     // 获取 mint 账户
-    let mint_account = rpc_client
-        .get_account(mint)
-        .await
-        .map_err(|e| format!("RPC error: {}", e))?;
+    let mint_account =
+        rpc_client.get_account(mint).await.map_err(|e| format!("RPC error: {}", e))?;
 
     // Mint 账户的 owner 就是该 Token 使用的 Token Program
     Ok(mint_account.owner)
@@ -714,12 +710,10 @@ async fn call_surfnet_set_token_account(
         .await
         .map_err(|e| format!("HTTP request failed: {}", e))?;
 
-    let response_text = response
-        .text()
-        .await
-        .map_err(|e| format!("Failed to read response: {}", e))?;
-    let response_json: serde_json::Value = serde_json::from_str(&response_text)
-        .map_err(|e| format!("Failed to parse JSON: {}", e))?;
+    let response_text =
+        response.text().await.map_err(|e| format!("Failed to read response: {}", e))?;
+    let response_json: serde_json::Value =
+        serde_json::from_str(&response_text).map_err(|e| format!("Failed to parse JSON: {}", e))?;
 
     if let Some(error) = response_json.get("error") {
         return Err(format!("RPC error: {}", error));

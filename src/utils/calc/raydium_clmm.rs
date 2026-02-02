@@ -420,6 +420,9 @@ pub fn calculate_swap_exact_out_with_tick_arrays(
                 sqrt_price_next_x64
             };
 
+            // 保存 step 开始时的价格（用于后续比较）
+            let sqrt_price_start_x64 = current_sqrt_price;
+
             // 调用官方 swap 计算，关键：is_base_input = false（exact_out 模式）
             let swap_step = compute_swap_step(
                 current_sqrt_price,
@@ -439,16 +442,15 @@ pub fn calculate_swap_exact_out_with_tick_arrays(
             // - amount_out 是提供的输出
             let step_input = swap_step.amount_in;
             let step_output = swap_step.amount_out;
-            let step_fee = swap_step.fee_amount;
+            let _step_fee = swap_step.fee_amount;
 
             // 更新剩余输出和累计输入
             amount_out_remaining = amount_out_remaining
                 .checked_sub(step_output)
                 .ok_or("amount_out_remaining underflow")?;
 
-            amount_in_calculated = amount_in_calculated
-                .checked_add(step_input)
-                .ok_or("amount_in overflow")?;
+            amount_in_calculated =
+                amount_in_calculated.checked_add(step_input).ok_or("amount_in overflow")?;
 
             // 如果达到下一个 tick，更新流动性
             if current_sqrt_price == sqrt_price_next_x64 {
@@ -458,8 +460,9 @@ pub fn calculate_swap_exact_out_with_tick_arrays(
                 }
 
                 current_tick = if zero_for_one { tick_next - 1 } else { tick_next };
-            } else if current_sqrt_price != current_sqrt_price {
-                // 重新计算 tick
+            } else if current_sqrt_price != sqrt_price_start_x64 {
+                // 如果价格有变化（但没有到达下一个 tick），重新计算 tick
+                // 注意：这里使用的是 step 开始时的价格，不是 sqrt_price_next_x64
                 current_tick = get_tick_at_sqrt_price(current_sqrt_price)?;
             }
 
@@ -622,8 +625,8 @@ pub fn quote_exact_out_simplified(
     // 计算归一化价格（避免溢出）
     // normalized_price = (sqrt_price / 2^32)^2 = sqrt_price^2 / 2^64
     let price_shifted = sqrt_price_x64 >> 32; // 除以 2^32
-    let normalized_price = (price_shifted as u128)
-        .checked_mul(price_shifted as u128)
+    let normalized_price = price_shifted
+        .checked_mul(price_shifted)
         .ok_or_else(|| "Price calculation overflow".to_string())?;
 
     // 根据方向计算输入金额
@@ -664,7 +667,9 @@ pub fn quote_exact_out_simplified(
 
     // 确保计算结果合理
     if amount_in == 0 {
-        return Err("Calculated amount_in is zero, insufficient liquidity or invalid price".to_string());
+        return Err(
+            "Calculated amount_in is zero, insufficient liquidity or invalid price".to_string()
+        );
     }
 
     // 检查是否超过流动性限制
@@ -674,7 +679,7 @@ pub fn quote_exact_out_simplified(
     }
 
     // 计算手续费
-    let fee_amount = (amount_in as u128)
+    let fee_amount = amount_in
         .checked_mul(fee_rate as u128)
         .and_then(|p: u128| p.checked_div(FEE_RATE_DENOMINATOR_VALUE as u128))
         .ok_or_else(|| "Fee calculation overflow".to_string())? as u64;
@@ -684,19 +689,12 @@ pub fn quote_exact_out_simplified(
         .ok_or_else(|| "Total amount overflow".to_string())?;
 
     // 价格影响（简化：输出金额占总流动性比例）
-    let price_impact_bps = match (amount_out as u128)
+    let price_impact_bps = (amount_out as u128)
         .checked_mul(10_000u128)
         .and_then(|p| p.checked_div(liquidity))
-    {
-        Some(impact) => Some(impact as u64),
-        None => None,
-    };
+        .map(|impact| impact as u64);
 
-    Ok(QuoteExactOutResult {
-        amount_in: total_amount_in,
-        fee_amount,
-        price_impact_bps,
-    })
+    Ok(QuoteExactOutResult { amount_in: total_amount_in, fee_amount, price_impact_bps })
 }
 
 /// Quote an exact-out swap against a Raydium CLMM pool (完整版本)
@@ -741,24 +739,18 @@ pub fn quote_exact_out(
         fee_rate,
         zero_for_one,
         tick_arrays,
-    ).map_err(|e| e.to_string())?;
+    )
+    .map_err(|e| e.to_string())?;
 
     // TODO: 计算实际手续费（需要从 swap_step 中累计）
     // 目前简化为 0，因为 CLMM 的手续费已经包含在 amount_in 中
     let fee_amount = 0u64;
 
     // 价格影响（简化：输出金额占总流动性比例）
-    let price_impact_bps = match (amount_out as u128)
+    let price_impact_bps = (amount_out as u128)
         .checked_mul(10_000u128)
         .and_then(|p| p.checked_div(liquidity))
-    {
-        Some(impact) => Some(impact as u64),
-        None => None,
-    };
+        .map(|impact| impact as u64);
 
-    Ok(QuoteExactOutResult {
-        amount_in,
-        fee_amount,
-        price_impact_bps,
-    })
+    Ok(QuoteExactOutResult { amount_in, fee_amount, price_impact_bps })
 }

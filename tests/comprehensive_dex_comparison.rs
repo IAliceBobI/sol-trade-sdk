@@ -10,13 +10,20 @@
 use sol_trade_sdk::{
     common::SolanaRpcClient,
     instruction::utils::{
-        raydium_clmm::{get_pool_by_address as clmm_get_pool, quote_exact_in as clmm_quote_exact_in, quote_exact_out as clmm_quote_exact_out},
-        raydium_cpmm::{get_pool_by_address as cpmm_get_pool, quote_exact_in as cpmm_quote_exact_in},
-        raydium_amm_v4::{get_pool_by_address as amm_get_pool, quote_exact_in as amm_quote_exact_in},
+        raydium_amm_v4::{
+            get_pool_by_address as amm_get_pool, quote_exact_in as amm_quote_exact_in,
+        },
+        raydium_clmm::{
+            get_pool_by_address as clmm_get_pool, quote_exact_in as clmm_quote_exact_in,
+            quote_exact_out as clmm_quote_exact_out,
+        },
+        raydium_cpmm::{
+            get_pool_by_address as cpmm_get_pool, quote_exact_in as cpmm_quote_exact_in,
+        },
     },
     utils::calc::{
-        raydium_cpmm::quote_exact_out as cpmm_quote_exact_out,
         raydium_amm_v4::quote_exact_out as amm_quote_exact_out,
+        raydium_cpmm::quote_exact_out as cpmm_quote_exact_out,
     },
 };
 use solana_sdk::{pubkey::Pubkey, signature::Keypair};
@@ -56,11 +63,8 @@ async fn test_comprehensive_dex_comparison() {
 
     let mut all_results = Vec::new();
 
-    let test_amounts = vec![
-        ("Small", 1_000_000u64),
-        ("Medium", 10_000_000u64),
-        ("Large", 100_000_000u64),
-    ];
+    let test_amounts =
+        vec![("Small", 1_000_000u64), ("Medium", 10_000_000u64), ("Large", 100_000_000u64)];
 
     // Test CLMM
     println!("\n[Testing Raydium CLMM]");
@@ -97,7 +101,8 @@ async fn test_clmm_pools(
     println!("Pool: {}", pool_address);
     println!("Direction: WSOL <-> JUP\n");
 
-    let pool_state = clmm_get_pool(rpc, &pool_address).await
+    let pool_state = clmm_get_pool(rpc, &pool_address)
+        .await
         .map_err(|e| format!("Failed to get pool: {}", e))?;
 
     println!("Pool State:");
@@ -224,7 +229,8 @@ async fn test_cpmm_pools(
     println!("Pool: {}", pool_address);
     println!("Direction: WSOL <-> PIPE\n");
 
-    let pool_state = cpmm_get_pool(rpc, &pool_address).await
+    let pool_state = cpmm_get_pool(rpc, &pool_address)
+        .await
         .map_err(|e| format!("Failed to get pool: {}", e))?;
 
     println!("Pool State:");
@@ -370,7 +376,8 @@ async fn test_amm_v4_pools(
     println!("Pool: {}", pool_address);
     println!("Direction: SOL <-> USDC\n");
 
-    let pool_state = amm_get_pool(rpc, &pool_address).await
+    let pool_state = amm_get_pool(rpc, &pool_address)
+        .await
         .map_err(|e| format!("Failed to get pool: {}", e))?;
 
     println!("Pool State:");
@@ -514,12 +521,11 @@ fn print_summary_report(all_results: &Vec<TestResult>) {
     println!("Comprehensive Test Report");
     println!("====================================================\n");
 
-    let mut dex_groups: std::collections::HashMap<String, Vec<&TestResult>> = std::collections::HashMap::new();
+    let mut dex_groups: std::collections::HashMap<String, Vec<&TestResult>> =
+        std::collections::HashMap::new();
 
     for result in all_results {
-        dex_groups.entry(result.dex_name.clone())
-            .or_insert_with(Vec::new)
-            .push(result);
+        dex_groups.entry(result.dex_name.clone()).or_insert_with(Vec::new).push(result);
     }
 
     for dex in &["CLMM".to_string(), "CPMM".to_string(), "AMM V4".to_string()] {
@@ -534,7 +540,8 @@ fn print_summary_report(all_results: &Vec<TestResult>) {
                 ("exact_in", "sell"),
                 ("exact_out", "sell"),
             ] {
-                let filtered: Vec<_> = dex_results.iter()
+                let filtered: Vec<_> = dex_results
+                    .iter()
                     .filter(|r| &r.mode == mode && &r.direction == direction)
                     .collect();
 
@@ -543,7 +550,8 @@ fn print_summary_report(all_results: &Vec<TestResult>) {
 
                     for result in filtered {
                         if result.success {
-                            println!("  [OK] Input: {} -> Output: {} (Fee: {})",
+                            println!(
+                                "  [OK] Input: {} -> Output: {} (Fee: {})",
                                 format_amount(result.input_amount),
                                 format_amount(result.output_amount),
                                 format_amount(result.fee_amount)

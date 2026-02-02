@@ -494,17 +494,15 @@ impl InstructionBuilder for RaydiumClmmInstructionBuilder {
         //
         // exact_in 模式：输入固定，输出浮动
         // exact_out 模式：输出固定，输入浮动
-        let (swap_amount, other_threshold, is_base_input) = if has_fixed_output {
+        let (swap_amount, other_threshold, is_base_input) = if let Some(fixed_out) =
+            params.fixed_output_amount
+        {
             // exact_out 模式
-            let fixed_out = params.fixed_output_amount.unwrap();
             // 从 params.input_amount 获取计算出的输入（由 quote_exact_out 计算）
             let max_in = params.input_amount.unwrap_or(0);
             // 加上滑点：max_in * (1 + slippage)，round_up=true
-            let max_in_with_slippage = if max_in > 0 {
-                amount_with_slippage(max_in, slippage as u16, true)
-            } else {
-                0
-            };
+            let max_in_with_slippage =
+                if max_in > 0 { amount_with_slippage(max_in, slippage as u16, true) } else { 0 };
             (fixed_out, max_in_with_slippage, 0) // is_base_input = false
         } else {
             // exact_in 模式
@@ -917,22 +915,22 @@ impl InstructionBuilder for RaydiumClmmInstructionBuilder {
         //
         // exact_in 模式：输入固定，输出浮动
         // exact_out 模式：输出固定，输入浮动
-        let (swap_amount, other_threshold, is_base_input_val) = if has_fixed_output {
-            // exact_out 模式
-            let fixed_out = params.fixed_output_amount.unwrap();
-            // 从 params.input_amount 获取计算出的输入（由 quote_exact_out 计算）
-            let max_in = params.input_amount.unwrap_or(0);
-            // 加上滑点：max_in * (1 + slippage)
-            let max_in_with_slippage = if max_in > 0 {
-                ((max_in as f64) * (1.0 + (slippage as f64) / 10000.0)) as u64
+        let (swap_amount, other_threshold, is_base_input_val) =
+            if let Some(fixed_out) = params.fixed_output_amount {
+                // exact_out 模式
+                // 从 params.input_amount 获取计算出的输入（由 quote_exact_out 计算）
+                let max_in = params.input_amount.unwrap_or(0);
+                // 加上滑点：max_in * (1 + slippage)
+                let max_in_with_slippage = if max_in > 0 {
+                    ((max_in as f64) * (1.0 + (slippage as f64) / 10000.0)) as u64
+                } else {
+                    0
+                };
+                (fixed_out, max_in_with_slippage, 0) // is_base_input = false
             } else {
-                0
+                // exact_in 模式
+                (amount_in, minimum_amount_out, if is_token0_in { 1 } else { 0 })
             };
-            (fixed_out, max_in_with_slippage, 0) // is_base_input = false
-        } else {
-            // exact_in 模式
-            (amount_in, minimum_amount_out, if is_token0_in { 1 } else { 0 })
-        };
 
         let mut data = vec![0u8; 41];
         data[0..8].copy_from_slice(SWAP_V2_DISCRIMINATOR);

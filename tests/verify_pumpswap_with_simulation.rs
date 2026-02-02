@@ -17,7 +17,7 @@
 
 use sol_trade_sdk::{
     common::SolanaRpcClient,
-    constants::{TOKEN_PROGRAM, TOKEN_2022_PROGRAM},
+    constants::{TOKEN_2022_PROGRAM, TOKEN_PROGRAM},
     instruction::utils::pumpswap::{get_pool_by_address, quote_exact_in, quote_exact_out},
     trading::core::params::{PumpSwapParams, SwapParams},
     trading::core::traits::InstructionBuilder,
@@ -69,13 +69,14 @@ async fn test_pumpswap_exact_in_buy_with_simulation() {
 
     // 初始化 ATA
     if let Err(e) = ensure_ata_with_balance(
-        &rpc, &rpc_url, &payer,
-        &[
-            (wsol_mint, Some(amount_in)),
-            (pump_mint, None),
-        ],
+        &rpc,
+        &rpc_url,
+        &payer,
+        &[(wsol_mint, Some(amount_in)), (pump_mint, None)],
         1,
-    ).await {
+    )
+    .await
+    {
         println!("❌ 初始化失败: {}\n", e);
         return;
     }
@@ -160,8 +161,8 @@ async fn test_pumpswap_exact_in_buy_with_simulation() {
         pool_quote_token_reserves: quote_reserve,
         coin_creator_vault_ata: Pubkey::default(),
         coin_creator_vault_authority: Pubkey::default(),
-        base_token_program,   // 自动获取
-        quote_token_program,  // 自动获取
+        base_token_program,  // 自动获取
+        quote_token_program, // 自动获取
         is_mayhem_mode: pool_state.is_mayhem_mode,
     };
 
@@ -178,7 +179,9 @@ async fn test_pumpswap_exact_in_buy_with_simulation() {
         address_lookup_table_account: None,
         recent_blockhash: None,
         wait_transaction_confirmed: false,
-        protocol_params: sol_trade_sdk::trading::core::params::DexParamEnum::PumpSwap(pumpswap_params),
+        protocol_params: sol_trade_sdk::trading::core::params::DexParamEnum::PumpSwap(
+            pumpswap_params,
+        ),
         open_seed_optimize: false,
         swqos_clients: Vec::new(),
         middleware_manager: None,
@@ -208,18 +211,29 @@ async fn test_pumpswap_exact_in_buy_with_simulation() {
     };
 
     let user_input_ata = spl_associated_token_account::get_associated_token_address_with_program_id(
-        &payer.pubkey(), &wsol_mint, &spl_token::id()
+        &payer.pubkey(),
+        &wsol_mint,
+        &spl_token::id(),
     );
-    let user_output_ata = spl_associated_token_account::get_associated_token_address_with_program_id(
-        &payer.pubkey(), &pump_mint, &spl_token::id()
-    );
+    let user_output_ata =
+        spl_associated_token_account::get_associated_token_address_with_program_id(
+            &payer.pubkey(),
+            &pump_mint,
+            &spl_token::id(),
+        );
 
     // 链上模拟
     let simulation_result = match simulate_swap_transaction(
-        &rpc, &payer, instructions,
-        user_input_ata, user_output_ata,
-        wsol_mint, pump_mint,
-    ).await {
+        &rpc,
+        &payer,
+        instructions,
+        user_input_ata,
+        user_output_ata,
+        wsol_mint,
+        pump_mint,
+    )
+    .await
+    {
         Ok(result) => result,
         Err(e) => {
             println!("❌ 模拟失败: {}\n", e);
@@ -255,11 +269,8 @@ async fn test_pumpswap_exact_in_buy_with_simulation() {
     println!("│ 链上模拟:     {:>15} │", simulated_output);
 
     let diff = local_output.abs_diff(simulated_output);
-    let error_rate = if simulated_output > 0 {
-        (diff as f64 / simulated_output as f64) * 100.0
-    } else {
-        0.0
-    };
+    let error_rate =
+        if simulated_output > 0 { (diff as f64 / simulated_output as f64) * 100.0 } else { 0.0 };
 
     println!("│ 差值:         {:>15} │", diff);
     println!("│ 误差率:      {:>13.4}% │", error_rate);
@@ -299,26 +310,14 @@ async fn test_pumpswap_exact_in_sell_with_simulation() {
     println!("期望输出: WSOL (lamports)\n");
 
     // 初始化 ATA（只创建 WSOL ATA）
-    if let Err(e) = ensure_ata_with_balance(
-        &rpc, &rpc_url, &payer,
-        &[
-            (wsol_mint, None),
-        ],
-        1,
-    ).await {
+    if let Err(e) = ensure_ata_with_balance(&rpc, &rpc_url, &payer, &[(wsol_mint, None)], 1).await {
         println!("❌ 初始化失败: {}\n", e);
         return;
     }
 
     // 设置 PUMP 余额（使用 surfnet_setTokenAccount）
     // 设置 10000 PUMP 用于测试
-    if let Err(e) = common::set_token_balance(
-        &rpc,
-        &rpc_url,
-        &payer,
-        &pump_mint,
-        "10000",
-    ).await {
+    if let Err(e) = common::set_token_balance(&rpc, &rpc_url, &payer, &pump_mint, "10000").await {
         println!("❌ 设置 PUMP 余额失败: {}\n", e);
         return;
     }
@@ -403,8 +402,8 @@ async fn test_pumpswap_exact_in_sell_with_simulation() {
         pool_quote_token_reserves: quote_reserve,
         coin_creator_vault_ata: Pubkey::default(),
         coin_creator_vault_authority: Pubkey::default(),
-        base_token_program,   // 自动获取
-        quote_token_program,  // 自动获取
+        base_token_program,  // 自动获取
+        quote_token_program, // 自动获取
         is_mayhem_mode: pool_state.is_mayhem_mode,
     };
 
@@ -421,7 +420,9 @@ async fn test_pumpswap_exact_in_sell_with_simulation() {
         address_lookup_table_account: None,
         recent_blockhash: None,
         wait_transaction_confirmed: false,
-        protocol_params: sol_trade_sdk::trading::core::params::DexParamEnum::PumpSwap(pumpswap_params),
+        protocol_params: sol_trade_sdk::trading::core::params::DexParamEnum::PumpSwap(
+            pumpswap_params,
+        ),
         open_seed_optimize: false,
         swqos_clients: Vec::new(),
         middleware_manager: None,
@@ -451,18 +452,29 @@ async fn test_pumpswap_exact_in_sell_with_simulation() {
     };
 
     let user_input_ata = spl_associated_token_account::get_associated_token_address_with_program_id(
-        &payer.pubkey(), &pump_mint, &spl_token::id()
+        &payer.pubkey(),
+        &pump_mint,
+        &spl_token::id(),
     );
-    let user_output_ata = spl_associated_token_account::get_associated_token_address_with_program_id(
-        &payer.pubkey(), &wsol_mint, &spl_token::id()
-    );
+    let user_output_ata =
+        spl_associated_token_account::get_associated_token_address_with_program_id(
+            &payer.pubkey(),
+            &wsol_mint,
+            &spl_token::id(),
+        );
 
     // 链上模拟
     let simulation_result = match simulate_swap_transaction(
-        &rpc, &payer, instructions,
-        user_input_ata, user_output_ata,
-        pump_mint, wsol_mint,
-    ).await {
+        &rpc,
+        &payer,
+        instructions,
+        user_input_ata,
+        user_output_ata,
+        pump_mint,
+        wsol_mint,
+    )
+    .await
+    {
         Ok(result) => result,
         Err(e) => {
             println!("❌ 模拟失败: {}\n", e);
@@ -498,11 +510,8 @@ async fn test_pumpswap_exact_in_sell_with_simulation() {
     println!("│ 链上模拟:     {:>15} │", simulated_output);
 
     let diff = local_output.abs_diff(simulated_output);
-    let error_rate = if simulated_output > 0 {
-        (diff as f64 / simulated_output as f64) * 100.0
-    } else {
-        0.0
-    };
+    let error_rate =
+        if simulated_output > 0 { (diff as f64 / simulated_output as f64) * 100.0 } else { 0.0 };
 
     println!("│ 差值:         {:>15} │", diff);
     println!("│ 误差率:      {:>13.4}% │", error_rate);
@@ -543,13 +552,17 @@ async fn test_pumpswap_exact_out_buy_with_simulation() {
 
     // 初始化 ATA
     if let Err(e) = ensure_ata_with_balance(
-        &rpc, &rpc_url, &payer,
+        &rpc,
+        &rpc_url,
+        &payer,
         &[
             (wsol_mint, Some(10_000_000)), // 充值足够的 WSOL
             (pump_mint, None),
         ],
         1,
-    ).await {
+    )
+    .await
+    {
         println!("❌ 初始化失败: {}\n", e);
         return;
     }
@@ -613,8 +626,8 @@ async fn test_pumpswap_exact_out_buy_with_simulation() {
         pool_quote_token_reserves: quote_reserve,
         coin_creator_vault_ata: Pubkey::default(),
         coin_creator_vault_authority: Pubkey::default(),
-        base_token_program: TOKEN_PROGRAM,         // WSOL 使用旧 Token Program
-        quote_token_program: TOKEN_2022_PROGRAM,   // PUMP 使用 Token-2022
+        base_token_program: TOKEN_PROGRAM, // WSOL 使用旧 Token Program
+        quote_token_program: TOKEN_2022_PROGRAM, // PUMP 使用 Token-2022
         is_mayhem_mode: pool_state.is_mayhem_mode,
     };
 
@@ -631,7 +644,9 @@ async fn test_pumpswap_exact_out_buy_with_simulation() {
         address_lookup_table_account: None,
         recent_blockhash: None,
         wait_transaction_confirmed: false,
-        protocol_params: sol_trade_sdk::trading::core::params::DexParamEnum::PumpSwap(pumpswap_params),
+        protocol_params: sol_trade_sdk::trading::core::params::DexParamEnum::PumpSwap(
+            pumpswap_params,
+        ),
         open_seed_optimize: false,
         swqos_clients: Vec::new(),
         middleware_manager: None,
@@ -661,18 +676,29 @@ async fn test_pumpswap_exact_out_buy_with_simulation() {
     };
 
     let user_input_ata = spl_associated_token_account::get_associated_token_address_with_program_id(
-        &payer.pubkey(), &wsol_mint, &spl_token::id()
+        &payer.pubkey(),
+        &wsol_mint,
+        &spl_token::id(),
     );
-    let user_output_ata = spl_associated_token_account::get_associated_token_address_with_program_id(
-        &payer.pubkey(), &pump_mint, &spl_token::id()
-    );
+    let user_output_ata =
+        spl_associated_token_account::get_associated_token_address_with_program_id(
+            &payer.pubkey(),
+            &pump_mint,
+            &spl_token::id(),
+        );
 
     // 链上模拟
     let simulation_result = match simulate_swap_transaction(
-        &rpc, &payer, instructions,
-        user_input_ata, user_output_ata,
-        wsol_mint, pump_mint,
-    ).await {
+        &rpc,
+        &payer,
+        instructions,
+        user_input_ata,
+        user_output_ata,
+        wsol_mint,
+        pump_mint,
+    )
+    .await
+    {
         Ok(result) => result,
         Err(e) => {
             println!("❌ 模拟失败: {}\n", e);
@@ -708,11 +734,8 @@ async fn test_pumpswap_exact_out_buy_with_simulation() {
     println!("│ 链上模拟:     {:>15} │", simulated_output);
 
     let diff = amount_out.abs_diff(simulated_output);
-    let error_rate = if simulated_output > 0 {
-        (diff as f64 / simulated_output as f64) * 100.0
-    } else {
-        0.0
-    };
+    let error_rate =
+        if simulated_output > 0 { (diff as f64 / simulated_output as f64) * 100.0 } else { 0.0 };
 
     println!("│ 差值:         {:>15} │", diff);
     println!("│ 误差率:      {:>13.4}% │", error_rate);
@@ -752,26 +775,14 @@ async fn test_pumpswap_exact_out_sell_with_simulation() {
     println!("计算: 需要 PUMP 输入\n");
 
     // 初始化 ATA（只创建 WSOL ATA）
-    if let Err(e) = ensure_ata_with_balance(
-        &rpc, &rpc_url, &payer,
-        &[
-            (wsol_mint, None),
-        ],
-        1,
-    ).await {
+    if let Err(e) = ensure_ata_with_balance(&rpc, &rpc_url, &payer, &[(wsol_mint, None)], 1).await {
         println!("❌ 初始化失败: {}\n", e);
         return;
     }
 
     // 设置 PUMP 余额（使用 surfnet_setTokenAccount）
     // 设置 10000 PUMP 用于测试
-    if let Err(e) = common::set_token_balance(
-        &rpc,
-        &rpc_url,
-        &payer,
-        &pump_mint,
-        "10000",
-    ).await {
+    if let Err(e) = common::set_token_balance(&rpc, &rpc_url, &payer, &pump_mint, "10000").await {
         println!("❌ 设置 PUMP 余额失败: {}\n", e);
         return;
     }
@@ -835,8 +846,8 @@ async fn test_pumpswap_exact_out_sell_with_simulation() {
         pool_quote_token_reserves: quote_reserve,
         coin_creator_vault_ata: Pubkey::default(),
         coin_creator_vault_authority: Pubkey::default(),
-        base_token_program: TOKEN_PROGRAM,         // WSOL 使用旧 Token Program
-        quote_token_program: TOKEN_2022_PROGRAM,   // PUMP 使用 Token-2022
+        base_token_program: TOKEN_PROGRAM, // WSOL 使用旧 Token Program
+        quote_token_program: TOKEN_2022_PROGRAM, // PUMP 使用 Token-2022
         is_mayhem_mode: pool_state.is_mayhem_mode,
     };
 
@@ -853,7 +864,9 @@ async fn test_pumpswap_exact_out_sell_with_simulation() {
         address_lookup_table_account: None,
         recent_blockhash: None,
         wait_transaction_confirmed: false,
-        protocol_params: sol_trade_sdk::trading::core::params::DexParamEnum::PumpSwap(pumpswap_params),
+        protocol_params: sol_trade_sdk::trading::core::params::DexParamEnum::PumpSwap(
+            pumpswap_params,
+        ),
         open_seed_optimize: false,
         swqos_clients: Vec::new(),
         middleware_manager: None,
@@ -883,18 +896,29 @@ async fn test_pumpswap_exact_out_sell_with_simulation() {
     };
 
     let user_input_ata = spl_associated_token_account::get_associated_token_address_with_program_id(
-        &payer.pubkey(), &pump_mint, &spl_token::id()
+        &payer.pubkey(),
+        &pump_mint,
+        &spl_token::id(),
     );
-    let user_output_ata = spl_associated_token_account::get_associated_token_address_with_program_id(
-        &payer.pubkey(), &wsol_mint, &spl_token::id()
-    );
+    let user_output_ata =
+        spl_associated_token_account::get_associated_token_address_with_program_id(
+            &payer.pubkey(),
+            &wsol_mint,
+            &spl_token::id(),
+        );
 
     // 链上模拟
     let simulation_result = match simulate_swap_transaction(
-        &rpc, &payer, instructions,
-        user_input_ata, user_output_ata,
-        pump_mint, wsol_mint,
-    ).await {
+        &rpc,
+        &payer,
+        instructions,
+        user_input_ata,
+        user_output_ata,
+        pump_mint,
+        wsol_mint,
+    )
+    .await
+    {
         Ok(result) => result,
         Err(e) => {
             println!("❌ 模拟失败: {}\n", e);
@@ -930,11 +954,8 @@ async fn test_pumpswap_exact_out_sell_with_simulation() {
     println!("│ 链上模拟:     {:>15} │", simulated_output);
 
     let diff = amount_out.abs_diff(simulated_output);
-    let error_rate = if simulated_output > 0 {
-        (diff as f64 / simulated_output as f64) * 100.0
-    } else {
-        0.0
-    };
+    let error_rate =
+        if simulated_output > 0 { (diff as f64 / simulated_output as f64) * 100.0 } else { 0.0 };
 
     println!("│ 差值:         {:>15} │", diff);
     println!("│ 误差率:      {:>13.4}% │", error_rate);

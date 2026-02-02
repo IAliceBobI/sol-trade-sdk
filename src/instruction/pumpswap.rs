@@ -309,8 +309,8 @@ impl InstructionBuilder for PumpSwapInstructionBuilder {
             (result.max_quote, result.base)
         };
 
-        if params.fixed_output_amount.is_some() {
-            sol_amount = params.fixed_output_amount.unwrap();
+        if let Some(fixed_amount) = params.fixed_output_amount {
+            sol_amount = fixed_amount;
         }
 
         // Determine fee recipient based on mayhem mode

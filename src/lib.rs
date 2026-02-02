@@ -611,13 +611,11 @@ impl TradingClient {
     /// 返回 `SimulationResult` 包含模拟的输出金额、CU 消耗、交易费用等
     pub async fn buy_simulate(&self, params: TradeBuyParams) -> UnifiedResult<SimulationResult> {
         // 1. 参数验证（支持 exact_in 和 exact_out）
-        let is_exact_out = params.fixed_output_token_amount.is_some();
-
-        if is_exact_out {
+        if let Some(fixed_output) = params.fixed_output_token_amount {
             // exact_out 模式验证
-            if params.fixed_output_token_amount.unwrap() == 0 {
+            if fixed_output == 0 {
                 return Err(UnifiedTradingError::InvalidParameters(
-                    "fixed_output_token_amount must be > 0".into()
+                    "fixed_output_token_amount must be > 0".into(),
                 ));
             }
         } else {
@@ -738,7 +736,7 @@ impl TradingClient {
         Ok(SimulationResult {
             amount_out: sim_result.actual_output_amount,
             amount_in: params.input_token_amount, // 添加此行：支持 exact_out 模式
-            fee_amount: 0, // TODO: 从 sim_result 计算
+            fee_amount: 0,                        // TODO: 从 sim_result 计算
             compute_units: sim_result.units_consumed.unwrap_or(0),
             transaction_fee: sim_result.transaction_fee,
             success: sim_result.success,
@@ -767,18 +765,16 @@ impl TradingClient {
     /// - `transaction_fee`: 交易费用
     pub async fn sell_simulate(&self, params: TradeSellParams) -> UnifiedResult<SimulationResult> {
         // 1. 参数验证
-        let is_exact_out = params.fixed_output_token_amount.is_some();
-
-        if is_exact_out {
-            if params.fixed_output_token_amount.unwrap() == 0 {
+        if let Some(fixed_output) = params.fixed_output_token_amount {
+            if fixed_output == 0 {
                 return Err(UnifiedTradingError::InvalidParameters(
-                    "fixed_output_token_amount must be > 0".into()
+                    "fixed_output_token_amount must be > 0".into(),
                 ));
             }
         } else {
             if params.input_token_amount == 0 {
                 return Err(UnifiedTradingError::InvalidParameters(
-                    "input_token_amount must be > 0".into()
+                    "input_token_amount must be > 0".into(),
                 ));
             }
         }
@@ -823,24 +819,29 @@ impl TradingClient {
         let instructions = match params.dex_type {
             DexType::RaydiumClmm => {
                 crate::instruction::raydium_clmm::RaydiumClmmInstructionBuilder
-                    .build_sell_instructions(&swap_params).await
+                    .build_sell_instructions(&swap_params)
+                    .await
             },
             DexType::RaydiumCpmm => {
                 crate::instruction::raydium_cpmm::RaydiumCpmmInstructionBuilder
-                    .build_sell_instructions(&swap_params).await
+                    .build_sell_instructions(&swap_params)
+                    .await
             },
             DexType::RaydiumAmmV4 => {
                 crate::instruction::raydium_amm_v4::RaydiumAmmV4InstructionBuilder
-                    .build_sell_instructions(&swap_params).await
+                    .build_sell_instructions(&swap_params)
+                    .await
             },
             DexType::PumpSwap => {
                 crate::instruction::pumpswap::PumpSwapInstructionBuilder
-                    .build_sell_instructions(&swap_params).await
+                    .build_sell_instructions(&swap_params)
+                    .await
             },
             _ => {
                 return Err(UnifiedTradingError::UnsupportedDex(params.dex_type));
-            }
-        }.map_err(|e| UnifiedTradingError::TransactionBuildError(e.to_string()))?;
+            },
+        }
+        .map_err(|e| UnifiedTradingError::TransactionBuildError(e.to_string()))?;
 
         // 5. 获取用户 ATA
         let user_input_ata = spl_associated_token_account::get_associated_token_address(

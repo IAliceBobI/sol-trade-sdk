@@ -130,9 +130,7 @@ pub async fn poll_transaction_confirmation(
 
         let meta = tx_details.transaction.meta;
         if let Some(meta) = meta {
-            if meta.err.is_none() {
-                return Ok(txt_sig);
-            } else {
+            if let Some(ui_err) = meta.err {
                 // 从 log_messages 中提取错误信息
                 let mut error_msg = String::new();
                 if let solana_transaction_status::option_serializer::OptionSerializer::Some(logs) =
@@ -154,8 +152,6 @@ pub async fn poll_transaction_confirmation(
                         }
                     }
                 }
-
-                let ui_err = meta.err.unwrap();
                 let tx_err: TransactionError =
                     serde_json::from_value(serde_json::to_value(&ui_err)?)?;
 
