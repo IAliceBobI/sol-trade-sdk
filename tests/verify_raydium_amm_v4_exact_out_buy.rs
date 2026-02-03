@@ -113,8 +113,8 @@ async fn test_raydium_amm_v4_exact_out_buy_with_simulation() {
     println!();
 
     // 本地计算 (exact_out)
-    let local_calc = match quote_exact_out(&rpc, &pool_address, amount_out, false).await {
-        // false: pc -> coin (WSOL 是 coin, USDC 是 pc)
+    let local_calc = match quote_exact_out(&rpc, &pool_address, amount_out, true).await {
+        // true: coin -> pc (WSOL 是 coin, USDC 是 pc，我们想用 WSOL 买 USDC)
         Ok(result) => result,
         Err(e) => {
             println!("❌ 本地计算失败: {}\n", e);
@@ -124,10 +124,14 @@ async fn test_raydium_amm_v4_exact_out_buy_with_simulation() {
 
     println!("✅ 本地计算:");
     println!("  期望输出: {} USDC (smallest unit)", amount_out);
-    println!("  需要输入: {} WSOL (lamports)\n", local_calc.amount_in);
+    println!("  需要输入: {} WSOL (lamports)", local_calc.amount_in);
+    println!("  手续费: {} WSOL (lamports)", local_calc.fee_amount);
+    println!("  预期计算: {} WSOL (根据储备金手动计算)\n",
+        (53941108051154u128 * 1000u128 / (5506467795682u128 - 1000u128)) as u64);
 
     // 🔧 自动从 Pool 获取 mint 并检测 Token Program
     let (coin_mint, pc_mint) = (pool_state.coin_mint, pool_state.pc_mint);
+    println!("🔍 Pool 方向: coin_mint={}, pc_mint={}", coin_mint, pc_mint);
     let coin_token_program =
         match sol_trade_sdk::utils::token::get_token_program_with_cache(&rpc, &coin_mint).await {
             Ok(program) => {
@@ -158,10 +162,14 @@ async fn test_raydium_amm_v4_exact_out_buy_with_simulation() {
     let coin_balance = rpc.get_token_account_balance(&pool_state.token_coin).await;
     let pc_balance = rpc.get_token_account_balance(&pool_state.token_pc).await;
 
+    println!("🔍 Pool 储备金信息:");
+
     let (coin_reserve, pc_reserve) = match (coin_balance, pc_balance) {
         (Ok(coin), Ok(pc)) => {
             let coin_amt = coin.amount.parse::<u64>().unwrap_or(0);
             let pc_amt = pc.amount.parse::<u64>().unwrap_or(0);
+            println!("  Coin Reserve (WSOL): {}", coin_amt);
+            println!("  PC Reserve (USDC): {}\n", pc_amt);
             (coin_amt, pc_amt)
         },
         _ => {
@@ -190,7 +198,7 @@ async fn test_raydium_amm_v4_exact_out_buy_with_simulation() {
         output_mint: usdc_mint,
         output_token_program: Some(pc_token_program),
         input_amount: Some(local_calc.amount_in), // 使用计算出的输入
-        slippage_basis_points: Some(1000),
+        slippage_basis_points: Some(2000), // ✅ 20% 滑点容忍 (按任务要求)
         address_lookup_table_account: None,
         recent_blockhash: None,
         wait_transaction_confirmed: false,
@@ -219,7 +227,21 @@ async fn test_raydium_amm_v4_exact_out_buy_with_simulation() {
             .build_buy_instructions(&swap_params)
             .await
         {
-            Ok(instrs) => instrs,
+            Ok(instrs) => {
+                // 🔍 调试：打印指令数据
+                if let Some(swap_instr) = instrs.iter().find(|i| i.program_id == solana_sdk::pubkey!("675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8")) {
+                    println!("🔍 Swap 指令数据:");
+                    println!("  Discriminator: {:02x}", swap_instr.data[0]);
+                    if swap_instr.data.len() >= 17 {
+                        let amount_in = u64::from_le_bytes(swap_instr.data[1..9].try_into().unwrap());
+                        let amount_out = u64::from_le_bytes(swap_instr.data[9..17].try_into().unwrap());
+                        println!("  Amount In/Max: {}", amount_in);
+                        println!("  Amount Out/Min: {}", amount_out);
+                    }
+                    println!();
+                }
+                instrs
+            },
             Err(e) => {
                 println!("❌ 构造指令失败: {}\n", e);
                 return;

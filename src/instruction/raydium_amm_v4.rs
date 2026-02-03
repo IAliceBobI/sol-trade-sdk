@@ -48,19 +48,15 @@ impl InstructionBuilder for RaydiumAmmV4InstructionBuilder {
         // Parameter validation and basic data preparation
         // ========================================
         // 检查是否为 exact_out 模式
-        let has_fixed_output = params.fixed_output_amount.is_some();
+        let _has_fixed_output = params.fixed_output_amount.is_some();
 
-        let input_amount = if !has_fixed_output {
-            // exact_in 模式：需要 input_amount
-            let amount = params.input_amount.ok_or_else(|| anyhow!("Input amount is required"))?;
-            if amount == 0 {
-                return Err(anyhow!("Amount cannot be zero"));
-            }
-            amount
-        } else {
-            // exact_out 模式：稍后计算
-            0
-        };
+        // 对于 exact_in 模式，input_amount 是用户指定的输入量
+        // 对于 exact_out 模式，input_amount 是通过 quote_exact_out 计算的所需输入量
+        let amount = params.input_amount.ok_or_else(|| anyhow!("Input amount is required"))?;
+        if amount == 0 {
+            return Err(anyhow!("Amount cannot be zero"));
+        }
+        let input_amount = amount;
 
         let protocol_params = params
             .protocol_params
@@ -223,10 +219,13 @@ impl InstructionBuilder for RaydiumAmmV4InstructionBuilder {
             AccountMeta::new(params.payer.pubkey(), true),           // User Source Owner
         ];
         // Create instruction data
+        // 注意：Raydium AMM V4 的 exact_out 交易实际上还是使用 SWAP_BASE_IN 指令
+        // 只是将 minimum_amount_out 设置为固定的输出量即可
         let mut data = [0u8; 17];
         data[..1].copy_from_slice(SWAP_BASE_IN_DISCRIMINATOR);
         data[1..9].copy_from_slice(&amount_in.to_le_bytes());
         data[9..17].copy_from_slice(&minimum_amount_out.to_le_bytes());
+
 
         instructions.push(Instruction::new_with_bytes(
             accounts::RAYDIUM_AMM_V4,
