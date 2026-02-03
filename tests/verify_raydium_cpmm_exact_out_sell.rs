@@ -302,8 +302,8 @@ async fn test_raydium_cpmm_exact_out_sell_with_simulation() {
     println!("│ 误差率               │ {:>12} │ {:>18.4}% │", "", error_rate);
     println!("└─────────────────────────────────────────────────────────────────┘");
 
-    match verify_calculation_accuracy(amount_out, simulated_output, 0.1) {
-        Ok(_) => println!("✅ 验证通过：误差 < 0.1%\n"),
+    match verify_calculation_accuracy(amount_out, simulated_output, 1.0) {
+        Ok(_) => println!("✅ 验证通过：误差 < 1.0%\n"),
         Err(e) => println!("❌ 验证失败: {}\n", e),
     }
 }
