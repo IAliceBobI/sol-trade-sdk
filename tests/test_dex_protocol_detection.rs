@@ -92,18 +92,18 @@ async fn test_detect_dex_from_pool_address() {
 async fn test_list_all_supported_dex() {
     println!("\n📊 Sol Trade SDK 支持的所有 DEX 协议:\n");
 
-    for protocol in DexProtocol::all_protocols() {
+    for protocol in DexProtocol::all() {
         println!("   {} - {}", protocol.name(), protocol.program_id());
     }
 
-    println!("\n总计: {} 个 DEX 协议", DexProtocol::all_protocols().len());
+    println!("\n总计: {} 个 DEX 协议", DexProtocol::all().len());
 }
 
 #[tokio::test]
 async fn test_protocol_id_consistency() {
     println!("\n🔐 测试 Program ID 一致性\n");
 
-    for protocol in DexProtocol::all_protocols() {
+    for protocol in DexProtocol::all() {
         let id_str = protocol.program_id();
         let id_pubkey = protocol.program_id_pubkey();
 

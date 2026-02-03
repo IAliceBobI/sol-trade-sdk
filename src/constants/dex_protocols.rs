@@ -2,7 +2,49 @@
 //!
 //! 提供统一的 DEX 协议枚举和识别功能
 
-use solana_sdk::{pubkey, pubkey::Pubkey};
+use solana_sdk::pubkey::Pubkey;
+
+// ===== DEX 协议常量 =====
+
+/// PumpFun 协议常量
+pub const PUMPFUN_PROGRAM_ID: &str = "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P";
+pub const PUMPFUN_NAME: &str = "pumpfun";
+pub const PUMPFUN_DISPLAY_NAME: &str = "PumpFun";
+
+/// PumpSwap 协议常量
+pub const PUMPSWAP_PROGRAM_ID: &str = "pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA";
+pub const PUMPSWAP_NAME: &str = "pumpswap";
+pub const PUMPSWAP_DISPLAY_NAME: &str = "PumpSwap";
+
+/// Bonk 协议常量
+pub const BONK_PROGRAM_ID: &str = "BSwp6bEBihVLdqJRKGgzjcGLHkcTuzmSo1TQkHepzH8p";
+pub const BONK_NAME: &str = "bonk";
+pub const BONK_DISPLAY_NAME: &str = "Bonk";
+
+/// Raydium AMM V4 协议常量
+pub const RAYDIUM_AMM_V4_PROGRAM_ID: &str = "675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8";
+pub const RAYDIUM_AMM_V4_NAME: &str = "raydium_amm_v4";
+pub const RAYDIUM_AMM_V4_DISPLAY_NAME: &str = "Raydium AMM V4";
+
+/// Raydium CLMM 协议常量
+pub const RAYDIUM_CLMM_PROGRAM_ID: &str = "CAMMCzo5YL8w4VFF8KVHrK22GGUsp5VTaW7grrKgrWqK";
+pub const RAYDIUM_CLMM_NAME: &str = "raydium_clmm";
+pub const RAYDIUM_CLMM_DISPLAY_NAME: &str = "Raydium CLMM";
+
+/// Raydium CPMM 协议常量
+pub const RAYDIUM_CPMM_PROGRAM_ID: &str = "CPMMoo8L3F4NbTegBCKVNunggL7H1ZpdTHKxQB5qKP1C";
+pub const RAYDIUM_CPMM_NAME: &str = "raydium_cpmm";
+pub const RAYDIUM_CPMM_DISPLAY_NAME: &str = "Raydium CPMM";
+
+/// Raydium LaunchLab 协议常量
+pub const RAYDIUM_LAUNCHLAB_PROGRAM_ID: &str = "LanMV9sAd7wArD4vJFi2qDdfnVhFxYSUg6eADduJ3uj";
+pub const RAYDIUM_LAUNCHLAB_NAME: &str = "raydium_launchlab";
+pub const RAYDIUM_LAUNCHLAB_DISPLAY_NAME: &str = "Raydium LaunchLab";
+
+/// Meteora DAMM V2 协议常量
+pub const METEORA_DAMM_V2_PROGRAM_ID: &str = "cpamdpZCGKUy5JxQXB4dcpGPiikHawvSWAd6mEn1sGG";
+pub const METEORA_DAMM_V2_NAME: &str = "meteora_damm_v2";
+pub const METEORA_DAMM_V2_DISPLAY_NAME: &str = "Meteora DAMM V2";
 
 /// 支持的 DEX 协议
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -21,70 +63,61 @@ impl DexProtocol {
     /// 获取协议的 Program ID
     pub fn program_id(&self) -> &'static str {
         match self {
-            DexProtocol::PumpFun => "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P",
-            DexProtocol::PumpSwap => "pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA",
-            DexProtocol::Bonk => "BSwp6bEBihVLdqJRKGgzjcGLHkcTuzmSo1TQkHepzH8p",
-            DexProtocol::RaydiumAmmV4 => "675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8",
-            DexProtocol::RaydiumClmm => "CAMMCzo5YL8w4VFF8KVHrK22GGUsp5VTaW7grrKgrWqK",
-            DexProtocol::RaydiumCpmm => "CPMMoo8L3F4NbTegBCKVNunggL7H1ZpdTHKxQB5qKP1C",
-            DexProtocol::RaydiumLaunchlab => "LanMV9sAd7wArD4vJFi2qDdfnVhFxYSUg6eADduJ3uj",
-            DexProtocol::MeteoraDammV2 => "cpamdpZCGKUy5JxQXB4dcpGPiikHawvSWAd6mEn1sGG",
+            DexProtocol::PumpFun => PUMPFUN_PROGRAM_ID,
+            DexProtocol::PumpSwap => PUMPSWAP_PROGRAM_ID,
+            DexProtocol::Bonk => BONK_PROGRAM_ID,
+            DexProtocol::RaydiumAmmV4 => RAYDIUM_AMM_V4_PROGRAM_ID,
+            DexProtocol::RaydiumClmm => RAYDIUM_CLMM_PROGRAM_ID,
+            DexProtocol::RaydiumCpmm => RAYDIUM_CPMM_PROGRAM_ID,
+            DexProtocol::RaydiumLaunchlab => RAYDIUM_LAUNCHLAB_PROGRAM_ID,
+            DexProtocol::MeteoraDammV2 => METEORA_DAMM_V2_PROGRAM_ID,
         }
     }
 
     /// 获取协议的 Program ID (Pubkey 格式)
     pub fn program_id_pubkey(&self) -> Pubkey {
-        match self {
-            DexProtocol::PumpFun => pubkey!("6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P"),
-            DexProtocol::PumpSwap => pubkey!("pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA"),
-            DexProtocol::Bonk => pubkey!("BSwp6bEBihVLdqJRKGgzjcGLHkcTuzmSo1TQkHepzH8p"),
-            DexProtocol::RaydiumAmmV4 => pubkey!("675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8"),
-            DexProtocol::RaydiumClmm => pubkey!("CAMMCzo5YL8w4VFF8KVHrK22GGUsp5VTaW7grrKgrWqK"),
-            DexProtocol::RaydiumCpmm => pubkey!("CPMMoo8L3F4NbTegBCKVNunggL7H1ZpdTHKxQB5qKP1C"),
-            DexProtocol::RaydiumLaunchlab => pubkey!("LanMV9sAd7wArD4vJFi2qDdfnVhFxYSUg6eADduJ3uj"),
-            DexProtocol::MeteoraDammV2 => pubkey!("cpamdpZCGKUy5JxQXB4dcpGPiikHawvSWAd6mEn1sGG"),
-        }
+        self.program_id().parse().expect("Invalid program ID")
     }
 
     /// 获取协议名称（不带空格，用于代码/数据库）
     pub fn name(&self) -> &'static str {
         match self {
-            DexProtocol::PumpFun => "pumpfun",
-            DexProtocol::PumpSwap => "pumpswap",
-            DexProtocol::Bonk => "bonk",
-            DexProtocol::RaydiumAmmV4 => "raydium_amm_v4",
-            DexProtocol::RaydiumClmm => "raydium_clmm",
-            DexProtocol::RaydiumCpmm => "raydium_cpmm",
-            DexProtocol::RaydiumLaunchlab => "raydium_launchlab",
-            DexProtocol::MeteoraDammV2 => "meteora_damm_v2",
+            DexProtocol::PumpFun => PUMPFUN_NAME,
+            DexProtocol::PumpSwap => PUMPSWAP_NAME,
+            DexProtocol::Bonk => BONK_NAME,
+            DexProtocol::RaydiumAmmV4 => RAYDIUM_AMM_V4_NAME,
+            DexProtocol::RaydiumClmm => RAYDIUM_CLMM_NAME,
+            DexProtocol::RaydiumCpmm => RAYDIUM_CPMM_NAME,
+            DexProtocol::RaydiumLaunchlab => RAYDIUM_LAUNCHLAB_NAME,
+            DexProtocol::MeteoraDammV2 => METEORA_DAMM_V2_NAME,
         }
     }
 
     /// 获取协议显示名称（带空格，用于 UI 显示）
     pub fn display_name(&self) -> &'static str {
         match self {
-            DexProtocol::PumpFun => "PumpFun",
-            DexProtocol::PumpSwap => "PumpSwap",
-            DexProtocol::Bonk => "Bonk",
-            DexProtocol::RaydiumAmmV4 => "Raydium AMM V4",
-            DexProtocol::RaydiumClmm => "Raydium CLMM",
-            DexProtocol::RaydiumCpmm => "Raydium CPMM",
-            DexProtocol::RaydiumLaunchlab => "Raydium LaunchLab",
-            DexProtocol::MeteoraDammV2 => "Meteora DAMM V2",
+            DexProtocol::PumpFun => PUMPFUN_DISPLAY_NAME,
+            DexProtocol::PumpSwap => PUMPSWAP_DISPLAY_NAME,
+            DexProtocol::Bonk => BONK_DISPLAY_NAME,
+            DexProtocol::RaydiumAmmV4 => RAYDIUM_AMM_V4_DISPLAY_NAME,
+            DexProtocol::RaydiumClmm => RAYDIUM_CLMM_DISPLAY_NAME,
+            DexProtocol::RaydiumCpmm => RAYDIUM_CPMM_DISPLAY_NAME,
+            DexProtocol::RaydiumLaunchlab => RAYDIUM_LAUNCHLAB_DISPLAY_NAME,
+            DexProtocol::MeteoraDammV2 => METEORA_DAMM_V2_DISPLAY_NAME,
         }
     }
 
     /// 从 DEX 名称解析协议（不带空格，用于代码/数据库）
     pub fn from_name(name: &str) -> Option<Self> {
         match name {
-            "pumpfun" => Some(DexProtocol::PumpFun),
-            "pumpswap" => Some(DexProtocol::PumpSwap),
-            "bonk" => Some(DexProtocol::Bonk),
-            "raydium_amm_v4" => Some(DexProtocol::RaydiumAmmV4),
-            "raydium_clmm" => Some(DexProtocol::RaydiumClmm),
-            "raydium_cpmm" => Some(DexProtocol::RaydiumCpmm),
-            "raydium_launchlab" => Some(DexProtocol::RaydiumLaunchlab),
-            "meteora_damm_v2" => Some(DexProtocol::MeteoraDammV2),
+            PUMPFUN_NAME => Some(DexProtocol::PumpFun),
+            PUMPSWAP_NAME => Some(DexProtocol::PumpSwap),
+            BONK_NAME => Some(DexProtocol::Bonk),
+            RAYDIUM_AMM_V4_NAME => Some(DexProtocol::RaydiumAmmV4),
+            RAYDIUM_CLMM_NAME => Some(DexProtocol::RaydiumClmm),
+            RAYDIUM_CPMM_NAME => Some(DexProtocol::RaydiumCpmm),
+            RAYDIUM_LAUNCHLAB_NAME => Some(DexProtocol::RaydiumLaunchlab),
+            METEORA_DAMM_V2_NAME => Some(DexProtocol::MeteoraDammV2),
             _ => None,
         }
     }
@@ -92,14 +125,14 @@ impl DexProtocol {
     /// 从 Program ID (Pubkey) 解析协议
     pub fn from_program_id(program_id: &Pubkey) -> Option<Self> {
         match program_id.to_string().as_str() {
-            "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P" => Some(DexProtocol::PumpFun),
-            "pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA" => Some(DexProtocol::PumpSwap),
-            "BSwp6bEBihVLdqJRKGgzjcGLHkcTuzmSo1TQkHepzH8p" => Some(DexProtocol::Bonk),
-            "675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8" => Some(DexProtocol::RaydiumAmmV4),
-            "CAMMCzo5YL8w4VFF8KVHrK22GGUsp5VTaW7grrKgrWqK" => Some(DexProtocol::RaydiumClmm),
-            "CPMMoo8L3F4NbTegBCKVNunggL7H1ZpdTHKxQB5qKP1C" => Some(DexProtocol::RaydiumCpmm),
-            "LanMV9sAd7wArD4vJFi2qDdfnVhFxYSUg6eADduJ3uj" => Some(DexProtocol::RaydiumLaunchlab),
-            "cpamdpZCGKUy5JxQXB4dcpGPiikHawvSWAd6mEn1sGG" => Some(DexProtocol::MeteoraDammV2),
+            PUMPFUN_PROGRAM_ID => Some(DexProtocol::PumpFun),
+            PUMPSWAP_PROGRAM_ID => Some(DexProtocol::PumpSwap),
+            BONK_PROGRAM_ID => Some(DexProtocol::Bonk),
+            RAYDIUM_AMM_V4_PROGRAM_ID => Some(DexProtocol::RaydiumAmmV4),
+            RAYDIUM_CLMM_PROGRAM_ID => Some(DexProtocol::RaydiumClmm),
+            RAYDIUM_CPMM_PROGRAM_ID => Some(DexProtocol::RaydiumCpmm),
+            RAYDIUM_LAUNCHLAB_PROGRAM_ID => Some(DexProtocol::RaydiumLaunchlab),
+            METEORA_DAMM_V2_PROGRAM_ID => Some(DexProtocol::MeteoraDammV2),
             _ => None,
         }
     }
@@ -107,14 +140,14 @@ impl DexProtocol {
     /// 从 Program ID 字符串解析协议
     pub fn from_program_id_str(program_id: &str) -> Option<Self> {
         match program_id {
-            "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P" => Some(DexProtocol::PumpFun),
-            "pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA" => Some(DexProtocol::PumpSwap),
-            "BSwp6bEBihVLdqJRKGgzjcGLHkcTuzmSo1TQkHepzH8p" => Some(DexProtocol::Bonk),
-            "675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8" => Some(DexProtocol::RaydiumAmmV4),
-            "CAMMCzo5YL8w4VFF8KVHrK22GGUsp5VTaW7grrKgrWqK" => Some(DexProtocol::RaydiumClmm),
-            "CPMMoo8L3F4NbTegBCKVNunggL7H1ZpdTHKxQB5qKP1C" => Some(DexProtocol::RaydiumCpmm),
-            "LanMV9sAd7wArD4vJFi2qDdfnVhFxYSUg6eADduJ3uj" => Some(DexProtocol::RaydiumLaunchlab),
-            "cpamdpZCGKUy5JxQXB4dcpGPiikHawvSWAd6mEn1sGG" => Some(DexProtocol::MeteoraDammV2),
+            PUMPFUN_PROGRAM_ID => Some(DexProtocol::PumpFun),
+            PUMPSWAP_PROGRAM_ID => Some(DexProtocol::PumpSwap),
+            BONK_PROGRAM_ID => Some(DexProtocol::Bonk),
+            RAYDIUM_AMM_V4_PROGRAM_ID => Some(DexProtocol::RaydiumAmmV4),
+            RAYDIUM_CLMM_PROGRAM_ID => Some(DexProtocol::RaydiumClmm),
+            RAYDIUM_CPMM_PROGRAM_ID => Some(DexProtocol::RaydiumCpmm),
+            RAYDIUM_LAUNCHLAB_PROGRAM_ID => Some(DexProtocol::RaydiumLaunchlab),
+            METEORA_DAMM_V2_PROGRAM_ID => Some(DexProtocol::MeteoraDammV2),
             _ => None,
         }
     }
@@ -131,13 +164,6 @@ impl DexProtocol {
             DexProtocol::RaydiumLaunchlab,
             DexProtocol::MeteoraDammV2,
         ]
-    }
-
-    // ===== 向后兼容的弃用方法 =====
-
-    #[deprecated(since = "0.3.0", note = "Use all() instead")]
-    pub fn all_protocols() -> &'static [DexProtocol] {
-        Self::all()
     }
 }
 
