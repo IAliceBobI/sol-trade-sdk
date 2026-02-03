@@ -13,6 +13,7 @@ use sol_trade_sdk::{
 use solana_sdk::{pubkey::Pubkey, signer::Signer};
 use std::str::FromStr;
 use std::sync::Arc;
+use base64;
 
 // 导入公共测试模块
 mod common;
@@ -108,12 +109,19 @@ async fn test_raydium_amm_v4_exact_in_buy_with_simulation() {
     println!("  Mint: {}", usdc_mint);
     println!("  Decimals: {}", output_decimals);
     println!();
+    println!("🔍 Pool Token 方向:");
+    println!("  pool_state.coin_mint: {}", pool_state.coin_mint);
+    println!("  pool_state.pc_mint: {}", pool_state.pc_mint);
+    println!("  WSOL mint: {}", wsol_mint);
+    println!("  USDC mint: {}", usdc_mint);
+    println!("  WSOL 是 coin: {}", pool_state.coin_mint == wsol_mint);
+    println!("  USDC 是 pc: {}", pool_state.pc_mint == usdc_mint);
+    println!();
 
     // 本地计算
-    let local_output = match quote_exact_in(&rpc, &pool_address, amount_in, false).await {
-        // false: pc -> coin (WSOL 是 coin, USDC 是 pc, 我们要用 WSOL 换 USDC)
-        // 在 AMM V4 中，is_coin_in=true 表示输入 coin，false 表示输入 pc
-        // WSOL 是 coin，USDC 是 pc，所以 WSOL->USDC 应该是 is_coin_in=true
+    let local_output = match quote_exact_in(&rpc, &pool_address, amount_in, true).await {
+        // is_coin_in=true: Coin -> PC (WSOL 是 Coin, USDC 是 PC)
+        // ray_log 验证: direction=2 (Coin2PC), 输入 Coin，输出 PC
         Ok(quote) => quote.amount_out,
         Err(e) => {
             println!("❌ 本地计算失败: {}\n", e);
@@ -122,6 +130,14 @@ async fn test_raydium_amm_v4_exact_in_buy_with_simulation() {
     };
 
     println!("✅ 本地计算: {} USDC (smallest unit)\n", local_output);
+
+    // 🔍 检查指令构建器的 is_base_in 计算
+    let is_base_in_builder = pool_state.coin_mint == sol_trade_sdk::constants::WSOL_TOKEN_ACCOUNT
+        || pool_state.coin_mint == sol_trade_sdk::constants::USDC_TOKEN_ACCOUNT;
+    println!("🔍 指令构建器的 is_base_in: {}", is_base_in_builder);
+    println!("  quote_exact_in 使用的 is_coin_in: true");
+    println!("  两者一致: {}", is_base_in_builder == true);
+    println!();
 
     // 🔧 自动从 Pool 获取 mint 并检测 Token Program
     let (coin_mint, pc_mint) = (pool_state.coin_mint, pool_state.pc_mint);
@@ -159,6 +175,9 @@ async fn test_raydium_amm_v4_exact_in_buy_with_simulation() {
         (Ok(coin), Ok(pc)) => {
             let coin_amt = coin.amount.parse::<u64>().unwrap_or(0);
             let pc_amt = pc.amount.parse::<u64>().unwrap_or(0);
+            println!("📊 实际储备余额:");
+            println!("  coin_reserve (WSOL): {} lamports", coin_amt);
+            println!("  pc_reserve (USDC): {} smallest unit", pc_amt);
             (coin_amt, pc_amt)
         },
         _ => {
@@ -272,10 +291,56 @@ async fn test_raydium_amm_v4_exact_in_buy_with_simulation() {
         return;
     }
 
+    // 解析 ray_log 获取实际的储备金和输出
+    if let Some(ref logs) = simulation_result.logs {
+        for log in logs.iter() {
+            if log.starts_with("Program log: ray_log:") {
+                let encoded = log.split("Program log: ray_log: ").nth(1).unwrap_or("");
+                if let Ok(decoded) = base64::decode(encoded) {
+                    if decoded.len() >= 57 {
+                        // 按照 SwapBaseInLog 结构解析
+                        let pool_coin_from_log = u64::from_le_bytes(decoded[33..41].try_into().unwrap());
+                        let pool_pc_from_log = u64::from_le_bytes(decoded[41..49].try_into().unwrap());
+                        let out_amount_from_log = u64::from_le_bytes(decoded[49..57].try_into().unwrap());
+
+                        println!("📊 Ray_log 中的实际数据:");
+                        println!("  pool_coin (实际): {}", pool_coin_from_log);
+                        println!("  pool_pc (实际): {}", pool_pc_from_log);
+                        println!("  out_amount (链上计算): {}", out_amount_from_log);
+                        println!();
+                    }
+                }
+            }
+        }
+    }
+
     let simulated_output = simulation_result.actual_output_amount;
 
+    // 从 ray_log 中获取实际的链上输出（更准确）
+    let actual_chain_output = if let Some(ref logs) = simulation_result.logs {
+        let mut found_output = None;
+        for log in logs.iter() {
+            if log.starts_with("Program log: ray_log:") {
+                let encoded = log.split("Program log: ray_log: ").nth(1).unwrap_or("");
+                if let Ok(decoded) = base64::decode(encoded) {
+                    if decoded.len() >= 57 {
+                        let out_amount = u64::from_le_bytes(decoded[49..57].try_into().unwrap());
+                        found_output = Some(out_amount);
+                        break;
+                    }
+                }
+            }
+        }
+        found_output
+    } else {
+        None
+    };
+
+    // 使用 ray_log 中的实际输出作为基准
+    let baseline_output = actual_chain_output.unwrap_or(simulated_output);
+
     let local_output_formatted = local_output as f64 / 10_f64.powi(output_decimals as i32);
-    let simulated_output_formatted = simulated_output as f64 / 10_f64.powi(output_decimals as i32);
+    let baseline_output_formatted = baseline_output as f64 / 10_f64.powi(output_decimals as i32);
 
     // 结果对比
     println!("┌─────────────────────────────────────────────────────────────────┐");
@@ -284,14 +349,21 @@ async fn test_raydium_amm_v4_exact_in_buy_with_simulation() {
     println!("│                    │ 最小单位    │ 可读单位 (USDC)              │");
     println!("├─────────────────────────────────────────────────────────────────┤");
     println!("│ 本地计算             │ {:>12} │ {:>20} │", local_output, local_output_formatted);
-    println!(
-        "│ 链上模拟             │ {:>12} │ {:>20} │",
-        simulated_output, simulated_output_formatted
-    );
+    if actual_chain_output.is_some() {
+        println!(
+            "│ 链上实际 (ray_log)    │ {:>12} │ {:>20} │",
+            baseline_output, baseline_output_formatted
+        );
+    } else {
+        println!(
+            "│ 链上模拟             │ {:>12} │ {:>20} │",
+            baseline_output, baseline_output_formatted
+        );
+    }
 
-    let diff = local_output.abs_diff(simulated_output);
+    let diff = local_output.abs_diff(baseline_output);
     let error_rate =
-        if simulated_output > 0 { (diff as f64 / simulated_output as f64) * 100.0 } else { 0.0 };
+        if baseline_output > 0 { (diff as f64 / baseline_output as f64) * 100.0 } else { 0.0 };
     let diff_formatted = diff as f64 / 10_f64.powi(output_decimals as i32);
 
     println!("├─────────────────────────────────────────────────────────────────┤");
@@ -299,14 +371,14 @@ async fn test_raydium_amm_v4_exact_in_buy_with_simulation() {
     println!("│ 误差率               │ {:>12} │ {:>18.4}% │", "", error_rate);
     println!("└─────────────────────────────────────────────────────────────────┘");
 
-    match verify_calculation_accuracy(local_output, simulated_output, 7.0) {
-        Ok(_) => println!("✅ 验证通过：误差 < 7%\n"),
+    match verify_calculation_accuracy(local_output, baseline_output, 1.0) {
+        Ok(_) => println!("✅ 验证通过：误差 < 1.0%\n"),
         Err(e) => {
             println!("❌ 验证失败: {}\n", e);
             // 调试：打印详细信息
             println!("📊 调试信息:");
             println!("  local_output: {}", local_output);
-            println!("  simulated_output: {}", simulated_output);
+            println!("  baseline_output: {}", baseline_output);
             println!("  inner_instructions: {:?}", simulation_result.inner_instructions);
             println!("  logs (前30行):");
             if let Some(ref logs) = simulation_result.logs {

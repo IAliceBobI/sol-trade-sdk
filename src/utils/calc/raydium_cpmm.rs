@@ -107,23 +107,34 @@ fn swap_base_input(
 ) -> SwapResult {
     let mut creator_fee = 0u64;
 
+    // 根据 Raydium CPMM 官方实现，所有费用从输入金额扣除
+    // 计算所有费用（全部从 input_amount 计算，而不是从 trade_fee 计算）
     let trade_fee = compute_trading_fee(input_amount, trade_fee_rate);
+    let protocol_fee = compute_protocol_fund_fee(input_amount, protocol_fee_rate);
+    let fund_fee = compute_protocol_fund_fee(input_amount, fund_fee_rate);
 
+    // Creator fee 根据配置从输入或输出扣除
     let input_amount_less_fees = if is_creator_fee_on_input {
         creator_fee = compute_creator_fee_new(input_amount, creator_fee_rate);
-        input_amount.saturating_sub(trade_fee).saturating_sub(creator_fee)
+        input_amount
+            .saturating_sub(trade_fee)
+            .saturating_sub(protocol_fee)
+            .saturating_sub(fund_fee)
+            .saturating_sub(creator_fee)
     } else {
-        input_amount.saturating_sub(trade_fee)
+        input_amount
+            .saturating_sub(trade_fee)
+            .saturating_sub(protocol_fee)
+            .saturating_sub(fund_fee)
     };
 
-    let protocol_fee = compute_protocol_fund_fee(trade_fee, protocol_fee_rate);
-    let fund_fee = compute_protocol_fund_fee(trade_fee, fund_fee_rate);
-
+    // 使用扣除费用后的金额进行恒定乘积计算
     let output_amount_swapped = ((output_vault_amount as u128)
         .saturating_mul(input_amount_less_fees as u128)
         / (input_vault_amount as u128).saturating_add(input_amount_less_fees as u128))
         as u64;
 
+    // 如果 creator_fee 不从输入扣除，则从输出扣除
     let output_amount = if is_creator_fee_on_input {
         output_amount_swapped
     } else {

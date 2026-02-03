@@ -179,32 +179,31 @@ pub fn sell_base_input_internal(
         return Err("Invalid input: 'baseReserve' or 'quoteReserve' cannot be zero.".to_string());
     }
 
-    // Calculate quote amount out using constant product formula
-    let quote_amount_out = ((quote_reserve as u128) * (base as u128)
-        / ((base_reserve as u128) + (base as u128))) as u64;
-
-    // Calculate fees
-    let lp_fee = compute_fee(quote_amount_out as u128, LP_FEE_BASIS_POINTS as u128) as u64;
-    let protocol_fee =
-        compute_fee(quote_amount_out as u128, PROTOCOL_FEE_BASIS_POINTS as u128) as u64;
+    // 根据 PumpSwap 的 bonding curve 实现，费用从输入金额扣除
+    // 计算所有费用（从 base 输入计算）
+    let lp_fee = compute_fee(base as u128, LP_FEE_BASIS_POINTS as u128) as u64;
+    let protocol_fee = compute_fee(base as u128, PROTOCOL_FEE_BASIS_POINTS as u128) as u64;
     let coin_creator_fee = if *coin_creator == Pubkey::default() {
         0
     } else {
-        compute_fee(quote_amount_out as u128, COIN_CREATOR_FEE_BASIS_POINTS as u128) as u64
+        compute_fee(base as u128, COIN_CREATOR_FEE_BASIS_POINTS as u128) as u64
     };
 
-    // Calculate final quote after fees
-    let total_fees = lp_fee + protocol_fee + coin_creator_fee;
-    if total_fees > quote_amount_out {
-        return Err("Fees exceed total output; final quote is negative.".to_string());
-    }
-    let final_quote = quote_amount_out - total_fees;
+    // 总费用从输入扣除
+    let base_after_fees = base
+        .saturating_sub(lp_fee)
+        .saturating_sub(protocol_fee)
+        .saturating_sub(coin_creator_fee);
+
+    // 使用扣除费用后的输入金额进行恒定乘积计算
+    let quote_amount_out = ((quote_reserve as u128) * (base_after_fees as u128)
+        / ((base_reserve as u128) + (base_after_fees as u128))) as u64;
 
     // Calculate min quote with slippage
-    let min_quote = calculate_with_slippage_sell(final_quote, slippage_basis_points);
+    let min_quote = calculate_with_slippage_sell(quote_amount_out, slippage_basis_points);
 
     Ok(SellBaseInputResult {
-        ui_quote: final_quote,
+        ui_quote: quote_amount_out,
         min_quote,
         internal_quote_amount_out: quote_amount_out,
     })

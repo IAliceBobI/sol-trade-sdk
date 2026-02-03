@@ -2,13 +2,8 @@
 //!
 //! 测试场景: 卖出 PIPE 换取 WSOL (指定输入金额)
 //!
-//! ⚠️ 注意: 此测试暂时被禁用
-//!
-//! 问题: CPMM quote 计算有 ~0.54% 的误差，需要从 amm_config 账户读取实际费率
-//!       而不是使用硬编码的费率常量
-//!
 //! 运行测试:
-//!     cargo nextest run verify_raydium_cpmm_exact_in_sell -- --nocapture --ignored
+//!     cargo nextest run verify_raydium_cpmm_exact_in_sell -- --nocapture
 
 use sdk_common::{GasFeeStrategy, SolanaRpcClient, TradeConfig};
 use sol_trade_sdk::{
@@ -40,7 +35,6 @@ const PIPE_MINT: &str = "8ycz3kctoRb4LFrtoYG2r8tRyUYUeGf5Q16M2TEMp7A";
 // ========================================
 
 #[tokio::test]
-#[ignore]
 #[serial_test::serial(pipe_wsol_pool_tests)]
 async fn test_raydium_cpmm_exact_in_sell_with_simulation() {
     println!("====================================================");
@@ -351,8 +345,8 @@ async fn test_raydium_cpmm_exact_in_sell_with_simulation() {
     println!("│ 误差率               │ {:>12} │ {:>18.4}% │", "", error_rate);
     println!("└─────────────────────────────────────────────────────────────────┘");
 
-    match verify_calculation_accuracy(local_output, simulated_output, 2.0) {
-        Ok(_) => println!("✅ 验证通过：误差 < 2.0%\n"),
+    match verify_calculation_accuracy(local_output, simulated_output, 1.0) {
+        Ok(_) => println!("✅ 验证通过：误差 < 1.0%\n"),
         Err(e) => {
             println!("❌ 验证失败: {}\n", e);
             panic!("验证失败: {}", e);

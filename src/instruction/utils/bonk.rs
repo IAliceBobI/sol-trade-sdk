@@ -320,12 +320,12 @@ mod tests {
     }
 
     #[tokio::test]
-    #[ignore]
     async fn test_fetch_pool_state_owner_validation() {
         // Test that get_pool_by_address validates the program owner
         let invalid_address = Pubkey::from_str("11111111111111111111111111111111").unwrap(); // System program
 
-        let rpc_url = "https://api.mainnet-beta.solana.com";
+        // 使用本地测试节点
+        let rpc_url = "http://127.0.0.1:8899";
         let rpc = RpcClient::new(rpc_url.to_string());
 
         let result = get_pool_by_address(&rpc, &invalid_address).await;

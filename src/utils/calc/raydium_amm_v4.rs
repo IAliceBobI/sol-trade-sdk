@@ -99,26 +99,36 @@ fn swap_base_input(
     trade_fee_rate: u64,
     swap_fee_rate: u64,
 ) -> SwapResult {
-    let trade_fee = compute_trading_fee(input_amount, trade_fee_rate, TRADE_FEE_DENOMINATOR);
+    // 根据 Raydium AMM V4 官方实现，只有一个 swap_fee，从输入金额扣除
+    // 参考: https://github.com/raydium-io/raydium-amm/blob/master/program/src/processor.rs
+    // 在 process_swap_base_in 中：
+    //   swap_fee = U128::from(swap.amount_in)
+    //       .checked_mul(amm.fees.swap_fee_numerator.into())
+    //       .checked_ceil_div(amm.fees.swap_fee_denominator.into())
+    //   swap_in_after_deduct_fee = U128::from(swap.amount_in).checked_sub(swap_fee).unwrap()
+    //   swap_amount_out = Calculator::swap_token_amount_base_in(
+    //       swap_in_after_deduct_fee, total_pc_without_take_pnl.into(), ...
+    //   ).as_u64()
 
-    let input_amount_less_fees = input_amount.saturating_sub(trade_fee);
+    // AMM V4 只有一个费用：swap_fee (0.25%)
+    let swap_fee = compute_trading_fee(input_amount, swap_fee_rate, SWAP_FEE_DENOMINATOR);
 
-    let swap_fee = compute_protocol_fund_fee(trade_fee, swap_fee_rate, SWAP_FEE_DENOMINATOR);
+    // 从输入金额扣除费用
+    let input_amount_less_fee = input_amount.saturating_sub(swap_fee);
 
-    let output_amount_swapped = ((output_vault_amount as u128)
-        .saturating_mul(input_amount_less_fees as u128)
-        / (input_vault_amount as u128).saturating_add(input_amount_less_fees as u128))
+    // 使用扣除费用后的金额进行恒定乘积计算
+    let output_amount = ((output_vault_amount as u128)
+        .saturating_mul(input_amount_less_fee as u128)
+        / (input_vault_amount as u128).saturating_add(input_amount_less_fee as u128))
         as u64;
 
-    let output_amount = output_amount_swapped.saturating_sub(swap_fee);
-
     SwapResult {
-        new_input_vault_amount: input_vault_amount.saturating_add(input_amount_less_fees),
-        new_output_vault_amount: output_vault_amount.saturating_sub(output_amount_swapped),
+        new_input_vault_amount: input_vault_amount.saturating_add(input_amount_less_fee),
+        new_output_vault_amount: output_vault_amount.saturating_sub(output_amount),
         input_amount,
         output_amount,
-        trade_fee,
-        swap_fee,
+        trade_fee: swap_fee,  // 统一使用 trade_fee 字段返回 swap_fee
+        swap_fee: 0,       // 不再单独计算 swap_fee
     }
 }
 

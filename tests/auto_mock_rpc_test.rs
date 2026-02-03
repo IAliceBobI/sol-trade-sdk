@@ -61,7 +61,7 @@ fn test_has_mock_data() {
 }
 
 #[tokio::test]
-#[ignore] // 需要 RPC 节点，手动运行
+#[ignore = "TODO: Mock 数据文件创建逻辑需要进一步调查"]
 async fn test_auto_mode_first_call() {
     let client = AutoMockRpcClient::new_with_namespace(
         "http://127.0.0.1:8899".to_string(),
