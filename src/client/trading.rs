@@ -1,11 +1,11 @@
 //! TradingClient 核心交易方法（buy/sell）
 
-use super::types::{TradingClient, TradeBuyParams, TradeSellParams};
+use super::types::{TradeBuyParams, TradeSellParams, TradingClient};
+use crate::trading::core::params::SwapParams;
 use crate::trading::core::params::{
     BonkParams, MeteoraDammV2Params, PumpFunParams, PumpSwapParams, RaydiumAmmV4Params,
     RaydiumClmmParams, RaydiumCpmmParams,
 };
-use crate::trading::core::params::SwapParams;
 use crate::trading::factory::TradeFactory;
 use solana_sdk::signature::Signature;
 
@@ -46,7 +46,9 @@ impl TradingClient {
                 crate::constants::trade_consts::DEFAULT_SLIPPAGE
             );
         }
-        if params.input_token_type == crate::TradeTokenType::USD1 && params.dex_type != crate::DexType::Bonk {
+        if params.input_token_type == crate::TradeTokenType::USD1
+            && params.dex_type != crate::DexType::Bonk
+        {
             return Err(anyhow::anyhow!(
                 " Current version only support USD1 trading on Bonk protocols"
             ));
@@ -99,7 +101,9 @@ impl TradingClient {
 
         // Validate protocol params
         let is_valid_params = match params.dex_type {
-            crate::DexType::PumpFun => protocol_params.as_any().downcast_ref::<PumpFunParams>().is_some(),
+            crate::DexType::PumpFun => {
+                protocol_params.as_any().downcast_ref::<PumpFunParams>().is_some()
+            },
             crate::DexType::PumpSwap => {
                 protocol_params.as_any().downcast_ref::<PumpSwapParams>().is_some()
             },
@@ -170,7 +174,9 @@ impl TradingClient {
                 crate::constants::trade_consts::DEFAULT_SLIPPAGE
             );
         }
-        if params.output_token_type == crate::TradeTokenType::USD1 && params.dex_type != crate::DexType::Bonk {
+        if params.output_token_type == crate::TradeTokenType::USD1
+            && params.dex_type != crate::DexType::Bonk
+        {
             return Err(anyhow::anyhow!(
                 " Current version only support USD1 trading on Bonk protocols"
             ));
@@ -223,7 +229,9 @@ impl TradingClient {
 
         // Validate protocol params
         let is_valid_params = match params.dex_type {
-            crate::DexType::PumpFun => protocol_params.as_any().downcast_ref::<PumpFunParams>().is_some(),
+            crate::DexType::PumpFun => {
+                protocol_params.as_any().downcast_ref::<PumpFunParams>().is_some()
+            },
             crate::DexType::PumpSwap => {
                 protocol_params.as_any().downcast_ref::<PumpSwapParams>().is_some()
             },

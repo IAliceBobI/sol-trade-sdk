@@ -1,8 +1,6 @@
 use crate::{
-    common::{
-        spl_associated_token_account::get_associated_token_address_with_program_id,
-    },
-    constants::{TOKEN_PROGRAM, WSOL_TOKEN_ACCOUNT, USDC_MINT, USDT_MINT},
+    common::spl_associated_token_account::get_associated_token_address_with_program_id,
+    constants::{TOKEN_PROGRAM, USDC_MINT, USDT_MINT, WSOL_TOKEN_ACCOUNT},
     instruction::utils::pumpswap::constants::{accounts, seeds},
 };
 use solana_sdk::pubkey::Pubkey;
@@ -17,7 +15,9 @@ pub fn is_hot_mint(mint: &Pubkey) -> bool {
 ///
 /// 策略：
 /// - LP 供应量越大，说明流动性越好
-pub fn select_best_pool_by_liquidity(pools: &[(Pubkey, super::Pool)]) -> Option<(Pubkey, super::Pool)> {
+pub fn select_best_pool_by_liquidity(
+    pools: &[(Pubkey, super::Pool)],
+) -> Option<(Pubkey, super::Pool)> {
     if pools.is_empty() {
         return None;
     }

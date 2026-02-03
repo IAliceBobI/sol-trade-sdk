@@ -1,8 +1,8 @@
 //! TradingClient 报价相关方法
 
 use super::helpers::{get_input_mint, get_output_mint, supports_quote};
-use super::types::{TradingClient, TradeBuyParams, TradeSellParams};
-use crate::{DexType, QuoteResult, TradeTokenType, UnifiedResult, UnifiedTradingError};
+use super::types::{TradeBuyParams, TradeSellParams, TradingClient};
+use crate::{QuoteResult, UnifiedResult, UnifiedTradingError};
 
 impl TradingClient {
     /// 本地计算（快速估算）

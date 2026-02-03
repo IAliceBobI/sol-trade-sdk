@@ -89,7 +89,7 @@ pub fn select_best_pool_by_liquidity(pools: &[(Pubkey, PoolState)]) -> Option<(P
             std::cmp::Ordering::Equal => {
                 // LP 供应量相同时，按开池时间排序（更早的池更成熟）
                 pool_b.open_time.cmp(&pool_a.open_time)
-            }
+            },
             other => other,
         }
     });

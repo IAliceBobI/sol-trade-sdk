@@ -4,8 +4,11 @@ use crate::{
     common::auto_mock_rpc::PoolRpcClient,
     constants::{USDC_MINT, USDT_MINT, WSOL_TOKEN_ACCOUNT},
     instruction::utils::{
+        raydium_cpmm::{
+            cache, constants::TOKEN0_MINT_OFFSET, constants::TOKEN1_MINT_OFFSET,
+            constants::accounts, helpers::is_hot_mint, helpers::select_best_pool_by_liquidity,
+        },
         raydium_cpmm_types::PoolState,
-        raydium_cpmm::{cache, constants::accounts, constants::TOKEN0_MINT_OFFSET, constants::TOKEN1_MINT_OFFSET, helpers::is_hot_mint, helpers::select_best_pool_by_liquidity},
     },
 };
 use anyhow::anyhow;
@@ -14,7 +17,7 @@ use base64::engine::general_purpose::STANDARD;
 use solana_account_decoder::{UiAccountData, UiAccountEncoding};
 use solana_client::rpc_filter::Memcmp;
 use solana_rpc_client_api::{config::RpcProgramAccountsConfig, filter::RpcFilterType};
-use solana_sdk::{pubkey::Pubkey};
+use solana_sdk::pubkey::Pubkey;
 use std::str::FromStr;
 
 /// 获取指定地址的 CPMM 池（支持 Auto Mock）
@@ -278,10 +281,7 @@ async fn find_pools_by_mint_offset_collect<T: PoolRpcClient + ?Sized>(
     offset: usize,
 ) -> Result<Vec<(Pubkey, PoolState)>, anyhow::Error> {
     // 暂时移除 DataSize 过滤，只使用 Memcmp 过滤
-    let filters = vec![RpcFilterType::Memcmp(Memcmp::new_base58_encoded(
-        offset,
-        &mint.to_bytes(),
-    ))];
+    let filters = vec![RpcFilterType::Memcmp(Memcmp::new_base58_encoded(offset, &mint.to_bytes()))];
     let config = RpcProgramAccountsConfig {
         filters: Some(filters),
         account_config: solana_rpc_client_api::config::RpcAccountInfoConfig {
@@ -342,7 +342,7 @@ async fn find_all_pools_by_mint_impl<T: PoolRpcClient + ?Sized>(
     // 检测是否都失败，如果都失败则返回第一个错误（通常包含 RPC 限制信息）
     match (&token0_result, &token1_result) {
         (Err(e), Err(_)) => return Err(anyhow::anyhow!("{}", e)),
-        _ => {}
+        _ => {},
     }
 
     let mut all_pools: Vec<(Pubkey, PoolState)> = Vec::new();

@@ -6,7 +6,7 @@
 use sol_trade_sdk::{
     TradingClient,
     common::{GasFeeStrategy, SolanaRpcClient, TradeConfig},
-    instruction::utils::raydium_amm_v4::{get_pool_by_address, quote_exact_in},
+    instruction::utils::raydium_amm_v4::get_pool_by_address,
     trading::core::params::{RaydiumAmmV4Params, SwapParams},
     trading::core::traits::InstructionBuilder,
     utils::simulation_based_calc::{simulate_swap_transaction, verify_calculation_accuracy},

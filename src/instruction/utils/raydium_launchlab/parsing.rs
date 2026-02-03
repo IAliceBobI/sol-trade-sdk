@@ -1,4 +1,4 @@
-use super::types::{GlobalConfig, LaunchLabPoolState, PlatformConfig, GLOBAL_CONFIG_SIZE};
+use super::types::{GLOBAL_CONFIG_SIZE, GlobalConfig, LaunchLabPoolState, PlatformConfig};
 use solana_sdk::pubkey::Pubkey;
 
 /// Parse PlatformConfig from account data
@@ -101,7 +101,11 @@ pub fn parse_platform_config(account_data: &[u8]) -> Result<PlatformConfig, anyh
         epoch,
         fee_wallet,
         nft_wallet,
-        migrate_nft_info: super::types::MigrateNftInfo { platform_scale, creator_scale, burn_scale },
+        migrate_nft_info: super::types::MigrateNftInfo {
+            platform_scale,
+            creator_scale,
+            burn_scale,
+        },
         fee_rate,
         name,
         web,

@@ -3,10 +3,7 @@
 use anyhow::anyhow;
 use solana_sdk::pubkey::Pubkey;
 
-use crate::{
-    common::SolanaRpcClient,
-    instruction::utils::raydium_clmm_types::amm_config_decode,
-};
+use crate::{common::SolanaRpcClient, instruction::utils::raydium_clmm_types::amm_config_decode};
 
 use super::{
     helpers::get_tick_array_start_index,

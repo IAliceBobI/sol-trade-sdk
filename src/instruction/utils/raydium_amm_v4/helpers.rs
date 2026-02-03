@@ -23,14 +23,10 @@ pub fn calculate_effective_volume(amm: &AmmInfo) -> u128 {
 
     if coin_is_stable && !pc_is_stable {
         // 只计算 coin 侧（WSOL/USDC/USDT）的交易量
-        amm.out_put
-            .swap_coin_in_amount
-            .saturating_add(amm.out_put.swap_pc_out_amount)
+        amm.out_put.swap_coin_in_amount.saturating_add(amm.out_put.swap_pc_out_amount)
     } else if pc_is_stable && !coin_is_stable {
         // 只计算 pc 侧（WSOL/USDC/USDT）的交易量
-        amm.out_put
-            .swap_pc_in_amount
-            .saturating_add(amm.out_put.swap_coin_out_amount)
+        amm.out_put.swap_pc_in_amount.saturating_add(amm.out_put.swap_coin_out_amount)
     } else {
         // 两侧都是稳定资产或都不是，计算总交易量
         amm.out_put
@@ -112,7 +108,7 @@ pub fn select_best_pool_by_volume(
             std::cmp::Ordering::Equal => {
                 // 交易量相同时，按流动性排序
                 amm_b.lp_amount.cmp(&amm_a.lp_amount)
-            }
+            },
             other => other,
         }
     });

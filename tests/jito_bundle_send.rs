@@ -163,7 +163,9 @@ async fn test_jito_bundle_send_example() -> Result<(), Box<dyn std::error::Error
     // 为了提高成功率，我们动态获取 Tip Floor 并计算最优 tip
 
     println!("\n📊 正在获取 Tip Floor 数据...");
-    use sol_trade_sdk::swqos::jito::dynamic_tip::{DynamicTipConfig, JitoTipFloorClient, TipPercentile};
+    use sol_trade_sdk::swqos::jito::dynamic_tip::{
+        DynamicTipConfig, JitoTipFloorClient, TipPercentile,
+    };
 
     let tip_floor_client = JitoTipFloorClient::from_env_proxy();
     let base_tip_amount: u64 = match tip_floor_client.get_tip_floor().await {

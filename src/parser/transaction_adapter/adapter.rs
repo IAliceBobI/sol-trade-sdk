@@ -9,7 +9,7 @@ use super::parsers::{
     parse_transfer_instruction_parsed, parse_transfer_instruction_raw,
 };
 use super::types::{
-    token_program, token_program_2022, InnerInstructionInfo, InstructionInfo, TransferData,
+    InnerInstructionInfo, InstructionInfo, TransferData, token_program, token_program_2022,
 };
 use solana_account_decoder::parse_token::UiTokenAmount;
 use solana_sdk::pubkey::Pubkey;

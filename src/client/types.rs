@@ -7,7 +7,7 @@ use std::sync::Arc;
 
 use crate::common::GasFeeStrategy;
 use crate::{
-    CallbackExecutionMode, CallbackRef, DurableNonceInfo, DexParamEnum, DexType, MiddlewareManager,
+    CallbackExecutionMode, CallbackRef, DexParamEnum, DexType, DurableNonceInfo, MiddlewareManager,
     TradeTokenType,
 };
 

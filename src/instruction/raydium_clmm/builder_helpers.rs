@@ -2,7 +2,7 @@
 //!
 //! 提取重复的逻辑以提高代码可维护性。
 
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 use solana_sdk::{instruction::AccountMeta, pubkey::Pubkey};
 
 use crate::instruction::raydium_clmm::helpers::amount_with_slippage;
@@ -84,13 +84,9 @@ pub fn get_swap_tick_arrays(
         }
     }
 
-    let (tick_array_bitmap_extension_pda, _) =
-        get_tick_array_bitmap_extension_pda(pool_state);
+    let (tick_array_bitmap_extension_pda, _) = get_tick_array_bitmap_extension_pda(pool_state);
 
-    Ok(TickArraysInfo {
-        tick_array_pdas,
-        tick_array_bitmap_extension_pda,
-    })
+    Ok(TickArraysInfo { tick_array_pdas, tick_array_bitmap_extension_pda })
 }
 
 /// 构建 Swap 指令数据
@@ -149,8 +145,8 @@ pub fn build_swap_account_metas(
         AccountMeta::new(protocol_params.pool_state, false), // 2. Pool State (writable)
         AccountMeta::new(input_token_account, false), // 3. Input Token Account (writable)
         AccountMeta::new(output_token_account, false), // 4. Output Token Account (writable)
-        AccountMeta::new(input_vault, false),         // 5. Input Vault (writable)
-        AccountMeta::new(output_vault, false),        // 6. Output Vault (writable)
+        AccountMeta::new(input_vault, false),   // 5. Input Vault (writable)
+        AccountMeta::new(output_vault, false),  // 6. Output Vault (writable)
         AccountMeta::new(protocol_params.observation_state, false), // 7. Observation State (writable)
         AccountMeta::new_readonly(crate::constants::TOKEN_PROGRAM, false), // 8. Token Program (readonly)
         AccountMeta::new_readonly(crate::constants::TOKEN_2022_PROGRAM, false), // 9. Token 2022 Program (readonly)
@@ -160,10 +156,8 @@ pub fn build_swap_account_metas(
     ];
 
     // remainingAccounts: exTickArrayBitmap (readonly for SwapV2) + tickArrays (writable)
-    account_metas.push(AccountMeta::new_readonly(
-        tick_arrays_info.tick_array_bitmap_extension_pda,
-        false,
-    )); // 13. TickArray Bitmap Extension (readonly)
+    account_metas
+        .push(AccountMeta::new_readonly(tick_arrays_info.tick_array_bitmap_extension_pda, false)); // 13. TickArray Bitmap Extension (readonly)
 
     // 添加额外的 tick arrays（全部 writable）
     for tick_array_pda in &tick_arrays_info.tick_array_pdas {
@@ -186,4 +180,3 @@ pub fn calculate_slippage_amount(input_amount: u64, slippage: u64, is_round_up: 
         0
     }
 }
-

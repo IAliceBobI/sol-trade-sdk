@@ -1,7 +1,7 @@
 // Pool 查询函数
 
 use super::constants::{
-    accounts::RAYDIUM_AMM_V4, COIN_MINT_OFFSET, MAX_CACHE_SIZE, PC_MINT_OFFSET,
+    COIN_MINT_OFFSET, MAX_CACHE_SIZE, PC_MINT_OFFSET, accounts::RAYDIUM_AMM_V4,
 };
 use super::helpers::{calculate_effective_volume, is_hot_mint, select_best_pool_by_volume};
 use crate::common::{SolanaRpcClient, auto_mock_rpc::PoolRpcClient};
@@ -97,8 +97,8 @@ pub async fn get_pool_by_address<T: PoolRpcClient + ?Sized>(
         return Err(anyhow!("Account is not owned by Raydium AMM V4 program"));
     }
     // 使用修改后的 amm_info_decode（传入 program_id）
-    let amm_info =
-        amm_info_decode(&account.data, account.owner).ok_or_else(|| anyhow!("Failed to decode amm info"))?;
+    let amm_info = amm_info_decode(&account.data, account.owner)
+        .ok_or_else(|| anyhow!("Failed to decode amm info"))?;
 
     // 不写入缓存
     Ok(amm_info)
@@ -144,21 +144,21 @@ async fn find_pools_by_mint_offset_collect<T: PoolRpcClient + ?Sized>(
         sort_results: None,
     };
 
-    let accounts = rpc
-        .get_program_ui_accounts_with_config(&RAYDIUM_AMM_V4, config)
-        .await
-        .map_err(|e| {
-            // 检测公共 RPC 限制错误
-            if e.contains("excluded from account secondary indexes") {
-                anyhow!(
-                    "Public RPC does not support getProgramAccounts for Raydium AMM V4. \
+    let accounts =
+        rpc.get_program_ui_accounts_with_config(&RAYDIUM_AMM_V4, config)
+            .await
+            .map_err(|e| {
+                // 检测公共 RPC 限制错误
+                if e.contains("excluded from account secondary indexes") {
+                    anyhow!(
+                        "Public RPC does not support getProgramAccounts for Raydium AMM V4. \
                     Please use: (1) paid RPC service (Helius, QuickNode, Triton), \
                     (2) local full node, or (3) known pool addresses directly."
-                )
-            } else {
-                anyhow!("RPC error: {}", e)
-            }
-        })?;
+                    )
+                } else {
+                    anyhow!("RPC error: {}", e)
+                }
+            })?;
 
     let pools: Vec<(Pubkey, AmmInfo)> = accounts
         .into_iter()
@@ -167,7 +167,7 @@ async fn find_pools_by_mint_offset_collect<T: PoolRpcClient + ?Sized>(
             let data_bytes = match &acc.data {
                 solana_account_decoder::UiAccountData::Binary(base64_str, _) => {
                     STANDARD.decode(base64_str).ok()?
-                }
+                },
                 _ => return None,
             };
             // 使用 program_id (所有账户都属于 RAYDIUM_AMM_V4)
@@ -194,7 +194,7 @@ async fn find_all_pools_by_mint_impl<T: PoolRpcClient + ?Sized>(
     // 检测是否都失败，如果都失败则返回第一个错误（通常包含 RPC 限制信息）
     match (&coin_result, &pc_result) {
         (Err(e), Err(_)) => return Err(anyhow::anyhow!("{}", e)),
-        _ => {}
+        _ => {},
     }
 
     let mut all_pools: Vec<(Pubkey, AmmInfo)> = Vec::new();
@@ -530,11 +530,11 @@ pub async fn get_token_price_in_usd(
         let pc_decimals = crate::utils::token::get_token_decimals(rpc, &amm.pc_mint).await?;
 
         // 获取实时余额
-        let coin_balance = rpc
-            .get_token_account_balance(&amm.token_coin)
-            .await?
-            .ui_amount
-            .ok_or_else(|| anyhow!("Failed to get coin balance"))? as u64;
+        let coin_balance =
+            rpc.get_token_account_balance(&amm.token_coin)
+                .await?
+                .ui_amount
+                .ok_or_else(|| anyhow!("Failed to get coin balance"))? as u64;
         let pc_balance = rpc
             .get_token_account_balance(&amm.token_pc)
             .await?
@@ -597,11 +597,12 @@ pub async fn get_token_price_in_usd(
     }
 
     // 4. 计算 WSOL 的 USD 价格
-    let price_wsol_in_usd = crate::instruction::utils::raydium_clmm::get_wsol_price_in_usd_with_client(
-        rpc,
-        Some(wsol_usd_pool),
-    )
-    .await?;
+    let price_wsol_in_usd =
+        crate::instruction::utils::raydium_clmm::get_wsol_price_in_usd_with_client(
+            rpc,
+            Some(wsol_usd_pool),
+        )
+        .await?;
 
     Ok(price_x_in_wsol * price_wsol_in_usd)
 }
@@ -670,11 +671,11 @@ pub async fn get_token_price_in_usd_with_pool(
         let pc_decimals = crate::utils::token::get_token_decimals(rpc, &amm.pc_mint).await?;
 
         // 获取实时余额
-        let coin_balance = rpc
-            .get_token_account_balance(&amm.token_coin)
-            .await?
-            .ui_amount
-            .ok_or_else(|| anyhow!("Failed to get coin balance"))? as u64;
+        let coin_balance =
+            rpc.get_token_account_balance(&amm.token_coin)
+                .await?
+                .ui_amount
+                .ok_or_else(|| anyhow!("Failed to get coin balance"))? as u64;
         let pc_balance = rpc
             .get_token_account_balance(&amm.token_pc)
             .await?
@@ -737,11 +738,12 @@ pub async fn get_token_price_in_usd_with_pool(
     }
 
     // 4. 计算 WSOL 的 USD 价格
-    let price_wsol_in_usd = crate::instruction::utils::raydium_clmm::get_wsol_price_in_usd_with_client(
-        rpc,
-        Some(wsol_usd_pool),
-    )
-    .await?;
+    let price_wsol_in_usd =
+        crate::instruction::utils::raydium_clmm::get_wsol_price_in_usd_with_client(
+            rpc,
+            Some(wsol_usd_pool),
+        )
+        .await?;
 
     Ok(price_x_in_wsol * price_wsol_in_usd)
 }

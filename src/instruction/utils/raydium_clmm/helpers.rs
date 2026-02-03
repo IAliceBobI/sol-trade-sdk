@@ -4,7 +4,7 @@ use solana_sdk::pubkey::Pubkey;
 
 use crate::constants::{SOL_MINT, USDC_MINT, USDT_MINT};
 
-use super::constants::{seeds, TICKS_PER_ARRAY};
+use super::constants::{TICKS_PER_ARRAY, seeds};
 
 /// Constants related to program accounts and authorities
 pub mod accounts {

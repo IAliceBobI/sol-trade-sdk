@@ -1,7 +1,9 @@
 // Quote 计算函数
 
 use crate::common::SolanaRpcClient;
-use crate::utils::calc::raydium_amm_v4::{compute_swap_amount, quote_exact_out as calc_quote_exact_out};
+use crate::utils::calc::raydium_amm_v4::{
+    compute_swap_amount, quote_exact_out as calc_quote_exact_out,
+};
 use anyhow::anyhow;
 use solana_sdk::pubkey::Pubkey;
 

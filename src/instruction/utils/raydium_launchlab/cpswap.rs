@@ -1,7 +1,7 @@
 use super::constants::accounts;
+use crate::common::SolanaRpcClient;
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD;
-use crate::common::SolanaRpcClient;
 use solana_account_decoder::UiAccountData;
 use solana_account_decoder::UiAccountEncoding;
 use solana_rpc_client_api::config::RpcProgramAccountsConfig;
@@ -36,7 +36,8 @@ async fn try_known_config_address(rpc: &SolanaRpcClient) -> Option<(Pubkey, Pubk
 async fn query_all_amm_configs(
     rpc: &SolanaRpcClient,
     cpmm_program: &Pubkey,
-) -> Result<Vec<(Pubkey, crate::instruction::utils::raydium_cpmm_types::AmmConfig)>, anyhow::Error> {
+) -> Result<Vec<(Pubkey, crate::instruction::utils::raydium_cpmm_types::AmmConfig)>, anyhow::Error>
+{
     use crate::instruction::utils::raydium_cpmm_types::{AMM_CONFIG_SIZE, amm_config_decode};
 
     // AmmConfig account size: 228 bytes (data) + 8 bytes (discriminator) = 236 bytes

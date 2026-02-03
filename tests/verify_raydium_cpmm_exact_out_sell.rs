@@ -5,19 +5,17 @@
 //! 运行测试:
 //!     cargo nextest run verify_raydium_cpmm_exact_out_sell -- --nocapture
 
+use sdk_common::SolanaRpcClient;
 use sol_trade_sdk::{
     common as sdk_common,
-    TradingClient,
     instruction::utils::raydium_cpmm::{get_pool_by_address, quote_exact_out},
     trading::core::params::{RaydiumCpmmParams, SwapParams},
     trading::core::traits::InstructionBuilder,
     utils::simulation_based_calc::{simulate_swap_transaction, verify_calculation_accuracy},
 };
-use solana_commitment_config::CommitmentConfig;
 use solana_sdk::{pubkey::Pubkey, signer::Signer};
 use std::str::FromStr;
 use std::sync::Arc;
-use sdk_common::{GasFeeStrategy, SolanaRpcClient, TradeConfig};
 
 // 导入公共测试模块
 mod common;

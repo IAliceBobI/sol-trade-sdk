@@ -4,8 +4,7 @@ use crate::{
     common::SolanaRpcClient,
     constants::{SOL_MINT, USDC_MINT, USDT_MINT, WSOL_TOKEN_ACCOUNT},
     instruction::utils::{
-        raydium_cpmm::pool_queries,
-        raydium_cpmm::constants::DEFAULT_WSOL_USDT_CLMM_POOL,
+        raydium_cpmm::constants::DEFAULT_WSOL_USDT_CLMM_POOL, raydium_cpmm::pool_queries,
     },
     utils::price::raydium_cpmm::{price_base_in_quote, price_quote_in_base},
     utils::quote::{QuoteExactInResult, QuoteExactOutResult},
@@ -201,9 +200,13 @@ pub async fn get_token_price_in_usd(
 
     // X-WSOL 池：计算 X 相对 WSOL 的价格
     // 获取实时余额
-    let (token0_balance, token1_balance) =
-        pool_queries::get_pool_token_balances(rpc, &pool_address, &pool.token0_mint, &pool.token1_mint)
-            .await?;
+    let (token0_balance, token1_balance) = pool_queries::get_pool_token_balances(
+        rpc,
+        &pool_address,
+        &pool.token0_mint,
+        &pool.token1_mint,
+    )
+    .await?;
 
     let price_x_in_wsol = if is_token0_x {
         // token0 = X, token1 = WSOL
@@ -249,7 +252,9 @@ pub async fn get_token_price_in_usd(
 /// * `token_mint` - Token X 的 mint 地址
 /// * `x_wsol_pool_address` - Token X 与 WSOL 配对的 CPMM 池地址
 /// * `wsol_usd_clmm_pool_address` - Raydium CLMM 上的 WSOL-USDT/USDC 锚定池地址
-pub async fn get_token_price_in_usd_with_pool<T: crate::common::auto_mock_rpc::PoolRpcClient + ?Sized>(
+pub async fn get_token_price_in_usd_with_pool<
+    T: crate::common::auto_mock_rpc::PoolRpcClient + ?Sized,
+>(
     rpc: &T,
     token_mint: &Pubkey,
     x_wsol_pool_address: &Pubkey,

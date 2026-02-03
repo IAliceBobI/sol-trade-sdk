@@ -2,6 +2,6 @@
 pub use crate::common::CallbackExecutionMode;
 pub use crate::common::GasFeeStrategy;
 pub use crate::common::InfrastructureConfig;
+pub use crate::common::SolanaRpcClient;
 pub use crate::common::TradeConfig;
 pub use crate::common::nonce_cache::DurableNonceInfo;
-pub use crate::common::SolanaRpcClient;

@@ -85,7 +85,10 @@ pub fn serialize_vesting_params(params: &VestingParams) -> Vec<u8> {
 }
 
 /// Calculate pool state PDA (seeds: ["pool", base_mint, quote_mint])
-pub fn get_pool_state_pda(base_mint: &Pubkey, quote_mint: &Pubkey) -> Result<(Pubkey, u8), anyhow::Error> {
+pub fn get_pool_state_pda(
+    base_mint: &Pubkey,
+    quote_mint: &Pubkey,
+) -> Result<(Pubkey, u8), anyhow::Error> {
     Pubkey::try_find_program_address(
         &[seeds::POOL_SEED, base_mint.as_ref(), quote_mint.as_ref()],
         &accounts::LAUNCHLAB_PROGRAM,
@@ -100,7 +103,10 @@ pub fn get_vault_authority_pda() -> Result<(Pubkey, u8), anyhow::Error> {
 }
 
 /// Calculate pool vault PDA (seeds: ["pool_vault", pool_state, mint])
-pub fn get_pool_vault_pda(pool_state: &Pubkey, mint: &Pubkey) -> Result<(Pubkey, u8), anyhow::Error> {
+pub fn get_pool_vault_pda(
+    pool_state: &Pubkey,
+    mint: &Pubkey,
+) -> Result<(Pubkey, u8), anyhow::Error> {
     Pubkey::try_find_program_address(
         &[seeds::POOL_VAULT_SEED, pool_state.as_ref(), mint.as_ref()],
         &accounts::LAUNCHLAB_PROGRAM,
@@ -125,7 +131,10 @@ pub fn get_platform_config_pda(platform_admin: &Pubkey) -> Result<(Pubkey, u8), 
 
 /// Calculate platform fee vault PDA (seeds: [platform_id, mint_b])
 /// This is the vault where platform fees are collected
-pub fn get_platform_fee_vault_pda(platform_id: &Pubkey, mint_b: &Pubkey) -> Result<(Pubkey, u8), anyhow::Error> {
+pub fn get_platform_fee_vault_pda(
+    platform_id: &Pubkey,
+    mint_b: &Pubkey,
+) -> Result<(Pubkey, u8), anyhow::Error> {
     Pubkey::try_find_program_address(
         &[platform_id.as_ref(), mint_b.as_ref()],
         &accounts::LAUNCHLAB_PROGRAM,
@@ -135,7 +144,10 @@ pub fn get_platform_fee_vault_pda(platform_id: &Pubkey, mint_b: &Pubkey) -> Resu
 
 /// Calculate creator fee vault PDA (seeds: [creator, mint_b])
 /// This is the vault where creator fees are collected
-pub fn get_creator_fee_vault_pda(creator: &Pubkey, mint_b: &Pubkey) -> Result<(Pubkey, u8), anyhow::Error> {
+pub fn get_creator_fee_vault_pda(
+    creator: &Pubkey,
+    mint_b: &Pubkey,
+) -> Result<(Pubkey, u8), anyhow::Error> {
     Pubkey::try_find_program_address(
         &[creator.as_ref(), mint_b.as_ref()],
         &accounts::LAUNCHLAB_PROGRAM,
@@ -145,7 +157,11 @@ pub fn get_creator_fee_vault_pda(creator: &Pubkey, mint_b: &Pubkey) -> Result<(P
 
 /// Get global config PDA
 /// Seeds: ["global_config", quote_token_mint, curve_type, index]
-pub fn get_global_config_pda(quote_mint: &Pubkey, curve_type: u8, index: u16) -> Result<(Pubkey, u8), anyhow::Error> {
+pub fn get_global_config_pda(
+    quote_mint: &Pubkey,
+    curve_type: u8,
+    index: u16,
+) -> Result<(Pubkey, u8), anyhow::Error> {
     let curve_type_bytes = curve_type.to_le_bytes();
     let index_bytes = index.to_le_bytes();
     Pubkey::try_find_program_address(
@@ -177,7 +193,11 @@ pub fn get_bonding_curve_pda(mint: &Pubkey) -> Result<(Pubkey, u8), anyhow::Erro
 
 /// Calculate CPMM pool PDA
 /// Seeds: ["pool", cpswap_config, token_0_mint, token_1_mint]
-pub fn get_cpswap_pool_pda(cpswap_config: &Pubkey, token_0_mint: &Pubkey, token_1_mint: &Pubkey) -> Result<(Pubkey, u8), anyhow::Error> {
+pub fn get_cpswap_pool_pda(
+    cpswap_config: &Pubkey,
+    token_0_mint: &Pubkey,
+    token_1_mint: &Pubkey,
+) -> Result<(Pubkey, u8), anyhow::Error> {
     use crate::instruction::utils::raydium_cpmm::seeds as cpmm_seeds;
     Pubkey::try_find_program_address(
         &[
@@ -212,7 +232,10 @@ pub fn get_cpswap_lp_mint_pda(cpswap_pool: &Pubkey) -> Result<(Pubkey, u8), anyh
 
 /// Calculate CPMM vault PDA
 /// Seeds: ["pool_vault", cpswap_pool, mint]
-pub fn get_cpswap_vault_pda(cpswap_pool: &Pubkey, mint: &Pubkey) -> Result<(Pubkey, u8), anyhow::Error> {
+pub fn get_cpswap_vault_pda(
+    cpswap_pool: &Pubkey,
+    mint: &Pubkey,
+) -> Result<(Pubkey, u8), anyhow::Error> {
     use crate::instruction::utils::raydium_cpmm::seeds as cpmm_seeds;
     Pubkey::try_find_program_address(
         &[cpmm_seeds::POOL_VAULT_SEED, cpswap_pool.as_ref(), mint.as_ref()],

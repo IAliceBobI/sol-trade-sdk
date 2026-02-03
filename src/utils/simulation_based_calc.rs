@@ -336,6 +336,7 @@ async fn get_token_balance(rpc: &Arc<SolanaRpcClient>, token_account: &Pubkey) -
 /// # 返回
 /// * `Some((amount_in, amount_out))` - 解析成功
 /// * `None` - 解析失败（没有找到 Program data 或格式错误）
+#[allow(dead_code)]
 fn parse_program_data_from_logs(logs: &[String]) -> Option<(u64, u64)> {
     // 查找包含 "Program data:" 的日志行
     for log in logs {
@@ -369,6 +370,7 @@ fn parse_program_data_from_logs(logs: &[String]) -> Option<(u64, u64)> {
 /// # 返回
 /// * `Some((amount_in, amount_out))` - 解析成功
 /// * `None` - 解析失败（数据长度不足或格式错误）
+#[allow(dead_code)]
 fn parse_return_data(return_data_base64: &str) -> Option<(u64, u64)> {
     use base64::Engine;
 

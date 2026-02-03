@@ -1,6 +1,6 @@
 //! TradingClient 辅助函数
 
-use crate::{TradeTokenType};
+use crate::TradeTokenType;
 
 /// 获取输入代币的 mint 地址
 pub fn get_input_mint(input_token_type: &TradeTokenType) -> solana_sdk::pubkey::Pubkey {

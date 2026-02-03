@@ -11,8 +11,7 @@ use tracing::warn;
 
 /// 提取签名
 pub fn extract_signature(tx: &EncodedTransactionWithStatusMeta) -> Result<String, AdapterError> {
-    let tx_value =
-        serde_json::to_value(tx).map_err(|e| AdapterError::JsonError(e.to_string()))?;
+    let tx_value = serde_json::to_value(tx).map_err(|e| AdapterError::JsonError(e.to_string()))?;
 
     if let Some(signatures) = tx_value["transaction"]["signatures"].as_array()
         && let Some(first_sig) = signatures.first()
@@ -30,8 +29,7 @@ pub fn extract_account_keys(
 ) -> Result<Vec<Pubkey>, AdapterError> {
     let mut keys = Vec::new();
 
-    let tx_value =
-        serde_json::to_value(tx).map_err(|e| AdapterError::JsonError(e.to_string()))?;
+    let tx_value = serde_json::to_value(tx).map_err(|e| AdapterError::JsonError(e.to_string()))?;
 
     // 尝试多种可能的路径
     // 1. transaction.message.accountKeys (字符串数组)
@@ -96,8 +94,7 @@ pub fn extract_token_balances(
     let mut spl_token_map = HashMap::new();
     let mut spl_decimals_map = HashMap::new();
 
-    let tx_value =
-        serde_json::to_value(tx).map_err(|e| AdapterError::JsonError(e.to_string()))?;
+    let tx_value = serde_json::to_value(tx).map_err(|e| AdapterError::JsonError(e.to_string()))?;
 
     let meta = &tx_value["meta"];
 
@@ -220,8 +217,8 @@ pub fn parse_transfer_instruction_parsed(
         .and_then(|v| v.as_str())
         .ok_or_else(|| AdapterError::InstructionParseError("缺少 destination".to_string()))?;
 
-    let source = Pubkey::from_str(source_str)
-        .map_err(|e| AdapterError::PubkeyParseError(e.to_string()))?;
+    let source =
+        Pubkey::from_str(source_str).map_err(|e| AdapterError::PubkeyParseError(e.to_string()))?;
 
     let destination = Pubkey::from_str(destination_str)
         .map_err(|e| AdapterError::PubkeyParseError(e.to_string()))?;
@@ -267,12 +264,10 @@ pub fn parse_transfer_instruction_parsed(
         .and_then(|s| Pubkey::from_str(s).ok());
 
     // 获取余额信息
-    let source_balance = token_balance_changes
-        .get(&source)
-        .and_then(|(pre, _)| pre.as_ref().cloned());
-    let source_pre_balance = token_balance_changes
-        .get(&source)
-        .and_then(|(pre, _)| pre.as_ref().cloned());
+    let source_balance =
+        token_balance_changes.get(&source).and_then(|(pre, _)| pre.as_ref().cloned());
+    let source_pre_balance =
+        token_balance_changes.get(&source).and_then(|(pre, _)| pre.as_ref().cloned());
     let destination_balance = token_balance_changes
         .get(&destination)
         .and_then(|(_, post)| post.as_ref().cloned());
@@ -339,7 +334,7 @@ pub fn parse_transfer_instruction_raw(
                 .ok_or_else(|| AdapterError::InstructionParseError("无法推断 mint".to_string()))?;
 
             (source, mint, destination, authority)
-        }
+        },
         12 => {
             // TransferChecked
             if accounts.len() < 4 {
@@ -353,13 +348,13 @@ pub fn parse_transfer_instruction_raw(
             let authority = Some(accounts[3]);
 
             (source, mint, destination, authority)
-        }
+        },
         _ => {
             return Err(AdapterError::InstructionParseError(format!(
                 "未知的指令 discriminator: {}",
                 discriminator
             )));
-        }
+        },
     };
 
     // 解析 amount (从偏移 1 开始，8 字节)
@@ -385,12 +380,10 @@ pub fn parse_transfer_instruction_raw(
     };
 
     // 获取余额信息
-    let source_balance = token_balance_changes
-        .get(&source)
-        .and_then(|(pre, _)| pre.as_ref().cloned());
-    let source_pre_balance = token_balance_changes
-        .get(&source)
-        .and_then(|(pre, _)| pre.as_ref().cloned());
+    let source_balance =
+        token_balance_changes.get(&source).and_then(|(pre, _)| pre.as_ref().cloned());
+    let source_pre_balance =
+        token_balance_changes.get(&source).and_then(|(pre, _)| pre.as_ref().cloned());
     let destination_balance = token_balance_changes
         .get(&destination)
         .and_then(|(_, post)| post.as_ref().cloned());
@@ -439,8 +432,7 @@ pub fn extract_instructions(
     let mut inner_instructions = Vec::new();
     let mut inner_instructions_json = Vec::new();
 
-    let tx_value =
-        serde_json::to_value(tx).map_err(|e| AdapterError::JsonError(e.to_string()))?;
+    let tx_value = serde_json::to_value(tx).map_err(|e| AdapterError::JsonError(e.to_string()))?;
 
     // 提取外部指令
     if let Some(ixs) = tx_value["transaction"]["message"]["instructions"].as_array() {
@@ -469,11 +461,7 @@ pub fn extract_instructions(
                     .filter_map(|acc| {
                         if let Some(index) = acc.as_u64() {
                             let idx = index as usize;
-                            if idx < account_keys.len() {
-                                Some(account_keys[idx])
-                            } else {
-                                None
-                            }
+                            if idx < account_keys.len() { Some(account_keys[idx]) } else { None }
                         } else if let Some(acc_str) = acc.as_str() {
                             Pubkey::from_str(acc_str).ok()
                         } else {
@@ -560,8 +548,14 @@ pub fn extract_instructions(
 
                     // 解析 data
                     let data = if let Some(data_str) = ix_json["data"].as_str() {
-                        bs58::decode(data_str).into_vec()
-                            .inspect_err(|e| warn!("内部指令数据 base58 解析失败 (外部索引 {}, 内部索引 {}): {}", outer_index, inner_idx, e))
+                        bs58::decode(data_str)
+                            .into_vec()
+                            .inspect_err(|e| {
+                                warn!(
+                                    "内部指令数据 base58 解析失败 (外部索引 {}, 内部索引 {}): {}",
+                                    outer_index, inner_idx, e
+                                )
+                            })
                             .unwrap_or_default()
                     } else {
                         Vec::new()

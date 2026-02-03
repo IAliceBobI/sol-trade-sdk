@@ -4,16 +4,12 @@ use crate::{
     instruction::{
         raydium_clmm::{
             builder_helpers::{
-                build_swap_account_metas, build_swap_instruction_data, get_swap_tick_arrays,
-                calculate_slippage_amount,
+                build_swap_account_metas, build_swap_instruction_data, calculate_slippage_amount,
+                get_swap_tick_arrays,
             },
-            helpers::{
-                amount_with_slippage, fallback_price_calculation,
-            },
+            helpers::{amount_with_slippage, fallback_price_calculation},
         },
-        utils::raydium_clmm::{
-            accounts, get_pool_by_address,
-        },
+        utils::raydium_clmm::{accounts, get_pool_by_address},
     },
     trading::core::{
         params::{RaydiumClmmParams, SwapParams},
@@ -21,7 +17,7 @@ use crate::{
     },
     utils::calc::raydium_clmm as clmm_math,
 };
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use solana_sdk::{
     instruction::{AccountMeta, Instruction},
     signer::Signer,
@@ -125,13 +121,13 @@ impl InstructionBuilder for RaydiumClmmInstructionBuilder {
         let is_token0_in = protocol_params.token0_mint == input_mint;
 
         // 获取 vaults 和 token programs
-        let (input_vault, input_token_program) = if is_token0_in {
+        let (_input_vault, input_token_program) = if is_token0_in {
             (protocol_params.token0_vault, protocol_params.token0_program)
         } else {
             (protocol_params.token1_vault, protocol_params.token1_program)
         };
 
-        let (output_vault, output_token_program) = if output_mint == protocol_params.token0_mint {
+        let (_output_vault, output_token_program) = if output_mint == protocol_params.token0_mint {
             (protocol_params.token0_vault, protocol_params.token0_program)
         } else {
             (protocol_params.token1_vault, protocol_params.token1_program)
@@ -308,15 +304,14 @@ impl InstructionBuilder for RaydiumClmmInstructionBuilder {
         )?;
 
         // 构建 swap 数据
-        let (swap_amount, other_threshold, is_base_input) = if let Some(fixed_out) =
-            params.fixed_output_amount
-        {
-            let max_in = params.input_amount.unwrap_or(0);
-            let max_in_with_slippage = calculate_slippage_amount(max_in, slippage, true);
-            (fixed_out, max_in_with_slippage, 0)
-        } else {
-            (amount_in, minimum_amount_out, 1)
-        };
+        let (swap_amount, other_threshold, is_base_input) =
+            if let Some(fixed_out) = params.fixed_output_amount {
+                let max_in = params.input_amount.unwrap_or(0);
+                let max_in_with_slippage = calculate_slippage_amount(max_in, slippage, true);
+                (fixed_out, max_in_with_slippage, 0)
+            } else {
+                (amount_in, minimum_amount_out, 1)
+            };
 
         let data = build_swap_instruction_data(
             swap_amount,
@@ -452,13 +447,13 @@ impl InstructionBuilder for RaydiumClmmInstructionBuilder {
         let is_token0_in = protocol_params.token0_mint == input_mint;
 
         // 获取 vaults 和 token programs
-        let (input_vault, input_token_program) = if is_token0_in {
+        let (_input_vault, input_token_program) = if is_token0_in {
             (protocol_params.token0_vault, protocol_params.token0_program)
         } else {
             (protocol_params.token1_vault, protocol_params.token1_program)
         };
 
-        let (output_vault, output_token_program) = if output_mint == protocol_params.token0_mint {
+        let (_output_vault, output_token_program) = if output_mint == protocol_params.token0_mint {
             (protocol_params.token0_vault, protocol_params.token0_program)
         } else {
             (protocol_params.token1_vault, protocol_params.token1_program)

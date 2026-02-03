@@ -1,8 +1,8 @@
 //! 交易适配器数据类型
 
+use serde_json::Value;
 use solana_account_decoder::parse_token::UiTokenAmount;
 use solana_sdk::pubkey::Pubkey;
-use serde_json::Value;
 
 /// 指令信息
 #[derive(Debug, Clone)]

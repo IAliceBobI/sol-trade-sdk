@@ -8,7 +8,7 @@
 use sol_trade_sdk::{
     common::SolanaRpcClient,
     constants::TOKEN_PROGRAM,
-    instruction::utils::pumpswap::{get_pool_by_address, quote_exact_in},
+    instruction::utils::pumpswap::get_pool_by_address,
     trading::core::params::{PumpSwapParams, SwapParams},
     trading::core::traits::InstructionBuilder,
     utils::simulation_based_calc::{simulate_swap_transaction, verify_calculation_accuracy},

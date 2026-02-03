@@ -1,7 +1,7 @@
 //! TradingClient 模拟相关方法
 
 use super::helpers::{get_input_mint, get_output_mint};
-use super::types::{TradingClient, TradeBuyParams, TradeSellParams};
+use super::types::{TradeBuyParams, TradeSellParams, TradingClient};
 use crate::trading::core::params::SwapParams;
 use crate::trading::core::traits::InstructionBuilder;
 use crate::{DexType, SimulationResult, TradeTokenType, UnifiedResult, UnifiedTradingError};

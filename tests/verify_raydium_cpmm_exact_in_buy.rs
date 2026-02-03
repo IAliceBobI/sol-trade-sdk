@@ -5,6 +5,7 @@
 //! 运行测试:
 //!     cargo nextest run verify_raydium_cpmm_exact_in_buy -- --nocapture
 
+use sdk_common::SolanaRpcClient;
 use sol_trade_sdk::{
     common as sdk_common,
     instruction::utils::raydium_cpmm::{get_pool_by_address, quote_exact_in},
@@ -15,7 +16,6 @@ use sol_trade_sdk::{
 use solana_sdk::{pubkey::Pubkey, signer::Signer};
 use std::str::FromStr;
 use std::sync::Arc;
-use sdk_common::SolanaRpcClient;
 
 // 导入公共测试模块
 mod common;
@@ -127,45 +127,28 @@ async fn test_raydium_cpmm_exact_in_buy_with_simulation() {
 
     // 🔧 自动从 Pool 获取 mint 并检测 Token Program
     let (token0_mint, token1_mint) = (pool_state.token0_mint, pool_state.token1_mint);
-    let base_token_program = match sol_trade_sdk::utils::token::get_token_program_with_cache(
-        &rpc,
-        &token0_mint,
-    )
-    .await
-    {
-        Ok(program) => {
-            println!("✅ 自动检测 token0_mint ({}) Token Program: {}", token0_mint, program);
-            program
-        },
-        Err(e) => {
-            println!(
-                "⚠️  无法获取 token0_mint Token Program，使用默认值: {}",
-                e
-            );
-            spl_token::id()
-        },
-    };
-    let quote_token_program = match sol_trade_sdk::utils::token::get_token_program_with_cache(
-        &rpc,
-        &token1_mint,
-    )
-    .await
-    {
-        Ok(program) => {
-            println!(
-                "✅ 自动检测 token1_mint ({}) Token Program: {}",
-                token1_mint, program
-            );
-            program
-        },
-        Err(e) => {
-            println!(
-                "⚠️  无法获取 token1_mint Token Program，使用默认值: {}",
-                e
-            );
-            spl_token::id()
-        },
-    };
+    let base_token_program =
+        match sol_trade_sdk::utils::token::get_token_program_with_cache(&rpc, &token0_mint).await {
+            Ok(program) => {
+                println!("✅ 自动检测 token0_mint ({}) Token Program: {}", token0_mint, program);
+                program
+            },
+            Err(e) => {
+                println!("⚠️  无法获取 token0_mint Token Program，使用默认值: {}", e);
+                spl_token::id()
+            },
+        };
+    let quote_token_program =
+        match sol_trade_sdk::utils::token::get_token_program_with_cache(&rpc, &token1_mint).await {
+            Ok(program) => {
+                println!("✅ 自动检测 token1_mint ({}) Token Program: {}", token1_mint, program);
+                program
+            },
+            Err(e) => {
+                println!("⚠️  无法获取 token1_mint Token Program，使用默认值: {}", e);
+                spl_token::id()
+            },
+        };
     println!();
 
     // 获取储备余额
@@ -307,18 +290,9 @@ async fn test_raydium_cpmm_exact_in_buy_with_simulation() {
 
     // 🐛 调试：输出 inner_instructions
     println!("🐛 调试信息:");
-    println!(
-        "  actual_input_amount: {}",
-        simulation_result.actual_input_amount
-    );
-    println!(
-        "  actual_output_amount: {}",
-        simulation_result.actual_output_amount
-    );
-    println!(
-        "  inner_instructions: {:?}",
-        simulation_result.inner_instructions
-    );
+    println!("  actual_input_amount: {}", simulation_result.actual_input_amount);
+    println!("  actual_output_amount: {}", simulation_result.actual_output_amount);
+    println!("  inner_instructions: {:?}", simulation_result.inner_instructions);
     println!();
 
     let simulated_output = simulation_result.actual_output_amount;
@@ -332,29 +306,20 @@ async fn test_raydium_cpmm_exact_in_buy_with_simulation() {
     println!("├─────────────────────────────────────────────────────────────────┤");
     println!("│                    │ 最小单位     │ 可读单位 (PIPE)             │");
     println!("├─────────────────────────────────────────────────────────────────┤");
-    println!(
-        "│ 本地计算             │ {:>12} │ {:>20} │",
-        local_output, local_output_formatted
-    );
+    println!("│ 本地计算             │ {:>12} │ {:>20} │", local_output, local_output_formatted);
     println!(
         "│ 链上模拟             │ {:>12} │ {:>20} │",
         simulated_output, simulated_output_formatted
     );
 
     let diff = local_output.abs_diff(simulated_output);
-    let error_rate = if simulated_output > 0 {
-        (diff as f64 / simulated_output as f64) * 100.0
-    } else {
-        0.0
-    };
+    let error_rate =
+        if simulated_output > 0 { (diff as f64 / simulated_output as f64) * 100.0 } else { 0.0 };
     let diff_formatted = diff as f64 / 10_f64.powi(output_decimals as i32);
 
     println!("├─────────────────────────────────────────────────────────────────┤");
     println!("│ 差值                 │ {:>12} │ {:>20} │", diff, diff_formatted);
-    println!(
-        "│ 误差率               │ {:>12} │ {:>18.4}% │",
-        "", error_rate
-    );
+    println!("│ 误差率               │ {:>12} │ {:>18.4}% │", "", error_rate);
     println!("└─────────────────────────────────────────────────────────────────┘");
 
     match verify_calculation_accuracy(local_output, simulated_output, 0.1) {
