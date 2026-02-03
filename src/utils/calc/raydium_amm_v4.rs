@@ -96,7 +96,7 @@ fn swap_base_input(
     input_amount: u64,
     input_vault_amount: u64,
     output_vault_amount: u64,
-    trade_fee_rate: u64,
+    _trade_fee_rate: u64,
     swap_fee_rate: u64,
 ) -> SwapResult {
     // 根据 Raydium AMM V4 官方实现，只有一个 swap_fee，从输入金额扣除

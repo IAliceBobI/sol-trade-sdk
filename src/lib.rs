@@ -7,6 +7,7 @@ pub mod client;
 pub mod common;
 pub mod constants;
 pub mod instruction;
+pub mod liquidity;
 pub mod parser;
 pub mod perf;
 pub mod swqos;
