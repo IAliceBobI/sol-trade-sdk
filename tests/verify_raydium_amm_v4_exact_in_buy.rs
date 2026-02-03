@@ -336,6 +336,23 @@ async fn test_raydium_amm_v4_exact_in_buy_with_simulation() {
         None
     };
 
+    // 🔍 检查 PNL 值
+    println!("🔍 PNL 分析:");
+    println!("  need_take_pnl_coin: {}", pool_state.out_put.need_take_pnl_coin);
+    println!("  need_take_pnl_pc: {}", pool_state.out_put.need_take_pnl_pc);
+
+    let coin_total_without_pnl = coin_reserve
+        .checked_sub(pool_state.out_put.need_take_pnl_coin)
+        .unwrap_or(coin_reserve);
+    let pc_total_without_pnl = pc_reserve
+        .checked_sub(pool_state.out_put.need_take_pnl_pc)
+        .unwrap_or(pc_reserve);
+
+    println!("  计算的 total_without_take_pnl:");
+    println!("    coin: {}", coin_total_without_pnl);
+    println!("    pc: {}", pc_total_without_pnl);
+    println!();
+
     // 使用 ray_log 中的实际输出作为基准
     let baseline_output = actual_chain_output.unwrap_or(simulated_output);
 

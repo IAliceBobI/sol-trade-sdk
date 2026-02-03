@@ -307,8 +307,31 @@ async fn test_raydium_amm_v4_exact_in_sell_with_simulation() {
 
     let simulated_output = simulation_result.actual_output_amount;
 
+    // 解析 ray_log 获取实际的链上输出（更准确）
+    let actual_chain_output = if let Some(ref logs) = simulation_result.logs {
+        let mut found_output = None;
+        for log in logs.iter() {
+            if log.starts_with("Program log: ray_log:") {
+                let encoded = log.split("Program log: ray_log: ").nth(1).unwrap_or("");
+                if let Ok(decoded) = base64::decode(encoded) {
+                    if decoded.len() >= 57 {
+                        let out_amount = u64::from_le_bytes(decoded[49..57].try_into().unwrap());
+                        found_output = Some(out_amount);
+                        break;
+                    }
+                }
+            }
+        }
+        found_output
+    } else {
+        None
+    };
+
+    // 使用 ray_log 中的实际输出作为基准
+    let baseline_output = actual_chain_output.unwrap_or(simulated_output);
+
     let local_output_formatted = local_output as f64 / 10_f64.powi(output_decimals as i32);
-    let simulated_output_formatted = simulated_output as f64 / 10_f64.powi(output_decimals as i32);
+    let baseline_output_formatted = baseline_output as f64 / 10_f64.powi(output_decimals as i32);
 
     // 结果对比
     println!("┌─────────────────────────────────────────────────────────────────┐");
@@ -317,14 +340,21 @@ async fn test_raydium_amm_v4_exact_in_sell_with_simulation() {
     println!("│                    │ 最小单位      │ 可读单位 (WSOL)             │");
     println!("├─────────────────────────────────────────────────────────────────┤");
     println!("│ 本地计算             │ {:>12} │ {:>20} │", local_output, local_output_formatted);
-    println!(
-        "│ 链上模拟             │ {:>12} │ {:>20} │",
-        simulated_output, simulated_output_formatted
-    );
+    if actual_chain_output.is_some() {
+        println!(
+            "│ 链上实际 (ray_log)    │ {:>12} │ {:>20} │",
+            baseline_output, baseline_output_formatted
+        );
+    } else {
+        println!(
+            "│ 链上模拟             │ {:>12} │ {:>20} │",
+            baseline_output, baseline_output_formatted
+        );
+    }
 
-    let diff = local_output.abs_diff(simulated_output);
+    let diff = local_output.abs_diff(baseline_output);
     let error_rate =
-        if simulated_output > 0 { (diff as f64 / simulated_output as f64) * 100.0 } else { 0.0 };
+        if baseline_output > 0 { (diff as f64 / baseline_output as f64) * 100.0 } else { 0.0 };
     let diff_formatted = diff as f64 / 10_f64.powi(output_decimals as i32);
 
     println!("├─────────────────────────────────────────────────────────────────┤");
@@ -332,7 +362,7 @@ async fn test_raydium_amm_v4_exact_in_sell_with_simulation() {
     println!("│ 误差率               │ {:>12} │ {:>18.4}% │", "", error_rate);
     println!("└─────────────────────────────────────────────────────────────────┘");
 
-    match verify_calculation_accuracy(local_output, simulated_output, 1.0) {
+    match verify_calculation_accuracy(local_output, baseline_output, 1.0) {
         Ok(_) => println!("✅ 验证通过：误差 < 1.0%\n"),
         Err(e) => {
             println!("❌ 验证失败: {}\n", e);

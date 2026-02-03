@@ -81,13 +81,63 @@ impl InstructionBuilder for RaydiumAmmV4InstructionBuilder {
         // ========================================
         // Trade calculation and account address preparation
         // ========================================
-        let is_base_in = protocol_params.coin_mint == crate::constants::WSOL_TOKEN_ACCOUNT
-            || protocol_params.coin_mint == crate::constants::USDC_TOKEN_ACCOUNT;
+        // is_base_in: true = coin 作为输入 (Coin -> PC), false = pc 作为输入 (PC -> Coin)
+        let is_base_in = params.input_mint == protocol_params.coin_mint;
+
+        // 实时获取 Pool 状态（包含 Serum 相关账户和 PNL 信息）
+        let amm_info = if let Some(ref rpc) = params.rpc {
+            match crate::instruction::utils::raydium_amm_v4::get_pool_by_address(
+                rpc,
+                &protocol_params.amm,
+            )
+            .await
+            {
+                Ok(info) => Some(info),
+                Err(e) => {
+                    tracing::warn!("Failed to get pool info: {}", e);
+                    None
+                },
+            }
+        } else {
+            None
+        };
+
+        // 如果储备金为 0 或有 Pool 状态，实时获取储备金（带 PNL 调整）
+        let (coin_reserve, pc_reserve) = if protocol_params.coin_reserve == 0
+            || protocol_params.pc_reserve == 0
+            || amm_info.is_some()
+        {
+            if let Some(ref rpc) = params.rpc {
+                match (
+                    rpc.get_token_account_balance(&protocol_params.token_coin).await,
+                    rpc.get_token_account_balance(&protocol_params.token_pc).await,
+                ) {
+                    (Ok(coin), Ok(pc)) => {
+                        let mut coin_amt = coin.amount.parse::<u64>().unwrap_or(0);
+                        let mut pc_amt = pc.amount.parse::<u64>().unwrap_or(0);
+
+                        // 如果有 Pool 状态，应用 PNL 调整
+                        if let Some(ref info) = amm_info {
+                            coin_amt = coin_amt.checked_sub(info.out_put.need_take_pnl_coin).unwrap_or(coin_amt);
+                            pc_amt = pc_amt.checked_sub(info.out_put.need_take_pnl_pc).unwrap_or(pc_amt);
+                        }
+
+                        (coin_amt, pc_amt)
+                    },
+                    _ => (protocol_params.coin_reserve, protocol_params.pc_reserve),
+                }
+            } else {
+                (protocol_params.coin_reserve, protocol_params.pc_reserve)
+            }
+        } else {
+            (protocol_params.coin_reserve, protocol_params.pc_reserve)
+        };
+
         // 🔧 修复：使用已经解包的 input_amount
         let amount_in: u64 = input_amount;
         let swap_result = compute_swap_amount(
-            protocol_params.coin_reserve,
-            protocol_params.pc_reserve,
+            coin_reserve,
+            pc_reserve,
             is_base_in,
             amount_in,
             params.slippage_basis_points.unwrap_or(DEFAULT_SLIPPAGE),
@@ -97,15 +147,14 @@ impl InstructionBuilder for RaydiumAmmV4InstructionBuilder {
             None => swap_result.min_amount_out,
         };
 
+        // 获取输入 token 的 program（支持 Token-2022）
+        let input_token_program = crate::utils::token::get_token_program_cached(&params.input_mint)
+            .unwrap_or(crate::constants::TOKEN_PROGRAM);
         let user_source_token_account =
             crate::common::fast_fn::get_associated_token_address_with_program_id_fast_use_seed(
                 &params.payer.pubkey(),
-                if is_wsol {
-                    &crate::constants::WSOL_TOKEN_ACCOUNT
-                } else {
-                    &crate::constants::USDC_TOKEN_ACCOUNT
-                },
-                get_input_token_program(is_wsol),
+                &params.input_mint,
+                &input_token_program,
                 params.open_seed_optimize,
             );
         // 获取输出 token 的 program（支持 Token-2022）
@@ -143,21 +192,33 @@ impl InstructionBuilder for RaydiumAmmV4InstructionBuilder {
         }
 
         // Create buy instruction
+        // 使用 amm_info 中的 Serum 相关账户（如果可用），否则使用默认值
+        let (serum_program, serum_market, open_orders) = if let Some(ref info) = amm_info {
+            (info.serum_dex, info.market, info.open_orders)
+        } else {
+            // 如果没有 Pool 状态，使用旧的逻辑（可能导致错误）
+            (
+                protocol_params.amm,
+                protocol_params.amm,
+                protocol_params.amm,
+            )
+        };
+
         let accounts: [AccountMeta; 17] = [
             crate::constants::TOKEN_PROGRAM_META, // Token Program (readonly)
             AccountMeta::new(protocol_params.amm, false), // Amm
             accounts::AUTHORITY_META,             // Authority (readonly)
-            AccountMeta::new(protocol_params.amm, false), // Amm Open Orders
+            AccountMeta::new(open_orders, false), // Amm Open Orders
             AccountMeta::new(protocol_params.token_coin, false), // Pool Coin Token Account
             AccountMeta::new(protocol_params.token_pc, false), // Pool Pc Token Account
-            AccountMeta::new(protocol_params.amm, false), // Serum Program
-            AccountMeta::new(protocol_params.amm, false), // Serum Market
-            AccountMeta::new(protocol_params.amm, false), // Serum Bids
-            AccountMeta::new(protocol_params.amm, false), // Serum Asks
-            AccountMeta::new(protocol_params.amm, false), // Serum Event Queue
-            AccountMeta::new(protocol_params.amm, false), // Serum Coin Vault Account
-            AccountMeta::new(protocol_params.amm, false), // Serum Pc Vault Account
-            AccountMeta::new(protocol_params.amm, false), // Serum Vault Signer
+            AccountMeta::new_readonly(serum_program, false), // Serum Program
+            AccountMeta::new(serum_market, false), // Serum Market
+            AccountMeta::new(serum_market, false), // Serum Bids (从 market 派生，这里简化处理)
+            AccountMeta::new(serum_market, false), // Serum Asks (从 market 派生，这里简化处理)
+            AccountMeta::new(serum_market, false), // Serum Event Queue (从 market 派生，这里简化处理)
+            AccountMeta::new(serum_market, false), // Serum Coin Vault Account (从 market 派生，这里简化处理)
+            AccountMeta::new(serum_market, false), // Serum Pc Vault Account (从 market 派生，这里简化处理)
+            AccountMeta::new(serum_market, false), // Serum Vault Signer (从 market 派生，这里简化处理)
             AccountMeta::new(user_source_token_account, false), // User Source Token Account
             AccountMeta::new(user_destination_token_account, false), // User Destination Token Account
             AccountMeta::new(params.payer.pubkey(), true),           // User Source Owner
@@ -219,11 +280,61 @@ impl InstructionBuilder for RaydiumAmmV4InstructionBuilder {
         // ========================================
         // Trade calculation and account address preparation
         // ========================================
-        let is_base_in = protocol_params.pc_mint == crate::constants::WSOL_TOKEN_ACCOUNT
-            || protocol_params.pc_mint == crate::constants::USDC_TOKEN_ACCOUNT;
+        // is_base_in: true = coin 作为输入 (Coin -> PC), false = pc 作为输入 (PC -> Coin)
+        let is_base_in = params.input_mint == protocol_params.coin_mint;
+
+        // 实时获取 Pool 状态（包含 Serum 相关账户和 PNL 信息）
+        let amm_info = if let Some(ref rpc) = params.rpc {
+            match crate::instruction::utils::raydium_amm_v4::get_pool_by_address(
+                rpc,
+                &protocol_params.amm,
+            )
+            .await
+            {
+                Ok(info) => Some(info),
+                Err(e) => {
+                    tracing::warn!("Failed to get pool info: {}", e);
+                    None
+                },
+            }
+        } else {
+            None
+        };
+
+        // 如果储备金为 0 或有 Pool 状态，实时获取储备金（带 PNL 调整）
+        let (coin_reserve, pc_reserve) = if protocol_params.coin_reserve == 0
+            || protocol_params.pc_reserve == 0
+            || amm_info.is_some()
+        {
+            if let Some(ref rpc) = params.rpc {
+                match (
+                    rpc.get_token_account_balance(&protocol_params.token_coin).await,
+                    rpc.get_token_account_balance(&protocol_params.token_pc).await,
+                ) {
+                    (Ok(coin), Ok(pc)) => {
+                        let mut coin_amt = coin.amount.parse::<u64>().unwrap_or(0);
+                        let mut pc_amt = pc.amount.parse::<u64>().unwrap_or(0);
+
+                        // 如果有 Pool 状态，应用 PNL 调整
+                        if let Some(ref info) = amm_info {
+                            coin_amt = coin_amt.checked_sub(info.out_put.need_take_pnl_coin).unwrap_or(coin_amt);
+                            pc_amt = pc_amt.checked_sub(info.out_put.need_take_pnl_pc).unwrap_or(pc_amt);
+                        }
+
+                        (coin_amt, pc_amt)
+                    },
+                    _ => (protocol_params.coin_reserve, protocol_params.pc_reserve),
+                }
+            } else {
+                (protocol_params.coin_reserve, protocol_params.pc_reserve)
+            }
+        } else {
+            (protocol_params.coin_reserve, protocol_params.pc_reserve)
+        };
+
         let swap_result = compute_swap_amount(
-            protocol_params.coin_reserve,
-            protocol_params.pc_reserve,
+            coin_reserve,
+            pc_reserve,
             is_base_in,
             params.input_amount.unwrap_or(0),
             params.slippage_basis_points.unwrap_or(DEFAULT_SLIPPAGE),
@@ -243,15 +354,15 @@ impl InstructionBuilder for RaydiumAmmV4InstructionBuilder {
                 &input_token_program,
                 params.open_seed_optimize,
             );
+        // 获取输出 token 的 program（支持 Token-2022）
+        let output_token_program =
+            crate::utils::token::get_token_program_cached(&params.output_mint)
+                .unwrap_or(crate::constants::TOKEN_PROGRAM);
         let user_destination_token_account =
             crate::common::fast_fn::get_associated_token_address_with_program_id_fast_use_seed(
                 &params.payer.pubkey(),
-                if is_wsol {
-                    &crate::constants::WSOL_TOKEN_ACCOUNT
-                } else {
-                    &crate::constants::USDC_TOKEN_ACCOUNT
-                },
-                get_input_token_program(is_wsol),
+                &params.output_mint,
+                &output_token_program,
                 params.open_seed_optimize,
             );
 
@@ -264,22 +375,34 @@ impl InstructionBuilder for RaydiumAmmV4InstructionBuilder {
             instructions.extend(crate::trading::common::create_wsol_ata(&params.payer.pubkey()));
         }
 
-        // Create buy instruction
+        // Create sell instruction
+        // 使用 amm_info 中的 Serum 相关账户（如果可用），否则使用默认值
+        let (serum_program, serum_market, open_orders) = if let Some(ref info) = amm_info {
+            (info.serum_dex, info.market, info.open_orders)
+        } else {
+            // 如果没有 Pool 状态，使用旧的逻辑（可能导致错误）
+            (
+                protocol_params.amm,
+                protocol_params.amm,
+                protocol_params.amm,
+            )
+        };
+
         let accounts: [AccountMeta; 17] = [
             crate::constants::TOKEN_PROGRAM_META, // Token Program (readonly)
             AccountMeta::new(protocol_params.amm, false), // Amm
             accounts::AUTHORITY_META,             // Authority (readonly)
-            AccountMeta::new(protocol_params.amm, false), // Amm Open Orders
+            AccountMeta::new(open_orders, false), // Amm Open Orders
             AccountMeta::new(protocol_params.token_coin, false), // Pool Coin Token Account
             AccountMeta::new(protocol_params.token_pc, false), // Pool Pc Token Account
-            AccountMeta::new(protocol_params.amm, false), // Serum Program
-            AccountMeta::new(protocol_params.amm, false), // Serum Market
-            AccountMeta::new(protocol_params.amm, false), // Serum Bids
-            AccountMeta::new(protocol_params.amm, false), // Serum Asks
-            AccountMeta::new(protocol_params.amm, false), // Serum Event Queue
-            AccountMeta::new(protocol_params.amm, false), // Serum Coin Vault Account
-            AccountMeta::new(protocol_params.amm, false), // Serum Pc Vault Account
-            AccountMeta::new(protocol_params.amm, false), // Serum Vault Signer
+            AccountMeta::new_readonly(serum_program, false), // Serum Program
+            AccountMeta::new(serum_market, false), // Serum Market
+            AccountMeta::new(serum_market, false), // Serum Bids (从 market 派生，这里简化处理)
+            AccountMeta::new(serum_market, false), // Serum Asks (从 market 派生，这里简化处理)
+            AccountMeta::new(serum_market, false), // Serum Event Queue (从 market 派生，这里简化处理)
+            AccountMeta::new(serum_market, false), // Serum Coin Vault Account (从 market 派生，这里简化处理)
+            AccountMeta::new(serum_market, false), // Serum Pc Vault Account (从 market 派生，这里简化处理)
+            AccountMeta::new(serum_market, false), // Serum Vault Signer (从 market 派生，这里简化处理)
             AccountMeta::new(user_source_token_account, false), // User Source Token Account
             AccountMeta::new(user_destination_token_account, false), // User Destination Token Account
             AccountMeta::new(params.payer.pubkey(), true),           // User Source Owner

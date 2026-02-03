@@ -3,10 +3,6 @@
 //! 完全复制自 Raydium 官方实现
 //! 源码: https://github.com/raydium-io/raydium-amm/blob/master/program/src/math.rs
 
-use crate::instruction::utils::raydium_amm_v4::accounts::{
-    SWAP_FEE_DENOMINATOR, SWAP_FEE_NUMERATOR,
-};
-
 /// Swap 方向枚举
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SwapDirection {

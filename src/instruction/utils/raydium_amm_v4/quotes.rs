@@ -1,9 +1,7 @@
 // Quote 计算函数
 
 use crate::common::SolanaRpcClient;
-use crate::utils::calc::raydium_amm_v4::{
-    compute_swap_amount, quote_exact_out as calc_quote_exact_out,
-};
+use crate::utils::calc::raydium_amm_v4::quote_exact_out as calc_quote_exact_out;
 use crate::utils::calc::raydium_amm_v4_official::{calculate_swap_with_fee, SwapDirection};
 use anyhow::anyhow;
 use solana_sdk::pubkey::Pubkey;
@@ -48,7 +46,16 @@ pub async fn quote_exact_in(
         .parse::<u64>()
         .map_err(|_| anyhow!("Failed to parse pc reserve"))?;
 
-    // 3. 完全复制 Raydium 官方的计算逻辑
+    // 3. 计算总储备金（扣除 PNL）- 这才是链上实际使用的储备金
+    // 参考: math.rs:322-334 calc_total_without_pnl_no_orderbook
+    let total_coin_without_pnl = coin_reserve
+        .checked_sub(amm_info.out_put.need_take_pnl_coin)
+        .ok_or_else(|| anyhow!("Subtraction overflow for coin reserve"))?;
+    let total_pc_without_pnl = pc_reserve
+        .checked_sub(amm_info.out_put.need_take_pnl_pc)
+        .ok_or_else(|| anyhow!("Subtraction overflow for pc reserve"))?;
+
+    // 4. 完全复制 Raydium 官方的计算逻辑
     // 源码: processor.rs:2393-2405
 
     // 确定方向：
@@ -65,17 +72,17 @@ pub async fn quote_exact_in(
     let swap_fee_numerator = amm_info.fees.swap_fee_numerator;
     let swap_fee_denominator = amm_info.fees.swap_fee_denominator;
 
-    // 调用官方计算函数
+    // 调用官方计算函数（使用 total_without_pnl）
     let (swap_fee, amount_out) = calculate_swap_with_fee(
         amount_in,
         swap_fee_numerator,
         swap_fee_denominator,
-        pc_reserve,          // total_pc_without_take_pnl
-        coin_reserve,        // total_coin_without_take_pnl
+        total_pc_without_pnl,     // total_pc_without_take_pnl
+        total_coin_without_pnl,    // total_coin_without_take_pnl
         swap_direction,
     );
 
-    // 4. 返回统一格式
+    // 5. 返回统一格式
     Ok(crate::utils::quote::QuoteExactInResult {
         amount_out,
         fee_amount: swap_fee,
