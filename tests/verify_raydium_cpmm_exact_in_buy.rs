@@ -2,8 +2,31 @@
 //!
 //! 测试场景: 使用 WSOL 买入 PIPE (指定输入金额)
 //!
+//! ⚠️ 已知问题: 计算误差 ~0.54%
+//!
+//! # 误差分析
+//!
+//! - **误差率**: 0.54% (本地计算 vs 链上模拟)
+//! - **测试结果**:
+//!   - 本地计算: 4641849 PIPE
+//!   - 链上模拟: 4667117 PIPE
+//! - **费率验证**: ✅ 已实现从 amm_config 读取实际费率
+//!   - 链上费率: trade=2500, protocol=120000, fund=40000
+//!   - 结论: 误差不是由费率引起
+//!
+//! # 当前状态
+//!
+//! - ✅ 动态费率读取已实现
+//! - ✅ 缓存机制已实现
+//! - ⚠️  误差来源待调查（非费率问题）
+//!
+//! # 建议
+//!
+//! 选项 A: 临时放宽误差容忍度到 1%
+//! 选项 B: 继续深入调查误差来源（需要更多时间）
+//!
 //! 运行测试:
-//!     cargo nextest run verify_raydium_cpmm_exact_in_buy -- --nocapture
+//!     cargo test --test verify_raydium_cpmm_exact_in_buy -- --nocapture
 
 use sdk_common::SolanaRpcClient;
 use sol_trade_sdk::{

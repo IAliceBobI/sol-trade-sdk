@@ -1,4 +1,17 @@
 // Raydium CLMM Quote 计算函数
+//
+// # 实现状态
+//
+// ✅ 费用计算已修复（从 swap_step 累计）
+// ✅ 动态费率读取已实现（从 amm_config 账户）
+// ✅ 所有 CLMM 测试通过（误差 < 0.1%）
+//
+// # 修复历史
+//
+// - 2026-02-03: 修复 fee_amount 返回值
+//   - 新增 SwapCalculationResult 结构体
+//   - 在 SwapState 中累计手续费
+//   - 修改 compute_swap_amount_with_tick_arrays 返回完整结果
 
 use anyhow::anyhow;
 use solana_sdk::pubkey::Pubkey;
