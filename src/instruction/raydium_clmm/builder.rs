@@ -134,7 +134,7 @@ impl InstructionBuilder for RaydiumClmmInstructionBuilder {
         let (output_vault, output_token_program) = if output_mint == protocol_params.token0_mint {
             (protocol_params.token0_vault, protocol_params.token0_program)
         } else {
-            (protocol_params.token1_vault, protocol_params.token1_vault)
+            (protocol_params.token1_vault, protocol_params.token1_program)
         };
 
         let amount_in: u64 = input_amount;
@@ -461,7 +461,7 @@ impl InstructionBuilder for RaydiumClmmInstructionBuilder {
         let (output_vault, output_token_program) = if output_mint == protocol_params.token0_mint {
             (protocol_params.token0_vault, protocol_params.token0_program)
         } else {
-            (protocol_params.token1_vault, protocol_params.token1_vault)
+            (protocol_params.token1_vault, protocol_params.token1_program)
         };
 
         let amount_in: u64 = input_amount;
