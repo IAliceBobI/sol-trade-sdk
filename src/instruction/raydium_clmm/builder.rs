@@ -1,21 +1,27 @@
 use crate::{
     common::fast_fn::get_associated_token_address_with_program_id_fast_use_seed,
     constants::trade_consts::DEFAULT_SLIPPAGE,
-    instruction::utils::raydium_clmm::{accounts, get_pool_by_address, get_tick_array_pda},
+    instruction::{
+        raydium_clmm::helpers::{amount_with_slippage, fallback_price_calculation},
+        utils::raydium_clmm::{
+            accounts, get_pool_by_address, get_tick_array_pda,
+            get_tick_array_bitmap_extension_pda,
+        },
+    },
     trading::core::{
         params::{RaydiumClmmParams, SwapParams},
         traits::InstructionBuilder,
     },
-    utils::{
-        calc::raydium_clmm as clmm_math,
-        price::raydium_clmm::{price_token0_in_token1, price_token1_in_token0},
-    },
+    utils::calc::raydium_clmm as clmm_math,
 };
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
 use solana_sdk::{
     instruction::{AccountMeta, Instruction},
     signer::Signer,
 };
+
+/// Instruction builder for RaydiumClmm protocol
+pub struct RaydiumClmmInstructionBuilder;
 
 /// Instruction discriminator for CLMM swap
 ///
@@ -27,50 +33,15 @@ use solana_sdk::{
 const SWAP_V2_DISCRIMINATOR: &[u8] = &[43, 4, 237, 11, 26, 201, 30, 98];
 const _SWAP_DISCRIMINATOR: &[u8] = &[248, 198, 158, 145, 225, 117, 135, 200];
 
-/// Instruction builder for RaydiumClmm protocol
-pub struct RaydiumClmmInstructionBuilder;
+/// Sqrt price limits for slippage protection
+/// Match Raydium SDK V2 logic from constants.ts
+const MIN_SQRT_PRICE_X64: u128 = 4295048016;
+const MAX_SQRT_PRICE_X64: u128 = 79226673521066979257578248091;
 
-/// 滑点计算辅助函数
-/// 根据官方 client 实现移植
-fn amount_with_slippage(amount: u64, slippage_bps: u16, round_up: bool) -> u64 {
-    let slippage_f64 = (slippage_bps as f64) / 10000.0; // 将 BP 转换为小数
-    if round_up {
-        // max in: amount * (1 + slippage), 向上取整
-        ((amount as f64) * (1.0 + slippage_f64)).ceil() as u64
-    } else {
-        // min out: amount * (1 - slippage), 向下取整
-        ((amount as f64) * (1.0 - slippage_f64)).floor() as u64
-    }
-}
-
-/// 价格计算降级方案（当无法获取 tick arrays 时使用）
-fn fallback_price_calculation(
-    amount_in: u64,
-    sqrt_price_x64: u128,
-    is_token0_in: bool,
-    input_decimals: u8,
-    output_decimals: u8,
-    protocol_params: &RaydiumClmmParams,
-) -> u64 {
-    // 使用价格计算作为降级方案
-    let price = if is_token0_in {
-        price_token0_in_token1(
-            sqrt_price_x64,
-            protocol_params.token0_decimals,
-            protocol_params.token1_decimals,
-        )
-    } else {
-        price_token1_in_token0(
-            sqrt_price_x64,
-            protocol_params.token0_decimals,
-            protocol_params.token1_decimals,
-        )
-    };
-
-    let input_amount_f64 = amount_in as f64 / 10f64.powi(input_decimals as i32);
-    let output_amount_f64 = input_amount_f64 * price;
-    (output_amount_f64 * 10f64.powi(output_decimals as i32)) as u64
-}
+/// Tick range constants
+const MIN_TICK: i32 = -443636;
+const MAX_TICK: i32 = 443636;
+const TICK_ARRAY_SIZE: i32 = 60; // raydium_amm_v3::states::TICK_ARRAY_SIZE
 
 #[async_trait::async_trait]
 impl InstructionBuilder for RaydiumClmmInstructionBuilder {
@@ -344,15 +315,6 @@ impl InstructionBuilder for RaydiumClmmInstructionBuilder {
         );
 
         // Calculate sqrt_price_limit_x64 for slippage protection
-        // Match Raydium SDK V2 logic from constants.ts:
-        // MIN_SQRT_PRICE_X64 = 4295048016
-        // MAX_SQRT_PRICE_X64 = 79226673521066979257578248091
-        // MIN_SQRT_PRICE_X64_ADD_ONE = 4295048017
-        // MAX_SQRT_PRICE_X64_SUB_ONE = 79226673521066979257578248090
-        const MIN_SQRT_PRICE_X64: u128 = 4295048016;
-        const MAX_SQRT_PRICE_X64: u128 = 79226673521066979257578248091;
-
-        // No price limit specified, use default limits matching SDK
         // For baseIn (token0 -> token1): use minimum sqrt price + 1
         // For baseOut (token1 -> token0): use maximum sqrt price - 1
         let sqrt_price_limit_x64 = if is_token0_in {
@@ -401,7 +363,6 @@ impl InstructionBuilder for RaydiumClmmInstructionBuilder {
 
         // 获取后续的 tick arrays（最多 5 个）
         let tick_spacing = pool_state.tick_spacing as i32;
-        const TICK_ARRAY_SIZE: i32 = 60; // raydium_amm_v3::states::TICK_ARRAY_SIZE
         let ticks_per_array = tick_spacing * TICK_ARRAY_SIZE;
 
         for _ in 0..4 {
@@ -412,8 +373,6 @@ impl InstructionBuilder for RaydiumClmmInstructionBuilder {
             };
 
             // 检查是否超出范围
-            const MIN_TICK: i32 = -443636;
-            const MAX_TICK: i32 = 443636;
             if (zero_for_one && tick_array_start_index < MIN_TICK)
                 || (!zero_for_one && tick_array_start_index > MAX_TICK)
             {
@@ -429,9 +388,7 @@ impl InstructionBuilder for RaydiumClmmInstructionBuilder {
 
         // Get tick array bitmap extension PDA
         let (tick_array_bitmap_extension_pda, _) =
-            crate::instruction::utils::raydium_clmm::get_tick_array_bitmap_extension_pda(
-                &protocol_params.pool_state,
-            );
+            get_tick_array_bitmap_extension_pda(&protocol_params.pool_state);
 
         // Create swap instruction
         // Account order for SwapV2 instruction (Raydium SDK V2):
@@ -795,15 +752,6 @@ impl InstructionBuilder for RaydiumClmmInstructionBuilder {
         );
 
         // Calculate sqrt_price_limit_x64 for slippage protection
-        // Match Raydium SDK V2 logic from constants.ts:
-        // MIN_SQRT_PRICE_X64 = 4295048016
-        // MAX_SQRT_PRICE_X64 = 79226673521066979257578248091
-        // MIN_SQRT_PRICE_X64_ADD_ONE = 4295048017
-        // MAX_SQRT_PRICE_X64_SUB_ONE = 79226673521066979257578248090
-        const MIN_SQRT_PRICE_X64: u128 = 4295048016;
-        const MAX_SQRT_PRICE_X64: u128 = 79226673521066979257578248091;
-
-        // No price limit specified, use default limits matching SDK
         // For baseIn (token0 -> token1): use minimum sqrt price + 1
         // For baseOut (token1 -> token0): use maximum sqrt price - 1
         let sqrt_price_limit_x64 = if is_token0_in {
@@ -851,7 +799,6 @@ impl InstructionBuilder for RaydiumClmmInstructionBuilder {
 
         // 获取后续的 tick arrays（最多 5 个）
         let tick_spacing = pool_state.tick_spacing as i32;
-        const TICK_ARRAY_SIZE: i32 = 60; // raydium_amm_v3::states::TICK_ARRAY_SIZE
         let ticks_per_array = tick_spacing * TICK_ARRAY_SIZE;
 
         for _ in 0..4 {
@@ -862,8 +809,6 @@ impl InstructionBuilder for RaydiumClmmInstructionBuilder {
             };
 
             // 检查是否超出范围
-            const MIN_TICK: i32 = -443636;
-            const MAX_TICK: i32 = 443636;
             if (zero_for_one && tick_array_start_index < MIN_TICK)
                 || (!zero_for_one && tick_array_start_index > MAX_TICK)
             {
@@ -879,9 +824,7 @@ impl InstructionBuilder for RaydiumClmmInstructionBuilder {
 
         // Get tick array bitmap extension PDA (may not exist)
         let (tick_array_bitmap_extension_pda, _) =
-            crate::instruction::utils::raydium_clmm::get_tick_array_bitmap_extension_pda(
-                &protocol_params.pool_state,
-            );
+            get_tick_array_bitmap_extension_pda(&protocol_params.pool_state);
 
         // Create swap instruction
         // SwapV2 指令账户顺序（与 buy 相同）
