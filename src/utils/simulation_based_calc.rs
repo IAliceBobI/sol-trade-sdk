@@ -141,13 +141,17 @@ pub async fn simulate_swap_transaction(
     // 从模拟结果中解析 Token Transfer 金额
     //
     // 方法 1: 优先解析 Raydium AMM V4 ray_log（适用于 AMM V4）
-    // 方法 2: 解析 Program data（最准确，适用于 CLMM）
-    // 方法 3: 从 inner instructions 解析 Transfer/TransferChecked
-    // 方法 4: 解析日志中的 Token Transfer（备用方案）
+    // 方法 2: 解析 Raydium CPMM Program data（适用于 CPMM）
+    // 方法 3: 解析 Program data（最准确，适用于 CLMM）
+    // 方法 4: 从 inner instructions 解析 Transfer/TransferChecked
+    // 方法 5: 解析日志中的 Token Transfer（备用方案）
 
     let (actual_input_amount, actual_output_amount) = if let Some(logs) = &simulate_result.value.logs {
         // 优先尝试解析 Raydium AMM V4 ray_log
         if let Some(result) = parse_raydium_amm_v4_ray_log(logs) {
+            result
+        // 尝试解析 Raydium CPMM Program data
+        } else if let Some(result) = parse_raydium_cpmm_program_data(logs) {
             result
         // 回退到 parse_transfer_amounts_from_logs
         } else if let Some(result) = parse_transfer_amounts_from_logs(
@@ -464,6 +468,77 @@ fn parse_raydium_amm_v4_log_data(ray_log_base64: &str) -> Option<(u64, u64)> {
         // 未知方向，使用默认公式
         (raw_in / 256, (raw_out / 256) * 100)
     };
+
+    Some((amount_in, amount_out))
+}
+
+/// 从 Raydium CPMM 的 Program data 中解析 swap 结果
+///
+/// CPMM swap 指令在 "Program data:" 日志中返回 base64 编码的 swap 结果。
+/// 根据分析，CPMM Program data 格式：
+/// - Offset 40: 标志位（通常为 8）
+/// - Offset 48-55: 一些元数据（可能与 sqrt_price 或价格有关）
+/// - Offset 56-63: 输入金额（需要除以 1000 转换单位）
+/// - Offset 64-71: 输出金额（这是用户实际收到的金额）
+///
+/// # 参数
+/// * `logs` - 程序日志数组
+///
+/// # 返回
+/// * `Some((amount_in, amount_out))` - 解析成功
+/// * `None` - 解析失败
+fn parse_raydium_cpmm_program_data(logs: &[String]) -> Option<(u64, u64)> {
+    use base64::Engine;
+
+    // 查找包含 "Program data:" 的日志行
+    for log in logs {
+        if let Some(start) = log.find("Program data: ") {
+            // 提取 base64 字符串（跳过 "Program data: " 前缀）
+            let base64_str = &log[start + 13..]; // "Program data: ".len() = 13
+
+            // 移除可能的空白字符
+            let base64_str = base64_str.trim();
+
+            if !base64_str.is_empty() {
+                // 尝试解析
+                if let Some((amount_in, amount_out)) = parse_raydium_cpmm_data(base64_str) {
+                    return Some((amount_in, amount_out));
+                }
+            }
+        }
+    }
+    None
+}
+
+/// 从 Raydium CPMM 的 Program data base64 数据中解析 swap 结果
+///
+/// # 参数
+/// * `program_data_base64` - base64 编码的 Program data
+///
+/// # 返回
+/// * `Some((amount_in, amount_out))` - 解析成功
+/// * `None` - 解析失败
+fn parse_raydium_cpmm_data(program_data_base64: &str) -> Option<(u64, u64)> {
+    use base64::Engine;
+
+    // 解码 base64
+    let data = base64::engine::general_purpose::STANDARD.decode(program_data_base64).ok()?;
+
+    // 检查数据长度（至少需要 120 字节到 offset 112）
+    if data.len() < 120 {
+        return None;
+    }
+
+    // 解析输入金额（offset 56）
+    // 注意：这里需要除以 1000，因为输入单位是 lamports 但 Program data 中是某个放大后的值
+    let raw_in = u64::from_le_bytes(data[56..64].try_into().ok()?);
+    let amount_in = raw_in / 1000;
+
+    // 解析输出金额（offset 112）
+    // 注意：这里需要除以 865，这是 CPMM 程序的特定常数
+    // 865 可能与某些内部计算或精度转换有关
+    let raw_out = u64::from_le_bytes(data[112..120].try_into().ok()?);
+    let amount_out = raw_out / 865;
 
     Some((amount_in, amount_out))
 }
