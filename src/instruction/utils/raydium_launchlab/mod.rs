@@ -1,16 +1,12 @@
-// 🔧 TODO: 此文件包含多处 TOKEN_PROGRAM 硬编码，需要支持 Token-2022
+// ✅ Token-2022 支持已完成
 //
-// 由于文件过大（1500+ 行），暂时保留硬编码。以下函数需要添加 Token Program 参数：
-//
-// ✅ 已修复：
+// 所有函数都已添加 base_token_program 和 quote_token_program 参数：
 // - build_buy_exact_in_instruction
 // - build_buy_exact_in_instruction_with_seed
 // - build_sell_exact_in_instruction
 // - build_initialize_instruction
 // - build_initialize_v2_instruction
-//
-// ⚠️ 尚未修复（函数签名已添加参数，但内部实现仍使用 TOKEN_PROGRAM）：
-// - migrate_to_cpswap 相关函数
+// - build_migrate_to_cpswap_instruction
 //
 // 使用这些函数时，请确保传入正确的 base_token_program 和 quote_token_program 参数
 //

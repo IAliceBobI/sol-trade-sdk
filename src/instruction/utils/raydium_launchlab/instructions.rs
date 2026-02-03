@@ -300,6 +300,8 @@ pub fn build_initialize_v2_instruction(
     curve_params: &CurveParams,
     vesting_params: &VestingParams,
     amm_fee_on: &AmmCreatorFeeOn,
+    base_token_program: &Pubkey,
+    quote_token_program: &Pubkey,
 ) -> Result<Instruction, anyhow::Error> {
     // Calculate PDAs
     let (pool_state, _) = get_pool_state_pda(mint, quote_mint)?;
@@ -338,9 +340,9 @@ pub fn build_initialize_v2_instruction(
         AccountMeta::new_readonly(*quote_mint, false),      // quote_mint
         AccountMeta::new(base_vault, false),                // base_vault
         AccountMeta::new(quote_vault, false),               // quote_vault
-        AccountMeta::new(metadata_account, false), // metadata_account (PDA, may not exist yet)
-        AccountMeta::new_readonly(crate::constants::TOKEN_PROGRAM, false), // base_token_program
-        AccountMeta::new_readonly(crate::constants::TOKEN_PROGRAM, false), // quote_token_program
+        AccountMeta::new(metadata_account, false),         // metadata_account (PDA, may not exist yet)
+        AccountMeta::new_readonly(*base_token_program, false),  // base_token_program
+        AccountMeta::new_readonly(*quote_token_program, false), // quote_token_program
         AccountMeta::new_readonly(accounts::METADATA_PROGRAM, false), // metadata_program
         AccountMeta::new_readonly(accounts::SYSTEM_PROGRAM, false), // system_program
         AccountMeta::new_readonly(accounts::RENT_SYSVAR, false), // rent_program
@@ -360,6 +362,8 @@ pub fn build_migrate_to_cpswap_instruction(
     global_config: &Pubkey,
     cpswap_config: &Pubkey,
     cpswap_create_pool_fee: &Pubkey,
+    base_token_program: &Pubkey,
+    quote_token_program: &Pubkey,
 ) -> Result<Instruction, anyhow::Error> {
     // Calculate LaunchLab PDAs
     let (pool_state, _) = get_pool_state_pda(base_mint, quote_mint)?;
@@ -417,9 +421,9 @@ pub fn build_migrate_to_cpswap_instruction(
         AccountMeta::new_readonly(*global_config, false),         // global_config
         AccountMeta::new(base_vault, false),                      // base_vault
         AccountMeta::new(quote_vault, false),                     // quote_vault
-        AccountMeta::new(pool_lp_token, false),                   // pool_lp_token
-        AccountMeta::new_readonly(TOKEN_PROGRAM, false),          // base_token_program
-        AccountMeta::new_readonly(TOKEN_PROGRAM, false),          // quote_token_program
+        AccountMeta::new(pool_lp_token, false),                      // pool_lp_token
+        AccountMeta::new_readonly(*base_token_program, false),      // base_token_program
+        AccountMeta::new_readonly(*quote_token_program, false),     // quote_token_program
         AccountMeta::new_readonly(accounts::ASSOCIATED_TOKEN_PROGRAM, false), // associated_token_program
         AccountMeta::new_readonly(accounts::SYSTEM_PROGRAM, false),           // system_program
         AccountMeta::new_readonly(accounts::RENT_SYSVAR, false),              // rent_program
