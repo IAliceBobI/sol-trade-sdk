@@ -7,6 +7,176 @@ use crate::trading::core::traits::InstructionBuilder;
 use crate::{DexType, SimulationResult, TradeTokenType, UnifiedResult, UnifiedTradingError};
 use solana_sdk::signature::Signer;
 
+/// 从 SwapParams 获取 swap 手续费
+///
+/// 根据不同的 DEX 类型和交易模式（exact_in/exact_out），调用对应的本地 quote 函数
+/// 来计算手续费。
+async fn get_swap_fee_amount(
+    rpc: &crate::common::SolanaRpcClient,
+    swap_params: &SwapParams,
+) -> Result<u64, String> {
+    match &swap_params.protocol_params {
+        crate::trading::core::params::DexParamEnum::RaydiumCpmm(params) => {
+            get_raydium_cpmm_fee(rpc, &params.pool_state, swap_params).await
+        },
+        crate::trading::core::params::DexParamEnum::RaydiumAmmV4(params) => {
+            get_raydium_amm_v4_fee(rpc, &params.amm, swap_params).await
+        },
+        crate::trading::core::params::DexParamEnum::RaydiumClmm(params) => {
+            get_raydium_clmm_fee(rpc, &params.pool_state, swap_params).await
+        },
+        crate::trading::core::params::DexParamEnum::PumpSwap(params) => {
+            get_pumpswap_fee(rpc, &params.pool, swap_params).await
+        },
+        // 对于尚未实现 quote 的 DEX，返回 0
+        _ => Ok(0),
+    }
+}
+
+/// Raydium CPMM 费用计算
+async fn get_raydium_cpmm_fee(
+    rpc: &crate::common::SolanaRpcClient,
+    pool_address: &solana_sdk::pubkey::Pubkey,
+    swap_params: &SwapParams,
+) -> Result<u64, String> {
+    let base_mint = match &swap_params.protocol_params {
+        crate::trading::core::params::DexParamEnum::RaydiumCpmm(p) => p.base_mint,
+        _ => return Err("Invalid DEX params".to_string()),
+    };
+
+    let is_token0_in = swap_params.input_mint == base_mint;
+
+    // 根据模式调用不同的 quote 函数，并提取 fee_amount
+    if let Some(amount_out) = swap_params.fixed_output_amount {
+        // exact_out 模式
+        let result = crate::instruction::utils::raydium_cpmm::quote_exact_out(
+            rpc,
+            pool_address,
+            amount_out,
+            is_token0_in,
+        ).await;
+        result.map(|q| q.fee_amount).map_err(|e| format!("Quote failed: {}", e))
+    } else {
+        // exact_in 模式
+        let amount_in = swap_params.input_amount.unwrap_or(0);
+        let result = crate::instruction::utils::raydium_cpmm::quote_exact_in(
+            rpc,
+            pool_address,
+            amount_in,
+            is_token0_in,
+        ).await;
+        result.map(|q| q.fee_amount).map_err(|e| format!("Quote failed: {}", e))
+    }
+}
+
+/// Raydium AMM V4 费用计算
+async fn get_raydium_amm_v4_fee(
+    rpc: &crate::common::SolanaRpcClient,
+    pool_address: &solana_sdk::pubkey::Pubkey,
+    swap_params: &SwapParams,
+) -> Result<u64, String> {
+    let coin_mint = match &swap_params.protocol_params {
+        crate::trading::core::params::DexParamEnum::RaydiumAmmV4(p) => p.coin_mint,
+        _ => return Err("Invalid DEX params".to_string()),
+    };
+
+    let is_coin_in = swap_params.input_mint == coin_mint;
+
+    // 根据模式调用不同的 quote 函数，并提取 fee_amount
+    if let Some(amount_out) = swap_params.fixed_output_amount {
+        // exact_out 模式
+        let result = crate::instruction::utils::raydium_amm_v4::quote_exact_out(
+            rpc,
+            pool_address,
+            amount_out,
+            is_coin_in,
+        ).await;
+        result.map(|q| q.fee_amount).map_err(|e| format!("Quote failed: {}", e))
+    } else {
+        // exact_in 模式
+        let amount_in = swap_params.input_amount.unwrap_or(0);
+        let result = crate::instruction::utils::raydium_amm_v4::quote_exact_in(
+            rpc,
+            pool_address,
+            amount_in,
+            is_coin_in,
+        ).await;
+        result.map(|q| q.fee_amount).map_err(|e| format!("Quote failed: {}", e))
+    }
+}
+
+/// Raydium CLMM 费用计算
+async fn get_raydium_clmm_fee(
+    rpc: &crate::common::SolanaRpcClient,
+    pool_address: &solana_sdk::pubkey::Pubkey,
+    swap_params: &SwapParams,
+) -> Result<u64, String> {
+    let token0_mint = match &swap_params.protocol_params {
+        crate::trading::core::params::DexParamEnum::RaydiumClmm(p) => p.token0_mint,
+        _ => return Err("Invalid DEX params".to_string()),
+    };
+
+    let zero_for_one = swap_params.input_mint == token0_mint;
+
+    // 根据模式调用不同的 quote 函数，并提取 fee_amount
+    if let Some(amount_out) = swap_params.fixed_output_amount {
+        // exact_out 模式
+        let result = crate::instruction::utils::raydium_clmm::quote_exact_out(
+            rpc,
+            pool_address,
+            amount_out,
+            zero_for_one,
+        ).await;
+        result.map(|q| q.fee_amount).map_err(|e| format!("Quote failed: {}", e))
+    } else {
+        // exact_in 模式
+        let amount_in = swap_params.input_amount.unwrap_or(0);
+        let result = crate::instruction::utils::raydium_clmm::quote_exact_in(
+            rpc,
+            pool_address,
+            amount_in,
+            zero_for_one,
+        ).await;
+        result.map(|q| q.fee_amount).map_err(|e| format!("Quote failed: {}", e))
+    }
+}
+
+/// PumpSwap 费用计算
+async fn get_pumpswap_fee(
+    rpc: &crate::common::SolanaRpcClient,
+    pool_address: &solana_sdk::pubkey::Pubkey,
+    swap_params: &SwapParams,
+) -> Result<u64, String> {
+    let base_mint = match &swap_params.protocol_params {
+        crate::trading::core::params::DexParamEnum::PumpSwap(p) => p.base_mint,
+        _ => return Err("Invalid DEX params".to_string()),
+    };
+
+    let is_base_in = swap_params.input_mint == base_mint;
+
+    // 根据模式调用不同的 quote 函数，并提取 fee_amount
+    if let Some(amount_out) = swap_params.fixed_output_amount {
+        // exact_out 模式
+        let result = crate::instruction::utils::pumpswap::quote_exact_out(
+            rpc,
+            pool_address,
+            amount_out,
+            is_base_in,
+        ).await;
+        result.map(|q| q.fee_amount).map_err(|e| format!("Quote failed: {}", e))
+    } else {
+        // exact_in 模式
+        let amount_in = swap_params.input_amount.unwrap_or(0);
+        let result = crate::instruction::utils::pumpswap::quote_exact_in(
+            rpc,
+            pool_address,
+            amount_in,
+            is_base_in,
+        ).await;
+        result.map(|q| q.fee_amount).map_err(|e| format!("Quote failed: {}", e))
+    }
+}
+
 impl TradingClient {
     /// 链上模拟（准确验证）
     ///
@@ -129,7 +299,17 @@ impl TradingClient {
             &params.mint,
         );
 
-        // 6. 调用链上模拟
+        // 6. 调用本地 quote 计算手续费（对于支持 quote 的 DEX）
+        let fee_amount = match get_swap_fee_amount(&self.rpc, &swap_params).await {
+            Ok(fee) => fee,
+            Err(e) => {
+                // Quote 失败不影响模拟，只是 fee_amount 为 0
+                eprintln!("⚠️  Quote calculation failed: {}, fee_amount will be 0", e);
+                0
+            },
+        };
+
+        // 7. 调用链上模拟
         let sim_result = crate::utils::simulation_based_calc::simulate_swap_transaction(
             &self.rpc,
             &self.payer,
@@ -142,11 +322,11 @@ impl TradingClient {
         .await
         .map_err(|e| UnifiedTradingError::SimulationFailed(e.to_string()))?;
 
-        // 7. 转换返回值
+        // 8. 转换返回值
         Ok(SimulationResult {
             amount_out: sim_result.actual_output_amount,
-            amount_in: params.input_token_amount, // 添加此行：支持 exact_out 模式
-            fee_amount: 0,                        // TODO: 从 sim_result 计算
+            amount_in: params.input_token_amount,
+            fee_amount, // 使用本地 quote 计算的手续费
             compute_units: sim_result.units_consumed.unwrap_or(0),
             transaction_fee: sim_result.transaction_fee,
             success: sim_result.success,
@@ -262,7 +442,17 @@ impl TradingClient {
             &output_mint,
         );
 
-        // 6. 调用链上模拟
+        // 6. 调用本地 quote 计算手续费（对于支持 quote 的 DEX）
+        let fee_amount = match get_swap_fee_amount(&self.rpc, &swap_params).await {
+            Ok(fee) => fee,
+            Err(e) => {
+                // Quote 失败不影响模拟，只是 fee_amount 为 0
+                eprintln!("⚠️  Quote calculation failed: {}, fee_amount will be 0", e);
+                0
+            },
+        };
+
+        // 7. 调用链上模拟
         let sim_result = crate::utils::simulation_based_calc::simulate_swap_transaction(
             &self.rpc,
             &self.payer,
@@ -275,11 +465,11 @@ impl TradingClient {
         .await
         .map_err(|e| UnifiedTradingError::SimulationFailed(e.to_string()))?;
 
-        // 7. 转换返回值
+        // 8. 转换返回值
         Ok(SimulationResult {
             amount_out: sim_result.actual_output_amount,
             amount_in: params.input_token_amount,
-            fee_amount: 0,
+            fee_amount, // 使用本地 quote 计算的手续费
             compute_units: sim_result.units_consumed.unwrap_or(0),
             transaction_fee: sim_result.transaction_fee,
             success: sim_result.success,
