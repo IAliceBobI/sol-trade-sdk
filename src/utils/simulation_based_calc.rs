@@ -452,21 +452,69 @@ fn parse_raydium_amm_v4_log_data(ray_log_base64: &str) -> Option<(u64, u64)> {
     // 解析 swap_out_amount（后 8 字节，little endian）
     let raw_out = u64::from_le_bytes(data[8..16].try_into().ok()?);
 
-    // 根据方向标志调整解析公式
-    // 方向标志：512 (0x200) = 买入 (coin -> pc), 256 (0x100) = 卖出 (pc -> coin)
-    let (amount_in, amount_out) = if direction == 512 {
-        // 买入方向: WSOL -> USDC
-        // offset 0: swap_in / 256
-        // offset 8: swap_out / 256 * 100
-        (raw_in / 256, (raw_out / 256) * 100)
-    } else if direction == 256 {
-        // 卖出方向: USDC -> WSOL
-        // offset 0: swap_in / 256 * 1000 (因为单位是 smallest unit)
-        // offset 8: swap_out / 256 * 100
-        ((raw_in / 256) * 1000, (raw_out / 256) * 100)
+    // 判断是 exact_in 还是 exact_out
+    // 方法：检查 raw_in 的大小（offset 0），并根据 direction 使用不同的阈值
+    // direction=512 (buy):
+    //   - exact_in: raw_in ~ 256,000,000 (direction * amount)
+    //   - exact_out: raw_in < 200,000,000
+    // direction=256 (sell):
+    //   - exact_in: raw_in ~ 256,000 (direction * amount / 1000)
+    //   - exact_out: raw_in > 200,000,000
+    let is_exact_out = if direction == 512 {
+        // buy: raw_in 较小的是 exact_out
+        raw_in < 200_000_000
     } else {
-        // 未知方向，使用默认公式
-        (raw_in / 256, (raw_out / 256) * 100)
+        // sell: raw_in 较大的是 exact_out
+        raw_in > 200_000_000
+    };
+
+    eprintln!("🐛 AMM V4 ray_log 解析调试:");
+    eprintln!("  raw_in: {}", raw_in);
+    eprintln!("  raw_out: {}", raw_out);
+    eprintln!("  direction: {}", direction);
+    eprintln!("  is_exact_out: {}", is_exact_out);
+
+    // 根据方向标志和 swap 类型调整解析公式
+    let (amount_in, amount_out) = if is_exact_out {
+        // exact_out 的公式根据方向有所不同
+        match direction {
+            512 => {
+                // 买入 exact_out: WSOL -> USDC
+                // offset 0: 输入 WSOL / 256
+                // offset 8: 输出 USDC / 256 / 100
+                (raw_in / 256, raw_out / 256 / 100)
+            },
+            256 => {
+                // 卖出 exact_out: USDC -> WSOL
+                // offset 0: 输入 USDC / 256
+                // offset 8: 输出 WSOL / 256（不需要除以 100）
+                (raw_in / 256, raw_out / 256)
+            },
+            _ => {
+                // 未知方向，使用默认公式
+                (raw_in / 256, raw_out / 256)
+            },
+        }
+    } else {
+        // exact_in: 使用原来的公式
+        match direction {
+            512 => {
+                // 买入方向: WSOL -> USDC
+                // offset 0: swap_in / 256
+                // offset 8: swap_out / 256 * 100
+                (raw_in / 256, (raw_out / 256) * 100)
+            },
+            256 => {
+                // 卖出方向: USDC -> WSOL
+                // offset 0: swap_in / 256 * 1000 (因为单位是 smallest unit)
+                // offset 8: swap_out / 256 * 100
+                ((raw_in / 256) * 1000, (raw_out / 256) * 100)
+            },
+            _ => {
+                // 未知方向，使用默认公式
+                (raw_in / 256, (raw_out / 256) * 100)
+            },
+        }
     };
 
     Some((amount_in, amount_out))

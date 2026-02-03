@@ -584,7 +584,6 @@ async fn test_raydium_amm_v4_exact_in_sell_with_simulation() {
 
 #[tokio::test]
 #[serial_test::serial]
-#[ignore = "TODO: 修复 exact_out ray_log 解析 - 单位转换问题"]
 async fn test_raydium_amm_v4_exact_out_buy_with_simulation() {
     println!("====================================================");
     println!("Test 3: Raydium AMM V4 Exact Out Buy (指定 USDC 数量)");
@@ -795,6 +794,23 @@ async fn test_raydium_amm_v4_exact_out_buy_with_simulation() {
         return;
     }
 
+    // 🐛 调试：输出模拟结果
+    println!("🐛 调试信息:");
+    println!("  actual_input_amount: {}", simulation_result.actual_input_amount);
+    println!("  actual_output_amount: {}", simulation_result.actual_output_amount);
+    println!("  inner_instructions: {:?}", simulation_result.inner_instructions);
+
+    if let Some(ref logs) = simulation_result.logs {
+        println!("  日志数量: {}", logs.len());
+        // 查找 ray_log
+        for log in logs.iter().take(10) {
+            if log.contains("ray_log:") {
+                println!("  ray_log: {}", log);
+            }
+        }
+    }
+    println!();
+
     let simulated_output = simulation_result.actual_output_amount;
 
     // 结果对比
@@ -827,7 +843,6 @@ async fn test_raydium_amm_v4_exact_out_buy_with_simulation() {
 
 #[tokio::test]
 #[serial_test::serial]
-#[ignore = "TODO: 修复 exact_out ray_log 解析 - 单位转换问题"]
 async fn test_raydium_amm_v4_exact_out_sell_with_simulation() {
     println!("====================================================");
     println!("Test 4: Raydium AMM V4 Exact Out Sell (指定 WSOL 数量)");
@@ -1032,6 +1047,23 @@ async fn test_raydium_amm_v4_exact_out_sell_with_simulation() {
         }
         return;
     }
+
+    // 🐛 调试：输出模拟结果
+    println!("🐛 调试信息:");
+    println!("  actual_input_amount: {}", simulation_result.actual_input_amount);
+    println!("  actual_output_amount: {}", simulation_result.actual_output_amount);
+    println!("  inner_instructions: {:?}", simulation_result.inner_instructions);
+
+    if let Some(ref logs) = simulation_result.logs {
+        println!("  日志数量: {}", logs.len());
+        // 查找 ray_log
+        for log in logs.iter().take(10) {
+            if log.contains("ray_log:") {
+                println!("  ray_log: {}", log);
+            }
+        }
+    }
+    println!();
 
     let simulated_output = simulation_result.actual_output_amount;
 
