@@ -12,39 +12,13 @@ pub mod swqos;
 pub mod trading;
 pub mod utils;
 
-// 导出交易执行模式
-use crate::common::CallbackExecutionMode;
-use crate::common::GasFeeStrategy;
-use crate::common::InfrastructureConfig;
-use crate::common::TradeConfig;
-use crate::common::nonce_cache::DurableNonceInfo;
-use crate::constants::SOL_TOKEN_ACCOUNT;
-use crate::constants::USD1_TOKEN_ACCOUNT;
-use crate::constants::USDC_TOKEN_ACCOUNT;
-use crate::constants::WSOL_TOKEN_ACCOUNT;
-#[cfg(feature = "perf-trace")]
-use crate::constants::trade_consts::DEFAULT_SLIPPAGE;
-use crate::swqos::SwqosClient;
-use crate::swqos::SwqosConfig;
-use crate::swqos::TradeType;
-use crate::swqos::common::TradeError;
-pub use crate::trading::CallbackContext;
-pub use crate::trading::CallbackRef;
-use crate::trading::MiddlewareManager;
-pub use crate::trading::NoopCallback;
-use crate::trading::SwapParams;
-use crate::trading::TradeFactory;
-pub use crate::trading::TransactionLifecycleCallback;
-use crate::trading::core::params::BonkParams;
-use crate::trading::core::params::DexParamEnum;
-use crate::trading::core::params::MeteoraDammV2Params;
-use crate::trading::core::params::PumpFunParams;
-use crate::trading::core::params::PumpSwapParams;
-use crate::trading::core::params::{RaydiumAmmV4Params, RaydiumClmmParams, RaydiumCpmmParams};
-pub use crate::trading::error::{Result as UnifiedResult, TradingError as UnifiedTradingError};
-pub use crate::trading::factory::DexType;
-pub use crate::trading::results::{QuoteResult, SimulationResult};
-use common::SolanaRpcClient;
+// 导出模块
+mod exports;
+
+// 重导出公共接口
+pub use exports::*;
+
+// 使用的依赖项
 use parking_lot::Mutex;
 use rustls::crypto::{CryptoProvider, ring::default_provider};
 use solana_sdk::hash::Hash;
@@ -52,7 +26,6 @@ use solana_sdk::message::AddressLookupTableAccount;
 use solana_sdk::signer::Signer;
 use solana_sdk::{pubkey::Pubkey, signature::Keypair, signature::Signature};
 use std::sync::Arc;
-pub use trading::ExecutionMode;
 
 /// Type of the token to buy
 #[derive(Clone, PartialEq)]
