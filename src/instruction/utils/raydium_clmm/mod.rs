@@ -14,6 +14,7 @@ mod helpers;
 mod pool_queries;
 mod price;
 mod quotes;
+mod tick_array_bitmap;
 
 // 重新导出所有公共接口
 pub use constants::*;
@@ -21,3 +22,4 @@ pub use helpers::*;
 pub use pool_queries::*;
 pub use price::*;
 pub use quotes::*;
+pub use tick_array_bitmap::*;

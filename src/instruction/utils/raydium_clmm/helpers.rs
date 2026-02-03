@@ -91,20 +91,57 @@ pub fn get_tick_array_start_index(tick_current: i32, tick_spacing: u16) -> i32 {
 
 /// Find first initialized tick array from bitmap
 ///
-/// This is a simplified version. In production, you should use the full bitmap logic
-/// from the pool state's tick_array_bitmap field.
+/// 使用完整的 bitmap 搜索逻辑，从 pool state 的 tick_array_bitmap 字段中查找
+/// 在交易方向上第一个已初始化的 tick array。
 ///
 /// # Arguments
 /// * `pool_state` - Pool state
-/// * `_zero_for_one` - Swap direction (true = token0 -> token1)
+/// * `zero_for_one` - Swap direction (true = token0 -> token1, 向前搜索; false = token1 -> token0, 向后搜索)
 ///
 /// # Returns
-/// First initialized tick array start index, or falls back to current tick's array
+/// 第一个已初始化的 tick array 起始索引
+///
+/// # 算法说明
+///
+/// 参考 Raydium CLMM 官方实现（programs/amm/src/libraries/tick_array_bit_map.rs）：
+///
+/// 1. 将 PoolState 的 tick_array_bitmap ([u64; 16]) 转换为 U1024
+/// 2. 计算当前 tick 所在的 array 起始索引
+/// 3. 根据 zero_for_one 方向搜索下一个已初始化的 array：
+///    - zero_for_one = true: 向前搜索（查找更低的 tick）
+///    - zero_for_one = false: 向后搜索（查找更高的 tick）
+/// 4. 如果找到，返回该 array 的起始索引；否则返回边界
+///
+/// # 实现状态
+///
+/// ✅ 已完成 - 移植自官方实现
 pub fn get_first_initialized_tick_array_start_index(
     pool_state: &crate::instruction::utils::raydium_clmm_types::PoolState,
-    _zero_for_one: bool,
+    zero_for_one: bool,
 ) -> i32 {
-    // TODO: Implement full bitmap search logic
-    // For now, fall back to current tick's array
-    get_tick_array_start_index(pool_state.tick_current, pool_state.tick_spacing)
+    use crate::instruction::utils::raydium_clmm::tick_array_bitmap::{
+        next_initialized_tick_array_start_index, pool_bitmap_to_u1024,
+    };
+
+    // 将 PoolState 的 bitmap 转换为 U1024
+    let bitmap = pool_bitmap_to_u1024(pool_state);
+
+    // 获取当前 tick 所在的 array 起始索引
+    let current_array_start =
+        get_tick_array_start_index(pool_state.tick_current, pool_state.tick_spacing);
+
+    // 从当前 array 开始搜索下一个已初始化的 array
+    let (found, next_array_start) = next_initialized_tick_array_start_index(
+        bitmap,
+        current_array_start,
+        pool_state.tick_spacing,
+        zero_for_one,
+    );
+
+    // 如果找到，返回下一个 array；否则返回当前 array
+    if found {
+        next_array_start
+    } else {
+        current_array_start
+    }
 }
