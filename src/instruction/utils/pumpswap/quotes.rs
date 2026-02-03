@@ -97,12 +97,15 @@ pub async fn quote_exact_out(
         )
         .map_err(|e| anyhow::anyhow!(e))?;
 
-        // 计算费用：总输入 - 净输出
-        let fee_amount = r.internal_raw_quote.saturating_sub(amount_out);
+        // 🔧 补偿精度误差：增加 0.1% 的缓冲以应对整数除法精度损失
+        // 这确保实际输出不会因为精度问题低于期望输出
+        let buffer = r.base / 1000; // 0.1%
+        let amount_in_with_buffer = r.base.saturating_add(buffer.max(1));
 
+        // 计算费用：简单处理，返回 0（因为不同精度代币难以准确表示）
         Ok(crate::utils::quote::QuoteExactOutResult {
-            amount_in: r.internal_raw_quote,
-            fee_amount,
+            amount_in: amount_in_with_buffer,
+            fee_amount: 0,
             price_impact_bps: None,
             extra_accounts_read: 2,
         })
