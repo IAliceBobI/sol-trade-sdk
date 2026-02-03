@@ -276,10 +276,10 @@ pub fn quote_exact_out(
         .checked_div(denominator)
         .ok_or_else(|| "Calculation overflow in division".to_string())? as u64;
 
-    // 计算手续费
+    // 计算手续费 - protocol_fee 和 fund_fee 从 trade_fee 计算
     let trade_fee = compute_trading_fee(amount_in, trade_fee_rate);
-    let protocol_fee = compute_protocol_fund_fee(amount_in, protocol_fee_rate);
-    let fund_fee = compute_protocol_fund_fee(amount_in, fund_fee_rate);
+    let protocol_fee = compute_protocol_fund_fee(trade_fee, protocol_fee_rate);
+    let fund_fee = compute_protocol_fund_fee(trade_fee, fund_fee_rate);
     let creator_fee = compute_creator_fee_new(amount_in, 0); // CPMM 目前 creator_fee 为 0
 
     let total_fee = trade_fee
