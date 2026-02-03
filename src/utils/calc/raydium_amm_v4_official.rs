@@ -53,30 +53,26 @@ pub fn swap_token_amount_base_in(
             // => amount_out = pc - coin * pc / (coin + amount_in)
             // => amount_out = ((pc * coin + pc * amount_in) - coin * pc) / (coin + amount_in)
             // => amount_out =  pc * amount_in / (coin + amount_in)
-            let denominator = total_coin_without_take_pnl
-                .checked_add(amount_in)
-                .unwrap();
+            let denominator = total_coin_without_take_pnl.checked_add(amount_in).unwrap();
             total_pc_without_take_pnl
                 .checked_mul(amount_in)
                 .unwrap()
                 .checked_div(denominator)
                 .unwrap()
-        }
+        },
         SwapDirection::PC2Coin => {
             // (x + delta_x) * (y + delta_y) = x * y
             // (pc + amount_in) * (coin - amount_out) = coin * pc
             // => amount_out = coin - coin * pc / (pc + amount_in)
             // => amount_out = (coin * pc + coin * amount_in - coin * pc) / (pc + amount_in)
             // => amount_out = coin * amount_in / (pc + amount_in)
-            let denominator = total_pc_without_take_pnl
-                .checked_add(amount_in)
-                .unwrap();
+            let denominator = total_pc_without_take_pnl.checked_add(amount_in).unwrap();
             total_coin_without_take_pnl
                 .checked_mul(amount_in)
                 .unwrap()
                 .checked_div(denominator)
                 .unwrap()
-        }
+        },
     }
 }
 
@@ -112,7 +108,8 @@ pub fn calculate_swap_with_fee(
 
     // 2. 从输入扣除费用
     // 源码: processor.rs:2398
-    let swap_in_after_deduct_fee = (amount_in as u128).checked_sub(swap_fee as u128).unwrap() as u64;
+    let swap_in_after_deduct_fee =
+        (amount_in as u128).checked_sub(swap_fee as u128).unwrap() as u64;
 
     // 3. 计算输出金额
     // 源码: processor.rs:2399-2405
@@ -143,7 +140,7 @@ mod tests {
         let amount_in = 1_000_000u64;
         let (swap_fee, _) = calculate_swap_with_fee(
             amount_in,
-            25,    // 0.25%
+            25, // 0.25%
             10000,
             5_531_095_839_846,
             53_692_923_475_369,

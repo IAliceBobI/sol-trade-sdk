@@ -2,7 +2,7 @@
 
 use crate::common::SolanaRpcClient;
 use crate::utils::calc::raydium_amm_v4::quote_exact_out as calc_quote_exact_out;
-use crate::utils::calc::raydium_amm_v4_official::{calculate_swap_with_fee, SwapDirection};
+use crate::utils::calc::raydium_amm_v4_official::{SwapDirection, calculate_swap_with_fee};
 use anyhow::anyhow;
 use solana_sdk::pubkey::Pubkey;
 
@@ -63,9 +63,9 @@ pub async fn quote_exact_in(
     // - is_coin_in=false => 使用 PC 作为输入储备计算（PC->Coin 方向）
     // - is_coin_in=true  => 使用 Coin 作为输入储备计算（Coin->PC 方向）
     let swap_direction = if is_coin_in {
-        SwapDirection::Coin2PC  // 使用 coin 作为输入计算
+        SwapDirection::Coin2PC // 使用 coin 作为输入计算
     } else {
-        SwapDirection::PC2Coin   // 使用 pc 作为输入计算
+        SwapDirection::PC2Coin // 使用 pc 作为输入计算
     };
 
     // 使用链上的实际费用率
@@ -77,8 +77,8 @@ pub async fn quote_exact_in(
         amount_in,
         swap_fee_numerator,
         swap_fee_denominator,
-        total_pc_without_pnl,     // total_pc_without_take_pnl
-        total_coin_without_pnl,    // total_coin_without_take_pnl
+        total_pc_without_pnl,   // total_pc_without_take_pnl
+        total_coin_without_pnl, // total_coin_without_take_pnl
         swap_direction,
     );
 

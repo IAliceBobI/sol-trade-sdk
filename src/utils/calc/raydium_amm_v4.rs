@@ -127,8 +127,8 @@ fn swap_base_input(
         new_output_vault_amount: output_vault_amount.saturating_sub(output_amount),
         input_amount,
         output_amount,
-        trade_fee: swap_fee,  // 统一使用 trade_fee 字段返回 swap_fee
-        swap_fee: 0,       // 不再单独计算 swap_fee
+        trade_fee: swap_fee, // 统一使用 trade_fee 字段返回 swap_fee
+        swap_fee: 0,         // 不再单独计算 swap_fee
     }
 }
 

@@ -3,6 +3,7 @@
 //! 运行测试:
 //!     cargo nextest run verify_raydium_amm_v4_exact_in_buy -- --nocapture
 
+use base64;
 use sol_trade_sdk::{
     common::SolanaRpcClient,
     instruction::utils::raydium_amm_v4::{get_pool_by_address, quote_exact_in},
@@ -13,7 +14,6 @@ use sol_trade_sdk::{
 use solana_sdk::{pubkey::Pubkey, signer::Signer};
 use std::str::FromStr;
 use std::sync::Arc;
-use base64;
 
 // 导入公共测试模块
 mod common;
@@ -299,9 +299,12 @@ async fn test_raydium_amm_v4_exact_in_buy_with_simulation() {
                 if let Ok(decoded) = base64::decode(encoded) {
                     if decoded.len() >= 57 {
                         // 按照 SwapBaseInLog 结构解析
-                        let pool_coin_from_log = u64::from_le_bytes(decoded[33..41].try_into().unwrap());
-                        let pool_pc_from_log = u64::from_le_bytes(decoded[41..49].try_into().unwrap());
-                        let out_amount_from_log = u64::from_le_bytes(decoded[49..57].try_into().unwrap());
+                        let pool_coin_from_log =
+                            u64::from_le_bytes(decoded[33..41].try_into().unwrap());
+                        let pool_pc_from_log =
+                            u64::from_le_bytes(decoded[41..49].try_into().unwrap());
+                        let out_amount_from_log =
+                            u64::from_le_bytes(decoded[49..57].try_into().unwrap());
 
                         println!("📊 Ray_log 中的实际数据:");
                         println!("  pool_coin (实际): {}", pool_coin_from_log);

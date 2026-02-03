@@ -118,8 +118,11 @@ impl InstructionBuilder for RaydiumAmmV4InstructionBuilder {
 
                         // 如果有 Pool 状态，应用 PNL 调整
                         if let Some(ref info) = amm_info {
-                            coin_amt = coin_amt.checked_sub(info.out_put.need_take_pnl_coin).unwrap_or(coin_amt);
-                            pc_amt = pc_amt.checked_sub(info.out_put.need_take_pnl_pc).unwrap_or(pc_amt);
+                            coin_amt = coin_amt
+                                .checked_sub(info.out_put.need_take_pnl_coin)
+                                .unwrap_or(coin_amt);
+                            pc_amt =
+                                pc_amt.checked_sub(info.out_put.need_take_pnl_pc).unwrap_or(pc_amt);
                         }
 
                         (coin_amt, pc_amt)
@@ -197,11 +200,7 @@ impl InstructionBuilder for RaydiumAmmV4InstructionBuilder {
             (info.serum_dex, info.market, info.open_orders)
         } else {
             // 如果没有 Pool 状态，使用旧的逻辑（可能导致错误）
-            (
-                protocol_params.amm,
-                protocol_params.amm,
-                protocol_params.amm,
-            )
+            (protocol_params.amm, protocol_params.amm, protocol_params.amm)
         };
 
         let accounts: [AccountMeta; 17] = [
@@ -317,8 +316,11 @@ impl InstructionBuilder for RaydiumAmmV4InstructionBuilder {
 
                         // 如果有 Pool 状态，应用 PNL 调整
                         if let Some(ref info) = amm_info {
-                            coin_amt = coin_amt.checked_sub(info.out_put.need_take_pnl_coin).unwrap_or(coin_amt);
-                            pc_amt = pc_amt.checked_sub(info.out_put.need_take_pnl_pc).unwrap_or(pc_amt);
+                            coin_amt = coin_amt
+                                .checked_sub(info.out_put.need_take_pnl_coin)
+                                .unwrap_or(coin_amt);
+                            pc_amt =
+                                pc_amt.checked_sub(info.out_put.need_take_pnl_pc).unwrap_or(pc_amt);
                         }
 
                         (coin_amt, pc_amt)
@@ -381,11 +383,7 @@ impl InstructionBuilder for RaydiumAmmV4InstructionBuilder {
             (info.serum_dex, info.market, info.open_orders)
         } else {
             // 如果没有 Pool 状态，使用旧的逻辑（可能导致错误）
-            (
-                protocol_params.amm,
-                protocol_params.amm,
-                protocol_params.amm,
-            )
+            (protocol_params.amm, protocol_params.amm, protocol_params.amm)
         };
 
         let accounts: [AccountMeta; 17] = [
