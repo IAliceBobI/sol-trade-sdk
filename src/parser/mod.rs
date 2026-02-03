@@ -15,6 +15,9 @@ pub mod transaction_adapter;
 pub mod types;
 pub mod utils;
 
+// 交易适配器子模块
+pub use transaction_adapter::{AdapterError, TransactionAdapter};
+
 pub mod pumpswap;
 pub mod raydium;
 

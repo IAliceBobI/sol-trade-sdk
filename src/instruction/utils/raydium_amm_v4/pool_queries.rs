@@ -1,55 +1,20 @@
-// 允许文档格式的当前写法
-#![allow(clippy::doc_markdown)]
+// Pool 查询函数
 
-use crate::{
-    common::{SolanaRpcClient, auto_mock_rpc::PoolRpcClient},
-    constants::{SOL_MINT, USDC_MINT, USDT_MINT},
-    instruction::utils::raydium_amm_v4_types::{AMM_INFO_SIZE, AmmInfo, amm_info_decode},
+use super::constants::{
+    accounts::RAYDIUM_AMM_V4, COIN_MINT_OFFSET, MAX_CACHE_SIZE, PC_MINT_OFFSET,
 };
+use super::helpers::{calculate_effective_volume, is_hot_mint, select_best_pool_by_volume};
+use crate::common::{SolanaRpcClient, auto_mock_rpc::PoolRpcClient};
+use crate::constants::{SOL_MINT, USDC_MINT, USDT_MINT};
+use crate::instruction::utils::raydium_amm_v4_types::{AMM_INFO_SIZE, AmmInfo, amm_info_decode};
 use anyhow::anyhow;
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD;
 use dashmap::DashMap;
 use once_cell::sync::Lazy;
-use solana_sdk::{pubkey, pubkey::Pubkey};
-
-/// Raydium CLMM WSOL-USDT 锚定池（用于 USD 价格计算）
-/// 如果不传入锚定池参数，默认使用此池
-pub const DEFAULT_WSOL_USDT_CLMM_POOL: Pubkey =
-    pubkey!("ExcBWu8fGPdJiaF1b1z3iEef38sjQJks8xvj6M85pPY6");
-
-/// Constants used as seeds for deriving PDAs (Program Derived Addresses)
-pub mod seeds {
-    pub const POOL_SEED: &[u8] = b"pool";
-}
-
-/// Constants related to program accounts and authorities
-pub mod accounts {
-    use solana_sdk::{pubkey, pubkey::Pubkey};
-    pub const AUTHORITY: Pubkey = pubkey!("5Q544fKrFoe6tsEbD7S8EmxGTJYAKtTVhAW5Q5pge4j1");
-    pub const RAYDIUM_AMM_V4: Pubkey = pubkey!("675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8");
-
-    pub const TRADE_FEE_NUMERATOR: u64 = 25;
-    pub const TRADE_FEE_DENOMINATOR: u64 = 10000;
-    pub const SWAP_FEE_NUMERATOR: u64 = 25;
-    pub const SWAP_FEE_DENOMINATOR: u64 = 10000;
-
-    // META
-
-    pub const AUTHORITY_META: solana_sdk::instruction::AccountMeta =
-        solana_sdk::instruction::AccountMeta {
-            pubkey: AUTHORITY,
-            is_signer: false,
-            is_writable: false,
-        };
-}
-
-pub const SWAP_BASE_IN_DISCRIMINATOR: &[u8] = &[9];
-pub const SWAP_BASE_OUT_DISCRIMINATOR: &[u8] = &[11];
+use solana_sdk::pubkey::Pubkey;
 
 // ==================== 缓存模块 ====================
-
-const MAX_CACHE_SIZE: usize = 50_000;
 
 /// pool_address → AmmInfo 数据缓存
 static POOL_DATA_CACHE: Lazy<DashMap<Pubkey, AmmInfo>> =
@@ -106,7 +71,14 @@ pub(crate) fn clear_pool_cache_internal() {
     MINT_TO_POOLS_LIST_CACHE.clear();
 }
 
-// ==================== 公共函数 ====================
+/// 清除所有 Pool 缓存
+///
+/// 清除所有缓存中的 Pool 数据。
+pub fn clear_pool_cache() {
+    clear_pool_cache_internal();
+}
+
+// ==================== Pool 查询函数 ====================
 
 /// 根据地址获取 AMM Pool 信息（使用 PoolRpcClient trait，支持 Auto Mock）
 ///
@@ -121,12 +93,12 @@ pub async fn get_pool_by_address<T: PoolRpcClient + ?Sized>(
         .get_account(pool_address)
         .await
         .map_err(|e| anyhow!("RPC 调用失败: {}", e))?;
-    if account.owner != accounts::RAYDIUM_AMM_V4 {
+    if account.owner != RAYDIUM_AMM_V4 {
         return Err(anyhow!("Account is not owned by Raydium AMM V4 program"));
     }
     // 使用修改后的 amm_info_decode（传入 program_id）
-    let amm_info = amm_info_decode(&account.data, account.owner)
-        .ok_or_else(|| anyhow!("Failed to decode amm info"))?;
+    let amm_info =
+        amm_info_decode(&account.data, account.owner).ok_or_else(|| anyhow!("Failed to decode amm info"))?;
 
     // 不写入缓存
     Ok(amm_info)
@@ -143,159 +115,7 @@ pub async fn get_pool_by_address_force(
     get_pool_by_address(rpc, pool_address).await
 }
 
-/// 清除所有 Pool 缓存
-///
-/// 清除所有缓存中的 Pool 数据。
-pub fn clear_pool_cache() {
-    clear_pool_cache_internal();
-}
-
-/// 判断是否为 Hot Mint（主流桥接资产）
-/// 当前包含：WSOL、USDC、USDT
-fn is_hot_mint(mint: &Pubkey) -> bool {
-    *mint == SOL_MINT || *mint == USDC_MINT || *mint == USDT_MINT
-}
-
-/// 计算池子的有效交易量（基于 swap 数据）
-/// - 如果包含 WSOL/USDC/USDT，只计算这些资产侧的交易量
-/// - 否则计算两侧的总交易量
-fn calculate_effective_volume(amm: &AmmInfo) -> u128 {
-    // 检查 coin_mint 是否为 WSOL/USDC/USDT
-    let coin_is_stable =
-        amm.coin_mint == SOL_MINT || amm.coin_mint == USDC_MINT || amm.coin_mint == USDT_MINT;
-
-    // 检查 pc_mint 是否为 WSOL/USDC/USDT
-    let pc_is_stable =
-        amm.pc_mint == SOL_MINT || amm.pc_mint == USDC_MINT || amm.pc_mint == USDT_MINT;
-
-    if coin_is_stable && !pc_is_stable {
-        // 只计算 coin 侧（WSOL/USDC/USDT）的交易量
-        amm.out_put.swap_coin_in_amount.saturating_add(amm.out_put.swap_pc_out_amount)
-    } else if pc_is_stable && !coin_is_stable {
-        // 只计算 pc 侧（WSOL/USDC/USDT）的交易量
-        amm.out_put.swap_pc_in_amount.saturating_add(amm.out_put.swap_coin_out_amount)
-    } else {
-        // 两侧都是稳定资产或都不是，计算总交易量
-        amm.out_put
-            .swap_coin_in_amount
-            .saturating_add(amm.out_put.swap_pc_out_amount)
-            .saturating_add(amm.out_put.swap_pc_in_amount)
-            .saturating_add(amm.out_put.swap_coin_out_amount)
-    }
-}
-
-/// 按累计交易量选择最佳池（零网络开销）
-///
-/// 策略：
-/// - 优先选择活跃状态的池
-/// - 如果池子包含 WSOL/USDC/USDT，只计算这些稳定资产侧的累计交易量
-/// - 否则计算两侧的总交易量
-/// - 交易量越大，说明池子被实际使用越多，深度越可靠
-fn select_best_pool_by_volume(pools: &[(Pubkey, AmmInfo)]) -> Option<(Pubkey, AmmInfo)> {
-    if pools.is_empty() {
-        return None;
-    }
-
-    if pools.len() == 1 {
-        return Some(pools[0].clone());
-    }
-
-    // 优先选择活跃状态的池
-    let mut active_pools: Vec<_> = pools
-        .iter()
-        .filter(|(_, amm)| is_pool_tradeable(amm))
-        .map(|(addr, amm)| (*addr, amm.clone()))
-        .collect();
-
-    if active_pools.is_empty() {
-        // 如果全部池都不活跃，使用所有池
-        active_pools = pools.to_vec();
-    }
-
-    // 按累计交易量排序
-    active_pools.sort_by(|(_, amm_a), (_, amm_b)| {
-        // 计算有效交易量（优先只看WSOL/USDC/USDT侧）
-        let volume_a = calculate_effective_volume(amm_a);
-        let volume_b = calculate_effective_volume(amm_b);
-
-        // 按交易量降序排序
-        match volume_b.cmp(&volume_a) {
-            std::cmp::Ordering::Equal => {
-                // 交易量相同时，按流动性排序
-                amm_b.lp_amount.cmp(&amm_a.lp_amount)
-            },
-            other => other,
-        }
-    });
-
-    // 返回交易量最高的池
-    active_pools.into_iter().next()
-}
-
-// ==================== Pool 状态检查函数 ====================
-
-/// Pool 状态常量
-pub mod pool_status {
-    /// 未初始化
-    pub const UNINITIALIZED: u64 = 0;
-    /// 已初始化
-    pub const INITIALIZED: u64 = 1;
-    /// 已禁用
-    pub const DISABLED: u64 = 2;
-    /// 只能提现
-    pub const WITHDRAW_ONLY: u64 = 3;
-    /// 只能订单簿
-    pub const ORDER_BOOK_ONLY: u64 = 4;
-    /// 只能交易
-    pub const SWAP_ONLY: u64 = 5;
-    /// 活跃状态
-    pub const ACTIVE: u64 = 6;
-}
-
-/// 检查 pool 是否处于活跃状态
-///
-/// 只有活跃状态的 pool 才适合进行交易。
-pub fn is_pool_active(amm_info: &AmmInfo) -> bool {
-    amm_info.status == pool_status::ACTIVE
-}
-
-/// 检查 pool 是否已禁用
-///
-/// 已禁用的 pool 不能进行交易。
-pub fn is_pool_disabled(amm_info: &AmmInfo) -> bool {
-    amm_info.status == pool_status::DISABLED
-}
-
-/// 检查 pool 是否只能提现
-///
-/// 只能提现的 pool 不能进行交易，只能提取流动性。
-pub fn is_pool_withdraw_only(amm_info: &AmmInfo) -> bool {
-    amm_info.status == pool_status::WITHDRAW_ONLY
-}
-
-/// 检查 pool 是否适合交易
-///
-/// 适合交易的 pool 必须是活跃状态。
-pub fn is_pool_tradeable(amm_info: &AmmInfo) -> bool {
-    is_pool_active(amm_info)
-}
-
-// ==================== Mint 查询相关常量与内部函数 ====================
-
-/// coin_mint 在 AmmInfo 结构中的偏移量
-///
-/// 根据 AmmInfo 字段顺序与 Borsh 编码规则计算：
-/// - 16 个 u64 字段 (16 * 8 = 128 字节)
-/// - Fees (8 个 u64, 8 * 8 = 64 字节)
-/// - OutPutData (10 个 u64 与 4 个 u128, 共 144 字节)
-/// - token_coin (Pubkey, 32 字节)
-/// - token_pc (Pubkey, 32 字节)
-///   因此 coin_mint 起始偏移量为 128 + 64 + 144 + 32 + 32 = 400 字节。
-const COIN_MINT_OFFSET: usize = 400;
-
-/// pc_mint 在 AmmInfo 结构中的偏移量
-/// 即 coin_mint 之后再偏移一个 Pubkey (32 字节)
-const PC_MINT_OFFSET: usize = 432;
+// ==================== Mint 查询相关内部函数 ====================
 
 /// 使用 PoolRpcClient 通过 offset 查找所有包含指定 mint 的 Raydium AMM V4 Pool
 async fn find_pools_by_mint_offset_collect<T: PoolRpcClient + ?Sized>(
@@ -325,7 +145,7 @@ async fn find_pools_by_mint_offset_collect<T: PoolRpcClient + ?Sized>(
     };
 
     let accounts = rpc
-        .get_program_ui_accounts_with_config(&accounts::RAYDIUM_AMM_V4, config)
+        .get_program_ui_accounts_with_config(&RAYDIUM_AMM_V4, config)
         .await
         .map_err(|e| {
             // 检测公共 RPC 限制错误
@@ -347,11 +167,11 @@ async fn find_pools_by_mint_offset_collect<T: PoolRpcClient + ?Sized>(
             let data_bytes = match &acc.data {
                 solana_account_decoder::UiAccountData::Binary(base64_str, _) => {
                     STANDARD.decode(base64_str).ok()?
-                },
+                }
                 _ => return None,
             };
             // 使用 program_id (所有账户都属于 RAYDIUM_AMM_V4)
-            amm_info_decode(&data_bytes, accounts::RAYDIUM_AMM_V4).map(|amm| (addr_pubkey, amm))
+            amm_info_decode(&data_bytes, RAYDIUM_AMM_V4).map(|amm| (addr_pubkey, amm))
         })
         .collect();
 
@@ -374,7 +194,7 @@ async fn find_all_pools_by_mint_impl<T: PoolRpcClient + ?Sized>(
     // 检测是否都失败，如果都失败则返回第一个错误（通常包含 RPC 限制信息）
     match (&coin_result, &pc_result) {
         (Err(e), Err(_)) => return Err(anyhow::anyhow!("{}", e)),
-        _ => {},
+        _ => {}
     }
 
     let mut all_pools: Vec<(Pubkey, AmmInfo)> = Vec::new();
@@ -398,7 +218,7 @@ async fn find_all_pools_by_mint_impl<T: PoolRpcClient + ?Sized>(
 
     // 如果需要过滤活跃状态的 pool
     if filter_active {
-        all_pools.retain(|(_, amm)| is_pool_tradeable(amm));
+        all_pools.retain(|(_, amm)| super::helpers::is_pool_tradeable(amm));
         if all_pools.is_empty() {
             return Err(anyhow!(
                 "No active Raydium AMM V4 pool found for mint {} (all pools are disabled or not tradeable)",
@@ -575,6 +395,8 @@ pub async fn list_pools_by_mint<T: PoolRpcClient + ?Sized>(
     mint: &Pubkey,
     filter_active: bool,
 ) -> Result<Vec<(Pubkey, AmmInfo)>, anyhow::Error> {
+    use super::helpers::is_pool_tradeable;
+
     // 注意：这里不使用内存缓存，直接查询
     // Auto Mock 会在文件层面缓存
 
@@ -658,7 +480,8 @@ pub async fn get_token_price_in_usd(
     token_mint: &Pubkey,
     wsol_usd_clmm_pool_address: Option<&Pubkey>,
 ) -> Result<f64, anyhow::Error> {
-    let wsol_usd_pool = wsol_usd_clmm_pool_address.unwrap_or(&DEFAULT_WSOL_USDT_CLMM_POOL);
+    let wsol_usd_pool =
+        wsol_usd_clmm_pool_address.unwrap_or(&super::constants::DEFAULT_WSOL_USDT_CLMM_POOL);
     use crate::utils::price::raydium_amm_v4::{price_base_in_quote, price_quote_in_base};
 
     // 稳定币自身的价格直接认为是 1 USD
@@ -707,11 +530,11 @@ pub async fn get_token_price_in_usd(
         let pc_decimals = crate::utils::token::get_token_decimals(rpc, &amm.pc_mint).await?;
 
         // 获取实时余额
-        let coin_balance =
-            rpc.get_token_account_balance(&amm.token_coin)
-                .await?
-                .ui_amount
-                .ok_or_else(|| anyhow!("Failed to get coin balance"))? as u64;
+        let coin_balance = rpc
+            .get_token_account_balance(&amm.token_coin)
+            .await?
+            .ui_amount
+            .ok_or_else(|| anyhow!("Failed to get coin balance"))? as u64;
         let pc_balance = rpc
             .get_token_account_balance(&amm.token_pc)
             .await?
@@ -774,12 +597,11 @@ pub async fn get_token_price_in_usd(
     }
 
     // 4. 计算 WSOL 的 USD 价格
-    let price_wsol_in_usd =
-        crate::instruction::utils::raydium_clmm::get_wsol_price_in_usd_with_client(
-            rpc,
-            Some(wsol_usd_pool),
-        )
-        .await?;
+    let price_wsol_in_usd = crate::instruction::utils::raydium_clmm::get_wsol_price_in_usd_with_client(
+        rpc,
+        Some(wsol_usd_pool),
+    )
+    .await?;
 
     Ok(price_x_in_wsol * price_wsol_in_usd)
 }
@@ -801,7 +623,8 @@ pub async fn get_token_price_in_usd_with_pool(
     x_wsol_pool_address: &Pubkey,
     wsol_usd_clmm_pool_address: Option<&Pubkey>,
 ) -> Result<f64, anyhow::Error> {
-    let wsol_usd_pool = wsol_usd_clmm_pool_address.unwrap_or(&DEFAULT_WSOL_USDT_CLMM_POOL);
+    let wsol_usd_pool =
+        wsol_usd_clmm_pool_address.unwrap_or(&super::constants::DEFAULT_WSOL_USDT_CLMM_POOL);
     use crate::utils::price::raydium_amm_v4::{price_base_in_quote, price_quote_in_base};
 
     // 稳定币自身的价格直接认为是 1 USD
@@ -847,11 +670,11 @@ pub async fn get_token_price_in_usd_with_pool(
         let pc_decimals = crate::utils::token::get_token_decimals(rpc, &amm.pc_mint).await?;
 
         // 获取实时余额
-        let coin_balance =
-            rpc.get_token_account_balance(&amm.token_coin)
-                .await?
-                .ui_amount
-                .ok_or_else(|| anyhow!("Failed to get coin balance"))? as u64;
+        let coin_balance = rpc
+            .get_token_account_balance(&amm.token_coin)
+            .await?
+            .ui_amount
+            .ok_or_else(|| anyhow!("Failed to get coin balance"))? as u64;
         let pc_balance = rpc
             .get_token_account_balance(&amm.token_pc)
             .await?
@@ -914,129 +737,11 @@ pub async fn get_token_price_in_usd_with_pool(
     }
 
     // 4. 计算 WSOL 的 USD 价格
-    let price_wsol_in_usd =
-        crate::instruction::utils::raydium_clmm::get_wsol_price_in_usd_with_client(
-            rpc,
-            Some(wsol_usd_pool),
-        )
-        .await?;
+    let price_wsol_in_usd = crate::instruction::utils::raydium_clmm::get_wsol_price_in_usd_with_client(
+        rpc,
+        Some(wsol_usd_pool),
+    )
+    .await?;
 
     Ok(price_x_in_wsol * price_wsol_in_usd)
-}
-
-/// Quote an exact-in swap against a Raydium AMM V4 pool
-///
-/// 使用恒定乘积公式 (x * y = k) 计算预期输出金额
-///
-/// # Arguments
-/// * `rpc` - Solana RPC 客户端
-/// * `pool_address` - AMM V4 Pool 地址
-/// * `amount_in` - 输入代币数量（最小单位）
-/// * `is_coin_in` - true: coin -> pc, false: pc -> coin
-///
-/// # Returns
-/// 返回 `QuoteExactInResult`，包含输出金额、手续费等
-///
-/// # Example
-/// ```ignore
-/// let quote = quote_exact_in(&rpc, &pool, 1_000_000, true).await?;
-/// println!("预期输出: {} USDC", quote.amount_out);
-/// ```
-pub async fn quote_exact_in(
-    rpc: &SolanaRpcClient,
-    pool_address: &Pubkey,
-    amount_in: u64,
-    is_coin_in: bool,
-) -> Result<crate::utils::quote::QuoteExactInResult, anyhow::Error> {
-    use crate::utils::calc::raydium_amm_v4::compute_swap_amount;
-
-    // 1. 获取 Pool 状态
-    let amm_info = get_pool_by_address(rpc, pool_address).await?;
-
-    // 2. 获取实时储备余额
-    let coin_balance = rpc.get_token_account_balance(&amm_info.token_coin).await?;
-    let pc_balance = rpc.get_token_account_balance(&amm_info.token_pc).await?;
-
-    let coin_reserve = coin_balance
-        .amount
-        .parse::<u64>()
-        .map_err(|_| anyhow!("Failed to parse coin reserve"))?;
-    let pc_reserve = pc_balance
-        .amount
-        .parse::<u64>()
-        .map_err(|_| anyhow!("Failed to parse pc reserve"))?;
-
-    // 3. 使用数学计算函数
-    let swap_result = compute_swap_amount(
-        coin_reserve,
-        pc_reserve,
-        is_coin_in,
-        amount_in,
-        0, // slippage: quote 不需要
-    );
-
-    // 4. 返回统一格式
-    Ok(crate::utils::quote::QuoteExactInResult {
-        amount_out: swap_result.amount_out,
-        fee_amount: swap_result.fee,
-        price_impact_bps: None,
-        extra_accounts_read: 2,
-    })
-}
-
-/// Quote an exact-out swap against a Raydium AMM V4 pool.
-///
-/// Calculates the required input amount to obtain a specific output amount.
-///
-/// # Arguments
-///
-/// * `rpc` - RPC client
-/// * `pool_address` - Pool address
-/// * `amount_out` - Desired output amount (in smallest units)
-/// * `is_coin_in` - true if coin token is the input, false if PC token is the input
-///
-/// # Returns
-///
-/// Returns `QuoteExactOutResult` containing the required input amount and fees
-///
-/// # Example
-/// ```ignore
-/// let quote = quote_exact_out(&rpc, &pool, 1_000_000, true).await?;
-/// println!("需要输入: {} lamports", quote.amount_in);
-/// ```
-pub async fn quote_exact_out(
-    rpc: &SolanaRpcClient,
-    pool_address: &Pubkey,
-    amount_out: u64,
-    is_coin_in: bool,
-) -> Result<crate::utils::quote::QuoteExactOutResult, anyhow::Error> {
-    use crate::utils::calc::raydium_amm_v4::quote_exact_out as calc_quote_exact_out;
-
-    // 1. 获取 Pool 状态
-    let amm_info = get_pool_by_address(rpc, pool_address).await?;
-
-    // 2. 获取实时储备余额
-    let coin_balance = rpc.get_token_account_balance(&amm_info.token_coin).await?;
-    let pc_balance = rpc.get_token_account_balance(&amm_info.token_pc).await?;
-
-    let coin_reserve = coin_balance
-        .amount
-        .parse::<u64>()
-        .map_err(|_| anyhow!("Failed to parse coin reserve"))?;
-    let pc_reserve = pc_balance
-        .amount
-        .parse::<u64>()
-        .map_err(|_| anyhow!("Failed to parse pc reserve"))?;
-
-    // 3. 使用数学计算函数
-    let result = calc_quote_exact_out(coin_reserve, pc_reserve, amount_out, is_coin_in)
-        .map_err(|e| anyhow!("Quote exact out failed: {}", e))?;
-
-    // 4. 返回统一格式
-    Ok(crate::utils::quote::QuoteExactOutResult {
-        amount_in: result.amount_in,
-        fee_amount: result.fee_amount,
-        price_impact_bps: result.price_impact_bps,
-        extra_accounts_read: 2,
-    })
 }
