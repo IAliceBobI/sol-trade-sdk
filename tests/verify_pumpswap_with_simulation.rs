@@ -96,16 +96,22 @@ async fn test_pumpswap_exact_in_buy_with_simulation() {
     println!("交易方向: WSOL -> PUMP (买入 PUMP)\n");
 
     // 本地计算
-    let local_output = match quote_exact_in(&rpc, &pool_address, amount_in, false).await {
+    let (local_output, fee_amount) = match quote_exact_in(&rpc, &pool_address, amount_in, false).await {
         // false: quote -> base (买入 PUMP)
-        Ok(quote) => quote.amount_out,
+        Ok(quote) => {
+            println!("📊 本地 Quote 计算:");
+            println!("  输入: {} lamports WSOL", amount_in);
+            println!("  输出: {} PUMP tokens", quote.amount_out);
+            println!("  手续费: {} lamports", quote.fee_amount);
+            (quote.amount_out, quote.fee_amount)
+        },
         Err(e) => {
             println!("❌ 本地计算失败: {}\n", e);
             return;
         },
     };
 
-    println!("✅ 本地计算: {} PUMP\n", local_output);
+    println!();
 
     // 获取储备余额
     let base_balance = rpc.get_token_account_balance(&pool_state.pool_base_token_account).await;
