@@ -145,8 +145,10 @@ async fn test_pumpswap_exact_in_sell_with_simulation() {
         },
     };
 
-    // 确定 base 和 quote mint
-    let (base_mint, quote_mint) = if pool_state.base_mint.to_string() == WSOL_MINT {
+    // 确定 base 和 quote mint（根据交易方向）
+    // 卖出 PUMP -> WSOL: input = PUMP (base), output = WSOL (quote)
+    // 所以 base_mint = PUMP, quote_mint = WSOL
+    let (base_mint, quote_mint) = if pump_mint == pool_state.base_mint {
         (pool_state.base_mint, pool_state.quote_mint)
     } else {
         (pool_state.quote_mint, pool_state.base_mint)
@@ -179,6 +181,16 @@ async fn test_pumpswap_exact_in_sell_with_simulation() {
             },
         };
 
+    // 计算 coin_creator 相关账户
+    let coin_creator_vault_authority =
+        sol_trade_sdk::instruction::utils::pumpswap::coin_creator_vault_authority(
+            pool_state.coin_creator,
+        );
+    let coin_creator_vault_ata = sol_trade_sdk::instruction::utils::pumpswap::coin_creator_vault_ata(
+        pool_state.coin_creator,
+        quote_mint,
+    );
+
     // 构造指令
     let pumpswap_params = PumpSwapParams {
         pool: pool_address,
@@ -188,8 +200,8 @@ async fn test_pumpswap_exact_in_sell_with_simulation() {
         pool_quote_token_account: pool_state.pool_quote_token_account,
         pool_base_token_reserves: base_reserve,
         pool_quote_token_reserves: quote_reserve,
-        coin_creator_vault_ata: Pubkey::default(),
-        coin_creator_vault_authority: Pubkey::default(),
+        coin_creator_vault_ata,
+        coin_creator_vault_authority,
         base_token_program,  // 自动获取
         quote_token_program, // 自动获取
         is_mayhem_mode: pool_state.is_mayhem_mode,

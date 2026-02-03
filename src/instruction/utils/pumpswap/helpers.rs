@@ -37,7 +37,7 @@ pub fn select_best_pool_by_liquidity(
     sorted_pools.into_iter().next()
 }
 
-pub(crate) fn coin_creator_vault_authority(coin_creator: Pubkey) -> Pubkey {
+pub fn coin_creator_vault_authority(coin_creator: Pubkey) -> Pubkey {
     let (pump_pool_authority, _) = Pubkey::find_program_address(
         &[b"creator_vault", &coin_creator.to_bytes()],
         &accounts::AMM_PROGRAM,
@@ -45,7 +45,7 @@ pub(crate) fn coin_creator_vault_authority(coin_creator: Pubkey) -> Pubkey {
     pump_pool_authority
 }
 
-pub(crate) fn coin_creator_vault_ata(coin_creator: Pubkey, quote_mint: Pubkey) -> Pubkey {
+pub fn coin_creator_vault_ata(coin_creator: Pubkey, quote_mint: Pubkey) -> Pubkey {
     let creator_vault_authority = coin_creator_vault_authority(coin_creator);
 
     get_associated_token_address_with_program_id(
