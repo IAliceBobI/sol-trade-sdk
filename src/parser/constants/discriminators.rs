@@ -28,13 +28,8 @@ pub mod raydium_v4 {
     pub const CREATE_POOL: u8 = 0;
 }
 
-pub mod raydium_clmm {
-    /// Raydium CLMM 指令 discriminator (8 字节)
-    /// TODO: 需要查找实际值
-    pub const SWAP: [u8; 8] = [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00];
-
-    pub const ADD_LIQUIDITY: [u8; 8] = [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00];
-}
+// 注意: Raydium CLMM discriminator 已移至 src/parser/discriminators.rs
+// CLMM 使用反向逻辑（通过排除流动性操作来识别 Swap）
 
 pub mod raydium_cpmm {
     /// Raydium CPMM 指令 discriminator (8 字节)
