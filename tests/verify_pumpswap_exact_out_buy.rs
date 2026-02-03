@@ -7,7 +7,6 @@
 
 use sol_trade_sdk::{
     common::SolanaRpcClient,
-    constants::{TOKEN_2022_PROGRAM, TOKEN_PROGRAM},
     instruction::utils::pumpswap::{get_pool_by_address, quote_exact_out},
     trading::core::params::{PumpSwapParams, SwapParams},
     trading::core::traits::InstructionBuilder,
@@ -142,11 +141,52 @@ async fn test_pumpswap_exact_out_buy_with_simulation() {
     };
 
     // 确定 base 和 quote mint
-    let (base_mint, quote_mint) = if pool_state.base_mint.to_string() == WSOL_MINT {
+    // 对于买入 PUMP: quote (WSOL) 是输入, base (PUMP) 是输出
+    // quote_mint 应该是 WSOL，这样 quote_is_wsol_or_usdc 才为 true
+    let (base_mint, quote_mint) = if pool_state.quote_mint.to_string() == WSOL_MINT {
+        // quote_mint 是 WSOL，保持原样
         (pool_state.base_mint, pool_state.quote_mint)
     } else {
+        // 否则交换
         (pool_state.quote_mint, pool_state.base_mint)
     };
+
+    // 🔧 自动检测 Token Program（修复 Token-2022 问题）
+    let base_token_program =
+        match sol_trade_sdk::utils::token::get_token_program_with_cache(&rpc, &base_mint).await {
+            Ok(program) => {
+                println!("✅ 自动检测 base_mint ({}) Token Program: {}", base_mint, program);
+                program
+            },
+            Err(e) => {
+                eprintln!("❌ 无法获取 base_mint Token Program: {}", e);
+                eprintln!("   测试无法继续，因为无法构建正确的指令");
+                panic!("测试失败: {}", e);
+            },
+        };
+
+    let quote_token_program =
+        match sol_trade_sdk::utils::token::get_token_program_with_cache(&rpc, &quote_mint).await {
+            Ok(program) => {
+                println!("✅ 自动检测 quote_mint ({}) Token Program: {}", quote_mint, program);
+                program
+            },
+            Err(e) => {
+                eprintln!("❌ 无法获取 quote_mint Token Program: {}", e);
+                eprintln!("   测试无法继续，因为无法构建正确的指令");
+                panic!("测试失败: {}", e);
+            },
+        };
+
+    // 计算 coin_creator 相关账户
+    let coin_creator_vault_authority =
+        sol_trade_sdk::instruction::utils::pumpswap::coin_creator_vault_authority(
+            pool_state.coin_creator,
+        );
+    let coin_creator_vault_ata = sol_trade_sdk::instruction::utils::pumpswap::coin_creator_vault_ata(
+        pool_state.coin_creator,
+        quote_mint,
+    );
 
     // 构造指令 (使用 fixed_output_amount)
     let pumpswap_params = PumpSwapParams {
@@ -157,10 +197,10 @@ async fn test_pumpswap_exact_out_buy_with_simulation() {
         pool_quote_token_account: pool_state.pool_quote_token_account,
         pool_base_token_reserves: base_reserve,
         pool_quote_token_reserves: quote_reserve,
-        coin_creator_vault_ata: Pubkey::default(),
-        coin_creator_vault_authority: Pubkey::default(),
-        base_token_program: TOKEN_PROGRAM, // WSOL 使用旧 Token Program
-        quote_token_program: TOKEN_2022_PROGRAM, // PUMP 使用 Token-2022
+        coin_creator_vault_ata,
+        coin_creator_vault_authority,
+        base_token_program,  // 使用动态检测的 Token Program
+        quote_token_program, // 使用动态检测的 Token Program
         is_mayhem_mode: pool_state.is_mayhem_mode,
     };
 
@@ -169,9 +209,9 @@ async fn test_pumpswap_exact_out_buy_with_simulation() {
         payer: payer.clone(),
         trade_type: sol_trade_sdk::swqos::TradeType::Buy,
         input_mint: wsol_mint,
-        input_token_program: Some(spl_token::id()),
+        input_token_program: Some(base_token_program),
         output_mint: pump_mint,
-        output_token_program: Some(spl_token::id()),
+        output_token_program: Some(quote_token_program),
         input_amount: Some(local_calc.amount_in), // 使用计算出的输入
         slippage_basis_points: Some(1000),
         address_lookup_table_account: None,
@@ -211,13 +251,13 @@ async fn test_pumpswap_exact_out_buy_with_simulation() {
     let user_input_ata = spl_associated_token_account::get_associated_token_address_with_program_id(
         &payer.pubkey(),
         &wsol_mint,
-        &spl_token::id(),
+        &base_token_program,
     );
     let user_output_ata =
         spl_associated_token_account::get_associated_token_address_with_program_id(
             &payer.pubkey(),
             &pump_mint,
-            &spl_token::id(),
+            &quote_token_program,
         );
 
     // 链上模拟
