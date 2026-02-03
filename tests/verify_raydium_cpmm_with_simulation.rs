@@ -93,9 +93,13 @@ async fn test_raydium_cpmm_exact_in_buy_with_simulation() {
 
     println!("交易方向: WSOL -> PIPE (买入 PIPE)\n");
 
+    // 判断方向：WSOL -> PIPE
+    // WSOL 是 token1, PIPE 是 token0，所以 is_token0_in = false
+    let is_token0_in = wsol_mint.to_string() == pool_state.token0_mint.to_string();
+    println!("is_token0_in = {} (WSOL 是 {})", is_token0_in, if is_token0_in { "token0" } else { "token1" });
+
     // 本地计算
-    let local_output = match quote_exact_in(&rpc, &pool_address, amount_in, true).await {
-        // 需要确定 WSOL 是 token0 还是 token1
+    let local_output = match quote_exact_in(&rpc, &pool_address, amount_in, is_token0_in).await {
         Ok(quote) => quote.amount_out,
         Err(e) => {
             println!("❌ 本地计算失败: {}\n", e);
@@ -139,6 +143,10 @@ async fn test_raydium_cpmm_exact_in_buy_with_simulation() {
         (Ok(t0), Ok(t1)) => {
             let t0_amt = t0.amount.parse::<u64>().unwrap_or(0);
             let t1_amt = t1.amount.parse::<u64>().unwrap_or(0);
+            println!("📊 Pool Reserve:");
+            println!("  token0_reserve (PIPE): {}", t0_amt);
+            println!("  token1_reserve (WSOL): {}", t1_amt);
+            println!();
             (t0_amt, t1_amt)
         },
         _ => {
@@ -255,6 +263,15 @@ async fn test_raydium_cpmm_exact_in_buy_with_simulation() {
         return;
     }
 
+    // 调试：打印完整的日志
+    if let Some(ref logs) = simulation_result.logs {
+        println!("=== 完整交易日志 (前100行) ===");
+        for (i, log) in logs.iter().take(100).enumerate() {
+            println!("[{:03}] {}", i, log);
+        }
+        println!("==================\n");
+    }
+
     let simulated_output = simulation_result.actual_output_amount;
 
     // 结果对比
@@ -274,7 +291,10 @@ async fn test_raydium_cpmm_exact_in_buy_with_simulation() {
 
     match verify_calculation_accuracy(local_output, simulated_output, 0.1) {
         Ok(_) => println!("✅ 验证通过：误差 < 0.1%\n"),
-        Err(e) => println!("❌ 验证失败: {}\n", e),
+        Err(e) => {
+            println!("❌ 验证失败: {}\n", e);
+            panic!("验证失败: {}", e);
+        },
     }
 }
 
@@ -414,6 +434,10 @@ async fn test_raydium_cpmm_exact_in_sell_with_simulation() {
         (Ok(t0), Ok(t1)) => {
             let t0_amt = t0.amount.parse::<u64>().unwrap_or(0);
             let t1_amt = t1.amount.parse::<u64>().unwrap_or(0);
+            println!("📊 Pool Reserve:");
+            println!("  token0_reserve (PIPE): {}", t0_amt);
+            println!("  token1_reserve (WSOL): {}", t1_amt);
+            println!();
             (t0_amt, t1_amt)
         },
         _ => {
@@ -549,7 +573,10 @@ async fn test_raydium_cpmm_exact_in_sell_with_simulation() {
 
     match verify_calculation_accuracy(local_output, simulated_output, 0.1) {
         Ok(_) => println!("✅ 验证通过：误差 < 0.1%\n"),
-        Err(e) => println!("❌ 验证失败: {}\n", e),
+        Err(e) => {
+            println!("❌ 验证失败: {}\n", e);
+            panic!("验证失败: {}", e);
+        },
     }
 }
 
@@ -655,6 +682,10 @@ async fn test_raydium_cpmm_exact_out_buy_with_simulation() {
         (Ok(t0), Ok(t1)) => {
             let t0_amt = t0.amount.parse::<u64>().unwrap_or(0);
             let t1_amt = t1.amount.parse::<u64>().unwrap_or(0);
+            println!("📊 Pool Reserve:");
+            println!("  token0_reserve (PIPE): {}", t0_amt);
+            println!("  token1_reserve (WSOL): {}", t1_amt);
+            println!();
             (t0_amt, t1_amt)
         },
         _ => {
@@ -892,6 +923,10 @@ async fn test_raydium_cpmm_exact_out_sell_with_simulation() {
         (Ok(t0), Ok(t1)) => {
             let t0_amt = t0.amount.parse::<u64>().unwrap_or(0);
             let t1_amt = t1.amount.parse::<u64>().unwrap_or(0);
+            println!("📊 Pool Reserve:");
+            println!("  token0_reserve (PIPE): {}", t0_amt);
+            println!("  token1_reserve (WSOL): {}", t1_amt);
+            println!();
             (t0_amt, t1_amt)
         },
         _ => {

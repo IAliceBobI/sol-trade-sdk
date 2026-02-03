@@ -282,7 +282,10 @@ async fn test_pumpswap_exact_in_buy_with_simulation() {
 
     match verify_calculation_accuracy(local_output, simulated_output, 0.1) {
         Ok(_) => println!("✅ 验证通过：误差 < 0.1%\n"),
-        Err(e) => println!("❌ 验证失败: {}\n", e),
+        Err(e) => {
+            println!("❌ 验证失败: {}\n", e);
+            panic!("验证失败: {}", e);
+        },
     }
 }
 
@@ -572,7 +575,10 @@ async fn test_pumpswap_exact_in_sell_with_simulation() {
 
     match verify_calculation_accuracy(local_output, simulated_output, 0.1) {
         Ok(_) => println!("✅ 验证通过：误差 < 0.1%\n"),
-        Err(e) => println!("❌ 验证失败: {}\n", e),
+        Err(e) => {
+            println!("❌ 验证失败: {}\n", e);
+            panic!("验证失败: {}", e);
+        },
     }
 }
 
@@ -796,7 +802,10 @@ async fn test_pumpswap_exact_out_buy_with_simulation() {
 
     match verify_calculation_accuracy(amount_out, simulated_output, 0.1) {
         Ok(_) => println!("✅ 验证通过：误差 < 0.1%\n"),
-        Err(e) => println!("❌ 验证失败: {}\n", e),
+        Err(e) => {
+            println!("❌ 验证失败: {}\n", e);
+            panic!("验证失败: {}", e);
+        },
     }
 }
 
@@ -1016,6 +1025,9 @@ async fn test_pumpswap_exact_out_sell_with_simulation() {
 
     match verify_calculation_accuracy(amount_out, simulated_output, 0.1) {
         Ok(_) => println!("✅ 验证通过：误差 < 0.1%\n"),
-        Err(e) => println!("❌ 验证失败: {}\n", e),
+        Err(e) => {
+            println!("❌ 验证失败: {}\n", e);
+            panic!("验证失败: {}", e);
+        },
     }
 }

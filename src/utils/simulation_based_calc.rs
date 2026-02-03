@@ -111,7 +111,7 @@ pub async fn simulate_swap_transaction(
             RpcSimulateTransactionConfig {
                 sig_verify: false,
                 replace_recent_blockhash: false,
-                commitment: Some(CommitmentConfig { commitment: CommitmentLevel::Processed }),
+                commitment: Some(CommitmentConfig { commitment: CommitmentLevel::Finalized }), // 改用 Finalized
                 encoding: Some(UiTransactionEncoding::Base64),
                 accounts: None,
                 min_context_slot: None,
@@ -140,32 +140,43 @@ pub async fn simulate_swap_transaction(
 
     // 从模拟结果中解析 Token Transfer 金额
     //
-    // 方法 1: 从 inner instructions 解析 Transfer/TransferChecked（最准确）
-    // 方法 2: 解析 Program data（如果 inner instructions 不可用）
-    // 方法 3: 解析日志中的 Token Transfer（备用方案）
+    // 方法 1: 优先解析 Raydium AMM V4 ray_log（适用于 AMM V4）
+    // 方法 2: 解析 Program data（最准确，适用于 CLMM）
+    // 方法 3: 从 inner instructions 解析 Transfer/TransferChecked
+    // 方法 4: 解析日志中的 Token Transfer（备用方案）
 
-    let (actual_input_amount, actual_output_amount) = if let Some(ref amounts) = transfer_amounts {
-        // 方法 1: 从 inner instructions 解析
+    let (actual_input_amount, actual_output_amount) = if let Some(logs) = &simulate_result.value.logs {
+        // 优先尝试解析 Raydium AMM V4 ray_log
+        if let Some(result) = parse_raydium_amm_v4_ray_log(logs) {
+            result
+        // 回退到 parse_transfer_amounts_from_logs
+        } else if let Some(result) = parse_transfer_amounts_from_logs(
+            logs,
+            &user_input_token_account,
+            &user_output_token_account,
+        ) {
+            result
+        } else if let Some(ref amounts) = transfer_amounts {
+            // 回退到 inner instructions
+            if amounts.len() >= 2 {
+                (amounts[0].1, amounts[1].1)
+            } else if amounts.len() == 1 {
+                (0, amounts[0].1)
+            } else {
+                (0, 0)
+            }
+        } else {
+            (0, 0)
+        }
+    } else if let Some(ref amounts) = transfer_amounts {
+        // 没有 logs 时，使用 inner instructions
         if amounts.len() >= 2 {
-            // 假设第一条是输入，第二条是输出
             (amounts[0].1, amounts[1].1)
         } else if amounts.len() == 1 {
-            // 只有一条，可能是输出
             (0, amounts[0].1)
         } else {
             (0, 0)
         }
-    } else if let Some(logs) = &simulate_result.value.logs {
-        // 方法 2: 尝试从日志中解析 "Program data:"
-        parse_program_data_from_logs(logs).unwrap_or_else(|| {
-            // 方法 3: 如果没有 Program data，回退到解析 Token Transfer 日志
-            parse_transfer_amounts_from_logs(
-                logs,
-                &user_input_token_account,
-                &user_output_token_account,
-            )
-            .unwrap_or((0, 0))
-        })
     } else {
         (0, 0)
     };
@@ -369,6 +380,90 @@ fn parse_return_data(return_data_base64: &str) -> Option<(u64, u64)> {
 
     // 解析 amount_out（后 8 字节，little endian）
     let amount_out = u64::from_le_bytes(data[8..16].try_into().ok()?);
+
+    Some((amount_in, amount_out))
+}
+
+/// 从 Raydium AMM V4 的 ray_log 中解析 swap 结果
+///
+/// Raydium AMM V4 在日志中输出 "ray_log: <base64>"
+/// 这个 base64 编码的数据包含：
+/// - 前 8 字节：swap_in_amount (u64, little endian) / 256
+/// - 后 8 字节：swap_out_amount (u64, little endian) / 256 * 100
+///
+/// # 参数
+/// * `logs` - 程序日志数组
+///
+/// # 返回
+/// * `Some((amount_in, amount_out))` - 解析成功
+/// * `None` - 解析失败
+fn parse_raydium_amm_v4_ray_log(logs: &[String]) -> Option<(u64, u64)> {
+    use base64::Engine;
+
+    // 查找包含 "ray_log:" 的日志行
+    for log in logs {
+        if let Some(start) = log.find("ray_log: ") {
+            // 提取 base64 字符串（跳过 "ray_log: " 前缀）
+            let base64_str = &log[start + 9..]; // "ray_log: ".len() = 9
+
+            // 移除可能的空白字符
+            let base64_str = base64_str.trim();
+
+            if !base64_str.is_empty() {
+                // 尝试解析
+                if let Some((amount_in, amount_out)) = parse_raydium_amm_v4_log_data(base64_str) {
+                    return Some((amount_in, amount_out));
+                }
+            }
+        }
+    }
+    None
+}
+
+/// 从 Raydium AMM V4 的 ray_log base64 数据中解析 swap 结果
+///
+/// # 参数
+/// * `ray_log_base64` - base64 编码的 ray_log 数据
+///
+/// # 返回
+/// * `Some((amount_in, amount_out))` - 解析成功
+/// * `None` - 解析失败
+fn parse_raydium_amm_v4_log_data(ray_log_base64: &str) -> Option<(u64, u64)> {
+    use base64::Engine;
+
+    // 解码 base64
+    let data = base64::engine::general_purpose::STANDARD.decode(ray_log_base64).ok()?;
+
+    // 检查数据长度（至少需要 24 字节：3 个 u64）
+    if data.len() < 24 {
+        return None;
+    }
+
+    // 解析方向标志 (offset 16)
+    let direction = u64::from_le_bytes(data[16..24].try_into().ok()?);
+
+    // 解析 swap_in_amount（前 8 字节，little endian）
+    let raw_in = u64::from_le_bytes(data[0..8].try_into().ok()?);
+
+    // 解析 swap_out_amount（后 8 字节，little endian）
+    let raw_out = u64::from_le_bytes(data[8..16].try_into().ok()?);
+
+    // 根据方向标志调整解析公式
+    // 方向标志：512 (0x200) = 买入 (coin -> pc), 256 (0x100) = 卖出 (pc -> coin)
+    let (amount_in, amount_out) = if direction == 512 {
+        // 买入方向: WSOL -> USDC
+        // offset 0: swap_in / 256
+        // offset 8: swap_out / 256 * 100
+        (raw_in / 256, (raw_out / 256) * 100)
+    } else if direction == 256 {
+        // 卖出方向: USDC -> WSOL
+        // offset 0: swap_in / 256 * 1000 (因为单位是 smallest unit)
+        // offset 8: swap_out / 256 * 100
+        ((raw_in / 256) * 1000, (raw_out / 256) * 100)
+    } else {
+        // 未知方向，使用默认公式
+        (raw_in / 256, (raw_out / 256) * 100)
+    };
 
     Some((amount_in, amount_out))
 }
