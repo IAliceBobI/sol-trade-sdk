@@ -1,7 +1,7 @@
 # Makefile for sol-trade-sdk with cargo nextest support
 # 使用方法: make <target>
 
-.PHONY: help test test-all test-fast test-slow list clean test-cargo test-legacy
+.PHONY: help test test-all test-fast test-slow list clean test-cargo test-legacy show-all show-clmm show-amm-v4 show-cpmm show-pumpswap
 
 # 默认目标
 .DEFAULT_GOAL := help
@@ -31,6 +31,13 @@ help:
 	@echo "  make list                    列出所有测试"
 	@echo "  make clean                   清理测试缓存"
 	@echo "  make show-slow               显示慢速测试"
+	@echo ""
+	@echo "误差统计查看:"
+	@echo "  make show-all                显示所有 DEX 的详细误差统计"
+	@echo "  make show-clmm               显示 CLMM 误差统计"
+	@echo "  make show-amm-v4             显示 AMM V4 误差统计"
+	@echo "  make show-cpmm               显示 CPMM 误差统计"
+	@echo "  make show-pumpswap           显示 PumpSwap 误差统计"
 	@echo ""
 	@echo "CI 测试:"
 	@echo "  make test-ci                 运行 CI 环境测试（更严格）"
@@ -84,6 +91,52 @@ test-pumpswap:
 test-ci:
 	@echo "运行 CI 环境测试（严格配置）..."
 	cargo nextest run --profile ci
+
+# ============================================================================
+# DEX 验证测试 - 查看详细误差统计
+# ============================================================================
+
+# 显示所有 DEX 的误差统计
+show-all:
+	@echo "╔══════════════════════════════════════════════════════════════════╗"
+	@echo "║                    所有 DEX 误差统计                                ║"
+	@echo "╚══════════════════════════════════════════════════════════════════╝"
+	@echo ""
+	@echo "═══════════════════════════════════════════════════════════════════════"
+	@echo "Raydium CLMM (集中流动性)"
+	@echo "═══════════════════════════════════════════════════════════════════════"
+	@cargo test --test verify_clmm_with_simulation -- --nocapture 2>&1 | grep -E "(CLMM Swap 详细信息|输入:|输出:|本地计算|链上模拟|误差率)"
+	@echo ""
+	@echo "═══════════════════════════════════════════════════════════════════════"
+	@echo "Raydium AMM V4 (经典 AMM)"
+	@echo "═══════════════════════════════════════════════════════════════════════"
+	@cargo test --test verify_raydium_amm_v4_with_simulation -- --nocapture 2>&1 | grep -E "(AMM V4 Swap 详细信息|输入:|输出:|本地计算|链上模拟|误差率)"
+	@echo ""
+	@echo "═══════════════════════════════════════════════════════════════════════"
+	@echo "Raydium CPMM (恒定乘积)"
+	@echo "═══════════════════════════════════════════════════════════════════════"
+	@cargo test --test verify_raydium_cpmm_with_simulation -- --nocapture 2>&1 | grep -E "(CPMM Swap 详细信息|输入:|输出:|本地计算|链上模拟|误差率)"
+	@echo ""
+	@echo "═══════════════════════════════════════════════════════════════════════"
+	@echo "PumpSwap (Bonding Curve)"
+	@echo "═══════════════════════════════════════════════════════════════════════"
+	@cargo test --test verify_pumpswap_with_simulation -- --nocapture 2>&1 | grep -E "(PumpSwap Swap 详细信息|输入:|输出:|本地计算|链上模拟|误差率)"
+
+# 显示 CLMM 误差统计
+show-clmm:
+	@cargo test --test verify_clmm_with_simulation -- --nocapture 2>&1 | grep -E "(CLMM Swap 详细信息|Pool 信息|输入 Token|输出 Token|本地计算|链上模拟|误差率|数量:|Mint:)"
+
+# 显示 AMM V4 误差统计
+show-amm-v4:
+	@cargo test --test verify_raydium_amm_v4_with_simulation -- --nocapture 2>&1 | grep -E "(AMM V4 Swap 详细信息|Pool 信息|输入 Token|输出 Token|本地计算|链上模拟|误差率|数量:|Mint:)"
+
+# 显示 CPMM 误差统计
+show-cpmm:
+	@cargo test --test verify_raydium_cpmm_with_simulation -- --nocapture 2>&1 | grep -E "(CPMM Swap 详细信息|Pool 信息|输入 Token|输出 Token|本地计算|链上模拟|误差率|数量:|Mint:)"
+
+# 显示 PumpSwap 误差统计
+show-pumpswap:
+	@cargo test --test verify_pumpswap_with_simulation -- --nocapture 2>&1 | grep -E "(PumpSwap Swap 详细信息|Pool 信息|输入 Token|输出 Token|本地计算|链上模拟|误差率|数量:|Mint:)"
 
 # 列出所有测试
 list:

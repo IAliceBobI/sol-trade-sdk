@@ -402,7 +402,7 @@ fn parse_return_data(return_data_base64: &str) -> Option<(u64, u64)> {
 /// * `Some((amount_in, amount_out))` - 解析成功
 /// * `None` - 解析失败
 fn parse_raydium_amm_v4_ray_log(logs: &[String]) -> Option<(u64, u64)> {
-    use base64::Engine;
+    
 
     // 查找包含 "ray_log:" 的日志行
     for log in logs {
@@ -530,7 +530,7 @@ fn parse_raydium_amm_v4_log_data(ray_log_base64: &str) -> Option<(u64, u64)> {
 /// * `Some((amount_in, amount_out))` - 解析成功
 /// * `None` - 解析失败
 fn parse_raydium_cpmm_program_data(logs: &[String]) -> Option<(u64, u64)> {
-    use base64::Engine;
+    
 
     // 检查是否是 CLMM 交易（包含 "SwapV2" 指令）
     let is_clmm = logs.iter().any(|log| log.contains("SwapV2"));

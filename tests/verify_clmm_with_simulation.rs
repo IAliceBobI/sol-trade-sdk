@@ -100,15 +100,47 @@ async fn test_clmm_exact_in_buy_with_simulation() {
     );
 
     // 本地计算
-    let local_output = match quote_exact_in(&rpc, &pool_address, amount_in, zero_for_one).await {
-        Ok(quote) => quote.amount_out,
+    let (local_output, fee_amount) = match quote_exact_in(&rpc, &pool_address, amount_in, zero_for_one).await {
+        Ok(quote) => {
+            // 获取 decimals
+            let input_decimals = if zero_for_one { pool_state.mint_decimals0 } else { pool_state.mint_decimals1 };
+            let output_decimals = if zero_for_one { pool_state.mint_decimals1 } else { pool_state.mint_decimals0 };
+
+            // 格式化数值
+            let input_formatted = amount_in as f64 / 10_f64.powi(input_decimals as i32);
+            let output_formatted = quote.amount_out as f64 / 10_f64.powi(output_decimals as i32);
+
+            println!("╔══════════════════════════════════════════════════════════════════╗");
+            println!("║                    CLMM Swap 详细信息 - Exact In Buy                   ║");
+            println!("╚══════════════════════════════════════════════════════════════════╝");
+            println!();
+            println!("📊 Pool 信息:");
+            println!("  DEX: Raydium CLMM (集中流动性)");
+            println!("  Pool: {}", pool_address);
+            println!();
+            println!("💱 输入 Token:");
+            println!("  Mint: {}", if zero_for_one { pool_state.token_mint0 } else { pool_state.token_mint1 });
+            println!("  Decimals: {}", input_decimals);
+            println!("  数量: {} (最小单位)", amount_in);
+            println!("  数量: {} (可读单位)", input_formatted);
+            println!();
+            println!("💱 输出 Token:");
+            println!("  Mint: {}", if zero_for_one { pool_state.token_mint1 } else { pool_state.token_mint0 });
+            println!("  Decimals: {}", output_decimals);
+            println!("  数量: {} (最小单位)", quote.amount_out);
+            println!("  数量: {} (可读单位)", output_formatted);
+            println!();
+            println!("💰 手续费:");
+            println!("  数量: {} (最小单位)", quote.fee_amount);
+            println!();
+
+            (quote.amount_out, quote.fee_amount)
+        },
         Err(e) => {
             println!("❌ 本地计算失败: {}\n", e);
             return;
         },
     };
-
-    println!("✅ 本地计算: {} JUP\n", local_output);
 
     // 🔧 自动从 Pool 获取 mint 并检测 Token Program
     let (token0_mint, token1_mint) = (pool_state.token_mint0, pool_state.token_mint1);
@@ -247,20 +279,27 @@ async fn test_clmm_exact_in_buy_with_simulation() {
 
     let simulated_output = simulation_result.actual_output_amount;
 
+    // 获取 decimals 用于格式化
+    let output_decimals = if zero_for_one { pool_state.mint_decimals1 } else { pool_state.mint_decimals0 };
+    let output_formatted = local_output as f64 / 10_f64.powi(output_decimals as i32);
+    let simulated_formatted = simulated_output as f64 / 10_f64.powi(output_decimals as i32);
+
     // 结果对比
-    println!("┌─────────────────────────────────────┐");
-    println!("│           结果对比                  │");
-    println!("├─────────────────────────────────────┤");
-    println!("│ 本地计算:     {:>15} │", local_output);
-    println!("│ 链上模拟:     {:>15} │", simulated_output);
+    println!("┌─────────────────────────────────────────────────────────────────┐");
+    println!("│                           结果对比                              │");
+    println!("├─────────────────────────────────────────────────────────────────┤");
+    println!("│ 本地计算: {:>20} (最小单位)   │", local_output);
+    println!("│           {:>20} (可读单位)   │", output_formatted);
+    println!("│ 链上模拟: {:>20} (最小单位)   │", simulated_output);
+    println!("│           {:>20} (可读单位)   │", simulated_formatted);
 
     let diff = local_output.abs_diff(simulated_output);
     let error_rate =
         if simulated_output > 0 { (diff as f64 / simulated_output as f64) * 100.0 } else { 0.0 };
 
-    println!("│ 差值:         {:>15} │", diff);
-    println!("│ 误差率:      {:>13.4}% │", error_rate);
-    println!("└─────────────────────────────────────┘");
+    println!("│ 差值:     {:>20} (最小单位)   │", diff);
+    println!("│ 误差率:  {:>20}               │", format!("{}%", error_rate));
+    println!("└─────────────────────────────────────────────────────────────────┘");
 
     match verify_calculation_accuracy(local_output, simulated_output, 1.0) {
         Ok(_) => println!("✅ 验证通过：误差 < 1%\n"),
@@ -520,20 +559,27 @@ async fn test_clmm_exact_in_sell_with_simulation() {
 
     let simulated_output = simulation_result.actual_output_amount;
 
+    // 获取 decimals 用于格式化
+    let output_decimals = if zero_for_one { pool_state.mint_decimals1 } else { pool_state.mint_decimals0 };
+    let output_formatted = local_output as f64 / 10_f64.powi(output_decimals as i32);
+    let simulated_formatted = simulated_output as f64 / 10_f64.powi(output_decimals as i32);
+
     // 结果对比
-    println!("┌─────────────────────────────────────┐");
-    println!("│           结果对比                  │");
-    println!("├─────────────────────────────────────┤");
-    println!("│ 本地计算:     {:>15} │", local_output);
-    println!("│ 链上模拟:     {:>15} │", simulated_output);
+    println!("┌─────────────────────────────────────────────────────────────────┐");
+    println!("│                           结果对比                              │");
+    println!("├─────────────────────────────────────────────────────────────────┤");
+    println!("│ 本地计算: {:>20} (最小单位)   │", local_output);
+    println!("│           {:>20} (可读单位)   │", output_formatted);
+    println!("│ 链上模拟: {:>20} (最小单位)   │", simulated_output);
+    println!("│           {:>20} (可读单位)   │", simulated_formatted);
 
     let diff = local_output.abs_diff(simulated_output);
     let error_rate =
         if simulated_output > 0 { (diff as f64 / simulated_output as f64) * 100.0 } else { 0.0 };
 
-    println!("│ 差值:         {:>15} │", diff);
-    println!("│ 误差率:      {:>13.4}% │", error_rate);
-    println!("└─────────────────────────────────────┘");
+    println!("│ 差值:     {:>20} (最小单位)   │", diff);
+    println!("│ 误差率:  {:>20}               │", format!("{}%", error_rate));
+    println!("└─────────────────────────────────────────────────────────────────┘");
 
     match verify_calculation_accuracy(local_output, simulated_output, 1.0) {
         Ok(_) => println!("✅ 验证通过：误差 < 1%\n"),
