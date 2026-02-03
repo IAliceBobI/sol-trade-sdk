@@ -99,8 +99,8 @@ impl InstructionBuilder for RaydiumCpmmInstructionBuilder {
         // ========================================
         // Trade calculation and account address preparation
         // ========================================
-        let is_base_in = protocol_params.base_mint == crate::constants::WSOL_TOKEN_ACCOUNT
-            || protocol_params.base_mint == crate::constants::USDC_TOKEN_ACCOUNT;
+        // is_base_in: true = base (token0) 作为输入, false = quote (token1) 作为输入
+        let is_base_in = params.input_mint == protocol_params.base_mint;
         let mint_token_program = if is_base_in {
             protocol_params.quote_token_program
         } else {
@@ -134,20 +134,22 @@ impl InstructionBuilder for RaydiumCpmmInstructionBuilder {
             None => result.min_amount_out,
         };
 
+        // 获取输入 token 的 program（支持 Token-2022）
+        let input_token_program = crate::utils::token::get_token_program_cached(&params.input_mint)
+            .unwrap_or(crate::constants::TOKEN_PROGRAM);
         let input_token_account = get_associated_token_address_with_program_id_fast_use_seed(
             &params.payer.pubkey(),
-            if is_wsol {
-                &crate::constants::WSOL_TOKEN_ACCOUNT
-            } else {
-                &crate::constants::USDC_TOKEN_ACCOUNT
-            },
-            get_input_token_program(is_wsol),
+            &params.input_mint,
+            &input_token_program,
             params.open_seed_optimize,
         );
+        // 获取输出 token 的 program（支持 Token-2022）
+        let output_token_program = crate::utils::token::get_token_program_cached(&params.output_mint)
+            .unwrap_or(crate::constants::TOKEN_PROGRAM);
         let output_token_account = get_associated_token_address_with_program_id_fast_use_seed(
             &params.payer.pubkey(),
             &params.output_mint,
-            &mint_token_program,
+            &output_token_program,
             params.open_seed_optimize,
         );
 
@@ -277,12 +279,12 @@ impl InstructionBuilder for RaydiumCpmmInstructionBuilder {
         // ========================================
         // Trade calculation and account address preparation
         // ========================================
-        let is_quote_out = protocol_params.quote_mint == crate::constants::WSOL_TOKEN_ACCOUNT
-            || protocol_params.quote_mint == crate::constants::USDC_TOKEN_ACCOUNT;
-        let mint_token_program = if is_quote_out {
-            protocol_params.base_token_program
-        } else {
+        // is_base_in: true = base (token0) 作为输入, false = quote (token1) 作为输入
+        let is_base_in = params.input_mint == protocol_params.base_mint;
+        let mint_token_program = if is_base_in {
             protocol_params.quote_token_program
+        } else {
+            protocol_params.base_token_program
         };
 
         let minimum_amount_out: u64 = match params.fixed_output_amount {
@@ -299,7 +301,7 @@ impl InstructionBuilder for RaydiumCpmmInstructionBuilder {
                 compute_swap_amount(
                     protocol_params.base_reserve,
                     protocol_params.quote_reserve,
-                    is_quote_out,
+                    is_base_in,
                     params.input_amount.unwrap_or(0),
                     params.slippage_basis_points.unwrap_or(DEFAULT_SLIPPAGE),
                     fees.trade_fee_rate,
@@ -310,20 +312,22 @@ impl InstructionBuilder for RaydiumCpmmInstructionBuilder {
             },
         };
 
-        let output_token_account = get_associated_token_address_with_program_id_fast_use_seed(
-            &params.payer.pubkey(),
-            if is_wsol {
-                &crate::constants::WSOL_TOKEN_ACCOUNT
-            } else {
-                &crate::constants::USDC_TOKEN_ACCOUNT
-            },
-            get_input_token_program(is_wsol),
-            params.open_seed_optimize,
-        );
+        // 获取输入 token 的 program（支持 Token-2022）
+        let input_token_program = crate::utils::token::get_token_program_cached(&params.input_mint)
+            .unwrap_or(crate::constants::TOKEN_PROGRAM);
         let input_token_account = get_associated_token_address_with_program_id_fast_use_seed(
             &params.payer.pubkey(),
             &params.input_mint,
-            &mint_token_program,
+            &input_token_program,
+            params.open_seed_optimize,
+        );
+        // 获取输出 token 的 program（支持 Token-2022）
+        let output_token_program = crate::utils::token::get_token_program_cached(&params.output_mint)
+            .unwrap_or(crate::constants::TOKEN_PROGRAM);
+        let output_token_account = get_associated_token_address_with_program_id_fast_use_seed(
+            &params.payer.pubkey(),
+            &params.output_mint,
+            &output_token_program,
             params.open_seed_optimize,
         );
 
