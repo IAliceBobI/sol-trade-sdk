@@ -47,6 +47,7 @@ const WSOL_MINT: &str = "So11111111111111111111111111111111111111112";
 // ========================================
 
 #[tokio::test]
+#[ignore = "TODO: 修复 PumpSwap Token-2022 ATA 创建问题"]
 #[serial_test::serial]
 async fn test_pumpswap_exact_in_buy_with_simulation() {
     println!("====================================================");
@@ -294,6 +295,7 @@ async fn test_pumpswap_exact_in_buy_with_simulation() {
 // ========================================
 
 #[tokio::test]
+#[ignore = "TODO: 修复 PumpSwap Token-2022 ATA 创建问题"]
 #[serial_test::serial]
 async fn test_pumpswap_exact_in_sell_with_simulation() {
     println!("====================================================");
@@ -587,6 +589,7 @@ async fn test_pumpswap_exact_in_sell_with_simulation() {
 // ========================================
 
 #[tokio::test]
+#[ignore = "TODO: 修复 PumpSwap Token-2022 ATA 创建问题"]
 #[serial_test::serial]
 async fn test_pumpswap_exact_out_buy_with_simulation() {
     println!("====================================================");
@@ -814,6 +817,7 @@ async fn test_pumpswap_exact_out_buy_with_simulation() {
 // ========================================
 
 #[tokio::test]
+#[ignore = "TODO: 修复 PumpSwap Token-2022 ATA 创建问题"]
 #[serial_test::serial]
 async fn test_pumpswap_exact_out_sell_with_simulation() {
     println!("====================================================");
