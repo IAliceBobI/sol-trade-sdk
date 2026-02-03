@@ -181,7 +181,7 @@ mod tests {
 
         for _ in 0..5 {
             let pubkey = Pubkey::new_unique();
-            AmmConfigCache::insert(pubkey, config);
+            AmmConfigCache::insert(pubkey, config.clone());
         }
 
         let (total, valid, expired) = AmmConfigCache::stats();

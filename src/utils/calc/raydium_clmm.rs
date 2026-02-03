@@ -371,7 +371,7 @@ pub fn calculate_swap_exact_out_with_tick_arrays(
     fee_rate: u32,
     zero_for_one: bool,
     tick_arrays: &[(i32, Vec<(i32, i128, u128)>)], // (start_index, [(tick, liquidity_net, liquidity_gross)])
-) -> Result<u64, &'static str> {
+) -> Result<QuoteExactOutResult, &'static str> {
     if amount_out == 0 {
         return Err("amount_out must not be 0");
     }
@@ -399,8 +399,10 @@ pub fn calculate_swap_exact_out_with_tick_arrays(
     // 对于 exact_out，我们需要追踪：
     // - amount_out_remaining: 还需要提供的输出量
     // - amount_in_calculated: 已计算的输入量
+    // - fee_amount_calculated: 累计的手续费
     let mut amount_out_remaining = amount_out;
     let mut amount_in_calculated: u64 = 0;
+    let mut fee_amount_calculated: u64 = 0;
 
     let mut current_sqrt_price = sqrt_price_x64;
     let mut current_tick = tick_current;
@@ -463,7 +465,12 @@ pub fn calculate_swap_exact_out_with_tick_arrays(
             // - amount_out 是提供的输出
             let step_input = swap_step.amount_in;
             let step_output = swap_step.amount_out;
-            let _step_fee = swap_step.fee_amount;
+            let step_fee = swap_step.fee_amount;
+
+            // 累计手续费
+            fee_amount_calculated = fee_amount_calculated
+                .checked_add(step_fee)
+                .ok_or("fee amount overflow")?;
 
             // 更新剩余输出和累计输入
             amount_out_remaining = amount_out_remaining
@@ -513,7 +520,11 @@ pub fn calculate_swap_exact_out_with_tick_arrays(
         return Err("Insufficient liquidity to fulfill the exact_out request");
     }
 
-    Ok(amount_in_calculated)
+    Ok(QuoteExactOutResult {
+        amount_in: amount_in_calculated,
+        fee_amount: fee_amount_calculated,
+        price_impact_bps: None,
+    })
 }
 
 #[cfg(test)]
@@ -748,7 +759,7 @@ pub fn quote_exact_out(
     tick_arrays: &[(i32, Vec<(i32, i128, u128)>)],
 ) -> Result<QuoteExactOutResult, String> {
     // 调用完整版计算函数
-    let amount_in = calculate_swap_exact_out_with_tick_arrays(
+    let result = calculate_swap_exact_out_with_tick_arrays(
         amount_out,
         sqrt_price_x64,
         liquidity,
@@ -760,15 +771,7 @@ pub fn quote_exact_out(
     )
     .map_err(|e| e.to_string())?;
 
-    // TODO: 计算实际手续费（需要从 swap_step 中累计）
-    // 目前简化为 0，因为 CLMM 的手续费已经包含在 amount_in 中
-    let fee_amount = 0u64;
-
-    // 价格影响（简化：输出金额占总流动性比例）
-    let price_impact_bps = (amount_out as u128)
-        .checked_mul(10_000u128)
-        .and_then(|p| p.checked_div(liquidity))
-        .map(|impact| impact as u64);
-
-    Ok(QuoteExactOutResult { amount_in, fee_amount, price_impact_bps })
+    // 注意：calculate_swap_exact_out_with_tick_arrays 已经返回包含手续费的结果
+    // price_impact_bps 在内部设置为 None，可以根据需要计算
+    Ok(result)
 }

@@ -291,7 +291,7 @@ async fn test_cpmm_pools(
         }
 
         // Exact Out Buy
-        match cpmm_quote_exact_out(token0_reserve, token1_reserve, *amount, is_token0_wsol) {
+        match cpmm_quote_exact_out(token0_reserve, token1_reserve, *amount, is_token0_wsol, 2500, 120000, 40000) {
             Ok(quote) => {
                 println!("[OK] Exact Out Buy");
                 println!("  Expected Output: {} units", amount);
@@ -341,7 +341,7 @@ async fn test_cpmm_pools(
         }
 
         // Exact Out Sell
-        match cpmm_quote_exact_out(token0_reserve, token1_reserve, *amount, !is_token0_wsol) {
+        match cpmm_quote_exact_out(token0_reserve, token1_reserve, *amount, !is_token0_wsol, 2500, 120000, 40000) {
             Ok(quote) => {
                 println!("[OK] Exact Out Sell");
                 println!("  Expected Output: {} lamports", amount);
