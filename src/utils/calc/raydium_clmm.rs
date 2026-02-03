@@ -542,9 +542,6 @@ mod tests {
             false, // zero_for_one = false （价格上涨）
         );
 
-        if let Err(e) = &result {
-            eprintln!("compute_swap_step error: {}", e);
-        }
         assert!(result.is_ok(), "compute_swap_step should succeed: {:?}", result.err());
         let step = result.unwrap();
 

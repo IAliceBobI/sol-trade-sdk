@@ -28,7 +28,9 @@ pub async fn update_rents(client: &SolanaRpcClient) -> Result<(), anyhow::Error>
 pub fn start_rent_updater(client: Arc<SolanaRpcClient>) {
     tokio::spawn(async move {
         loop {
-            if let Err(_e) = update_rents(&client).await {}
+            if let Err(e) = update_rents(&client).await {
+                eprintln!("⚠️  Rent cache update failed: {}. Using previous values.", e);
+            }
             sleep(Duration::from_secs(60 * 60)).await;
         }
     });

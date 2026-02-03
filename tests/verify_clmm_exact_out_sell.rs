@@ -110,8 +110,9 @@ async fn test_clmm_exact_out_sell_with_simulation() {
                 program
             },
             Err(e) => {
-                println!("⚠️  无法获取 token0_mint Token Program，使用默认值: {}", e);
-                spl_token::id()
+                eprintln!("❌ 无法获取 token0_mint Token Program: {}", e);
+                eprintln!("   测试无法继续，因为无法构建正确的指令");
+                panic!("测试失败: {}", e);
             },
         };
     let token1_program =
@@ -121,8 +122,9 @@ async fn test_clmm_exact_out_sell_with_simulation() {
                 program
             },
             Err(e) => {
-                println!("⚠️  无法获取 token1_mint Token Program，使用默认值: {}", e);
-                spl_token::id()
+                eprintln!("❌ 无法获取 token1_mint Token Program: {}", e);
+                eprintln!("   测试无法继续，因为无法构建正确的指令");
+                panic!("测试失败: {}", e);
             },
         };
     println!();

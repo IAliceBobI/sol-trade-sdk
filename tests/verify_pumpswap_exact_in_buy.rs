@@ -161,8 +161,9 @@ async fn test_pumpswap_exact_in_buy_with_simulation() {
                 program
             },
             Err(e) => {
-                println!("⚠️  无法获取 base_mint Token Program，使用默认值: {}", e);
-                TOKEN_PROGRAM
+                eprintln!("❌ 无法获取 base_mint Token Program: {}", e);
+                eprintln!("   测试无法继续，因为无法构建正确的指令");
+                panic!("测试失败: {}", e);
             },
         };
 
@@ -173,8 +174,9 @@ async fn test_pumpswap_exact_in_buy_with_simulation() {
                 program
             },
             Err(e) => {
-                println!("⚠️  无法获取 quote_mint Token Program，使用默认值: {}", e);
-                TOKEN_PROGRAM
+                eprintln!("❌ 无法获取 quote_mint Token Program: {}", e);
+                eprintln!("   测试无法继续，因为无法构建正确的指令");
+                panic!("测试失败: {}", e);
             },
         };
 

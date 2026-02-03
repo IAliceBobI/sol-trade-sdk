@@ -132,8 +132,9 @@ async fn test_raydium_amm_v4_exact_in_buy_with_simulation() {
                 program
             },
             Err(e) => {
-                println!("⚠️  无法获取 coin_mint Token Program，使用默认值: {}", e);
-                spl_token::id()
+                eprintln!("❌ 无法获取 coin_mint Token Program: {}", e);
+                eprintln!("   测试无法继续，因为无法构建正确的指令");
+                panic!("测试失败: {}", e);
             },
         };
     let pc_token_program =
@@ -143,8 +144,9 @@ async fn test_raydium_amm_v4_exact_in_buy_with_simulation() {
                 program
             },
             Err(e) => {
-                println!("⚠️  无法获取 pc_mint Token Program，使用默认值: {}", e);
-                spl_token::id()
+                eprintln!("❌ 无法获取 pc_mint Token Program: {}", e);
+                eprintln!("   测试无法继续，因为无法构建正确的指令");
+                panic!("测试失败: {}", e);
             },
         };
     println!();
