@@ -468,12 +468,6 @@ fn parse_raydium_amm_v4_log_data(ray_log_base64: &str) -> Option<(u64, u64)> {
         raw_in > 200_000_000
     };
 
-    eprintln!("🐛 AMM V4 ray_log 解析调试:");
-    eprintln!("  raw_in: {}", raw_in);
-    eprintln!("  raw_out: {}", raw_out);
-    eprintln!("  direction: {}", direction);
-    eprintln!("  is_exact_out: {}", is_exact_out);
-
     // 根据方向标志和 swap 类型调整解析公式
     let (amount_in, amount_out) = if is_exact_out {
         // exact_out 的公式根据方向有所不同
@@ -537,6 +531,14 @@ fn parse_raydium_amm_v4_log_data(ray_log_base64: &str) -> Option<(u64, u64)> {
 /// * `None` - 解析失败
 fn parse_raydium_cpmm_program_data(logs: &[String]) -> Option<(u64, u64)> {
     use base64::Engine;
+
+    // 检查是否是 CLMM 交易（包含 "SwapV2" 指令）
+    let is_clmm = logs.iter().any(|log| log.contains("SwapV2"));
+
+    // CLMM 交易不应该使用 CPMM 解析器
+    if is_clmm {
+        return None;
+    }
 
     // 查找包含 "Program data:" 的日志行
     for log in logs {
@@ -606,6 +608,14 @@ fn parse_transfer_amounts_from_logs(
     _output_account: &Pubkey,
 ) -> Option<(u64, u64)> {
     use regex::Regex;
+
+    // 检查是否是 CLMM 交易（包含 "SwapV2" 指令）
+    let is_clmm = logs.iter().any(|log| log.contains("SwapV2"));
+
+    // CLMM 交易不应该使用这个方法解析，应该使用 inner instructions
+    if is_clmm {
+        return None;
+    }
 
     // 尝试从日志中提取所有数字
     let mut numbers: Vec<u64> = Vec::new();
