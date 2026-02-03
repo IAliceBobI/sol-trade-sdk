@@ -1,11 +1,10 @@
-//! 测试向 Raydium CPMM 池子添加流动性
+//! 测试向 PIPE-WSOL CPMM 池子添加大量流动性
 //!
 //! 这个测试会：
-//! 1. 获取一个现有的 CPMM 池子（PIPE-WSOL）
+//! 1. 使用 PIPE-WSOL CPMM 池子
 //! 2. 空投大量 PIPE 和 WSOL 到测试账户
-//! 3. 使用 deposit 指令添加流动性
+//! 3. 使用 deposit 指令添加流动性（100 亿 PIPE 级别）
 //! 4. 验证流动性添加成功
-//! 5. 执行一笔 swap 测试
 
 use sol_trade_sdk::liquidity::cpmm::{build_deposit_instruction, calculate_deposit_amounts, CpmmDepositParams};
 use sol_trade_sdk::{
@@ -23,16 +22,16 @@ use std::sync::Arc;
 
 // 导入公共测试模块
 mod common;
-use common::{ensure_ata_with_balance, get_simulation_test_keypair, set_token_balance};
+use common::{get_simulation_test_keypair, set_token_balance};
 
 /// PIPE-WSOL CPMM Pool
 const PIPE_WSOL_POOL: &str = "BnYsRpYvJpz6biY3hV6U9smChVePCJ6YyupVDfcnXpTp";
 
-/// WSOL Mint
-const WSOL_MINT: &str = "So11111111111111111111111111111111111111112";
-
 /// PIPE Token Mint
 const PIPE_MINT: &str = "8ycz3kctoRb4LFrtoYG2r8tRyUYUeGf5Q16M2TEMp7A";
+
+/// WSOL Mint
+const WSOL_MINT: &str = "So11111111111111111111111111111111111111112";
 
 /// Raydium CPMM 程序 ID
 const CPMM_PROGRAM_ID: &str = "CPMMoo8L3F4NbTegBCKVNunggL7H1ZpdTHKxQB5qKP1C";
@@ -95,12 +94,12 @@ async fn test_add_liquidity_to_cpmm_pool() {
     };
 
     // 3. 设置测试账户余额（使用空投）
-    // 我们要添加大量流动性：1 亿 PIPE + 对应的 WSOL
+    // 我们要添加大量流动性：100 亿 PIPE + 对应的 WSOL
     println!("💰 设置测试账户代币余额...\n");
 
     // 设置 PIPE 余额（使用 surfnet_setTokenAccount）
-    // 我们设置 150,000,000 PIPE (1.5 亿，足够添加 1 亿)
-    let pipe_amount_str = "150000000";
+    // 我们设置 15,000,000,000 PIPE (150 亿，足够添加 100 亿)
+    let pipe_amount_str = "15000000000";
     if let Err(e) = set_token_balance(&rpc, &rpc_url, &payer, &pipe_mint, pipe_amount_str).await {
         println!("❌ 设置 PIPE 余额失败: {}\n", e);
         return;
@@ -109,9 +108,9 @@ async fn test_add_liquidity_to_cpmm_pool() {
     // 设置 WSOL 余额
     // 根据当前池子比例计算：
     // - 当前池子：6,061 PIPE : 0.027 WSOL
-    // - 添加 100,000,000 PIPE 需要约 (100M * 0.027 / 6061) ≈ 445 WSOL
-    // 我们设置 500 WSOL 以确保足够
-    let wsol_amount_str = "500";
+    // - 添加 10,000,000,000 PIPE 需要约 (10B * 0.027 / 6061) ≈ 44,537 WSOL
+    // 我们设置 50,000 WSOL 以确保足够
+    let wsol_amount_str = "50000";
     if let Err(e) = set_token_balance(&rpc, &rpc_url, &payer, &wsol_mint, wsol_amount_str).await {
         println!("❌ 设置 WSOL 余额失败: {}\n", e);
         return;
@@ -125,14 +124,14 @@ async fn test_add_liquidity_to_cpmm_pool() {
     // - Token0 vault (PIPE) ≈ 6,060,947,750
     // - Token1 vault (WSOL) ≈ 27,029,881
     //
-    // 如果我们要添加 100,000,000 PIPE：
-    // - 按比例需要 WSOL ≈ 100M * 27M / 6060M ≈ 445M lamports ≈ 0.445 WSOL
+    // 如果我们要添加 10,000,000,000 (100亿) PIPE：
+    // - 按比例需要 WSOL ≈ 10B * 27M / 6060M ≈ 44.5M lamports ≈ 0.0445 WSOL
     //
     // 计算 LP 数量：
-    // - LP_amount = (100,000,000 / 6,060,947,750) * 41,000 ≈ 676,000,000
+    // - LP_amount = (10,000,000,000 / 6,060,947,750) * 41,000 ≈ 67,600,000,000
     //
-    // 我们添加 700,000,000 LP (7 亿) 来获得约 100M PIPE + ~0.46 WSOL 的流动性
-    let lp_token_amount = 700_000_000_u64;
+    // 我们添加 68,000,000,000 LP (680 亿) 来获得约 100 亿 PIPE + ~0.045 WSOL 的流动性
+    let lp_token_amount = 68_000_000_000_u64;
 
     println!("🪙 要铸造的 LP 代币: {}", lp_token_amount);
     println!();
@@ -144,10 +143,6 @@ async fn test_add_liquidity_to_cpmm_pool() {
             println!("  Token0 (PIPE): {}", calc_token0);
             println!("  Token1 (WSOL): {} lamports", calc_token1);
             println!();
-
-            // 使用计算出的数量，但设置一个较高的上限以允许滑点
-            let max_token0 = calc_token0.saturating_mul(110) / 100; // +10% 滑点容忍
-            let max_token1 = calc_token1.saturating_mul(110) / 100;
         }
         None => {
             println!("⚠️  无法计算代币数量，使用固定值\n");
@@ -184,10 +179,10 @@ async fn test_add_liquidity_to_cpmm_pool() {
         token_1_mint: wsol_mint,
         lp_mint: pool_state.lp_mint,
         lp_token_amount,
-        // 设置足够高的上限（基于 700M LP 的计算值，加缓冲）
-        // 计算值：约 100M PIPE + 0.46 WSOL
-        maximum_token_0_amount: 120_000_000_000_000,   // 120M PIPE (decimals=6)
-        maximum_token_1_amount: 1_000_000_000_000,     // 1,000 WSOL (lamports)
+        // 设置足够高的上限（基于 68B LP 的计算值，加缓冲）
+        // 计算值：约 100 亿 PIPE + ~0.045 WSOL
+        maximum_token_0_amount: 12_000_000_000_000_000,   // 120 亿 PIPE (decimals=6)
+        maximum_token_1_amount: 100_000_000_000,          // 100,000 WSOL (lamports)
         token_program: spl_token::id(),
     };
 
@@ -197,8 +192,8 @@ async fn test_add_liquidity_to_cpmm_pool() {
     println!("  Program: {}", CPMM_PROGRAM_ID);
     println!("  Pool: {}", pool_address);
     println!("  LP Token Amount: {}", lp_token_amount);
-    println!("  Max Token0: 120,000,000,000,000 (120M PIPE)");
-    println!("  Max Token1: 1,000,000,000,000 (1,000 WSOL)");
+    println!("  Max Token0: 12,000,000,000,000,000 (120 亿 PIPE)");
+    println!("  Max Token1: 100,000,000,000 (100,000 WSOL)");
     println!();
 
     // 7. 创建 LP token ATA（如果不存在）

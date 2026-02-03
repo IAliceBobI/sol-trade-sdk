@@ -107,11 +107,11 @@ fn swap_base_input(
 ) -> SwapResult {
     let mut creator_fee = 0u64;
 
-    // 根据 Raydium CPMM 官方实现，所有费用从输入金额扣除
-    // 计算所有费用（全部从 input_amount 计算，而不是从 trade_fee 计算）
+    // 根据 Raydium CPMM 官方实现修复
+    // protocol_fee 和 fund_fee 应该从 trade_fee 计算，而不是从 input_amount
     let trade_fee = compute_trading_fee(input_amount, trade_fee_rate);
-    let protocol_fee = compute_protocol_fund_fee(input_amount, protocol_fee_rate);
-    let fund_fee = compute_protocol_fund_fee(input_amount, fund_fee_rate);
+    let protocol_fee = compute_protocol_fund_fee(trade_fee, protocol_fee_rate);
+    let fund_fee = compute_protocol_fund_fee(trade_fee, fund_fee_rate);
 
     // Creator fee 根据配置从输入或输出扣除
     let input_amount_less_fees = if is_creator_fee_on_input {

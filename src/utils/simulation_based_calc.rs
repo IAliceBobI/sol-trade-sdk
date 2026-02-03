@@ -573,8 +573,8 @@ fn parse_raydium_cpmm_data(program_data_base64: &str) -> Option<(u64, u64)> {
     // 解码 base64
     let data = base64::engine::general_purpose::STANDARD.decode(program_data_base64).ok()?;
 
-    // 检查数据长度（至少需要 120 字节到 offset 112）
-    if data.len() < 120 {
+    // 检查数据长度（至少需要 72 字节到 offset 64）
+    if data.len() < 72 {
         return None;
     }
 
@@ -583,11 +583,9 @@ fn parse_raydium_cpmm_data(program_data_base64: &str) -> Option<(u64, u64)> {
     let raw_in = u64::from_le_bytes(data[56..64].try_into().ok()?);
     let amount_in = raw_in / 1000;
 
-    // 解析输出金额（offset 112）
-    // 注意：这里需要除以 865，这是 CPMM Program 返回数据的特定常数
-    // 经过验证，这个值是正确的（与链上模拟误差 < 0.01%）
-    let raw_out = u64::from_le_bytes(data[112..120].try_into().ok()?);
-    let amount_out = raw_out / 865;
+    // 解析输出金额（offset 64）
+    // 这个值直接就是实际的输出金额（lamports），不需要除法
+    let amount_out = u64::from_le_bytes(data[64..72].try_into().ok()?);
 
     Some((amount_in, amount_out))
 }

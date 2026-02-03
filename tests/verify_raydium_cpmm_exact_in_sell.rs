@@ -49,7 +49,8 @@ async fn test_raydium_cpmm_exact_in_sell_with_simulation() {
     let pipe_mint = Pubkey::from_str(PIPE_MINT).unwrap();
 
     // 测试金额：卖出 1000 PIPE
-    let amount_in = 1_000u64;
+    // PIPE decimals = 6，所以 1000 PIPE = 1,000,000,000 最小单位
+    let amount_in = 1_000_000_000u64;
     let payer = Arc::new(get_simulation_test_keypair());
 
     println!("📊 测试配置:");
@@ -64,8 +65,8 @@ async fn test_raydium_cpmm_exact_in_sell_with_simulation() {
     }
 
     // 设置 PIPE 余额（使用 surfnet_setTokenAccount）
-    // 设置 10000 PIPE 用于测试
-    if let Err(e) = set_token_balance(&rpc, &rpc_url, &payer, &pipe_mint, "10000").await {
+    // 设置 1,000,000 PIPE (100万) 用于测试
+    if let Err(e) = set_token_balance(&rpc, &rpc_url, &payer, &pipe_mint, "1000000").await {
         println!("❌ 设置 PIPE 余额失败: {}\n", e);
         return;
     }
