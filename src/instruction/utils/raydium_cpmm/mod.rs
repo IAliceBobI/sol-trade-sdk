@@ -9,6 +9,7 @@
 
 mod cache;
 mod constants;
+mod fee_queries;
 mod helpers;
 mod pool_queries;
 mod quotes;
@@ -31,6 +32,8 @@ pub use pool_queries::{
 pub use quotes::{
     get_token_price_in_usd, get_token_price_in_usd_with_pool, quote_exact_in, quote_exact_out,
 };
+
+pub use fee_queries::{clear_amm_config_cache, get_amm_config_fees, FeeRates};
 
 // 重新导出类型
 pub use crate::instruction::utils::raydium_cpmm_types::{PoolState, pool_state_decode};

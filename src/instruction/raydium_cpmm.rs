@@ -8,7 +8,7 @@ use crate::{
     constants::trade_consts::DEFAULT_SLIPPAGE,
     instruction::utils::raydium_cpmm::{
         SWAP_BASE_IN_DISCRIMINATOR, accounts, get_observation_state_pda, get_pool_pda,
-        get_vault_account,
+        get_vault_account, get_amm_config_fees,
     },
     trading::core::{
         params::{RaydiumCpmmParams, SwapParams},
@@ -109,12 +109,25 @@ impl InstructionBuilder for RaydiumCpmmInstructionBuilder {
 
         // 🔧 修复：使用已经解包的 input_amount
         let amount_in: u64 = input_amount;
+
+        // 获取实际费率（从 amm_config 账户）
+        let fees = match params.rpc.as_ref() {
+            Some(rpc) => get_amm_config_fees(rpc, &protocol_params.amm_config).await?,
+            None => {
+                // 无 RPC 客户端时使用默认费率（向后兼容）
+                return Err(anyhow!("RPC client is required for fee calculation"));
+            },
+        };
+
         let result = compute_swap_amount(
             protocol_params.base_reserve,
             protocol_params.quote_reserve,
             is_base_in,
             amount_in,
             params.slippage_basis_points.unwrap_or(DEFAULT_SLIPPAGE),
+            fees.trade_fee_rate,
+            fees.protocol_fee_rate,
+            fees.fund_fee_rate,
         );
         let minimum_amount_out = match params.fixed_output_amount {
             Some(fixed) => fixed,
@@ -275,12 +288,23 @@ impl InstructionBuilder for RaydiumCpmmInstructionBuilder {
         let minimum_amount_out: u64 = match params.fixed_output_amount {
             Some(fixed) => fixed,
             None => {
+                // 获取实际费率（从 amm_config 账户）
+                let fees = match params.rpc.as_ref() {
+                    Some(rpc) => get_amm_config_fees(rpc, &protocol_params.amm_config).await?,
+                    None => {
+                        return Err(anyhow!("RPC client is required for fee calculation"));
+                    },
+                };
+
                 compute_swap_amount(
                     protocol_params.base_reserve,
                     protocol_params.quote_reserve,
                     is_quote_out,
                     params.input_amount.unwrap_or(0),
                     params.slippage_basis_points.unwrap_or(DEFAULT_SLIPPAGE),
+                    fees.trade_fee_rate,
+                    fees.protocol_fee_rate,
+                    fees.fund_fee_rate,
                 )
                 .min_amount_out
             },

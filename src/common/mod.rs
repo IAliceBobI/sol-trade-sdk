@@ -1,4 +1,5 @@
 pub mod address_lookup;
+pub mod amm_config_cache;
 pub mod auto_mock_rpc;
 pub mod bonding_curve;
 pub mod dex_pool_cache;

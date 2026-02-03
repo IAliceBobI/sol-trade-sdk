@@ -4,7 +4,7 @@ use crate::{
     common::SolanaRpcClient,
     constants::{SOL_MINT, USDC_MINT, USDT_MINT, WSOL_TOKEN_ACCOUNT},
     instruction::utils::{
-        raydium_cpmm::constants::DEFAULT_WSOL_USDT_CLMM_POOL, raydium_cpmm::pool_queries,
+        raydium_cpmm::{constants::DEFAULT_WSOL_USDT_CLMM_POOL, fee_queries, pool_queries},
     },
     utils::price::raydium_cpmm::{price_base_in_quote, price_quote_in_base},
     utils::quote::{QuoteExactInResult, QuoteExactOutResult},
@@ -23,6 +23,10 @@ pub async fn quote_exact_in(
     is_token0_in: bool,
 ) -> Result<QuoteExactInResult, anyhow::Error> {
     let pool_state = pool_queries::get_pool_by_address(rpc, pool_address).await?;
+
+    // 获取实际费率（从 amm_config 账户）
+    let fees = fee_queries::get_amm_config_fees(rpc, &pool_state.amm_config).await?;
+
     let (token0_reserve, token1_reserve) = pool_queries::get_pool_token_balances(
         rpc,
         pool_address,
@@ -37,6 +41,9 @@ pub async fn quote_exact_in(
         is_token0_in,
         amount_in,
         0,
+        fees.trade_fee_rate,
+        fees.protocol_fee_rate,
+        fees.fund_fee_rate,
     );
     Ok(QuoteExactInResult {
         amount_out: q.amount_out,
@@ -73,6 +80,10 @@ pub async fn quote_exact_out(
     is_token0_in: bool,
 ) -> Result<QuoteExactOutResult, anyhow::Error> {
     let pool_state = pool_queries::get_pool_by_address(rpc, pool_address).await?;
+
+    // 获取实际费率（从 amm_config 账户）
+    let fees = fee_queries::get_amm_config_fees(rpc, &pool_state.amm_config).await?;
+
     let (token0_reserve, token1_reserve) = pool_queries::get_pool_token_balances(
         rpc,
         pool_address,
@@ -86,6 +97,9 @@ pub async fn quote_exact_out(
         token1_reserve,
         amount_out,
         is_token0_in,
+        fees.trade_fee_rate,
+        fees.protocol_fee_rate,
+        fees.fund_fee_rate,
     )
     .map_err(|e| anyhow!("Quote exact out failed: {}", e))?;
 

@@ -1,6 +1,4 @@
-use crate::instruction::utils::raydium_cpmm::accounts::{
-    CREATOR_FEE_RATE, FEE_RATE_DENOMINATOR_VALUE, FUND_FEE_RATE, PROTOCOL_FEE_RATE, TRADE_FEE_RATE,
-};
+use crate::instruction::utils::raydium_cpmm::accounts::FEE_RATE_DENOMINATOR_VALUE;
 
 /// Computes trading fee using ceiling division.
 ///
@@ -166,6 +164,9 @@ pub fn compute_swap_amount(
     is_base_in: bool,
     amount_in: u64,
     slippage_basis_points: u64,
+    trade_fee_rate: u64,
+    protocol_fee_rate: u64,
+    fund_fee_rate: u64,
 ) -> ComputeSwapParams {
     let (input_reserve, output_reserve) =
         if is_base_in { (base_reserve, quote_reserve) } else { (quote_reserve, base_reserve) };
@@ -174,10 +175,10 @@ pub fn compute_swap_amount(
         amount_in,
         input_reserve,
         output_reserve,
-        TRADE_FEE_RATE,
-        CREATOR_FEE_RATE,
-        PROTOCOL_FEE_RATE,
-        FUND_FEE_RATE,
+        trade_fee_rate,
+        0, // creator_fee_rate (CPMM 目前为 0)
+        protocol_fee_rate,
+        fund_fee_rate,
         true,
     );
 
@@ -216,6 +217,9 @@ pub struct QuoteExactOutResult {
 /// * `quote_reserve` - Current reserve of quote token in the pool
 /// * `amount_out` - Desired output amount
 /// * `is_base_in` - true if base token is the input, false if quote token is the input
+/// * `trade_fee_rate` - Trading fee rate (除以 1_000_000 得到百分比)
+/// * `protocol_fee_rate` - Protocol fee rate (除以 1_000_000 得到百分比)
+/// * `fund_fee_rate` - Fund fee rate (除以 1_000_000 得到百分比)
 ///
 /// # Returns
 ///
@@ -231,6 +235,9 @@ pub fn quote_exact_out(
     quote_reserve: u64,
     amount_out: u64,
     is_base_in: bool,
+    trade_fee_rate: u64,
+    protocol_fee_rate: u64,
+    fund_fee_rate: u64,
 ) -> Result<QuoteExactOutResult, String> {
     let (reserve_in, reserve_out) =
         if is_base_in { (base_reserve, quote_reserve) } else { (quote_reserve, base_reserve) };
@@ -258,11 +265,11 @@ pub fn quote_exact_out(
         .checked_div(denominator)
         .ok_or_else(|| "Calculation overflow in division".to_string())? as u64;
 
-    // 计算手续费 (使用现有的 trade_fee_rate)
-    let trade_fee = compute_trading_fee(amount_in, TRADE_FEE_RATE);
-    let protocol_fee = compute_protocol_fund_fee(amount_in, PROTOCOL_FEE_RATE);
-    let fund_fee = compute_protocol_fund_fee(amount_in, FUND_FEE_RATE);
-    let creator_fee = compute_creator_fee_new(amount_in, CREATOR_FEE_RATE);
+    // 计算手续费
+    let trade_fee = compute_trading_fee(amount_in, trade_fee_rate);
+    let protocol_fee = compute_protocol_fund_fee(amount_in, protocol_fee_rate);
+    let fund_fee = compute_protocol_fund_fee(amount_in, fund_fee_rate);
+    let creator_fee = compute_creator_fee_new(amount_in, 0); // CPMM 目前 creator_fee 为 0
 
     let total_fee = trade_fee
         .saturating_add(protocol_fee)
