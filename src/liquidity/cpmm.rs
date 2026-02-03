@@ -116,11 +116,7 @@ pub fn build_deposit_instruction(params: CpmmDepositParams, owner: Pubkey) -> In
         AccountMeta::new(params.lp_mint, false),
     ];
 
-    Instruction {
-        program_id,
-        accounts,
-        data,
-    }
+    Instruction { program_id, accounts, data }
 }
 
 /// 计算添加流动性所需的代币数量
@@ -204,13 +200,10 @@ fn lp_tokens_to_trading_tokens(
             }
 
             (token_0_amount, token_1_amount)
-        }
+        },
     };
 
-    Some(TradingTokenResult {
-        token_0_amount,
-        token_1_amount,
-    })
+    Some(TradingTokenResult { token_0_amount, token_1_amount })
 }
 
 #[cfg(test)]
@@ -238,10 +231,7 @@ mod tests {
         let owner = Pubkey::new_unique();
         let instruction = build_deposit_instruction(params, owner);
 
-        assert_eq!(
-            instruction.program_id,
-            Pubkey::from_str(RAYDIUM_CPMM_PROGRAM_ID).unwrap()
-        );
+        assert_eq!(instruction.program_id, Pubkey::from_str(RAYDIUM_CPMM_PROGRAM_ID).unwrap());
         // 验证 discriminator 正确
         assert_eq!(&instruction.data[0..8], &DEPOSIT_DISCRIMINATOR);
         assert_eq!(instruction.accounts.len(), 13);
@@ -252,10 +242,10 @@ mod tests {
         // 测试示例：池子有 2 个 token A 和 49 个 token B，LP 供应量为 10
         // 如果要铸造 5 个 LP token，应该得到 1 个 token A 和 25 个 token B
         let result = lp_tokens_to_trading_tokens(
-            5,   // lp_token_amount
-            10,  // lp_token_supply
-            2,   // token_0_vault_amount
-            49,  // token_1_vault_amount
+            5,  // lp_token_amount
+            10, // lp_token_supply
+            2,  // token_0_vault_amount
+            49, // token_1_vault_amount
             RoundDirection::Ceiling,
         );
 

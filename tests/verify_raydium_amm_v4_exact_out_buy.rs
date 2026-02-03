@@ -126,8 +126,10 @@ async fn test_raydium_amm_v4_exact_out_buy_with_simulation() {
     println!("  期望输出: {} USDC (smallest unit)", amount_out);
     println!("  需要输入: {} WSOL (lamports)", local_calc.amount_in);
     println!("  手续费: {} WSOL (lamports)", local_calc.fee_amount);
-    println!("  预期计算: {} WSOL (根据储备金手动计算)\n",
-        (53941108051154u128 * 1000u128 / (5506467795682u128 - 1000u128)) as u64);
+    println!(
+        "  预期计算: {} WSOL (根据储备金手动计算)\n",
+        (53941108051154u128 * 1000u128 / (5506467795682u128 - 1000u128)) as u64
+    );
 
     // 🔧 自动从 Pool 获取 mint 并检测 Token Program
     let (coin_mint, pc_mint) = (pool_state.coin_mint, pool_state.pc_mint);
@@ -198,7 +200,7 @@ async fn test_raydium_amm_v4_exact_out_buy_with_simulation() {
         output_mint: usdc_mint,
         output_token_program: Some(pc_token_program),
         input_amount: Some(local_calc.amount_in), // 使用计算出的输入
-        slippage_basis_points: Some(2000), // ✅ 20% 滑点容忍 (按任务要求)
+        slippage_basis_points: Some(2000),        // ✅ 20% 滑点容忍 (按任务要求)
         address_lookup_table_account: None,
         recent_blockhash: None,
         wait_transaction_confirmed: false,
@@ -229,12 +231,17 @@ async fn test_raydium_amm_v4_exact_out_buy_with_simulation() {
         {
             Ok(instrs) => {
                 // 🔍 调试：打印指令数据
-                if let Some(swap_instr) = instrs.iter().find(|i| i.program_id == solana_sdk::pubkey!("675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8")) {
+                if let Some(swap_instr) = instrs.iter().find(|i| {
+                    i.program_id
+                        == solana_sdk::pubkey!("675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8")
+                }) {
                     println!("🔍 Swap 指令数据:");
                     println!("  Discriminator: {:02x}", swap_instr.data[0]);
                     if swap_instr.data.len() >= 17 {
-                        let amount_in = u64::from_le_bytes(swap_instr.data[1..9].try_into().unwrap());
-                        let amount_out = u64::from_le_bytes(swap_instr.data[9..17].try_into().unwrap());
+                        let amount_in =
+                            u64::from_le_bytes(swap_instr.data[1..9].try_into().unwrap());
+                        let amount_out =
+                            u64::from_le_bytes(swap_instr.data[9..17].try_into().unwrap());
                         println!("  Amount In/Max: {}", amount_in);
                         println!("  Amount Out/Min: {}", amount_out);
                     }

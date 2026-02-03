@@ -123,7 +123,10 @@ async fn test_pumpswap_exact_out_sell_with_simulation() {
 
     println!("📊 本地计算结果:");
     println!("  需要输入: {} PUMP (最小单位)", local_calc.amount_in);
-    println!("  需要输入: {} PUMP (可读单位)", local_calc.amount_in as f64 / 10_f64.powi(input_decimals as i32));
+    println!(
+        "  需要输入: {} PUMP (可读单位)",
+        local_calc.amount_in as f64 / 10_f64.powi(input_decimals as i32)
+    );
     println!("  手续费: {} (最小单位)", local_calc.fee_amount);
     println!();
 
@@ -184,10 +187,11 @@ async fn test_pumpswap_exact_out_sell_with_simulation() {
         sol_trade_sdk::instruction::utils::pumpswap::coin_creator_vault_authority(
             pool_state.coin_creator,
         );
-    let coin_creator_vault_ata = sol_trade_sdk::instruction::utils::pumpswap::coin_creator_vault_ata(
-        pool_state.coin_creator,
-        quote_mint,
-    );
+    let coin_creator_vault_ata =
+        sol_trade_sdk::instruction::utils::pumpswap::coin_creator_vault_ata(
+            pool_state.coin_creator,
+            quote_mint,
+        );
 
     // 构造指令 (使用 fixed_output_amount)
     let pumpswap_params = PumpSwapParams {
@@ -331,7 +335,10 @@ async fn test_pumpswap_exact_out_sell_with_simulation() {
         let excess_rate = (excess as f64 / amount_out as f64) * 100.0;
         if excess_rate <= 1.0 {
             // 允许最多 1% 的额外输出
-            println!("✅ 验证通过：实际输出 >= 期望输出，额外输出 {}% (容忍度 <= 1%)\n", excess_rate);
+            println!(
+                "✅ 验证通过：实际输出 >= 期望输出，额外输出 {}% (容忍度 <= 1%)\n",
+                excess_rate
+            );
         } else {
             println!("⚠️  警告：额外输出过多：{}% (可能需要优化)\n", excess_rate);
         }

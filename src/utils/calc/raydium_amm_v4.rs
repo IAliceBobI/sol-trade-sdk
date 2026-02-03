@@ -226,8 +226,22 @@ pub fn quote_exact_out(
         ));
     }
 
-    // 恒定乘积公式: (reserve_in + amount_in) * (reserve_out - amount_out) = reserve_in * reserve_out
-    // 反解: amount_in = (reserve_in * amount_out) / (reserve_out - amount_out)
+    // 恒定乘积公式 exact_out 反推（根据 Raydium 官方实现）:
+    // 参考: processor.rs:2794-2816
+    //
+    // 步骤 1: 计算不含费用的输入（使用恒定乘积公式）
+    // swap_in_before_add_fee = (reserve_in * amount_out) / (reserve_out - amount_out)
+    //
+    // 步骤 2: 添加费用（使用官方公式）
+    // swap_in_after_add_fee * (1 - fee_rate) = swap_in_before_add_fee
+    // swap_in_after_add_fee = swap_in_before_add_fee / (1 - fee_rate)
+    //
+    // 其中 fee_rate = swap_fee_numerator / swap_fee_denominator = 25 / 10000 = 0.0025
+    //
+    // 公式简化:
+    // swap_in_after_add_fee = swap_in_before_add_fee * SWAP_FEE_DENOMINATOR / (SWAP_FEE_DENOMINATOR - SWAP_FEE_NUMERATOR)
+    //                      = swap_in_before_add_fee * 10000 / (10000 - 25)
+    //                      = swap_in_before_add_fee * 10000 / 9975
 
     let numerator = (reserve_in as u128)
         .checked_mul(amount_out as u128)
@@ -237,18 +251,25 @@ pub fn quote_exact_out(
         .checked_sub(amount_out as u128)
         .ok_or_else(|| "Invalid reserve calculation".to_string())?;
 
-    let amount_in = numerator
+    let swap_in_before_add_fee = numerator
         .checked_div(denominator)
         .ok_or_else(|| "Calculation overflow in division".to_string())? as u64;
 
-    // 计算手续费
-    let trade_fee = compute_trading_fee(amount_in, TRADE_FEE_NUMERATOR, TRADE_FEE_DENOMINATOR);
-    let swap_fee = compute_trading_fee(amount_in, SWAP_FEE_NUMERATOR, SWAP_FEE_DENOMINATOR);
-    let total_fee = trade_fee.saturating_add(swap_fee);
+    // 根据官方公式计算总输入（含费用）
+    // swap_in_after_add_fee = swap_in_before_add_fee / (1 - fee_rate)
+    let fee_denominator_minus_numerator = (SWAP_FEE_DENOMINATOR as u128)
+        .checked_sub(SWAP_FEE_NUMERATOR as u128)
+        .ok_or_else(|| "Fee denominator calculation overflow".to_string())?;
 
-    let total_amount_in = amount_in
-        .checked_add(total_fee)
-        .ok_or_else(|| "Total amount calculation overflow".to_string())?;
+    let swap_in_after_add_fee = (swap_in_before_add_fee as u128)
+        .checked_mul(SWAP_FEE_DENOMINATOR as u128)
+        .and_then(|p| p.checked_div(fee_denominator_minus_numerator))
+        .ok_or_else(|| "Swap in after fee calculation overflow".to_string())? as u64;
+
+    // 计算实际费用
+    let swap_fee = swap_in_after_add_fee
+        .checked_sub(swap_in_before_add_fee)
+        .ok_or_else(|| "Fee calculation underflow".to_string())?;
 
     // 计算价格影响
     let price_impact_bps = if reserve_out > 0 {
@@ -262,8 +283,8 @@ pub fn quote_exact_out(
     };
 
     Ok(QuoteExactOutResult {
-        amount_in: total_amount_in,
-        fee_amount: total_fee,
+        amount_in: swap_in_after_add_fee,
+        fee_amount: swap_fee,
         price_impact_bps,
     })
 }

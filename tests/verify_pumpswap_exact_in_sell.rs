@@ -186,10 +186,11 @@ async fn test_pumpswap_exact_in_sell_with_simulation() {
         sol_trade_sdk::instruction::utils::pumpswap::coin_creator_vault_authority(
             pool_state.coin_creator,
         );
-    let coin_creator_vault_ata = sol_trade_sdk::instruction::utils::pumpswap::coin_creator_vault_ata(
-        pool_state.coin_creator,
-        quote_mint,
-    );
+    let coin_creator_vault_ata =
+        sol_trade_sdk::instruction::utils::pumpswap::coin_creator_vault_ata(
+            pool_state.coin_creator,
+            quote_mint,
+        );
 
     // 构造指令
     let pumpswap_params = PumpSwapParams {

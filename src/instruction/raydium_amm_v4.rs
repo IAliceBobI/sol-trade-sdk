@@ -1,6 +1,6 @@
 use crate::{
     constants::trade_consts::DEFAULT_SLIPPAGE,
-    instruction::utils::raydium_amm_v4::{SWAP_BASE_IN_DISCRIMINATOR, accounts},
+    instruction::utils::raydium_amm_v4::{SWAP_BASE_IN_DISCRIMINATOR, SWAP_BASE_OUT_DISCRIMINATOR, accounts},
     trading::core::{
         params::{RaydiumAmmV4Params, SwapParams},
         traits::InstructionBuilder,
@@ -219,13 +219,35 @@ impl InstructionBuilder for RaydiumAmmV4InstructionBuilder {
             AccountMeta::new(params.payer.pubkey(), true),           // User Source Owner
         ];
         // Create instruction data
-        // 注意：Raydium AMM V4 的 exact_out 交易实际上还是使用 SWAP_BASE_IN 指令
-        // 只是将 minimum_amount_out 设置为固定的输出量即可
-        let mut data = [0u8; 17];
-        data[..1].copy_from_slice(SWAP_BASE_IN_DISCRIMINATOR);
-        data[1..9].copy_from_slice(&amount_in.to_le_bytes());
-        data[9..17].copy_from_slice(&minimum_amount_out.to_le_bytes());
+        // 根据模式选择正确的指令类型和参数
+        // - exact_in 模式：使用 SWAP_BASE_IN (固定输入，计算最小输出)
+        //   参数: [amount_in, minimum_amount_out]
+        // - exact_out 模式：使用 SWAP_BASE_OUT (固定输出，计算最大输入)
+        //   参数: [max_amount_in, amount_out]
+        let discriminator = if params.fixed_output_amount.is_some() {
+            SWAP_BASE_OUT_DISCRIMINATOR
+        } else {
+            SWAP_BASE_IN_DISCRIMINATOR
+        };
 
+        // 在 exact_out 模式下，需要添加滑点缓冲到 max_amount_in
+        // 因为链上会从 max_amount_in 中扣除费用后计算输出
+        // 如果 max_amount_in 刚好等于计算值，扣除费用后可能无法得到足够的输出
+        let (param1, param2) = if params.fixed_output_amount.is_some() {
+            // exact_out: 添加滑点缓冲到 max_amount_in
+            let slippage_bps = params.slippage_basis_points.unwrap_or(DEFAULT_SLIPPAGE) as u64;
+            let max_amount_in = amount_in
+                .saturating_add((amount_in * slippage_bps / 10000).max(1));
+            (max_amount_in, minimum_amount_out)
+        } else {
+            // exact_in: 直接使用计算的值
+            (amount_in, minimum_amount_out)
+        };
+
+        let mut data = [0u8; 17];
+        data[..1].copy_from_slice(discriminator);
+        data[1..9].copy_from_slice(&param1.to_le_bytes());
+        data[9..17].copy_from_slice(&param2.to_le_bytes());
 
         instructions.push(Instruction::new_with_bytes(
             accounts::RAYDIUM_AMM_V4,
@@ -405,10 +427,35 @@ impl InstructionBuilder for RaydiumAmmV4InstructionBuilder {
             AccountMeta::new(params.payer.pubkey(), true),           // User Source Owner
         ];
         // Create instruction data
+        // 根据模式选择正确的指令类型和参数
+        // - exact_in 模式：使用 SWAP_BASE_IN (固定输入，计算最小输出)
+        //   参数: [amount_in, minimum_amount_out]
+        // - exact_out 模式：使用 SWAP_BASE_OUT (固定输出，计算最大输入)
+        //   参数: [max_amount_in, amount_out]
+        let discriminator = if params.fixed_output_amount.is_some() {
+            SWAP_BASE_OUT_DISCRIMINATOR
+        } else {
+            SWAP_BASE_IN_DISCRIMINATOR
+        };
+
+        let amount_in = params.input_amount.unwrap_or(0);
+
+        // 在 exact_out 模式下，需要添加滑点缓冲到 max_amount_in
+        let (param1, param2) = if params.fixed_output_amount.is_some() {
+            // exact_out: 添加滑点缓冲到 max_amount_in
+            let slippage_bps = params.slippage_basis_points.unwrap_or(DEFAULT_SLIPPAGE) as u64;
+            let max_amount_in = amount_in
+                .saturating_add((amount_in * slippage_bps / 10000).max(1));
+            (max_amount_in, minimum_amount_out)
+        } else {
+            // exact_in: 直接使用计算的值
+            (amount_in, minimum_amount_out)
+        };
+
         let mut data = [0u8; 17];
-        data[..1].copy_from_slice(SWAP_BASE_IN_DISCRIMINATOR);
-        data[1..9].copy_from_slice(&params.input_amount.unwrap_or(0).to_le_bytes());
-        data[9..17].copy_from_slice(&minimum_amount_out.to_le_bytes());
+        data[..1].copy_from_slice(discriminator);
+        data[1..9].copy_from_slice(&param1.to_le_bytes());
+        data[9..17].copy_from_slice(&param2.to_le_bytes());
 
         instructions.push(Instruction::new_with_bytes(
             accounts::RAYDIUM_AMM_V4,

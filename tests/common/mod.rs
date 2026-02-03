@@ -157,12 +157,14 @@ pub async fn ensure_ata_with_balance(
 
     for (mint, wrap_amount) in mints_with_amounts {
         // 🔧 动态检测 Token Program（支持 Token-2022）
-        let token_program = match sol_trade_sdk::utils::token::get_token_program_with_cache(rpc_client, mint).await {
-            Ok(program) => program,
-            Err(e) => {
-                return Err(format!("❌ 无法获取 mint {} Token Program: {}", mint, e));
-            }
-        };
+        let token_program =
+            match sol_trade_sdk::utils::token::get_token_program_with_cache(rpc_client, mint).await
+            {
+                Ok(program) => program,
+                Err(e) => {
+                    return Err(format!("❌ 无法获取 mint {} Token Program: {}", mint, e));
+                },
+            };
 
         let ata_address =
             spl_associated_token_account::get_associated_token_address_with_program_id(

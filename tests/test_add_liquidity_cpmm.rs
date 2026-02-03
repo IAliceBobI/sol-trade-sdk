@@ -6,17 +6,15 @@
 //! 3. 使用 deposit 指令添加流动性（100 亿 PIPE 级别）
 //! 4. 验证流动性添加成功
 
-use sol_trade_sdk::liquidity::cpmm::{build_deposit_instruction, calculate_deposit_amounts, CpmmDepositParams};
+use sol_trade_sdk::liquidity::cpmm::{
+    CpmmDepositParams, build_deposit_instruction, calculate_deposit_amounts,
+};
 use sol_trade_sdk::{
+    TradingClient,
     common::{GasFeeStrategy, SolanaRpcClient, TradeConfig},
     instruction::utils::raydium_cpmm::get_pool_by_address,
-    TradingClient,
 };
-use solana_sdk::{
-    pubkey::Pubkey,
-    signer::Signer,
-    transaction::Transaction,
-};
+use solana_sdk::{pubkey::Pubkey, signer::Signer, transaction::Transaction};
 use std::str::FromStr;
 use std::sync::Arc;
 
@@ -63,7 +61,7 @@ async fn test_add_liquidity_to_cpmm_pool() {
         Err(e) => {
             println!("❌ 获取 Pool 失败: {}\n", e);
             return;
-        }
+        },
     };
 
     println!("✅ Pool 状态获取成功:");
@@ -86,11 +84,11 @@ async fn test_add_liquidity_to_cpmm_pool() {
             println!("  Token1 (WSOL): {} lamports", t1_amt);
             println!();
             (t0_amt, t1_amt)
-        }
+        },
         _ => {
             println!("❌ 无法查询金库余额\n");
             return;
-        }
+        },
     };
 
     // 3. 设置测试账户余额（使用空投）
@@ -143,10 +141,10 @@ async fn test_add_liquidity_to_cpmm_pool() {
             println!("  Token0 (PIPE): {}", calc_token0);
             println!("  Token1 (WSOL): {} lamports", calc_token1);
             println!();
-        }
+        },
         None => {
             println!("⚠️  无法计算代币数量，使用固定值\n");
-        }
+        },
     }
 
     // 6. 构建 Deposit 指令
@@ -156,17 +154,19 @@ async fn test_add_liquidity_to_cpmm_pool() {
         &spl_token::id(),
     );
 
-    let token_0_account = spl_associated_token_account::get_associated_token_address_with_program_id(
-        &payer.pubkey(),
-        &pipe_mint,
-        &spl_token::id(),
-    );
+    let token_0_account =
+        spl_associated_token_account::get_associated_token_address_with_program_id(
+            &payer.pubkey(),
+            &pipe_mint,
+            &spl_token::id(),
+        );
 
-    let token_1_account = spl_associated_token_account::get_associated_token_address_with_program_id(
-        &payer.pubkey(),
-        &wsol_mint,
-        &spl_token::id(),
-    );
+    let token_1_account =
+        spl_associated_token_account::get_associated_token_address_with_program_id(
+            &payer.pubkey(),
+            &wsol_mint,
+            &spl_token::id(),
+        );
 
     let deposit_params = CpmmDepositParams {
         pool_state: pool_address, // 使用 pool_address (Pubkey) 而不是 pool_state (PoolState)
@@ -181,8 +181,8 @@ async fn test_add_liquidity_to_cpmm_pool() {
         lp_token_amount,
         // 设置足够高的上限（基于 68B LP 的计算值，加缓冲）
         // 计算值：约 100 亿 PIPE + ~0.045 WSOL
-        maximum_token_0_amount: 12_000_000_000_000_000,   // 120 亿 PIPE (decimals=6)
-        maximum_token_1_amount: 100_000_000_000,          // 100,000 WSOL (lamports)
+        maximum_token_0_amount: 12_000_000_000_000_000, // 120 亿 PIPE (decimals=6)
+        maximum_token_1_amount: 100_000_000_000,        // 100,000 WSOL (lamports)
         token_program: spl_token::id(),
     };
 
@@ -198,21 +198,19 @@ async fn test_add_liquidity_to_cpmm_pool() {
 
     // 7. 创建 LP token ATA（如果不存在）
     println!("🔧 检查并创建 LP token ATA...");
-    let create_lp_ata_instruction = spl_associated_token_account::instruction::create_associated_token_account(
-        &payer.pubkey(),
-        &payer.pubkey(),
-        &pool_state.lp_mint,
-        &spl_token::id(),
-    );
+    let create_lp_ata_instruction =
+        spl_associated_token_account::instruction::create_associated_token_account(
+            &payer.pubkey(),
+            &payer.pubkey(),
+            &pool_state.lp_mint,
+            &spl_token::id(),
+        );
 
     // 先查询 LP ATA 是否存在
     let lp_ata_exists = rpc.get_account(&owner_lp_token).await.is_ok();
 
     // 8. 获取最新 blockhash
-    let blockhash = rpc
-        .get_latest_blockhash()
-        .await
-        .expect("Failed to get blockhash");
+    let blockhash = rpc.get_latest_blockhash().await.expect("Failed to get blockhash");
 
     // 9. 构建并发送交易
     let instructions = if lp_ata_exists {
@@ -248,8 +246,16 @@ async fn test_add_liquidity_to_cpmm_pool() {
                 let new_t1_amt = new_t1.amount.parse::<u64>().unwrap_or(0);
 
                 println!("📊 更新后的金库余额:");
-                println!("  Token0 (PIPE): {} (增加: {})", new_t0_amt, new_t0_amt.saturating_sub(token0_reserve));
-                println!("  Token1 (WSOL): {} (增加: {})", new_t1_amt, new_t1_amt.saturating_sub(token1_reserve));
+                println!(
+                    "  Token0 (PIPE): {} (增加: {})",
+                    new_t0_amt,
+                    new_t0_amt.saturating_sub(token0_reserve)
+                );
+                println!(
+                    "  Token1 (WSOL): {} (增加: {})",
+                    new_t1_amt,
+                    new_t1_amt.saturating_sub(token1_reserve)
+                );
                 println!();
             }
 
@@ -259,17 +265,17 @@ async fn test_add_liquidity_to_cpmm_pool() {
                     let lp_amt = lp_balance.amount.parse::<u64>().unwrap_or(0);
                     println!("🪙 用户 LP 代币余额: {}", lp_amt);
                     println!();
-                }
+                },
                 Err(e) => {
                     println!("⚠️  无法查询 LP 余额: {}\n", e);
-                }
+                },
             }
 
             println!("✅ 流动性添加成功！\n");
-        }
+        },
         Err(e) => {
             println!("❌ 交易失败: {}\n", e);
-        }
+        },
     }
 }
 
@@ -285,7 +291,8 @@ async fn test_swap_after_adding_liquidity() {
     let payer = Arc::new(get_simulation_test_keypair());
 
     // 使用 TradingClient 执行一笔买入
-    let trade_config = TradeConfig::new(rpc_url, vec![], solana_commitment_config::CommitmentConfig::confirmed());
+    let trade_config =
+        TradeConfig::new(rpc_url, vec![], solana_commitment_config::CommitmentConfig::confirmed());
     let client = TradingClient::new(payer.clone(), trade_config).await;
 
     let pipe_mint = Pubkey::from_str(PIPE_MINT).unwrap();

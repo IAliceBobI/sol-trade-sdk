@@ -475,9 +475,12 @@ fn parse_raydium_amm_v4_log_data(ray_log_base64: &str) -> Option<(u64, u64)> {
         match direction {
             512 => {
                 // 买入 exact_out: WSOL -> USDC
-                // offset 0: 输入 WSOL / 256
-                // offset 8: 输出 USDC / 256 / 100
-                (raw_in / 256, raw_out / 256 / 100)
+                // 根据 raydium-amm processor.rs 的 SwapBaseOutLog 结构:
+                // - offset 0: max_in (最大输入)
+                // - offset 8: amount_out (实际输出，已包含单位转换)
+                // - offset 16: direction
+                // 公式应该与 exact_in 类似，但不需要额外乘除
+                (raw_in / 256, raw_out / 256)
             },
             256 => {
                 // 卖出 exact_out: USDC -> WSOL

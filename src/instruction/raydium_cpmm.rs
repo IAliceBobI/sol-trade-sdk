@@ -154,7 +154,8 @@ impl InstructionBuilder for RaydiumCpmmInstructionBuilder {
             params.open_seed_optimize,
         );
 
-        let input_vault_account = get_vault_account(&pool_state, &params.input_mint, protocol_params);
+        let input_vault_account =
+            get_vault_account(&pool_state, &params.input_mint, protocol_params);
         let output_vault_account =
             get_vault_account(&pool_state, &params.output_mint, protocol_params);
 
@@ -326,7 +327,8 @@ impl InstructionBuilder for RaydiumCpmmInstructionBuilder {
             params.open_seed_optimize,
         );
 
-        let output_vault_account = get_vault_account(&pool_state, &params.output_mint, protocol_params);
+        let output_vault_account =
+            get_vault_account(&pool_state, &params.output_mint, protocol_params);
         let input_vault_account =
             get_vault_account(&pool_state, &params.input_mint, protocol_params);
 
