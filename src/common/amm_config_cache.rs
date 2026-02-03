@@ -125,6 +125,7 @@ mod tests {
     use super::*;
 
     #[test]
+    #[serial_test::serial]
     fn test_cache_insert_and_get() {
         AmmConfigCache::clear();
 
@@ -146,6 +147,7 @@ mod tests {
     }
 
     #[test]
+    #[serial_test::serial]
     fn test_cache_miss() {
         AmmConfigCache::clear();
 
@@ -154,6 +156,7 @@ mod tests {
     }
 
     #[test]
+    #[serial_test::serial]
     fn test_cache_clear() {
         AmmConfigCache::clear();
 
@@ -168,19 +171,25 @@ mod tests {
     }
 
     #[test]
+    #[serial_test::serial]
     fn test_cache_stats() {
+        // 清理缓存以确保测试隔离
         AmmConfigCache::clear();
 
         let config = AmmConfig::default();
 
+        // 插入 5 个唯一的缓存条目
         for _ in 0..5 {
             let pubkey = Pubkey::new_unique();
             AmmConfigCache::insert(pubkey, config.clone());
         }
 
         let (total, valid, expired) = AmmConfigCache::stats();
-        assert_eq!(total, 5);
-        assert_eq!(valid, 5);
-        assert_eq!(expired, 0);
+        assert_eq!(total, 5, "总条目数应该为 5");
+        assert_eq!(valid, 5, "有效条目数应该为 5");
+        assert_eq!(expired, 0, "过期条目数应该为 0");
+
+        // 测试完成后清理
+        AmmConfigCache::clear();
     }
 }

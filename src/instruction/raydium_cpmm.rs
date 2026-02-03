@@ -144,8 +144,9 @@ impl InstructionBuilder for RaydiumCpmmInstructionBuilder {
             params.open_seed_optimize,
         );
         // 获取输出 token 的 program（支持 Token-2022）
-        let output_token_program = crate::utils::token::get_token_program_cached(&params.output_mint)
-            .unwrap_or(crate::constants::TOKEN_PROGRAM);
+        let output_token_program =
+            crate::utils::token::get_token_program_cached(&params.output_mint)
+                .unwrap_or(crate::constants::TOKEN_PROGRAM);
         let output_token_account = get_associated_token_address_with_program_id_fast_use_seed(
             &params.payer.pubkey(),
             &params.output_mint,
@@ -322,8 +323,9 @@ impl InstructionBuilder for RaydiumCpmmInstructionBuilder {
             params.open_seed_optimize,
         );
         // 获取输出 token 的 program（支持 Token-2022）
-        let output_token_program = crate::utils::token::get_token_program_cached(&params.output_mint)
-            .unwrap_or(crate::constants::TOKEN_PROGRAM);
+        let output_token_program =
+            crate::utils::token::get_token_program_cached(&params.output_mint)
+                .unwrap_or(crate::constants::TOKEN_PROGRAM);
         let output_token_account = get_associated_token_address_with_program_id_fast_use_seed(
             &params.payer.pubkey(),
             &params.output_mint,
