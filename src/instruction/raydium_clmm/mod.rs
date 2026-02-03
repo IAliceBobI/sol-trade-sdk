@@ -5,6 +5,7 @@
 //! ## 架构
 //!
 //! - **builder.rs**: InstructionBuilder trait 的实现
+//! - **builder_helpers.rs**: 指令构建辅助函数（tick arrays、账户列表等）
 //! - **helpers.rs**: 辅助函数（滑点计算、价格计算等）
 //!
 //! ## 使用示例
@@ -18,7 +19,9 @@
 //! ```
 
 mod builder;
+mod builder_helpers;
 mod helpers;
 
 pub use builder::RaydiumClmmInstructionBuilder;
+pub use builder_helpers::{calculate_slippage_amount, get_swap_tick_arrays, MAX_SQRT_PRICE_X64, MIN_SQRT_PRICE_X64};
 pub use helpers::{amount_with_slippage, fallback_price_calculation};
