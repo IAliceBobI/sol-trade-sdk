@@ -146,22 +146,35 @@ pub async fn simulate_swap_transaction(
     // 方法 4: 从 inner instructions 解析 Transfer/TransferChecked
     // 方法 5: 解析日志中的 Token Transfer（备用方案）
 
-    let (actual_input_amount, actual_output_amount) = if let Some(logs) = &simulate_result.value.logs {
-        // 优先尝试解析 Raydium AMM V4 ray_log
-        if let Some(result) = parse_raydium_amm_v4_ray_log(logs) {
-            result
-        // 尝试解析 Raydium CPMM Program data
-        } else if let Some(result) = parse_raydium_cpmm_program_data(logs) {
-            result
-        // 回退到 parse_transfer_amounts_from_logs
-        } else if let Some(result) = parse_transfer_amounts_from_logs(
-            logs,
-            &user_input_token_account,
-            &user_output_token_account,
-        ) {
-            result
+    let (actual_input_amount, actual_output_amount) =
+        if let Some(logs) = &simulate_result.value.logs {
+            // 优先尝试解析 Raydium AMM V4 ray_log
+            if let Some(result) = parse_raydium_amm_v4_ray_log(logs) {
+                result
+            // 尝试解析 Raydium CPMM Program data
+            } else if let Some(result) = parse_raydium_cpmm_program_data(logs) {
+                result
+            // 回退到 parse_transfer_amounts_from_logs
+            } else if let Some(result) = parse_transfer_amounts_from_logs(
+                logs,
+                &user_input_token_account,
+                &user_output_token_account,
+            ) {
+                result
+            } else if let Some(ref amounts) = transfer_amounts {
+                // 回退到 inner instructions
+                if amounts.len() >= 2 {
+                    (amounts[0].1, amounts[1].1)
+                } else if amounts.len() == 1 {
+                    (0, amounts[0].1)
+                } else {
+                    (0, 0)
+                }
+            } else {
+                (0, 0)
+            }
         } else if let Some(ref amounts) = transfer_amounts {
-            // 回退到 inner instructions
+            // 没有 logs 时，使用 inner instructions
             if amounts.len() >= 2 {
                 (amounts[0].1, amounts[1].1)
             } else if amounts.len() == 1 {
@@ -171,19 +184,7 @@ pub async fn simulate_swap_transaction(
             }
         } else {
             (0, 0)
-        }
-    } else if let Some(ref amounts) = transfer_amounts {
-        // 没有 logs 时，使用 inner instructions
-        if amounts.len() >= 2 {
-            (amounts[0].1, amounts[1].1)
-        } else if amounts.len() == 1 {
-            (0, amounts[0].1)
-        } else {
-            (0, 0)
-        }
-    } else {
-        (0, 0)
-    };
+        };
 
     // 模拟不改变链上状态，所以余额不变
     let input_balance_after = input_balance_before;
@@ -402,8 +403,6 @@ fn parse_return_data(return_data_base64: &str) -> Option<(u64, u64)> {
 /// * `Some((amount_in, amount_out))` - 解析成功
 /// * `None` - 解析失败
 fn parse_raydium_amm_v4_ray_log(logs: &[String]) -> Option<(u64, u64)> {
-    
-
     // 查找包含 "ray_log:" 的日志行
     for log in logs {
         if let Some(start) = log.find("ray_log: ") {
@@ -530,8 +529,6 @@ fn parse_raydium_amm_v4_log_data(ray_log_base64: &str) -> Option<(u64, u64)> {
 /// * `Some((amount_in, amount_out))` - 解析成功
 /// * `None` - 解析失败
 fn parse_raydium_cpmm_program_data(logs: &[String]) -> Option<(u64, u64)> {
-    
-
     // 检查是否是 CLMM 交易（包含 "SwapV2" 指令）
     let is_clmm = logs.iter().any(|log| log.contains("SwapV2"));
 

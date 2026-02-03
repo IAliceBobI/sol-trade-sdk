@@ -47,7 +47,6 @@ const WSOL_MINT: &str = "So11111111111111111111111111111111111111112";
 // ========================================
 
 #[tokio::test]
-
 #[serial_test::serial]
 async fn test_pumpswap_exact_in_buy_with_simulation() {
     println!("====================================================");
@@ -94,17 +93,16 @@ async fn test_pumpswap_exact_in_buy_with_simulation() {
     };
 
     // 获取 Token 信息和 decimals
-    let (input_decimals, output_decimals) =
-        match (
-            sol_trade_sdk::utils::token::get_token_decimals(&rpc, &wsol_mint).await,
-            sol_trade_sdk::utils::token::get_token_decimals(&rpc, &pump_mint).await,
-        ) {
-            (Ok(d1), Ok(d2)) => (d1, d2),
-            (e1, e2) => {
-                println!("❌ 获取 decimals 失败: {:?}, {:?}\n", e1, e2);
-                return;
-            },
-        };
+    let (input_decimals, output_decimals) = match (
+        sol_trade_sdk::utils::token::get_token_decimals(&rpc, &wsol_mint).await,
+        sol_trade_sdk::utils::token::get_token_decimals(&rpc, &pump_mint).await,
+    ) {
+        (Ok(d1), Ok(d2)) => (d1, d2),
+        (e1, e2) => {
+            println!("❌ 获取 decimals 失败: {:?}, {:?}\n", e1, e2);
+            return;
+        },
+    };
 
     let input_formatted = amount_in as f64 / 10_f64.powi(input_decimals as i32);
     println!("╔══════════════════════════════════════════════════════════════════╗");
@@ -127,20 +125,21 @@ async fn test_pumpswap_exact_in_buy_with_simulation() {
     println!();
 
     // 本地计算
-    let (local_output, fee_amount) = match quote_exact_in(&rpc, &pool_address, amount_in, false).await {
-        // false: quote -> base (买入 PUMP)
-        Ok(quote) => {
-            println!("📊 本地 Quote 计算:");
-            println!("  输入: {} lamports WSOL", amount_in);
-            println!("  输出: {} PUMP tokens", quote.amount_out);
-            println!("  手续费: {} lamports", quote.fee_amount);
-            (quote.amount_out, quote.fee_amount)
-        },
-        Err(e) => {
-            println!("❌ 本地计算失败: {}\n", e);
-            return;
-        },
-    };
+    let (local_output, fee_amount) =
+        match quote_exact_in(&rpc, &pool_address, amount_in, false).await {
+            // false: quote -> base (买入 PUMP)
+            Ok(quote) => {
+                println!("📊 本地 Quote 计算:");
+                println!("  输入: {} lamports WSOL", amount_in);
+                println!("  输出: {} PUMP tokens", quote.amount_out);
+                println!("  手续费: {} lamports", quote.fee_amount);
+                (quote.amount_out, quote.fee_amount)
+            },
+            Err(e) => {
+                println!("❌ 本地计算失败: {}\n", e);
+                return;
+            },
+        };
 
     println!();
 
@@ -313,7 +312,10 @@ async fn test_pumpswap_exact_in_buy_with_simulation() {
     println!("│                    │ 最小单位     │ 可读单位 (PUMP)             │");
     println!("├─────────────────────────────────────────────────────────────────┤");
     println!("│ 本地计算             │ {:>12} │ {:>20} │", local_output, local_output_formatted);
-    println!("│ 链上模拟             │ {:>12} │ {:>20} │", simulated_output, simulated_output_formatted);
+    println!(
+        "│ 链上模拟             │ {:>12} │ {:>20} │",
+        simulated_output, simulated_output_formatted
+    );
 
     let diff = local_output.abs_diff(simulated_output);
     let error_rate =
@@ -339,7 +341,6 @@ async fn test_pumpswap_exact_in_buy_with_simulation() {
 // ========================================
 
 #[tokio::test]
-
 #[serial_test::serial]
 async fn test_pumpswap_exact_in_sell_with_simulation() {
     println!("====================================================");
@@ -385,17 +386,16 @@ async fn test_pumpswap_exact_in_sell_with_simulation() {
     };
 
     // 获取 Token 信息和 decimals
-    let (input_decimals, output_decimals) =
-        match (
-            sol_trade_sdk::utils::token::get_token_decimals(&rpc, &pump_mint).await,
-            sol_trade_sdk::utils::token::get_token_decimals(&rpc, &wsol_mint).await,
-        ) {
-            (Ok(d1), Ok(d2)) => (d1, d2),
-            (e1, e2) => {
-                println!("❌ 获取 decimals 失败: {:?}, {:?}\n", e1, e2);
-                return;
-            },
-        };
+    let (input_decimals, output_decimals) = match (
+        sol_trade_sdk::utils::token::get_token_decimals(&rpc, &pump_mint).await,
+        sol_trade_sdk::utils::token::get_token_decimals(&rpc, &wsol_mint).await,
+    ) {
+        (Ok(d1), Ok(d2)) => (d1, d2),
+        (e1, e2) => {
+            println!("❌ 获取 decimals 失败: {:?}, {:?}\n", e1, e2);
+            return;
+        },
+    };
 
     let input_formatted = amount_in as f64 / 10_f64.powi(input_decimals as i32);
     println!("╔══════════════════════════════════════════════════════════════════╗");
@@ -645,7 +645,10 @@ async fn test_pumpswap_exact_in_sell_with_simulation() {
     println!("│                    │ 最小单位      │ 可读单位 (WSOL)             │");
     println!("├─────────────────────────────────────────────────────────────────┤");
     println!("│ 本地计算             │ {:>12} │ {:>20} │", local_output, local_output_formatted);
-    println!("│ 链上模拟             │ {:>12} │ {:>20} │", simulated_output, simulated_output_formatted);
+    println!(
+        "│ 链上模拟             │ {:>12} │ {:>20} │",
+        simulated_output, simulated_output_formatted
+    );
 
     let diff = local_output.abs_diff(simulated_output);
     let error_rate =
@@ -671,7 +674,6 @@ async fn test_pumpswap_exact_in_sell_with_simulation() {
 // ========================================
 
 #[tokio::test]
-
 #[serial_test::serial]
 async fn test_pumpswap_exact_out_buy_with_simulation() {
     println!("====================================================");
@@ -721,17 +723,16 @@ async fn test_pumpswap_exact_out_buy_with_simulation() {
     };
 
     // 获取 Token 信息和 decimals
-    let (input_decimals, output_decimals) =
-        match (
-            sol_trade_sdk::utils::token::get_token_decimals(&rpc, &wsol_mint).await,
-            sol_trade_sdk::utils::token::get_token_decimals(&rpc, &pump_mint).await,
-        ) {
-            (Ok(d1), Ok(d2)) => (d1, d2),
-            (e1, e2) => {
-                println!("❌ 获取 decimals 失败: {:?}, {:?}\n", e1, e2);
-                return;
-            },
-        };
+    let (input_decimals, output_decimals) = match (
+        sol_trade_sdk::utils::token::get_token_decimals(&rpc, &wsol_mint).await,
+        sol_trade_sdk::utils::token::get_token_decimals(&rpc, &pump_mint).await,
+    ) {
+        (Ok(d1), Ok(d2)) => (d1, d2),
+        (e1, e2) => {
+            println!("❌ 获取 decimals 失败: {:?}, {:?}\n", e1, e2);
+            return;
+        },
+    };
 
     let amount_out_formatted = amount_out as f64 / 10_f64.powi(output_decimals as i32);
     println!("╔══════════════════════════════════════════════════════════════════╗");
@@ -906,7 +907,10 @@ async fn test_pumpswap_exact_out_buy_with_simulation() {
     println!("│                    │ 最小单位     │ 可读单位 (PUMP)             │");
     println!("├─────────────────────────────────────────────────────────────────┤");
     println!("│ 期望输出             │ {:>12} │ {:>20} │", amount_out, amount_out_formatted);
-    println!("│ 链上模拟             │ {:>12} │ {:>20} │", simulated_output, simulated_output_formatted);
+    println!(
+        "│ 链上模拟             │ {:>12} │ {:>20} │",
+        simulated_output, simulated_output_formatted
+    );
 
     let diff = amount_out.abs_diff(simulated_output);
     let error_rate =
@@ -932,7 +936,6 @@ async fn test_pumpswap_exact_out_buy_with_simulation() {
 // ========================================
 
 #[tokio::test]
-
 #[serial_test::serial]
 async fn test_pumpswap_exact_out_sell_with_simulation() {
     println!("====================================================");
@@ -978,17 +981,16 @@ async fn test_pumpswap_exact_out_sell_with_simulation() {
     };
 
     // 获取 Token 信息和 decimals
-    let (input_decimals, output_decimals) =
-        match (
-            sol_trade_sdk::utils::token::get_token_decimals(&rpc, &pump_mint).await,
-            sol_trade_sdk::utils::token::get_token_decimals(&rpc, &wsol_mint).await,
-        ) {
-            (Ok(d1), Ok(d2)) => (d1, d2),
-            (e1, e2) => {
-                println!("❌ 获取 decimals 失败: {:?}, {:?}\n", e1, e2);
-                return;
-            },
-        };
+    let (input_decimals, output_decimals) = match (
+        sol_trade_sdk::utils::token::get_token_decimals(&rpc, &pump_mint).await,
+        sol_trade_sdk::utils::token::get_token_decimals(&rpc, &wsol_mint).await,
+    ) {
+        (Ok(d1), Ok(d2)) => (d1, d2),
+        (e1, e2) => {
+            println!("❌ 获取 decimals 失败: {:?}, {:?}\n", e1, e2);
+            return;
+        },
+    };
 
     let amount_out_formatted = amount_out as f64 / 10_f64.powi(output_decimals as i32);
     println!("╔══════════════════════════════════════════════════════════════════╗");
@@ -1163,7 +1165,10 @@ async fn test_pumpswap_exact_out_sell_with_simulation() {
     println!("│                    │ 最小单位      │ 可读单位 (WSOL)             │");
     println!("├─────────────────────────────────────────────────────────────────┤");
     println!("│ 期望输出             │ {:>12} │ {:>20} │", amount_out, amount_out_formatted);
-    println!("│ 链上模拟             │ {:>12} │ {:>20} │", simulated_output, simulated_output_formatted);
+    println!(
+        "│ 链上模拟             │ {:>12} │ {:>20} │",
+        simulated_output, simulated_output_formatted
+    );
 
     let diff = amount_out.abs_diff(simulated_output);
     let error_rate =

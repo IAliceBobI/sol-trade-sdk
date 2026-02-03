@@ -52,7 +52,7 @@ struct TestResult {
 }
 
 #[tokio::test]
-#[serial_test::serial]
+#[serial_test::serial(pipe_wsol_pool_tests)]
 async fn test_comprehensive_dex_comparison() {
     println!("====================================================");
     println!("DEX Comprehensive Comparison Test");
