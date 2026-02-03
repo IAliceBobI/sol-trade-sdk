@@ -44,12 +44,23 @@ pub struct SwapState {
     pub amount_specified_remaining: u64,
     /// 已计算的输出量
     pub amount_calculated: u64,
+    /// 累计手续费
+    pub fee_amount: u64,
     /// 当前价格
     pub sqrt_price_x64: u128,
     /// 当前 tick
     pub tick: i32,
     /// 当前流动性
     pub liquidity: u128,
+}
+
+/// CLMM Swap 计算结果
+#[derive(Debug, Clone, Copy)]
+pub struct SwapCalculationResult {
+    /// 输出金额
+    pub amount_out: u64,
+    /// 累计手续费
+    pub fee_amount: u64,
 }
 
 /// 单步计算结果（为了向后兼容保留，实际使用官方 OfficialSwapStep）
@@ -144,7 +155,7 @@ pub fn calculate_swap_amount_with_tick_arrays(
     fee_rate: u32,
     zero_for_one: bool,
     tick_arrays: &[(i32, Vec<(i32, i128, u128)>)], // (start_index, [(tick, liquidity_net, liquidity_gross)])
-) -> Result<u64, &'static str> {
+) -> Result<SwapCalculationResult, &'static str> {
     if amount_specified == 0 {
         return Err("amount_specified must not be 0");
     }
@@ -172,6 +183,7 @@ pub fn calculate_swap_amount_with_tick_arrays(
     let mut state = SwapState {
         amount_specified_remaining: amount_specified,
         amount_calculated: 0,
+        fee_amount: 0,
         sqrt_price_x64,
         tick: tick_current,
         liquidity,
@@ -235,6 +247,12 @@ pub fn calculate_swap_amount_with_tick_arrays(
             step.amount_out = swap_step.amount_out;
             step.fee_amount = swap_step.fee_amount;
 
+            // 累计手续费
+            state.fee_amount = state
+                .fee_amount
+                .checked_add(step.fee_amount)
+                .ok_or("fee amount overflow")?;
+
             // 更新剩余量和计算量
             state.amount_specified_remaining = state
                 .amount_specified_remaining
@@ -277,7 +295,10 @@ pub fn calculate_swap_amount_with_tick_arrays(
         }
     }
 
-    Ok(state.amount_calculated)
+    Ok(SwapCalculationResult {
+        amount_out: state.amount_calculated,
+        fee_amount: state.fee_amount,
+    })
 }
 
 /// 在 tick arrays 中找到下一个初始化的 tick

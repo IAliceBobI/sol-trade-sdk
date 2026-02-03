@@ -215,7 +215,7 @@ impl InstructionBuilder for RaydiumClmmInstructionBuilder {
                         zero_for_one,
                         &tick_data,
                     ) {
-                        Ok(amount) => amount,
+                        Ok(result) => result.amount_out,
                         Err(_e) => fallback_price_calculation(
                             amount_in,
                             pool_state.sqrt_price_x64,
@@ -539,7 +539,7 @@ impl InstructionBuilder for RaydiumClmmInstructionBuilder {
                         zero_for_one,
                         &tick_data,
                     ) {
-                        Ok(amount) => amount,
+                        Ok(result) => result.amount_out,
                         Err(_e) => fallback_price_calculation(
                             amount_in,
                             pool_state.sqrt_price_x64,

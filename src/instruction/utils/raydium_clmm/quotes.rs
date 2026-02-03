@@ -71,7 +71,7 @@ pub async fn quote_exact_in(
     }
 
     // 使用完整版 CLMM 计算
-    let amount_out = crate::utils::calc::raydium_clmm::calculate_swap_amount_with_tick_arrays(
+    let result = crate::utils::calc::raydium_clmm::calculate_swap_amount_with_tick_arrays(
         amount_in,
         pool_state.sqrt_price_x64,
         pool_state.liquidity,
@@ -84,8 +84,8 @@ pub async fn quote_exact_in(
     .map_err(|e| anyhow!("CLMM calculation failed: {}", e))?;
 
     Ok(crate::utils::quote::QuoteExactInResult {
-        amount_out,
-        fee_amount: 0,          // TODO: 计算实际费用
+        amount_out: result.amount_out,
+        fee_amount: result.fee_amount,
         price_impact_bps: None, // TODO: 使用执行价格 vs spot 价格计算
         extra_accounts_read: tick_arrays.len(),
     })
