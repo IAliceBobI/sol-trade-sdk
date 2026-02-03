@@ -2,7 +2,10 @@
 //!
 //! 测试场景: 卖出 PIPE 换取 WSOL (指定输入金额)
 //!
-//! ⚠️ 注意: 此测试暂时被禁用，需要修复 parse_raydium_cpmm_data 解析逻辑
+//! ⚠️ 注意: 此测试暂时被禁用
+//!
+//! 问题: CPMM quote 计算有 ~0.54% 的误差，需要从 amm_config 账户读取实际费率
+//!       而不是使用硬编码的费率常量
 //!
 //! 运行测试:
 //!     cargo nextest run verify_raydium_cpmm_exact_in_sell -- --nocapture --ignored
@@ -38,7 +41,7 @@ const PIPE_MINT: &str = "8ycz3kctoRb4LFrtoYG2r8tRyUYUeGf5Q16M2TEMp7A";
 
 #[tokio::test]
 #[serial_test::serial(pipe_wsol_pool_tests)]
-#[ignore = "TODO: 修复 parse_raydium_cpmm_data 解析逻辑 - 除数 865 可能不正确"]
+#[ignore = "TODO: 修复 CPMM quote 计算 - 需要从 amm_config 读取实际费率"]
 async fn test_raydium_cpmm_exact_in_sell_with_simulation() {
     println!("====================================================");
     println!("Test 2: Raydium CPMM Exact In Sell (PIPE -> WSOL)");
