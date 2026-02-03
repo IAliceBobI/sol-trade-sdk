@@ -248,10 +248,8 @@ pub fn calculate_swap_amount_with_tick_arrays(
             step.fee_amount = swap_step.fee_amount;
 
             // 累计手续费
-            state.fee_amount = state
-                .fee_amount
-                .checked_add(step.fee_amount)
-                .ok_or("fee amount overflow")?;
+            state.fee_amount =
+                state.fee_amount.checked_add(step.fee_amount).ok_or("fee amount overflow")?;
 
             // 更新剩余量和计算量
             state.amount_specified_remaining = state
@@ -468,9 +466,8 @@ pub fn calculate_swap_exact_out_with_tick_arrays(
             let step_fee = swap_step.fee_amount;
 
             // 累计手续费
-            fee_amount_calculated = fee_amount_calculated
-                .checked_add(step_fee)
-                .ok_or("fee amount overflow")?;
+            fee_amount_calculated =
+                fee_amount_calculated.checked_add(step_fee).ok_or("fee amount overflow")?;
 
             // 更新剩余输出和累计输入
             amount_out_remaining = amount_out_remaining

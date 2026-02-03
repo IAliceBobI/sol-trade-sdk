@@ -54,7 +54,8 @@ async fn get_raydium_cpmm_fee(
             pool_address,
             amount_out,
             is_token0_in,
-        ).await;
+        )
+        .await;
         result.map(|q| q.fee_amount).map_err(|e| format!("Quote failed: {}", e))
     } else {
         // exact_in 模式
@@ -64,7 +65,8 @@ async fn get_raydium_cpmm_fee(
             pool_address,
             amount_in,
             is_token0_in,
-        ).await;
+        )
+        .await;
         result.map(|q| q.fee_amount).map_err(|e| format!("Quote failed: {}", e))
     }
 }
@@ -90,7 +92,8 @@ async fn get_raydium_amm_v4_fee(
             pool_address,
             amount_out,
             is_coin_in,
-        ).await;
+        )
+        .await;
         result.map(|q| q.fee_amount).map_err(|e| format!("Quote failed: {}", e))
     } else {
         // exact_in 模式
@@ -100,7 +103,8 @@ async fn get_raydium_amm_v4_fee(
             pool_address,
             amount_in,
             is_coin_in,
-        ).await;
+        )
+        .await;
         result.map(|q| q.fee_amount).map_err(|e| format!("Quote failed: {}", e))
     }
 }
@@ -126,7 +130,8 @@ async fn get_raydium_clmm_fee(
             pool_address,
             amount_out,
             zero_for_one,
-        ).await;
+        )
+        .await;
         result.map(|q| q.fee_amount).map_err(|e| format!("Quote failed: {}", e))
     } else {
         // exact_in 模式
@@ -136,7 +141,8 @@ async fn get_raydium_clmm_fee(
             pool_address,
             amount_in,
             zero_for_one,
-        ).await;
+        )
+        .await;
         result.map(|q| q.fee_amount).map_err(|e| format!("Quote failed: {}", e))
     }
 }
@@ -162,7 +168,8 @@ async fn get_pumpswap_fee(
             pool_address,
             amount_out,
             is_base_in,
-        ).await;
+        )
+        .await;
         result.map(|q| q.fee_amount).map_err(|e| format!("Quote failed: {}", e))
     } else {
         // exact_in 模式
@@ -172,7 +179,8 @@ async fn get_pumpswap_fee(
             pool_address,
             amount_in,
             is_base_in,
-        ).await;
+        )
+        .await;
         result.map(|q| q.fee_amount).map_err(|e| format!("Quote failed: {}", e))
     }
 }

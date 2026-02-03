@@ -7,9 +7,9 @@
 //!
 //! 用于查找已初始化的 tick array，支持向前和向后搜索。
 
+use crate::instruction::utils::raydium_clmm::constants::TICKS_PER_ARRAY;
 use crate::instruction::utils::raydium_clmm_types::PoolState;
 use crate::utils::calc::clmm_math::big_num::U1024;
-use crate::instruction::utils::raydium_clmm::constants::TICKS_PER_ARRAY;
 
 pub const TICK_ARRAY_BITMAP_SIZE: i32 = 512;
 
@@ -33,7 +33,7 @@ pub fn check_current_tick_array_is_initialized(
     tick_spacing: u16,
 ) -> Option<(bool, i32)> {
     // 检查边界
-    if tick_current < -443636 || tick_current > 443636 {
+    if !(-443636..=443636).contains(&tick_current) {
         return None;
     }
 
@@ -43,7 +43,7 @@ pub fn check_current_tick_array_is_initialized(
         // 向下取整（朝负无穷方向）
         compressed -= 1;
     }
-    let bit_pos = compressed.abs() as usize;
+    let bit_pos = compressed.unsigned_abs() as usize;
 
     // 检查当前位是否已设置
     let initialized = bitmap.bit(bit_pos);
@@ -97,7 +97,7 @@ pub fn next_initialized_tick_array_start_index(
         // 向下取整（朝负无穷方向）
         compressed -= 1;
     }
-    let bit_pos = compressed.abs() as usize;
+    let bit_pos = compressed.unsigned_abs() as usize;
 
     if zero_for_one {
         // tick 从高到低（向前搜索）

@@ -76,13 +76,7 @@ impl AmmConfigCache {
     /// * `config` - 费率配置数据
     #[inline]
     pub fn insert(amm_config: Pubkey, config: AmmConfig) {
-        CACHE.insert(
-            amm_config,
-            CacheEntry {
-                config,
-                created_at: Instant::now(),
-            },
-        );
+        CACHE.insert(amm_config, CacheEntry { config, created_at: Instant::now() });
     }
 
     /// 清除所有缓存

@@ -3,8 +3,8 @@
 use crate::{
     common::SolanaRpcClient,
     constants::{SOL_MINT, USDC_MINT, USDT_MINT, WSOL_TOKEN_ACCOUNT},
-    instruction::utils::{
-        raydium_cpmm::{constants::DEFAULT_WSOL_USDT_CLMM_POOL, fee_queries, pool_queries},
+    instruction::utils::raydium_cpmm::{
+        constants::DEFAULT_WSOL_USDT_CLMM_POOL, fee_queries, pool_queries,
     },
     utils::price::raydium_cpmm::{price_base_in_quote, price_quote_in_base},
     utils::quote::{QuoteExactInResult, QuoteExactOutResult},

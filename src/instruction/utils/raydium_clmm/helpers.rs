@@ -139,9 +139,5 @@ pub fn get_first_initialized_tick_array_start_index(
     );
 
     // 如果找到，返回下一个 array；否则返回当前 array
-    if found {
-        next_array_start
-    } else {
-        current_array_start
-    }
+    if found { next_array_start } else { current_array_start }
 }

@@ -330,18 +330,18 @@ pub fn build_initialize_v2_instruction(
 
     // Build accounts (order matters! - same as initialize)
     let accounts = vec![
-        AccountMeta::new(*payer, true),                     // payer
-        AccountMeta::new_readonly(*creator, false),         // creator
-        AccountMeta::new_readonly(*global_config, false),   // global_config
-        AccountMeta::new_readonly(*platform_config, false), // platform_config
-        AccountMeta::new_readonly(authority, false),        // authority
-        AccountMeta::new(pool_state, false),                // pool_state
-        AccountMeta::new(*mint, true),                      // base_mint (signer!)
-        AccountMeta::new_readonly(*quote_mint, false),      // quote_mint
-        AccountMeta::new(base_vault, false),                // base_vault
-        AccountMeta::new(quote_vault, false),               // quote_vault
-        AccountMeta::new(metadata_account, false),         // metadata_account (PDA, may not exist yet)
-        AccountMeta::new_readonly(*base_token_program, false),  // base_token_program
+        AccountMeta::new(*payer, true),                                // payer
+        AccountMeta::new_readonly(*creator, false),                    // creator
+        AccountMeta::new_readonly(*global_config, false),              // global_config
+        AccountMeta::new_readonly(*platform_config, false),            // platform_config
+        AccountMeta::new_readonly(authority, false),                   // authority
+        AccountMeta::new(pool_state, false),                           // pool_state
+        AccountMeta::new(*mint, true),                                 // base_mint (signer!)
+        AccountMeta::new_readonly(*quote_mint, false),                 // quote_mint
+        AccountMeta::new(base_vault, false),                           // base_vault
+        AccountMeta::new(quote_vault, false),                          // quote_vault
+        AccountMeta::new(metadata_account, false), // metadata_account (PDA, may not exist yet)
+        AccountMeta::new_readonly(*base_token_program, false), // base_token_program
         AccountMeta::new_readonly(*quote_token_program, false), // quote_token_program
         AccountMeta::new_readonly(accounts::METADATA_PROGRAM, false), // metadata_program
         AccountMeta::new_readonly(accounts::SYSTEM_PROGRAM, false), // system_program
@@ -421,9 +421,9 @@ pub fn build_migrate_to_cpswap_instruction(
         AccountMeta::new_readonly(*global_config, false),         // global_config
         AccountMeta::new(base_vault, false),                      // base_vault
         AccountMeta::new(quote_vault, false),                     // quote_vault
-        AccountMeta::new(pool_lp_token, false),                      // pool_lp_token
-        AccountMeta::new_readonly(*base_token_program, false),      // base_token_program
-        AccountMeta::new_readonly(*quote_token_program, false),     // quote_token_program
+        AccountMeta::new(pool_lp_token, false),                   // pool_lp_token
+        AccountMeta::new_readonly(*base_token_program, false),    // base_token_program
+        AccountMeta::new_readonly(*quote_token_program, false),   // quote_token_program
         AccountMeta::new_readonly(accounts::ASSOCIATED_TOKEN_PROGRAM, false), // associated_token_program
         AccountMeta::new_readonly(accounts::SYSTEM_PROGRAM, false),           // system_program
         AccountMeta::new_readonly(accounts::RENT_SYSVAR, false),              // rent_program

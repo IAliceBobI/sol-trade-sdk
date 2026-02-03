@@ -27,8 +27,8 @@
 //! - [ ] 或者临时放宽误差容忍度到 1%
 
 use crate::{
-    common::{amm_config_cache::AmmConfigCache, SolanaRpcClient},
-    instruction::utils::raydium_cpmm_types::{amm_config_decode, AmmConfig},
+    common::{SolanaRpcClient, amm_config_cache::AmmConfigCache},
+    instruction::utils::raydium_cpmm_types::{AmmConfig, amm_config_decode},
 };
 use anyhow::anyhow;
 use solana_sdk::pubkey::Pubkey;
@@ -111,8 +111,8 @@ pub async fn get_amm_config_fees(
         return Err(anyhow!("AmmConfig account data too short: {}", account.data.len()));
     }
 
-    let config =
-        amm_config_decode(&account.data[8..]).ok_or_else(|| anyhow!("Failed to decode AmmConfig"))?;
+    let config = amm_config_decode(&account.data[8..])
+        .ok_or_else(|| anyhow!("Failed to decode AmmConfig"))?;
 
     // 4. 存入缓存
     AmmConfigCache::insert(*amm_config, config.clone());
