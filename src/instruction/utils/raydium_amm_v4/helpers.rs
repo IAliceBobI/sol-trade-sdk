@@ -5,7 +5,7 @@ use crate::instruction::utils::raydium_amm_v4_types::AmmInfo;
 
 /// 判断是否为 Hot Mint（主流桥接资产）
 /// 当前包含：WSOL、USDC、USDT
-pub(crate) fn is_hot_mint(mint: &solana_sdk::pubkey::Pubkey) -> bool {
+pub fn is_hot_mint(mint: &solana_sdk::pubkey::Pubkey) -> bool {
     *mint == SOL_MINT || *mint == USDC_MINT || *mint == USDT_MINT
 }
 
@@ -40,7 +40,7 @@ pub(crate) fn calculate_effective_volume(amm: &AmmInfo) -> u128 {
 /// 检查 pool 是否处于活跃状态
 ///
 /// 只有活跃状态的 pool 才适合进行交易。
-pub(crate) fn is_pool_active(amm_info: &AmmInfo) -> bool {
+pub fn is_pool_active(amm_info: &AmmInfo) -> bool {
     amm_info.status == super::constants::pool_status::ACTIVE
 }
 
@@ -63,7 +63,7 @@ pub(crate) fn is_pool_withdraw_only(amm_info: &AmmInfo) -> bool {
 /// 检查 pool 是否适合交易
 ///
 /// 适合交易的 pool 必须是活跃状态。
-pub(crate) fn is_pool_tradeable(amm_info: &AmmInfo) -> bool {
+pub fn is_pool_tradeable(amm_info: &AmmInfo) -> bool {
     is_pool_active(amm_info)
 }
 
