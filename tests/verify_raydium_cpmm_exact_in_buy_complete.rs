@@ -2,9 +2,9 @@
 //!
 //! 测试流程：
 //! 1. 确保代币余额和 Pool 流动性
-//! 2. 本地计算（quote_exact_in）
-//! 3. 链上模拟（simulate_transaction）
-//! 4. 实际执行（send_transaction）
+//! 2. 本地计算（buy_quote）
+//! 3. 链上模拟（buy_simulate）
+//! 4. 实际执行（buy）
 //!
 //! 作为裁判，验证三个步骤的结果是否一致。
 
@@ -150,9 +150,33 @@ async fn test_cpmm_exact_in_buy_three_stage_verification() {
     println!("  手续费: {} lamports", local_fee);
     println!("  净输出: {} PIPE\n", local_output);
 
-    // ===== 2. 实际执行 =====
+    // ===== 2. 链上模拟（client.buy_simulate）=====
     println!("========================================");
-    println!("阶段 2: 实际执行");
+    println!("阶段 2: 链上模拟（client.buy_simulate）");
+    println!("========================================\n");
+
+    let sim_result = match client.buy_simulate(buy_params.clone()).await {
+        Ok(result) => result,
+        Err(e) => {
+            panic!("❌ 链上模拟失败: {}", e);
+        },
+    };
+
+    let sim_output = sim_result.amount_out;
+    let sim_fee = sim_result.fee_amount;
+    let sim_cu = sim_result.compute_units;
+    let sim_tx_fee = sim_result.transaction_fee;
+
+    println!("✅ 链上模拟结果:");
+    println!("  输出金额: {} PIPE", sim_output);
+    println!("  手续费: {} lamports", sim_fee);
+    println!("  计算单元: {} CU", sim_cu);
+    println!("  交易费用: {} lamports", sim_tx_fee);
+    println!("  状态: {}\n", if sim_result.success { "成功" } else { "失败" });
+
+    // ===== 3. 实际执行 =====
+    println!("========================================");
+    println!("阶段 3: 实际执行");
     println!("========================================\n");
 
     println!("🚀 执行买入交易...");
@@ -201,9 +225,9 @@ async fn test_cpmm_exact_in_buy_three_stage_verification() {
     // 等待链上状态更新
     tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
 
-    // ===== 3. 裁判：比较本地计算和实际执行的结果 =====
+    // ===== 4. 裁判：比较三个阶段的结果 =====
     println!("========================================");
-    println!("裁判：结果对比");
+    println!("裁判：三阶段结果对比");
     println!("========================================\n");
 
     // 从解析结果中获取实际执行金额（使用 amount_raw，原始单位）
@@ -228,11 +252,15 @@ async fn test_cpmm_exact_in_buy_three_stage_verification() {
     println!("│ 阶段                │ 输出 (PIPE)  │ 说明                  │");
     println!("├─────────────────────────────────────────────────────────────┤");
     println!(
-        "│ 1. 本地计算         │ {:>12} │ quote_exact_in        │",
+        "│ 1. 本地计算         │ {:>12} │ buy_quote              │",
         local_output
     );
     println!(
-        "│ 2. 实际执行         │ {:>12} │ send_transaction       │",
+        "│ 2. 链上模拟         │ {:>12} │ buy_simulate           │",
+        sim_output
+    );
+    println!(
+        "│ 3. 实际执行         │ {:>12} │ send_transaction       │",
         actual_output_raw
     );
     println!("└─────────────────────────────────────────────────────────────┘");
@@ -240,13 +268,29 @@ async fn test_cpmm_exact_in_buy_three_stage_verification() {
 
     println!("📝 UI 格式对比（供参考）:");
     println!("  实际执行 UI: {:.6} PIPE (decimals=6)", actual_output_ui);
+    println!("  链上模拟 UI: {:.6} PIPE (decimals=6)", sim_output as f64 / 1_000_000.0);
     println!("  本地计算 UI: {:.6} PIPE (decimals=6)", local_output as f64 / 1_000_000.0);
     println!();
 
     // 计算差异（使用原始单位）
-    let diff_actual = local_output.abs_diff(actual_output_raw);
-    let error_rate_actual = if actual_output_raw > 0 {
-        (diff_actual as f64 / actual_output_raw as f64) * 100.0
+    let diff_sim_local = local_output.abs_diff(sim_output);
+    let diff_actual_sim = sim_output.abs_diff(actual_output_raw);
+    let diff_actual_local = local_output.abs_diff(actual_output_raw);
+
+    let error_rate_sim_local = if sim_output > 0 {
+        (diff_sim_local as f64 / sim_output as f64) * 100.0
+    } else {
+        0.0
+    };
+
+    let error_rate_actual_sim = if actual_output_raw > 0 {
+        (diff_actual_sim as f64 / actual_output_raw as f64) * 100.0
+    } else {
+        0.0
+    };
+
+    let error_rate_actual_local = if actual_output_raw > 0 {
+        (diff_actual_local as f64 / actual_output_raw as f64) * 100.0
     } else {
         0.0
     };
@@ -254,28 +298,62 @@ async fn test_cpmm_exact_in_buy_three_stage_verification() {
     println!("┌─────────────────────────────────────────────────────────────┐");
     println!("│ 差异分析                                                │");
     println!("├─────────────────────────────────────────────────────────────┤");
+    println!("│ 本地 vs 模拟:                                            │");
+    println!("│   绝对差异: {} PIPE (原始单位)                            │", diff_sim_local);
+    println!("│   误差率:   {:.4}%                                         │", error_rate_sim_local);
+    println!("│                                                         │");
+    println!("│ 模拟 vs 实际:                                            │");
+    println!("│   绝对差异: {} PIPE (原始单位)                            │", diff_actual_sim);
+    println!("│   误差率:   {:.4}%                                         │", error_rate_actual_sim);
+    println!("│                                                         │");
     println!("│ 本地 vs 实际:                                            │");
-    println!("│   绝对差异: {} PIPE (原始单位)                            │", diff_actual);
-    println!("│   误差率:   {:.4}%                                            │", error_rate_actual);
+    println!("│   绝对差异: {} PIPE (原始单位)                            │", diff_actual_local);
+    println!("│   误差率:   {:.4}%                                         │", error_rate_actual_local);
     println!("└─────────────────────────────────────────────────────────────┘");
     println!();
 
     // 判断：误差是否在可接受范围内
     const MAX_ERROR_PERCENT: f64 = 1.0; // 1% 容忍度
 
-    if error_rate_actual <= MAX_ERROR_PERCENT {
-        println!("✅ 裁判结果：本地计算与实际执行一致");
+    let local_sim_ok = error_rate_sim_local <= MAX_ERROR_PERCENT;
+    let sim_actual_ok = error_rate_actual_sim <= MAX_ERROR_PERCENT;
+    let local_actual_ok = error_rate_actual_local <= MAX_ERROR_PERCENT;
+
+    if local_sim_ok && sim_actual_ok && local_actual_ok {
+        println!("✅ 裁判结果：三阶段结果一致");
+        println!(
+            "   本地 vs 模拟: {:.4}% ≤ {:.1}% ✓",
+            error_rate_sim_local, MAX_ERROR_PERCENT
+        );
+        println!(
+            "   模拟 vs 实际: {:.4}% ≤ {:.1}% ✓",
+            error_rate_actual_sim, MAX_ERROR_PERCENT
+        );
         println!(
             "   本地 vs 实际: {:.4}% ≤ {:.1}% ✓",
-            error_rate_actual, MAX_ERROR_PERCENT
+            error_rate_actual_local, MAX_ERROR_PERCENT
         );
         println!("✅ 测试通过\n");
     } else {
-        println!("❌ 裁判结果：本地计算与实际执行不一致");
-        println!(
-            "   本地 vs 实际: {:.4}% > {:.1}% ✗",
-            error_rate_actual, MAX_ERROR_PERCENT
-        );
+        println!("❌ 裁判结果：三阶段结果不一致");
+        if !local_sim_ok {
+            println!(
+                "   ❌ 本地 vs 模拟: {:.4}% > {:.1}%",
+                error_rate_sim_local, MAX_ERROR_PERCENT
+            );
+        }
+        if !sim_actual_ok {
+            println!(
+                "   ❌ 模拟 vs 实际: {:.4}% > {:.1}%",
+                error_rate_actual_sim, MAX_ERROR_PERCENT
+            );
+        }
+        if !local_actual_ok {
+            println!(
+                "   ❌ 本地 vs 实际: {:.4}% > {:.1}%",
+                error_rate_actual_local, MAX_ERROR_PERCENT
+            );
+        }
         println!();
         println!("🔍 可能的原因：");
         println!("  1. 本地计算公式与链上逻辑不一致");
@@ -283,7 +361,7 @@ async fn test_cpmm_exact_in_buy_three_stage_verification() {
         println!("  3. 费用计算方式不同");
         println!("  4. Program data 解析错误");
         println!();
-        panic!("❌ 测试失败：本地计算与实际执行误差过大");
+        panic!("❌ 测试失败：三阶段结果误差过大");
     }
 
     // 清理缓存

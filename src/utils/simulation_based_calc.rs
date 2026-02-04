@@ -521,11 +521,9 @@ fn parse_raydium_amm_v4_log_data(ray_log_base64: &str) -> Option<(u64, u64)> {
 /// 从 Raydium CPMM 的 Program data 中解析 swap 结果
 ///
 /// CPMM swap 指令在 "Program data:" 日志中返回 base64 编码的 swap 结果。
-/// 根据分析，CPMM Program data 格式：
-/// - Offset 40: 标志位（通常为 8）
-/// - Offset 48-55: 一些元数据（可能与 sqrt_price 或价格有关）
-/// - Offset 56-63: 输入金额（需要除以 1000 转换单位）
-/// - Offset 112-119: 输出金额（需要除以 865 转换单位，已验证正确）
+/// 根据 CPMM Program 的 return data 格式：
+/// - Offset 56-63: 输入金额（u64, little endian）
+/// - Offset 64-71: 输出金额（u64, little endian）
 ///
 /// # 参数
 /// * `logs` - 程序日志数组
@@ -564,6 +562,10 @@ fn parse_raydium_cpmm_program_data(logs: &[String]) -> Option<(u64, u64)> {
 
 /// 从 Raydium CPMM 的 Program data base64 数据中解析 swap 结果
 ///
+/// 根据 CPMM Program 的 return data 格式：
+/// - Offset 56-63: 输入金额（u64, little endian）
+/// - Offset 64-71: 输出金额（u64, little endian）
+///
 /// # 参数
 /// * `program_data_base64` - base64 编码的 Program data
 ///
@@ -576,19 +578,16 @@ fn parse_raydium_cpmm_data(program_data_base64: &str) -> Option<(u64, u64)> {
     // 解码 base64
     let data = base64::engine::general_purpose::STANDARD.decode(program_data_base64).ok()?;
 
-    // 检查数据长度（至少需要 120 字节到 offset 112）
-    if data.len() < 120 {
+    // 检查数据长度（至少需要 72 字节到 offset 64）
+    if data.len() < 72 {
         return None;
     }
 
     // 解析输入金额（offset 56）
-    // 这个值直接就是实际的输入金额（lamports），不需要除法
     let amount_in = u64::from_le_bytes(data[56..64].try_into().ok()?);
 
-    // 解析输出金额（offset 112）
-    // 根据文档，这个值需要除以 865 才能得到实际的输出金额
-    let raw_out = u64::from_le_bytes(data[112..120].try_into().ok()?);
-    let amount_out = raw_out / 865;
+    // 解析输出金额（offset 64）
+    let amount_out = u64::from_le_bytes(data[64..72].try_into().ok()?);
 
     Some((amount_in, amount_out))
 }
