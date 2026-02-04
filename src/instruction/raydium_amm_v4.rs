@@ -1,6 +1,8 @@
 use crate::{
     constants::trade_consts::DEFAULT_SLIPPAGE,
-    instruction::utils::raydium_amm_v4::{SWAP_BASE_IN_DISCRIMINATOR, SWAP_BASE_OUT_DISCRIMINATOR, accounts},
+    instruction::utils::raydium_amm_v4::{
+        SWAP_BASE_IN_DISCRIMINATOR, SWAP_BASE_OUT_DISCRIMINATOR, accounts,
+    },
     trading::core::{
         params::{RaydiumAmmV4Params, SwapParams},
         traits::InstructionBuilder,
@@ -236,8 +238,7 @@ impl InstructionBuilder for RaydiumAmmV4InstructionBuilder {
         let (param1, param2) = if params.fixed_output_amount.is_some() {
             // exact_out: 添加滑点缓冲到 max_amount_in
             let slippage_bps = params.slippage_basis_points.unwrap_or(DEFAULT_SLIPPAGE) as u64;
-            let max_amount_in = amount_in
-                .saturating_add((amount_in * slippage_bps / 10000).max(1));
+            let max_amount_in = amount_in.saturating_add((amount_in * slippage_bps / 10000).max(1));
             (max_amount_in, minimum_amount_out)
         } else {
             // exact_in: 直接使用计算的值
@@ -444,8 +445,7 @@ impl InstructionBuilder for RaydiumAmmV4InstructionBuilder {
         let (param1, param2) = if params.fixed_output_amount.is_some() {
             // exact_out: 添加滑点缓冲到 max_amount_in
             let slippage_bps = params.slippage_basis_points.unwrap_or(DEFAULT_SLIPPAGE) as u64;
-            let max_amount_in = amount_in
-                .saturating_add((amount_in * slippage_bps / 10000).max(1));
+            let max_amount_in = amount_in.saturating_add((amount_in * slippage_bps / 10000).max(1));
             (max_amount_in, minimum_amount_out)
         } else {
             // exact_in: 直接使用计算的值

@@ -253,7 +253,8 @@ pub fn quote_exact_out(
 
     let swap_in_before_add_fee = numerator
         .checked_div(denominator)
-        .ok_or_else(|| "Calculation overflow in division".to_string())? as u64;
+        .ok_or_else(|| "Calculation overflow in division".to_string())?
+        as u64;
 
     // 根据官方公式计算总输入（含费用）
     // swap_in_after_add_fee = swap_in_before_add_fee / (1 - fee_rate)
@@ -264,7 +265,8 @@ pub fn quote_exact_out(
     let swap_in_after_add_fee = (swap_in_before_add_fee as u128)
         .checked_mul(SWAP_FEE_DENOMINATOR as u128)
         .and_then(|p| p.checked_div(fee_denominator_minus_numerator))
-        .ok_or_else(|| "Swap in after fee calculation overflow".to_string())? as u64;
+        .ok_or_else(|| "Swap in after fee calculation overflow".to_string())?
+        as u64;
 
     // 计算实际费用
     let swap_fee = swap_in_after_add_fee
