@@ -27,6 +27,12 @@ pub trait PoolRpcClient: Send + Sync {
     /// 获取账户信息
     async fn get_account(&self, pubkey: &Pubkey) -> Result<Account, String>;
 
+    /// 批量获取多个账户信息
+    async fn get_multiple_accounts(
+        &self,
+        pubkeys: &[Pubkey],
+    ) -> Result<Vec<Option<Account>>, String>;
+
     /// 获取程序账户列表
     async fn get_program_ui_accounts_with_config(
         &self,
@@ -68,6 +74,15 @@ pub trait PoolRpcClient: Send + Sync {
 impl PoolRpcClient for NonblockingRpcClient {
     async fn get_account(&self, pubkey: &Pubkey) -> Result<Account, String> {
         self.get_account(pubkey).await.map_err(|e| format!("RPC 调用失败: {}", e))
+    }
+
+    async fn get_multiple_accounts(
+        &self,
+        pubkeys: &[Pubkey],
+    ) -> Result<Vec<Option<Account>>, String> {
+        self.get_multiple_accounts(pubkeys)
+            .await
+            .map_err(|e| format!("RPC 批量查询失败: {}", e))
     }
 
     async fn get_program_ui_accounts_with_config(
@@ -143,6 +158,16 @@ impl PoolRpcClient for Arc<NonblockingRpcClient> {
             .get_account(pubkey)
             .await
             .map_err(|e| format!("RPC 调用失败: {}", e))
+    }
+
+    async fn get_multiple_accounts(
+        &self,
+        pubkeys: &[Pubkey],
+    ) -> Result<Vec<Option<Account>>, String> {
+        self.as_ref()
+            .get_multiple_accounts(pubkeys)
+            .await
+            .map_err(|e| format!("RPC 批量查询失败: {}", e))
     }
 
     async fn get_program_ui_accounts_with_config(
@@ -228,6 +253,13 @@ impl PoolRpcClient for Arc<NonblockingRpcClient> {
 impl PoolRpcClient for Arc<dyn PoolRpcClient + Send + Sync> {
     async fn get_account(&self, pubkey: &Pubkey) -> Result<Account, String> {
         self.as_ref().get_account(pubkey).await
+    }
+
+    async fn get_multiple_accounts(
+        &self,
+        pubkeys: &[Pubkey],
+    ) -> Result<Vec<Option<Account>>, String> {
+        self.as_ref().get_multiple_accounts(pubkeys).await
     }
 
     async fn get_program_ui_accounts_with_config(
@@ -670,6 +702,21 @@ impl AutoMockRpcClient {
 impl PoolRpcClient for AutoMockRpcClient {
     async fn get_account(&self, pubkey: &Pubkey) -> Result<Account, String> {
         self.get_account(pubkey).await
+    }
+
+    async fn get_multiple_accounts(
+        &self,
+        pubkeys: &[Pubkey],
+    ) -> Result<Vec<Option<Account>>, String> {
+        // 批量查询，使用单个查询的组合
+        let mut results = Vec::with_capacity(pubkeys.len());
+        for pubkey in pubkeys {
+            match self.get_account(pubkey).await {
+                Ok(account) => results.push(Some(account)),
+                Err(_) => results.push(None),
+            }
+        }
+        Ok(results)
     }
 
     async fn get_program_ui_accounts_with_config(
