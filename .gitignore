@@ -44,3 +44,6 @@ CLAUDE.md
 .qoderignore
 
 json
+
+tests/mock_data
+

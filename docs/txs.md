@@ -39,3 +39,9 @@ tx hash: 5DiDUkUntQVmDMUes3mwpiPTRHQW4YWeUWfFyDFDpsKezXdw9xZQmprgrK6ddu7YaNaJ3K5
 
 
 
+# pool
+
+cpmm pool: CVPpJXyiPNRgD3a8SjmXkC1cKdHtry1PF9BVG6dYoxjk, uscd-ring(token)
+cpmm pool: 7Cvz28TyKnGuL8GAtbsVFu1FJ3Po7A37Zc8JSJqkSPDp, uscd-prts(token2022)
+cpmm pool: GarGiGTMQrZyot44J9hc71NeGNeEaxnq3nefKxBruEsS, uscd-cib(token2022)
+
