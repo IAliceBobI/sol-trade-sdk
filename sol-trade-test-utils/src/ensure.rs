@@ -117,7 +117,7 @@ pub async fn ensure_token_balance(
     crate::token::set_token_balance(rpc_client, rpc_url, payer, mint, amount_formatted).await
 }
 
-/// 确保 PIPE-WSOL Pool 有足够的流动性
+/// 确保 PIPE Pool 有足够的 WSOL 流动性
 ///
 /// 便捷函数，专门用于确保 PIPE-WSOL pool 有指定数量的 WSOL 流动性。
 /// 如果当前 WSOL vault 余额不足，会自动添加流动性以达到目标值。
@@ -132,15 +132,15 @@ pub async fn ensure_token_balance(
 ///
 /// # 示例
 /// ```ignore
-/// // 确保 PIPE-WSOL pool 至少有 1000 SOL 的流动性
-/// ensure_pipe_wsol_pool_liquidity(
+/// // 确保 PIPE pool 至少有 1000 SOL 的流动性
+/// ensure_pipe_pool_wsol_liquidity(
 ///     &rpc,
 ///     "http://127.0.0.1:8899",
 ///     &payer,
 ///     1000,
 /// ).await?;
 /// ```
-pub async fn ensure_pipe_wsol_pool_liquidity(
+pub async fn ensure_pipe_pool_wsol_liquidity(
     rpc_client: &Arc<RpcClient>,
     rpc_url: &str,
     payer: &Keypair,
@@ -151,7 +151,7 @@ pub async fn ensure_pipe_wsol_pool_liquidity(
     let pool_address = pipe_wsol_pool();
     let min_wsol_lamports = min_wsol_sol * 1_000_000_000; // 转换为 lamports
 
-    println!("🪙 检查 PIPE-WSOS Pool 流动性...");
+    println!("🪙 检查 PIPE Pool 流动性...");
     println!("   Pool: {}", pool_address);
     println!("   目标 WSOL 流动性: {} SOL ({} lamports)", min_wsol_sol, min_wsol_lamports);
 

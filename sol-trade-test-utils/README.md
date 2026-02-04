@@ -31,14 +31,14 @@ use sol_trade_test_utils::ensure_sol_balance;
 ensure_sol_balance(&rpc, "http://127.0.0.1:8899", &payer.pubkey(), 10).await?;
 ```
 
-### 4. 确保 PIPE-WSOL Pool 流动性（推荐）
+### 4. 确保 PIPE Pool 流动性（推荐）
 
 ```rust
-use sol_trade_test_utils::ensure_pipe_wsol_pool_liquidity;
+use sol_trade_test_utils::ensure_pipe_pool_wsol_liquidity;
 
-// 确保 PIPE-WSOL pool 至少有 1000 SOL 的流动性
+// 确保 PIPE pool 至少有 1000 SOL 的流动性
 // 如果不足，会自动添加流动性
-ensure_pipe_wsol_pool_liquidity(
+ensure_pipe_pool_wsol_liquidity(
     &rpc,
     "http://127.0.0.1:8899",
     &payer,
@@ -47,7 +47,7 @@ ensure_pipe_wsol_pool_liquidity(
 ```
 
 这是最便捷的方式，特别适合测试场景。函数会：
-1. 检查当前 PIPE-WSOL pool 的 WSOL vault 余额
+1. 检查当前 PIPE pool 的 WSOL vault 余额
 2. 如果不足 1000 SOL，自动计算并添加所需流动性
 3. 自动按比例添加 PIPE token
 

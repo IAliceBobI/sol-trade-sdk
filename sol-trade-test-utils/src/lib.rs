@@ -37,7 +37,7 @@ pub use airdrop::airdrop_and_wait;
 pub use token::{get_mint_info, mint_token_to, set_token_balance, transfer_token_to, MintInfo};
 pub use ensure::{
     ensure_cpmm_liquidity,
-    ensure_pipe_wsol_pool_liquidity,
+    ensure_pipe_pool_wsol_liquidity,
     ensure_sol_balance,
     ensure_token_balance,
 };
