@@ -42,6 +42,11 @@ fn get_input_token_program(is_wsol: bool) -> &'static solana_sdk::pubkey::Pubkey
 ///
 /// Raydium AMM V4 使用恒定乘积公式（x * y = k）进行流动性提供和交易
 /// 程序地址: 675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8
+///
+/// # 参考源码
+/// - SwapBaseIn 指令定义: temp/raydium-amm/program/src/instruction.rs:72-93
+/// - SwapBaseIn 处理逻辑: temp/raydium-amm/program/src/processor.rs:2210-2406
+/// - 账户布局 (17-18 个账户): temp/raydium-amm/program/src/instruction.rs (指令文档)
 pub struct RaydiumAmmV4InstructionBuilder;
 
 #[async_trait::async_trait]
@@ -117,38 +122,6 @@ impl InstructionBuilder for RaydiumAmmV4InstructionBuilder {
 
                         // 如果有 Pool 状态，应用 PNL 调整
                         if let Some(ref info) = amm_info {
-                            // ========================================
-                            // TODO: 支持 Orderbook Pool (status=1 INITIALIZED, status=6 ACTIVE)
-                            // ========================================
-                            // 当前只支持 SWAP_ONLY Pool (status=5)
-                            //
-                            // 对于启用 Orderbook 的 Pool:
-                            // - 需要使用 SwapBaseIn (18个账户) 而非 SwapBaseInV2 (8个账户)
-                            // - 需要解析 Serum Market 账户获取子账户地址
-                            // - 参考: /opt/projects/sol-trade-sdk/temp/dex/raydium-amm/program/src/processor.rs:2210-2406
-                            //
-                            // 实现步骤:
-                            // 1. 添加 serum_dex crate 依赖
-                            // 2. 解析 Serum Market 账户数据 (见 /opt/projects/sol-trade-sdk/temp/dex/openbook-dex)
-                            // 3. 提取 bids, asks, event_queue, coin_vault, pc_vault, vault_signer
-                            // 4. 修改指令构建使用 SwapBaseIn
-                            // ========================================
-                            if info.status != 5 {
-                                return Err(anyhow!(
-                                    "Raydium AMM V4 Pool status is {} (only SWAP_ONLY=5 supported).\n\
-                                    Pool with Orderbook enabled (INITIALIZED=1, ACTIVE=6) requires Serum Market parsing.\n\
-n\
-                                    TODO: Implement Serum Market support:\n\
-                                    1. Add serum_dex crate dependency\n\
-                                    2. Parse Serum Market account data\n\
-                                    3. Use SwapBaseIn (18 accounts) instead of SwapBaseInV2\n\
-                                    \n\
-                                    Reference: /opt/projects/sol-trade-sdk/temp/dex/raydium-amm/program/src/instruction.rs:314-334\n\
-                                    Reference: /opt/projects/sol-trade-sdk/temp/dex/raydium-amm/program/src/processor.rs:2210-2406",
-                                    info.status
-                                ));
-                            }
-
                             coin_amt = coin_amt
                                 .checked_sub(info.out_put.need_take_pnl_coin)
                                 .unwrap_or(coin_amt);
@@ -371,38 +344,6 @@ n\
 
                         // 如果有 Pool 状态，应用 PNL 调整
                         if let Some(ref info) = amm_info {
-                            // ========================================
-                            // TODO: 支持 Orderbook Pool (status=1 INITIALIZED, status=6 ACTIVE)
-                            // ========================================
-                            // 当前只支持 SWAP_ONLY Pool (status=5)
-                            //
-                            // 对于启用 Orderbook 的 Pool:
-                            // - 需要使用 SwapBaseIn (18个账户) 而非 SwapBaseInV2 (8个账户)
-                            // - 需要解析 Serum Market 账户获取子账户地址
-                            // - 参考: /opt/projects/sol-trade-sdk/temp/dex/raydium-amm/program/src/processor.rs:2210-2406
-                            //
-                            // 实现步骤:
-                            // 1. 添加 serum_dex crate 依赖
-                            // 2. 解析 Serum Market 账户数据 (见 /opt/projects/sol-trade-sdk/temp/dex/openbook-dex)
-                            // 3. 提取 bids, asks, event_queue, coin_vault, pc_vault, vault_signer
-                            // 4. 修改指令构建使用 SwapBaseIn
-                            // ========================================
-                            if info.status != 5 {
-                                return Err(anyhow!(
-                                    "Raydium AMM V4 Pool status is {} (only SWAP_ONLY=5 supported).\n\
-                                    Pool with Orderbook enabled (INITIALIZED=1, ACTIVE=6) requires Serum Market parsing.\n\
-n\
-                                    TODO: Implement Serum Market support:\n\
-                                    1. Add serum_dex crate dependency\n\
-                                    2. Parse Serum Market account data\n\
-                                    3. Use SwapBaseIn (18 accounts) instead of SwapBaseInV2\n\
-                                    \n\
-                                    Reference: /opt/projects/sol-trade-sdk/temp/dex/raydium-amm/program/src/instruction.rs:314-334\n\
-                                    Reference: /opt/projects/sol-trade-sdk/temp/dex/raydium-amm/program/src/processor.rs:2210-2406",
-                                    info.status
-                                ));
-                            }
-
                             coin_amt = coin_amt
                                 .checked_sub(info.out_put.need_take_pnl_coin)
                                 .unwrap_or(coin_amt);

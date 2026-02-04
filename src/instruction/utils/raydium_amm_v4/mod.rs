@@ -9,6 +9,7 @@ mod constants;
 mod helpers;
 mod pool_queries;
 mod quotes;
+mod serum_market;
 
 // 重新导出公共 API
 pub use constants::{
@@ -28,3 +29,5 @@ pub use helpers::{
     calculate_effective_volume, is_hot_mint, is_pool_active, is_pool_disabled, is_pool_tradeable,
     is_pool_withdraw_only, select_best_pool_by_volume,
 };
+
+pub use serum_market::{derive_vault_signer, parse_market_account, MarketState};
