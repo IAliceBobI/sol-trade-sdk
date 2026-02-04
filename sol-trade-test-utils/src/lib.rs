@@ -35,7 +35,12 @@ pub mod pool_list;
 // 重新导出常用类型
 pub use airdrop::airdrop_and_wait;
 pub use token::{get_mint_info, mint_token_to, set_token_balance, transfer_token_to, MintInfo};
-pub use ensure::{ensure_cpmm_liquidity, ensure_sol_balance, ensure_token_balance};
+pub use ensure::{
+    ensure_cpmm_liquidity,
+    ensure_pipe_wsol_pool_liquidity,
+    ensure_sol_balance,
+    ensure_token_balance,
+};
 
 // 重新导出 CPMM 测试参数构建器
 pub use cpmm_test_params::{

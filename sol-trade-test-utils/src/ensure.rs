@@ -117,6 +117,127 @@ pub async fn ensure_token_balance(
     crate::token::set_token_balance(rpc_client, rpc_url, payer, mint, amount_formatted).await
 }
 
+/// 确保 PIPE-WSOL Pool 有足够的流动性
+///
+/// 便捷函数，专门用于确保 PIPE-WSOL pool 有指定数量的 WSOL 流动性。
+/// 如果当前 WSOL vault 余额不足，会自动添加流动性以达到目标值。
+///
+/// ⚠️ 仅适用于测试环境
+///
+/// # 参数
+/// * `rpc_client` - RPC 客户端
+/// * `rpc_url` - RPC URL
+/// * `payer` - 账户 Keypair
+/// * `min_wsol_sol` - 最小 WSOL 流动性（SOL 单位，如 1000 表示 1000 SOL）
+///
+/// # 示例
+/// ```ignore
+/// // 确保 PIPE-WSOL pool 至少有 1000 SOL 的流动性
+/// ensure_pipe_wsol_pool_liquidity(
+///     &rpc,
+///     "http://127.0.0.1:8899",
+///     &payer,
+///     1000,
+/// ).await?;
+/// ```
+pub async fn ensure_pipe_wsol_pool_liquidity(
+    rpc_client: &Arc<RpcClient>,
+    rpc_url: &str,
+    payer: &Keypair,
+    min_wsol_sol: u64,
+) -> Result<(), String> {
+    use crate::cpmm_test_params::pipe_wsol_pool;
+
+    let pool_address = pipe_wsol_pool();
+    let min_wsol_lamports = min_wsol_sol * 1_000_000_000; // 转换为 lamports
+
+    println!("🪙 检查 PIPE-WSOS Pool 流动性...");
+    println!("   Pool: {}", pool_address);
+    println!("   目标 WSOL 流动性: {} SOL ({} lamports)", min_wsol_sol, min_wsol_lamports);
+
+    // 1. 获取池子状态
+    let pool_state = get_pool_by_address(rpc_client, &pool_address)
+        .await
+        .map_err(|e| format!("获取池子状态失败: {}", e))?;
+
+    // 2. 检查当前 WSOL vault 余额
+    let current_wsol_balance = match rpc_client
+        .get_token_account_balance(&pool_state.token1_vault)
+        .await
+    {
+        Ok(balance_info) => balance_info.amount.parse::<u64>().unwrap_or(0),
+        Err(_) => 0,
+    };
+
+    let current_wsol_sol = current_wsol_balance / 1_000_000_000;
+
+    println!(
+        "   当前 WSOL 流动性: {} SOL ({} lamports)",
+        current_wsol_sol, current_wsol_balance
+    );
+
+    // 3. 如果流动性充足，直接返回
+    if current_wsol_balance >= min_wsol_lamports {
+        println!("✅ 流动性充足\n");
+        return Ok(());
+    }
+
+    // 4. 计算需要添加的流动性
+    let needed_wsol_lamports = min_wsol_lamports - current_wsol_balance;
+    let needed_wsol_sol = needed_wsol_lamports / 1_000_000_000;
+
+    println!(
+        "💰 流动性不足，需要添加 {} SOL 的流动性...\n",
+        needed_wsol_sol
+    );
+
+    // 5. 获取当前 PIPE vault 余额
+    let current_pipe_balance = match rpc_client
+        .get_token_account_balance(&pool_state.token0_vault)
+        .await
+    {
+        Ok(balance_info) => balance_info.amount.parse::<u64>().unwrap_or(0),
+        Err(_) => 0,
+    };
+
+    // 6. 根据 CPMM 公式计算需要添加的 PIPE 和 LP 数量
+    // 公式: (added_wsol / current_wsol) = (added_lp / current_lp) = (added_pipe / current_pipe)
+    let multiplier = (needed_wsol_lamports as u128) * 1000 / (current_wsol_balance as u128);
+    let needed_lp =
+        (pool_state.lp_supply as u128 * multiplier / 1000) as u64;
+    let needed_pipe = ((current_pipe_balance as u128 * multiplier) / 1000) as u64;
+
+    println!("📐 计算需要添加的流动性:");
+    println!("   LP Token: {} (约 {:.2} 亿)", needed_lp, needed_lp as f64 / 100_000_000.0);
+    println!(
+        "   PIPE: {} (约 {:.2} 亿)",
+        needed_pipe,
+        needed_pipe as f64 / 100_000_000.0
+    );
+    println!(
+        "   WSOL: {} ({} SOL)\n",
+        needed_wsol_lamports, needed_wsol_sol
+    );
+
+    // 7. 转换为格式化字符串（用于 ensure_token_balance）
+    // PIPE decimals = 6
+    let needed_pipe_formatted = format!("{}", needed_pipe);
+    // WSOL decimals = 9
+    let needed_wsol_formatted = format!("{}", needed_wsol_lamports);
+
+    // 8. 使用通用的 ensure_cpmm_liquidity 函数添加流动性
+    ensure_cpmm_liquidity(
+        rpc_client,
+        rpc_url,
+        payer,
+        &pool_address,
+        needed_lp,
+        &needed_pipe_formatted,
+        &needed_wsol_formatted,
+    )
+    .await
+}
+
 /// 确保池子有足够的流动性（添加流动性）
 ///
 /// ⚠️ 仅适用于测试环境

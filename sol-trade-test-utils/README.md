@@ -31,24 +31,44 @@ use sol_trade_test_utils::ensure_sol_balance;
 ensure_sol_balance(&rpc, "http://127.0.0.1:8899", &payer.pubkey(), 10).await?;
 ```
 
-### 4. 确保 CPMM 流动性
+### 4. 确保 PIPE-WSOL Pool 流动性（推荐）
+
+```rust
+use sol_trade_test_utils::ensure_pipe_wsol_pool_liquidity;
+
+// 确保 PIPE-WSOL pool 至少有 1000 SOL 的流动性
+// 如果不足，会自动添加流动性
+ensure_pipe_wsol_pool_liquidity(
+    &rpc,
+    "http://127.0.0.1:8899",
+    &payer,
+    1000,  // 1000 SOL
+).await?;
+```
+
+这是最便捷的方式，特别适合测试场景。函数会：
+1. 检查当前 PIPE-WSOL pool 的 WSOL vault 余额
+2. 如果不足 1000 SOL，自动计算并添加所需流动性
+3. 自动按比例添加 PIPE token
+
+### 5. 确保 CPMM 流动性（通用）
 
 ```rust
 use sol_trade_test_utils::ensure_cpmm_liquidity;
 
-// 向池子添加流动性
+// 向任意 CPMM 池子添加流动性
 ensure_cpmm_liquidity(
     &rpc,
     "http://127.0.0.1:8899",
     &payer,
     &pool_address,
     1_000_000_000,  // 10 亿 LP
-    "10000",        // 10000 PIPE
-    "10",           // 10 WSOL
+    "10000",        // 10000 Token0
+    "10",           // 10 Token1
 ).await?;
 ```
 
-### 5. Mint Token
+### 6. Mint Token
 
 ```rust
 use sol_trade_test_utils::mint_token_to;
@@ -57,7 +77,7 @@ use sol_trade_test_utils::mint_token_to;
 mint_token_to(&rpc, rpc_url, &mint_authority, &mint, &recipient, 1_000_000_000).await?;
 ```
 
-### 6. 转移 Token
+### 7. 转移 Token
 
 ```rust
 use sol_trade_test_utils::transfer_token_to;
