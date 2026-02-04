@@ -20,7 +20,6 @@ use std::str::FromStr;
 /// 3. 验证价格合理性（正数且在合理范围内）
 #[tokio::test]
 #[serial_test::serial]
-#[ignore = "需要本地测试节点"]
 async fn test_get_pipe_token_price_in_usd() {
     println!("\n=== 测试：获取 PIPE token 的 USD 价格 ===");
 
@@ -67,7 +66,6 @@ async fn test_get_pipe_token_price_in_usd() {
 /// 3. 验证价格合理性
 #[tokio::test]
 #[serial_test::serial]
-#[ignore = "需要本地测试节点"]
 async fn test_get_prts_token_price_in_usd() {
     println!("\n=== 测试：获取 PRTS token 的 USD 价格 ===");
 
@@ -107,7 +105,6 @@ async fn test_get_prts_token_price_in_usd() {
 /// 3. 验证所有价格都在合理范围内
 #[tokio::test]
 #[serial_test::serial]
-#[ignore = "需要本地测试节点"]
 async fn test_get_multiple_token_prices() {
     println!("\n=== 测试：获取多个 token 的 USD 价格 ===");
 
