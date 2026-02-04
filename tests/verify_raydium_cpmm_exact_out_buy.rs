@@ -18,8 +18,7 @@ use std::str::FromStr;
 use std::sync::Arc;
 
 // 导入公共测试模块
-mod common;
-use common::{ensure_ata_with_balance, get_simulation_test_keypair};
+use sol_trade_test_utils::{ensure_ata_with_balance, get_simulation_test_keypair};
 
 /// PIPE-WSOL CPMM Pool
 const PIPE_WSOL_POOL: &str = "BnYsRpYvJpz6biY3hV6U9smChVePCJ6YyupVDfcnXpTp";

@@ -16,6 +16,7 @@ readme = "README.md"
 
 [workspace]
 members = [
+    "sol-trade-test-utils",
     "examples/pumpfun_buy_test",
     "examples/trading_client",
     "examples/shared_infrastructure",
@@ -134,6 +135,7 @@ num_cpus = "1.16"
 libc = "0.2"
 
 [dev-dependencies]
+sol-trade-test-utils = { path = "./sol-trade-test-utils" }
 serial_test = "3.2.0"
 dotenvy = "0.15"
 tempfile = "3.14"

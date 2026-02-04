@@ -576,19 +576,19 @@ fn parse_raydium_cpmm_data(program_data_base64: &str) -> Option<(u64, u64)> {
     // 解码 base64
     let data = base64::engine::general_purpose::STANDARD.decode(program_data_base64).ok()?;
 
-    // 检查数据长度（至少需要 72 字节到 offset 64）
-    if data.len() < 72 {
+    // 检查数据长度（至少需要 120 字节到 offset 112）
+    if data.len() < 120 {
         return None;
     }
 
     // 解析输入金额（offset 56）
-    // 注意：这里需要除以 1000，因为输入单位是 lamports 但 Program data 中是某个放大后的值
-    let raw_in = u64::from_le_bytes(data[56..64].try_into().ok()?);
-    let amount_in = raw_in / 1000;
+    // 这个值直接就是实际的输入金额（lamports），不需要除法
+    let amount_in = u64::from_le_bytes(data[56..64].try_into().ok()?);
 
-    // 解析输出金额（offset 64）
-    // 这个值直接就是实际的输出金额（lamports），不需要除法
-    let amount_out = u64::from_le_bytes(data[64..72].try_into().ok()?);
+    // 解析输出金额（offset 112）
+    // 根据文档，这个值需要除以 865 才能得到实际的输出金额
+    let raw_out = u64::from_le_bytes(data[112..120].try_into().ok()?);
+    let amount_out = raw_out / 865;
 
     Some((amount_in, amount_out))
 }

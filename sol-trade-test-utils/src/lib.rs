@@ -1,0 +1,50 @@
+//! Solana 交易测试工具库
+//!
+//! 提供便捷的测试辅助函数，包括：
+//! - 空投 SOL
+//! - 设置 Token 余额
+//! - 确保账户余额
+//! - 添加流动性
+//!
+//! # 示例
+//!
+//! ```ignore
+//! use sol_trade_test_utils::{ensure_sol_balance, ensure_token_balance};
+//!
+//! #[tokio::test]
+//! async fn my_test() {
+//!     let rpc_url = "http://127.0.0.1:8899";
+//!     let rpc = Arc::new(SolanaRpcClient::new(rpc_url.to_string()));
+//!     let payer = Arc::new(Keypair::new());
+//!
+//!     // 确保 SOL 余额
+//!     ensure_sol_balance(&rpc, rpc_url, &payer.pubkey(), 10).await?;
+//!
+//!     // 确保 Token 余额
+//!     ensure_token_balance(&rpc, rpc_url, &payer, &mint, "1000").await?;
+//! }
+//! ```
+
+pub mod airdrop;
+pub mod token;
+pub mod ensure;
+
+// 重新导出常用类型
+pub use airdrop::airdrop_and_wait;
+pub use token::{get_mint_info, mint_token_to, set_token_balance, transfer_token_to, MintInfo};
+pub use ensure::{ensure_cpmm_liquidity, ensure_sol_balance, ensure_token_balance};
+
+// 导入常用类型
+use solana_sdk::signature::Keypair;
+
+/// 固定的测试模拟账户（已有 10 SOL 余额）
+/// 注意：这个账户是预先创建并空投过的，不需要在测试中重复空投
+///
+/// 地址: 8be6dbPmZH1URHXyFTbY876QuVunrD8wTZhHGXjEdrvj
+pub const SIMULATION_TEST_KEYPAIR: &str =
+    "2cUyNj1YLguzrU89Xu2AcnGZD9qcNjEJo5QTg4tBs9foVXzLF3fBdBXiUdMmb867T9EK8FfKUQCH8FR5oD3bYVew";
+
+/// 获取固定的模拟测试 Keypair
+pub fn get_simulation_test_keypair() -> Keypair {
+    Keypair::from_base58_string(SIMULATION_TEST_KEYPAIR)
+}

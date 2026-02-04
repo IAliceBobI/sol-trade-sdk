@@ -6,20 +6,19 @@
 //! 3. 使用 deposit 指令添加流动性（100 亿 PIPE 级别）
 //! 4. 验证流动性添加成功
 
-use sol_trade_sdk::liquidity::cpmm::{
-    CpmmDepositParams, build_deposit_instruction, calculate_deposit_amounts,
-};
 use sol_trade_sdk::{
     common::SolanaRpcClient,
     instruction::utils::raydium_cpmm::get_pool_by_address,
 };
-use solana_sdk::{pubkey::Pubkey, signer::Signer, transaction::Transaction};
-use std::str::FromStr;
+use solana_sdk::{signer::Signer, transaction::Transaction};
 use std::sync::Arc;
 
 // 导入公共测试模块
-mod common;
-use common::{get_simulation_test_keypair, set_token_balance};
+use sol_trade_test_utils::{get_simulation_test_keypair, set_token_balance};
+
+// 导入 CPMM 测试参数工具
+mod cpmm_test_params;
+use cpmm_test_params::{pipe_mint, pipe_wsol_pool, wsol_mint, PipeWsolLiquidityBuilder};
 
 /// 格式化代币数量为可读格式
 fn format_token_amount(amount: u64, decimals: u8) -> String {
@@ -43,18 +42,6 @@ fn format_token_amount(amount: u64, decimals: u8) -> String {
     }
 }
 
-/// PIPE-WSOL CPMM Pool
-const PIPE_WSOL_POOL: &str = "BnYsRpYvJpz6biY3hV6U9smChVePCJ6YyupVDfcnXpTp";
-
-/// PIPE Token Mint
-const PIPE_MINT: &str = "8ycz3kctoRb4LFrtoYG2r8tRyUYUeGf5Q16M2TEMp7A";
-
-/// WSOL Mint
-const WSOL_MINT: &str = "So11111111111111111111111111111111111111112";
-
-/// Raydium CPMM 程序 ID
-const CPMM_PROGRAM_ID: &str = "CPMMoo8L3F4NbTegBCKVNunggL7H1ZpdTHKxQB5qKP1C";
-
 #[tokio::test]
 #[serial_test::serial(add_liquidity_test)]
 async fn test_add_liquidity_to_cpmm_pool() {
@@ -65,9 +52,9 @@ async fn test_add_liquidity_to_cpmm_pool() {
     let rpc_url = "http://127.0.0.1:8899".to_string();
     let rpc = Arc::new(SolanaRpcClient::new(rpc_url.clone()));
 
-    let pool_address = Pubkey::from_str(PIPE_WSOL_POOL).unwrap();
-    let wsol_mint = Pubkey::from_str(WSOL_MINT).unwrap();
-    let pipe_mint = Pubkey::from_str(PIPE_MINT).unwrap();
+    let pool_address = pipe_wsol_pool();
+    let wsol_mint = wsol_mint();
+    let pipe_mint = pipe_mint();
     let payer = Arc::new(get_simulation_test_keypair());
 
     println!("📊 测试配置:");
@@ -151,79 +138,28 @@ async fn test_add_liquidity_to_cpmm_pool() {
     println!("✅ 代币余额设置成功\n");
 
     // 4. 计算要铸造的 LP 代币数量
-    // 当前池子状态（从上次测试得知）：
-    // - LP supply ≈ 41,000
-    // - Token0 vault (PIPE) ≈ 6,060,947,750
-    // - Token1 vault (WSOL) ≈ 27,029,881
-    //
-    // 如果我们要添加 10,000,000,000 (100亿) PIPE：
-    // - 按比例需要 WSOL ≈ 10B * 27M / 6060M ≈ 44.5M lamports ≈ 0.0445 WSOL
-    //
-    // 计算 LP 数量：
-    // - LP_amount = (10,000,000,000 / 6,060,947,750) * 41,000 ≈ 67,600,000,000
-    //
     // 我们添加 68,000,000,000 LP (680 亿) 来获得约 100 亿 PIPE + ~0.045 WSOL 的流动性
     let lp_token_amount = 68_000_000_000_u64;
 
     println!("🪙 要铸造的 LP 代币: {}", lp_token_amount);
     println!();
 
-    // 5. 计算需要的代币数量（使用我们的计算函数）
-    match calculate_deposit_amounts(lp_token_amount, &pool_state, token0_reserve, token1_reserve) {
-        Some((calc_token0, calc_token1)) => {
-            println!("📐 计算结果（基于 CPMM 公式）:");
-            println!("  Token0 (PIPE): {}", calc_token0);
-            println!("  Token1 (WSOL): {} lamports", calc_token1);
-            println!();
-        },
-        None => {
-            println!("⚠️  无法计算代币数量，使用固定值\n");
-        },
+    // 5. 使用构建器构建 Deposit 指令
+    let (deposit_instruction, calculated_amounts, owner_lp_token) =
+        PipeWsolLiquidityBuilder::new(lp_token_amount)
+            .max_pipe(12_000_000_000_000_000) // 120 亿 PIPE
+            .max_wsol(100_000_000_000)        // 100,000 WSOL
+            .build_instruction(payer.pubkey(), &pool_state, token0_reserve, token1_reserve);
+
+    // 6. 显示计算结果
+    if let Some((calc_token0, calc_token1)) = calculated_amounts {
+        println!("📐 计算结果（基于 CPMM 公式）:");
+        println!("  Token0 (PIPE): {}", calc_token0);
+        println!("  Token1 (WSOL): {} lamports", calc_token1);
+        println!();
     }
 
-    // 6. 构建 Deposit 指令
-    let owner_lp_token = spl_associated_token_account::get_associated_token_address_with_program_id(
-        &payer.pubkey(),
-        &pool_state.lp_mint,
-        &spl_token::id(),
-    );
-
-    let token_0_account =
-        spl_associated_token_account::get_associated_token_address_with_program_id(
-            &payer.pubkey(),
-            &pipe_mint,
-            &spl_token::id(),
-        );
-
-    let token_1_account =
-        spl_associated_token_account::get_associated_token_address_with_program_id(
-            &payer.pubkey(),
-            &wsol_mint,
-            &spl_token::id(),
-        );
-
-    let deposit_params = CpmmDepositParams {
-        pool_state: pool_address, // 使用 pool_address (Pubkey) 而不是 pool_state (PoolState)
-        owner_lp_token,
-        token_0_account,
-        token_1_account,
-        token_0_vault: pool_state.token0_vault,
-        token_1_vault: pool_state.token1_vault,
-        token_0_mint: pipe_mint,
-        token_1_mint: wsol_mint,
-        lp_mint: pool_state.lp_mint,
-        lp_token_amount,
-        // 设置足够高的上限（基于 68B LP 的计算值，加缓冲）
-        // 计算值：约 100 亿 PIPE + ~0.045 WSOL
-        maximum_token_0_amount: 12_000_000_000_000_000, // 120 亿 PIPE (decimals=6)
-        maximum_token_1_amount: 100_000_000_000,        // 100,000 WSOL (lamports)
-        token_program: spl_token::id(),
-    };
-
-    let deposit_instruction = build_deposit_instruction(deposit_params, payer.pubkey());
-
     println!("📝 Deposit 指令已构建:");
-    println!("  Program: {}", CPMM_PROGRAM_ID);
     println!("  Pool: {}", pool_address);
     println!("  LP Token Amount: {}", lp_token_amount);
     println!("  Max Token0: 12,000,000,000,000,000 (120 亿 PIPE)");

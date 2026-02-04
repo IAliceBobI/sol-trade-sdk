@@ -19,8 +19,7 @@ use std::str::FromStr;
 use std::sync::Arc;
 
 // 导入公共模块
-mod common;
-use common::{ensure_ata_with_balance, get_simulation_test_keypair};
+use sol_trade_test_utils::{ensure_ata_with_balance, get_simulation_test_keypair};
 
 /// WSOL-JUP CLMM Pool
 const WSOL_JUP_POOL: &str = "EZVkeboWeXygtq8LMyENHyXdF5wpYrtExRNH9UwB1qYw";

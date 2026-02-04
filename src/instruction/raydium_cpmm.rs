@@ -176,20 +176,9 @@ impl InstructionBuilder for RaydiumCpmmInstructionBuilder {
         // ========================================
         // Trade calculation and account address preparation
         // ========================================
-        // 🔴 需要修改：Swap Output 估算功能需要这里改为动态检测
-        //
-        // 当前逻辑（老版本）：假设 base_mint 是 WSOL/USDC，则输入是 base
-        // 参考：git rev fcf947bfa3d57d0927239fc3de9a5519c5a0f002
-        //
-        // 未来逻辑：
-        // let is_base_in = params.input_mint == protocol_params.base_mint;
-        //
-        // 影响：
-        // - compute_swap_amount 的方向参数
-        // - mint_token_program 的选择
-        // - 输入/输出 token 账户的确定
-        let is_base_in = protocol_params.base_mint == crate::constants::WSOL_TOKEN_ACCOUNT
-            || protocol_params.base_mint == crate::constants::USDC_TOKEN_ACCOUNT;
+        // 修复：根据实际输入代币判断方向
+        // is_base_in = true 表示输入是 token0 (base)，false 表示输入是 token1 (quote)
+        let is_base_in = params.input_mint == protocol_params.base_mint;
         let mint_token_program = if is_base_in {
             protocol_params.quote_token_program
         } else {
@@ -236,16 +225,29 @@ impl InstructionBuilder for RaydiumCpmmInstructionBuilder {
         //     &input_token_program,
         //     params.open_seed_optimize,
         // );
-        let input_token_account = get_associated_token_address_with_program_id_fast_use_seed(
+        // 使用实际输入代币和对应的 token program
+        let input_token_program = if is_base_in {
+            protocol_params.base_token_program
+        } else {
+            protocol_params.quote_token_program
+        };
+
+        // 处理 SOL_TOKEN_ACCOUNT 和 WSOL_TOKEN_ACCOUNT 的标准化
+        // TradingClient 使用 SOL_TOKEN_ACCOUNT，但 Pool 使用 WSOL_TOKEN_ACCOUNT
+        // 需要标准化以匹配 ATA 地址
+        let normalized_input_mint = if params.input_mint == crate::constants::SOL_TOKEN_ACCOUNT {
+            crate::constants::WSOL_TOKEN_ACCOUNT
+        } else {
+            params.input_mint
+        };
+
+        // 使用与测试一致的方法计算 ATA（不使用 seed optimize）
+        let input_token_account = crate::common::fast_fn::get_associated_token_address_with_program_id_fast(
             &params.payer.pubkey(),
-            if is_wsol {
-                &crate::constants::WSOL_TOKEN_ACCOUNT
-            } else {
-                &crate::constants::USDC_TOKEN_ACCOUNT
-            },
-            &crate::constants::TOKEN_PROGRAM,
-            params.open_seed_optimize,
+            &normalized_input_mint,
+            &input_token_program,
         );
+
         let output_token_account = get_associated_token_address_with_program_id_fast_use_seed(
             &params.payer.pubkey(),
             &params.output_mint,
@@ -255,11 +257,7 @@ impl InstructionBuilder for RaydiumCpmmInstructionBuilder {
 
         let input_vault_account = get_vault_account(
             &pool_state,
-            if is_wsol {
-                &crate::constants::WSOL_TOKEN_ACCOUNT
-            } else {
-                &crate::constants::USDC_TOKEN_ACCOUNT
-            },
+            &params.input_mint,
             protocol_params,
         );
         let output_vault_account =
@@ -316,15 +314,11 @@ impl InstructionBuilder for RaydiumCpmmInstructionBuilder {
             AccountMeta::new(output_token_account, false), // Output Token Account
             AccountMeta::new(input_vault_account, false),  // Input Vault Account
             AccountMeta::new(output_vault_account, false), // Output Vault Account
-            crate::constants::TOKEN_PROGRAM_META,          // Input Token Program (readonly)
-            AccountMeta::new_readonly(mint_token_program, false), // Output Token Program (readonly)
-            if is_wsol {
-                crate::constants::WSOL_TOKEN_ACCOUNT_META
-            } else {
-                crate::constants::USDC_TOKEN_ACCOUNT_META
-            }, // Input token mint (readonly)
-            AccountMeta::new_readonly(params.output_mint, false), // Output token mint (readonly)
-            AccountMeta::new(observation_state_account, false), // Observation State Account
+            AccountMeta::new_readonly(input_token_program, false),  // Input Token Program (readonly)
+            AccountMeta::new_readonly(mint_token_program, false),  // Output Token Program (readonly)
+            AccountMeta::new_readonly(normalized_input_mint, false),  // Input token mint (readonly) - 使用标准化后的 mint
+            AccountMeta::new_readonly(params.output_mint, false),    // Output token mint (readonly)
+            AccountMeta::new(observation_state_account, false),     // Observation State Account
         ];
         // Create instruction data
         let mut data = [0u8; 24];

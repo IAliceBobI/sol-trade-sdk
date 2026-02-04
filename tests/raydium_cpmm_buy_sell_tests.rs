@@ -14,40 +14,23 @@
 //!     cargo test --test raydium_cpmm_buy_sell_tests -- --nocapture
 
 use sol_trade_sdk::{
-    DexType, TradeBuyParams, TradeSellParams, TradeTokenType,
-    common::{GasFeeStrategy, auto_mock_rpc::AutoMockRpcClient},
+    common::auto_mock_rpc::AutoMockRpcClient,
     instruction::utils::raydium_cpmm::{
         clear_pool_cache, get_pool_by_address, get_pool_by_mint, get_token_price_in_usd_with_pool,
         list_pools_by_mint,
     },
     parser::DexParser,
-    trading::core::params::{DexParamEnum, RaydiumCpmmParams},
+    trading::core::params::RaydiumCpmmParams,
 };
 use solana_sdk::{pubkey::Pubkey, signer::Signer};
-use std::str::FromStr;
 
 mod test_helpers;
 use test_helpers::{create_test_client, print_balances, print_token_balance};
-mod common;
-use common::{set_token_balance};
+use sol_trade_test_utils::set_token_balance;
 
-/// 已知的 WSOL mint
-const WSOL_MINT: &str = "So11111111111111111111111111111111111111112";
-
-/// PIPE Token Mint
-const PIPE_MINT: &str = "8ycz3kctoRb4LFrtoYG2r8tRyUYUeGf5Q16M2TEMp7A";
-
-/// PIPE Token CPMM Pool
-const PIPE_POOL: &str = "BnYsRpYvJpz6biY3hV6U9smChVePCJ6YyupVDfcnXpTp";
-
-/// PRTS Token Mint (Token-2022)
-const PRTS_MINT: &str = "3PQkX8yfuxoe9kuBoLCEZoxzi9LG4w8Ci2JWWGNfPRTS";
-
-/// USDC Mint
-const USDC_MINT: &str = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
-
-/// USDC-PRTS CPMM Pool
-const USDC_PRTS_POOL: &str = "7Cvz28TyKnGuL8GAtbsVFu1FJ3Po7A37Zc8JSJqkSPDp";
+// 使用参数构造工具模块
+mod cpmm_test_params;
+use cpmm_test_params::*;
 
 /// 测试：Raydium CPMM 完整买入-卖出流程
 ///
@@ -82,12 +65,8 @@ async fn test_raydium_cpmm_buy_sell_complete() {
         .expect("Failed to fetch initial balances");
 
     // ===== 1. 使用指定的 CPMM Pool (PIPE-WSOL) =====
-    let pool_address = Pubkey::from_str("BnYsRpYvJpz6biY3hV6U9smChVePCJ6YyupVDfcnXpTp")
-        .unwrap_or_else(|_| {
-            panic!("Invalid pool address: HJPjoWUrhoZzkNfRpZvJe5dCA5hgXq8sxkY8XEsEi9D")
-        });
-    let wsol_mint =
-        Pubkey::from_str(WSOL_MINT).unwrap_or_else(|_| panic!("Invalid WSOL mint: {}", WSOL_MINT));
+    let pool_address = pipe_wsol_pool();
+    let wsol_mint = wsol_mint();
 
     println!("\n🔍 使用指定的 Raydium CPMM Pool: {}", pool_address);
 
@@ -138,43 +117,20 @@ async fn test_raydium_cpmm_buy_sell_complete() {
     println!("  quote_token_program: {}", cpmm_params.quote_token_program);
     println!("  observation_state: {}", cpmm_params.observation_state);
 
-    // ===== 3. 使用 SOL 买入目标代币 =====
+    // ===== 3. 使用 SOL 买入目标代币（使用参数构造工具）=====
     println!("\n💰 第一步：买入目标代币 (Raydium CPMM)");
 
-    let input_amount = 20_000_000u64; // 0.02 SOL
-    let gas_fee_strategy = GasFeeStrategy::new();
-    gas_fee_strategy.set_global_fee_strategy(150_000, 150_000, 500_000, 500_000, 0.001, 0.001);
-
-    let recent_blockhash =
-        client.rpc.get_latest_blockhash().await.expect("Failed to get latest blockhash");
-
-    let buy_params = TradeBuyParams {
-        dex_type: DexType::RaydiumCpmm,
-        input_token_type: TradeTokenType::SOL,
-        mint: target_mint,
-        input_token_amount: input_amount,
-        slippage_basis_points: Some(10000), // 10% 容忍度，避免因滑点导致测试偶发失败
-        recent_blockhash: Some(recent_blockhash),
-        extension_params: DexParamEnum::RaydiumCpmm(cpmm_params.clone()),
-        address_lookup_table_account: None,
-        wait_transaction_confirmed: true,
-        create_input_token_ata: true,
-        close_input_token_ata: false,
-        create_mint_ata: true,
-        durable_nonce: None,
-        enable_jito_sandwich_protection: Some(false),
-        fixed_output_token_amount: None,
-        gas_fee_strategy: gas_fee_strategy.clone(),
-        simulate: false,
-        on_transaction_signed: None,
-        callback_execution_mode: None,
-    };
+    // 使用构建器构造买入参数（简化代码）
+    let buy_params = PipeWsolBuyParamsBuilder::new(Some(20_000_000)) // 0.02 SOL
+        .slippage(10000) // 10% 容忍度，避免因滑点导致测试偶发失败
+        .build(&client)
+        .await;
 
     let (success_buy, buy_sigs, error_buy) =
         client.buy(buy_params).await.expect("Raydium CPMM 买入交易执行失败");
     if !success_buy {
         panic!("❌ 买入交易失败: {:?}\n  Pool: {}\n  Target Mint: {}\n  输入金额: {} lamports",
-               error_buy, pool_address, target_mint, input_amount);
+               error_buy, pool_address, target_mint, 20_000_000);
     }
     println!("✅ 买入成功，签名: {:?}", buy_sigs.first());
 
@@ -215,41 +171,14 @@ async fn test_raydium_cpmm_buy_sell_complete() {
         .expect("Failed to fetch token balance after buy");
     assert!(token_after_buy > initial_token_balance, "买入后目标代币余额应增加",);
 
-    // ===== 4. 卖出全部目标代币换回 SOL =====
+    // ===== 4. 卖出全部目标代币换回 SOL（使用参数构造工具）=====
     println!("\n💸 第二步：卖出全部目标代币 (Raydium CPMM)");
 
-    let cpmm_params_sell = RaydiumCpmmParams::from_pool_address_by_rpc(&client.rpc, &pool_address)
-        .await
-        .expect("Failed to build RaydiumCpmmParams for sell");
-
-    let recent_blockhash_sell = client
-        .rpc
-        .get_latest_blockhash()
-        .await
-        .expect("Failed to get latest blockhash for sell");
-
-    let sell_params = TradeSellParams {
-        dex_type: DexType::RaydiumCpmm,
-        output_token_type: TradeTokenType::SOL,
-        mint: target_mint,
-        input_token_amount: token_after_buy,
-        slippage_basis_points: Some(10000),
-        recent_blockhash: Some(recent_blockhash_sell),
-        with_tip: false,
-        extension_params: DexParamEnum::RaydiumCpmm(cpmm_params_sell),
-        address_lookup_table_account: None,
-        wait_transaction_confirmed: true,
-        create_output_token_ata: true,
-        close_output_token_ata: false,
-        close_mint_token_ata: false,
-        durable_nonce: None,
-        enable_jito_sandwich_protection: Some(false),
-        fixed_output_token_amount: None,
-        gas_fee_strategy,
-        simulate: false,
-        on_transaction_signed: None,
-        callback_execution_mode: None,
-    };
+    // 使用构建器构造卖出参数（简化代码）
+    let sell_params = PipeWsolSellParamsBuilder::new(token_after_buy)
+        .slippage(10000)
+        .build(&client)
+        .await;
 
     let (success_sell, sell_sigs, error_sell) =
         client.sell(sell_params).await.expect("Raydium CPMM 卖出交易执行失败");
@@ -326,8 +255,8 @@ async fn test_raydium_cpmm_buy_sell_complete() {
 async fn test_get_cpmm_token_price_in_usd() {
     println!("=== 测试：获取 CPMM token 的 USD 价格 (Auto Mock 加速) ===");
 
-    let token_mint = Pubkey::from_str(PIPE_MINT).unwrap();
-    let pool_address = Pubkey::from_str(PIPE_POOL).unwrap();
+    let token_mint = pipe_mint();
+    let pool_address = pipe_wsol_pool();
     let rpc_url = "http://127.0.0.1:8899";
 
     // 使用 Auto Mock RPC 客户端（使用独立命名空间）
@@ -372,8 +301,7 @@ async fn test_get_cpmm_token_price_in_usd() {
 async fn test_raydium_cpmm_get_pool_by_mint_with_auto_mock() {
     println!("=== 测试：使用 Auto Mock 加速 get_pool_by_mint 和 list_pools_by_mint ===");
 
-    let wsol_mint =
-        Pubkey::from_str(WSOL_MINT).unwrap_or_else(|_| panic!("Invalid WSOL mint: {}", WSOL_MINT));
+    let wsol_mint = wsol_mint();
     let rpc_url = "http://127.0.0.1:8899";
 
     // 使用 Auto Mock RPC 客户端（使用独立命名空间）
@@ -460,8 +388,10 @@ async fn test_raydium_cpmm_buy_sell_usdc_prts() {
     let payer_pubkey = client.payer.as_ref().pubkey();
     println!("测试钱包: {}", payer_pubkey);
 
+    let usdc_mint = usdc_mint();
+    let prts_mint = prts_mint();
+
     // 记录初始 USDC 余额
-    let usdc_mint = Pubkey::from_str(USDC_MINT).unwrap();
     let _initial_usdc = print_token_balance(rpc_url, &payer_pubkey, &usdc_mint, "USDC")
         .await
         .expect("Failed to fetch initial USDC balance");
@@ -475,10 +405,7 @@ async fn test_raydium_cpmm_buy_sell_usdc_prts() {
     println!("✅ USDC 空投完成");
 
     // ===== 2. 使用指定的 CPMM Pool (USDC-PRTS) =====
-    let pool_address = Pubkey::from_str(USDC_PRTS_POOL)
-        .unwrap_or_else(|_| panic!("Invalid pool address: {}", USDC_PRTS_POOL));
-    let prts_mint = Pubkey::from_str(PRTS_MINT)
-        .unwrap_or_else(|_| panic!("Invalid PRTS mint: {}", PRTS_MINT));
+    let pool_address = usdc_prts_pool();
 
     println!("\n🔍 使用指定的 Raydium CPMM Pool: {}", pool_address);
     println!("   PRTS Mint: {} (Token-2022)", prts_mint);
@@ -530,45 +457,21 @@ async fn test_raydium_cpmm_buy_sell_usdc_prts() {
     println!("  quote_token_program: {}", cpmm_params.quote_token_program);
     println!("  observation_state: {}", cpmm_params.observation_state);
 
-    // ===== 4. 使用 USDC 买入 PRTS 代币 =====
+    // ===== 4. 使用 USDC 买入 PRTS 代币（使用参数构造工具）=====
     println!("\n💰 第一步：买入 PRTS 代币 (Raydium CPMM)");
 
-    // USDC decimals = 6，100 USDC = 100_000_000
-    let input_amount = 100_000_000u64; // 100 USDC
-    let gas_fee_strategy = GasFeeStrategy::new();
-    gas_fee_strategy.set_global_fee_strategy(150_000, 150_000, 500_000, 500_000, 0.001, 0.001);
-
-    let recent_blockhash =
-        client.rpc.get_latest_blockhash().await.expect("Failed to get latest blockhash");
-
-    let buy_params = TradeBuyParams {
-        dex_type: DexType::RaydiumCpmm,
-        input_token_type: TradeTokenType::USDC,
-        mint: prts_mint,
-        input_token_amount: input_amount,
-        slippage_basis_points: Some(10000), // 10% 容忍度
-        recent_blockhash: Some(recent_blockhash),
-        extension_params: DexParamEnum::RaydiumCpmm(cpmm_params.clone()),
-        address_lookup_table_account: None,
-        wait_transaction_confirmed: true,
-        create_input_token_ata: true,
-        close_input_token_ata: false,
-        create_mint_ata: true,
-        durable_nonce: None,
-        enable_jito_sandwich_protection: Some(false),
-        fixed_output_token_amount: None,
-        gas_fee_strategy: gas_fee_strategy.clone(),
-        simulate: false,
-        on_transaction_signed: None,
-        callback_execution_mode: None,
-    };
+    // 使用构建器构造买入参数（简化代码，默认 100 USDC）
+    let buy_params = UsdcPrtsBuyParamsBuilder::new(None) // 默认 100 USDC
+        .slippage(10000) // 10% 容忍度
+        .build(&client)
+        .await;
 
     let (success_buy, buy_sigs, error_buy) =
         client.buy(buy_params).await.expect("Raydium CPMM 买入交易执行失败");
     if !success_buy {
         panic!(
-            "❌ 买入交易失败: {:?}\n  Pool: {}\n  Target Mint: {}\n  输入金额: {} (100 USDC)",
-            error_buy, pool_address, prts_mint, input_amount
+            "❌ 买入交易失败: {:?}\n  Pool: {}\n  Target Mint: {}\n  输入金额: 100 USDC",
+            error_buy, pool_address, prts_mint
         );
     }
     println!("✅ 买入成功，签名: {:?}", buy_sigs.first());
@@ -610,41 +513,14 @@ async fn test_raydium_cpmm_buy_sell_usdc_prts() {
         .expect("Failed to fetch PRTS balance after buy");
     assert!(prts_after_buy > initial_prts, "买入后 PRTS 余额应增加");
 
-    // ===== 5. 卖出全部 PRTS 代币换回 USDC =====
+    // ===== 5. 卖出全部 PRTS 代币换回 USDC（使用参数构造工具）=====
     println!("\n💸 第二步：卖出全部 PRTS 代币 (Raydium CPMM)");
 
-    let cpmm_params_sell = RaydiumCpmmParams::from_pool_address_by_rpc(&client.rpc, &pool_address)
-        .await
-        .expect("Failed to build RaydiumCpmmParams for sell");
-
-    let recent_blockhash_sell = client
-        .rpc
-        .get_latest_blockhash()
-        .await
-        .expect("Failed to get latest blockhash for sell");
-
-    let sell_params = TradeSellParams {
-        dex_type: DexType::RaydiumCpmm,
-        output_token_type: TradeTokenType::USDC,
-        mint: prts_mint,
-        input_token_amount: prts_after_buy,
-        slippage_basis_points: Some(10000),
-        recent_blockhash: Some(recent_blockhash_sell),
-        with_tip: false,
-        extension_params: DexParamEnum::RaydiumCpmm(cpmm_params_sell),
-        address_lookup_table_account: None,
-        wait_transaction_confirmed: true,
-        create_output_token_ata: true,
-        close_output_token_ata: false,
-        close_mint_token_ata: false,
-        durable_nonce: None,
-        enable_jito_sandwich_protection: Some(false),
-        fixed_output_token_amount: None,
-        gas_fee_strategy,
-        simulate: false,
-        on_transaction_signed: None,
-        callback_execution_mode: None,
-    };
+    // 使用构建器构造卖出参数（简化代码）
+    let sell_params = UsdcPrtsSellParamsBuilder::new(prts_after_buy)
+        .slippage(10000)
+        .build(&client)
+        .await;
 
     let (success_sell, sell_sigs, error_sell) =
         client.sell(sell_params).await.expect("Raydium CPMM 卖出交易执行失败");

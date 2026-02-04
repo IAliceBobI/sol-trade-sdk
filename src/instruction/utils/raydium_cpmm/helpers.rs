@@ -45,14 +45,23 @@ pub fn get_vault_account(
     token_mint: &Pubkey,
     protocol_params: &crate::trading::core::params::RaydiumCpmmParams,
 ) -> Pubkey {
-    if protocol_params.base_mint == *token_mint && protocol_params.base_vault != Pubkey::default() {
+    // 处理 SOL_TOKEN_ACCOUNT 和 WSOL_TOKEN_ACCOUNT 的别名关系
+    // SOL_TOKEN_ACCOUNT (以 11 结尾) 和 WSOL_TOKEN_ACCOUNT (以 12 结尾) 在链上指向同一个代币
+    // TradingClient 使用 SOL_TOKEN_ACCOUNT，但 Pool 使用 WSOL_TOKEN_ACCOUNT
+    let normalized_mint = if *token_mint == crate::constants::SOL_TOKEN_ACCOUNT {
+        &crate::constants::WSOL_TOKEN_ACCOUNT
+    } else {
+        token_mint
+    };
+
+    if protocol_params.base_mint == *normalized_mint && protocol_params.base_vault != Pubkey::default() {
         protocol_params.base_vault
-    } else if protocol_params.quote_mint == *token_mint
+    } else if protocol_params.quote_mint == *normalized_mint
         && protocol_params.quote_vault != Pubkey::default()
     {
         protocol_params.quote_vault
     } else {
-        get_vault_pda(pool_state, token_mint).unwrap()
+        get_vault_pda(pool_state, normalized_mint).unwrap()
     }
 }
 

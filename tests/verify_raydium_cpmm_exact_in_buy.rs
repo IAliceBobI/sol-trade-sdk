@@ -41,8 +41,7 @@ use std::str::FromStr;
 use std::sync::Arc;
 
 // 导入公共测试模块
-mod common;
-use common::{ensure_ata_with_balance, get_simulation_test_keypair};
+use sol_trade_test_utils::{ensure_ata_with_balance, get_simulation_test_keypair};
 
 /// PIPE-WSOL CPMM Pool
 const PIPE_WSOL_POOL: &str = "BnYsRpYvJpz6biY3hV6U9smChVePCJ6YyupVDfcnXpTp";
@@ -105,6 +104,22 @@ async fn test_raydium_cpmm_exact_in_buy_with_simulation() {
     // WSOL 是 token1, PIPE 是 token0，所以 is_token0_in = false
     let is_token0_in = wsol_mint.to_string() == pool_state.token0_mint.to_string();
 
+    // 再次获取储备金（与 quote_exact_in 时对比）
+    let (token0_reserve_after, token1_reserve_after) = match (
+        rpc.get_token_account_balance(&pool_state.token0_vault).await,
+        rpc.get_token_account_balance(&pool_state.token1_vault).await,
+    ) {
+        (Ok(t0), Ok(t1)) => {
+            let t0_amt = t0.amount.parse::<u64>().unwrap_or(0);
+            let t1_amt = t1.amount.parse::<u64>().unwrap_or(0);
+            (t0_amt, t1_amt)
+        },
+        _ => (0, 0),
+    };
+    println!("🐛 Quote 后的储备金:");
+    println!("  token0_reserve (PIPE): {}", token0_reserve_after);
+    println!("  token1_reserve (WSOL): {}", token1_reserve_after);
+
     // 获取 Token 信息和 decimals
     let (input_decimals, output_decimals) = match (
         sol_trade_sdk::utils::token::get_token_decimals(&rpc, &wsol_mint).await,
@@ -139,7 +154,14 @@ async fn test_raydium_cpmm_exact_in_buy_with_simulation() {
 
     // 本地计算
     let local_output = match quote_exact_in(&rpc, &pool_address, amount_in, is_token0_in).await {
-        Ok(quote) => quote.amount_out,
+        Ok(quote) => {
+            // 调试：打印 quote 计算的详细信息
+            println!("🐛 Quote 计算详情:");
+            println!("  amount_out: {}", quote.amount_out);
+            println!("  fee_amount: {}", quote.fee_amount);
+            println!("  price_impact: {:?}", quote.price_impact_bps);
+            quote.amount_out
+        },
         Err(e) => {
             println!("❌ 本地计算失败: {}\n", e);
             return;
