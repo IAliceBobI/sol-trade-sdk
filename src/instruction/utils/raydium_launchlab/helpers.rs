@@ -3,7 +3,7 @@ use super::types::{AmmCreatorFeeOn, CurveParams, MintParams, VestingParams};
 use solana_sdk::pubkey::Pubkey;
 
 /// Serialize AmmCreatorFeeOn to bytes
-pub fn serialize_amm_creator_fee_on(fee_on: &AmmCreatorFeeOn) -> Vec<u8> {
+pub(crate) fn serialize_amm_creator_fee_on(fee_on: &AmmCreatorFeeOn) -> Vec<u8> {
     match fee_on {
         AmmCreatorFeeOn::QuoteToken => vec![0], // Variant discriminator: 0
         AmmCreatorFeeOn::BothToken => vec![1],  // Variant discriminator: 1
@@ -11,7 +11,7 @@ pub fn serialize_amm_creator_fee_on(fee_on: &AmmCreatorFeeOn) -> Vec<u8> {
 }
 
 /// Serialize MintParams to bytes
-pub fn serialize_mint_params(params: &MintParams) -> Vec<u8> {
+pub(crate) fn serialize_mint_params(params: &MintParams) -> Vec<u8> {
     let mut data = Vec::new();
 
     // decimals: u8
@@ -36,7 +36,7 @@ pub fn serialize_mint_params(params: &MintParams) -> Vec<u8> {
 }
 
 /// Serialize CurveParams to bytes
-pub fn serialize_curve_params(params: &CurveParams) -> Vec<u8> {
+pub(crate) fn serialize_curve_params(params: &CurveParams) -> Vec<u8> {
     let mut data = Vec::new();
 
     match params {
@@ -76,7 +76,7 @@ pub fn serialize_curve_params(params: &CurveParams) -> Vec<u8> {
 }
 
 /// Serialize VestingParams to bytes
-pub fn serialize_vesting_params(params: &VestingParams) -> Vec<u8> {
+pub(crate) fn serialize_vesting_params(params: &VestingParams) -> Vec<u8> {
     let mut data = Vec::new();
     data.extend_from_slice(&params.total_locked_amount.to_le_bytes());
     data.extend_from_slice(&params.cliff_period.to_le_bytes());
@@ -85,7 +85,7 @@ pub fn serialize_vesting_params(params: &VestingParams) -> Vec<u8> {
 }
 
 /// Calculate pool state PDA (seeds: ["pool", base_mint, quote_mint])
-pub fn get_pool_state_pda(
+pub(crate) fn get_pool_state_pda(
     base_mint: &Pubkey,
     quote_mint: &Pubkey,
 ) -> Result<(Pubkey, u8), anyhow::Error> {
@@ -97,13 +97,13 @@ pub fn get_pool_state_pda(
 }
 
 /// Calculate vault authority PDA (seeds: ["vault_auth_seed"])
-pub fn get_vault_authority_pda() -> Result<(Pubkey, u8), anyhow::Error> {
+pub(crate) fn get_vault_authority_pda() -> Result<(Pubkey, u8), anyhow::Error> {
     Pubkey::try_find_program_address(&[seeds::VAULT_AUTH_SEED], &accounts::LAUNCHLAB_PROGRAM)
         .ok_or_else(|| anyhow::anyhow!("Failed to find vault authority PDA"))
 }
 
 /// Calculate pool vault PDA (seeds: ["pool_vault", pool_state, mint])
-pub fn get_pool_vault_pda(
+pub(crate) fn get_pool_vault_pda(
     pool_state: &Pubkey,
     mint: &Pubkey,
 ) -> Result<(Pubkey, u8), anyhow::Error> {
@@ -115,13 +115,13 @@ pub fn get_pool_vault_pda(
 }
 
 /// Calculate event authority PDA (seeds: ["__event_authority"])
-pub fn get_event_authority_pda() -> Result<(Pubkey, u8), anyhow::Error> {
+pub(crate) fn get_event_authority_pda() -> Result<(Pubkey, u8), anyhow::Error> {
     Pubkey::try_find_program_address(&[seeds::EVENT_AUTHORITY_SEED], &accounts::LAUNCHLAB_PROGRAM)
         .ok_or_else(|| anyhow::anyhow!("Failed to find event authority PDA"))
 }
 
 /// Calculate platform config PDA (seeds: ["platform_config", platform_admin])
-pub fn get_platform_config_pda(platform_admin: &Pubkey) -> Result<(Pubkey, u8), anyhow::Error> {
+pub(crate) fn get_platform_config_pda(platform_admin: &Pubkey) -> Result<(Pubkey, u8), anyhow::Error> {
     Pubkey::try_find_program_address(
         &[seeds::PLATFORM_CONFIG_SEED, platform_admin.as_ref()],
         &accounts::LAUNCHLAB_PROGRAM,
@@ -131,7 +131,7 @@ pub fn get_platform_config_pda(platform_admin: &Pubkey) -> Result<(Pubkey, u8), 
 
 /// Calculate platform fee vault PDA (seeds: [platform_id, mint_b])
 /// This is the vault where platform fees are collected
-pub fn get_platform_fee_vault_pda(
+pub(crate) fn get_platform_fee_vault_pda(
     platform_id: &Pubkey,
     mint_b: &Pubkey,
 ) -> Result<(Pubkey, u8), anyhow::Error> {
@@ -144,7 +144,7 @@ pub fn get_platform_fee_vault_pda(
 
 /// Calculate creator fee vault PDA (seeds: [creator, mint_b])
 /// This is the vault where creator fees are collected
-pub fn get_creator_fee_vault_pda(
+pub(crate) fn get_creator_fee_vault_pda(
     creator: &Pubkey,
     mint_b: &Pubkey,
 ) -> Result<(Pubkey, u8), anyhow::Error> {
@@ -157,7 +157,7 @@ pub fn get_creator_fee_vault_pda(
 
 /// Get global config PDA
 /// Seeds: ["global_config", quote_token_mint, curve_type, index]
-pub fn get_global_config_pda(
+pub(crate) fn get_global_config_pda(
     quote_mint: &Pubkey,
     curve_type: u8,
     index: u16,
@@ -173,7 +173,7 @@ pub fn get_global_config_pda(
 
 /// Calculate Metaplex metadata PDA
 /// Seeds: ["metadata", METADATA_PROGRAM_ID, mint]
-pub fn get_metadata_pda(mint: &Pubkey) -> Pubkey {
+pub(crate) fn get_metadata_pda(mint: &Pubkey) -> Pubkey {
     Pubkey::find_program_address(
         &[b"metadata", accounts::METADATA_PROGRAM.as_ref(), mint.as_ref()],
         &accounts::METADATA_PROGRAM,
@@ -184,7 +184,7 @@ pub fn get_metadata_pda(mint: &Pubkey) -> Pubkey {
 /// Calculate the bonding curve PDA for a given mint
 /// Note: In Raydium LaunchLab, the pool_state PDA uses seeds: ["pool", base_mint, quote_mint]
 /// This function is kept for compatibility but should use get_pool_state_pda instead
-pub fn get_bonding_curve_pda(mint: &Pubkey) -> Result<(Pubkey, u8), anyhow::Error> {
+pub(crate) fn get_bonding_curve_pda(mint: &Pubkey) -> Result<(Pubkey, u8), anyhow::Error> {
     // For Raydium LaunchLab, we need both base_mint and quote_mint to get pool_state
     // This is a simplified version that assumes quote_mint is WSOL
     use crate::constants::WSOL_TOKEN_ACCOUNT;
@@ -193,7 +193,7 @@ pub fn get_bonding_curve_pda(mint: &Pubkey) -> Result<(Pubkey, u8), anyhow::Erro
 
 /// Calculate CPMM pool PDA
 /// Seeds: ["pool", cpswap_config, token_0_mint, token_1_mint]
-pub fn get_cpswap_pool_pda(
+pub(crate) fn get_cpswap_pool_pda(
     cpswap_config: &Pubkey,
     token_0_mint: &Pubkey,
     token_1_mint: &Pubkey,
@@ -215,14 +215,14 @@ pub fn get_cpswap_pool_pda(
 /// Seeds: ["vault_and_lp_mint_auth_seed"]
 /// Note: We use the known CPMM_AUTHORITY address instead, but this function is kept as a fallback
 #[allow(dead_code)]
-pub fn get_cpswap_authority_pda() -> Result<(Pubkey, u8), anyhow::Error> {
+pub(crate) fn get_cpswap_authority_pda() -> Result<(Pubkey, u8), anyhow::Error> {
     Pubkey::try_find_program_address(&[b"vault_and_lp_mint_auth_seed"], &accounts::CPMM_PROGRAM)
         .ok_or_else(|| anyhow::anyhow!("Failed to find CPMM authority PDA"))
 }
 
 /// Calculate CPMM LP mint PDA
 /// Seeds: ["pool_lp_mint", cpswap_pool]
-pub fn get_cpswap_lp_mint_pda(cpswap_pool: &Pubkey) -> Result<(Pubkey, u8), anyhow::Error> {
+pub(crate) fn get_cpswap_lp_mint_pda(cpswap_pool: &Pubkey) -> Result<(Pubkey, u8), anyhow::Error> {
     Pubkey::try_find_program_address(
         &[b"pool_lp_mint", cpswap_pool.as_ref()],
         &accounts::CPMM_PROGRAM,
@@ -232,7 +232,7 @@ pub fn get_cpswap_lp_mint_pda(cpswap_pool: &Pubkey) -> Result<(Pubkey, u8), anyh
 
 /// Calculate CPMM vault PDA
 /// Seeds: ["pool_vault", cpswap_pool, mint]
-pub fn get_cpswap_vault_pda(
+pub(crate) fn get_cpswap_vault_pda(
     cpswap_pool: &Pubkey,
     mint: &Pubkey,
 ) -> Result<(Pubkey, u8), anyhow::Error> {
@@ -246,7 +246,7 @@ pub fn get_cpswap_vault_pda(
 
 /// Calculate CPMM observation PDA
 /// Seeds: ["observation", cpswap_pool]
-pub fn get_cpswap_observation_pda(cpswap_pool: &Pubkey) -> Result<(Pubkey, u8), anyhow::Error> {
+pub(crate) fn get_cpswap_observation_pda(cpswap_pool: &Pubkey) -> Result<(Pubkey, u8), anyhow::Error> {
     use crate::instruction::utils::raydium_cpmm::seeds as cpmm_seeds;
     Pubkey::try_find_program_address(
         &[cpmm_seeds::OBSERVATION_STATE_SEED, cpswap_pool.as_ref()],
@@ -257,7 +257,7 @@ pub fn get_cpswap_observation_pda(cpswap_pool: &Pubkey) -> Result<(Pubkey, u8), 
 
 /// Calculate lock authority PDA
 /// Seeds: ["lock_cp_authority_seed"]
-pub fn get_lock_authority_pda() -> Result<(Pubkey, u8), anyhow::Error> {
+pub(crate) fn get_lock_authority_pda() -> Result<(Pubkey, u8), anyhow::Error> {
     Pubkey::try_find_program_address(&[b"lock_cp_authority_seed"], &accounts::LOCK_PROGRAM)
         .ok_or_else(|| anyhow::anyhow!("Failed to find lock authority PDA"))
 }

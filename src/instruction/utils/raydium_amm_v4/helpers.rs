@@ -5,14 +5,14 @@ use crate::instruction::utils::raydium_amm_v4_types::AmmInfo;
 
 /// 判断是否为 Hot Mint（主流桥接资产）
 /// 当前包含：WSOL、USDC、USDT
-pub fn is_hot_mint(mint: &solana_sdk::pubkey::Pubkey) -> bool {
+pub(crate) fn is_hot_mint(mint: &solana_sdk::pubkey::Pubkey) -> bool {
     *mint == SOL_MINT || *mint == USDC_MINT || *mint == USDT_MINT
 }
 
 /// 计算池子的有效交易量（基于 swap 数据）
 /// - 如果包含 WSOL/USDC/USDT，只计算这些资产侧的交易量
 /// - 否则计算两侧的总交易量
-pub fn calculate_effective_volume(amm: &AmmInfo) -> u128 {
+pub(crate) fn calculate_effective_volume(amm: &AmmInfo) -> u128 {
     // 检查 coin_mint 是否为 WSOL/USDC/USDT
     let coin_is_stable =
         amm.coin_mint == SOL_MINT || amm.coin_mint == USDC_MINT || amm.coin_mint == USDT_MINT;
@@ -40,28 +40,28 @@ pub fn calculate_effective_volume(amm: &AmmInfo) -> u128 {
 /// 检查 pool 是否处于活跃状态
 ///
 /// 只有活跃状态的 pool 才适合进行交易。
-pub fn is_pool_active(amm_info: &AmmInfo) -> bool {
+pub(crate) fn is_pool_active(amm_info: &AmmInfo) -> bool {
     amm_info.status == super::constants::pool_status::ACTIVE
 }
 
 /// 检查 pool 是否已禁用
 ///
 /// 已禁用的 pool 不能进行交易。
-pub fn is_pool_disabled(amm_info: &AmmInfo) -> bool {
+pub(crate) fn is_pool_disabled(amm_info: &AmmInfo) -> bool {
     amm_info.status == super::constants::pool_status::DISABLED
 }
 
 /// 检查 pool 是否只能提现
 ///
 /// 只能提现的 pool 不能进行交易，只能提取流动性。
-pub fn is_pool_withdraw_only(amm_info: &AmmInfo) -> bool {
+pub(crate) fn is_pool_withdraw_only(amm_info: &AmmInfo) -> bool {
     amm_info.status == super::constants::pool_status::WITHDRAW_ONLY
 }
 
 /// 检查 pool 是否适合交易
 ///
 /// 适合交易的 pool 必须是活跃状态。
-pub fn is_pool_tradeable(amm_info: &AmmInfo) -> bool {
+pub(crate) fn is_pool_tradeable(amm_info: &AmmInfo) -> bool {
     is_pool_active(amm_info)
 }
 
@@ -72,7 +72,7 @@ pub fn is_pool_tradeable(amm_info: &AmmInfo) -> bool {
 /// - 如果池子包含 WSOL/USDC/USDT，只计算这些稳定资产侧的累计交易量
 /// - 否则计算两侧的总交易量
 /// - 交易量越大，说明池子被实际使用越多，深度越可靠
-pub fn select_best_pool_by_volume(
+pub(crate) fn select_best_pool_by_volume(
     pools: &[(solana_sdk::pubkey::Pubkey, AmmInfo)],
 ) -> Option<(solana_sdk::pubkey::Pubkey, AmmInfo)> {
     use solana_sdk::pubkey::Pubkey;

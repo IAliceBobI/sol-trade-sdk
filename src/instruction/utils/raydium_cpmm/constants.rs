@@ -33,8 +33,8 @@ pub mod accounts {
         };
 }
 
-pub const SWAP_BASE_IN_DISCRIMINATOR: &[u8] = &[143, 190, 90, 218, 196, 30, 51, 222];
-pub const SWAP_BASE_OUT_DISCRIMINATOR: &[u8] = &[55, 217, 98, 86, 163, 74, 180, 173];
+pub(crate) const SWAP_BASE_IN_DISCRIMINATOR: &[u8] = &[143, 190, 90, 218, 196, 30, 51, 222];
+pub(crate) const SWAP_BASE_OUT_DISCRIMINATOR: &[u8] = &[55, 217, 98, 86, 163, 74, 180, 173];
 
 /// 缓存大小限制
 pub(crate) const MAX_CACHE_SIZE: usize = 50_000;
@@ -42,5 +42,5 @@ pub(crate) const MAX_CACHE_SIZE: usize = 50_000;
 /// 常量偏移量（包含 discriminator）
 /// 根据实际数据解析结果，mintA 在 offset 160（不包含 discriminator），mintB 在 offset 192（不包含 discriminator）
 /// RPC 查询时使用包含 discriminator 的偏移量，所以需要加 8
-pub const TOKEN0_MINT_OFFSET: usize = 168; // mintA offset (160 + 8 discriminator)
-pub const TOKEN1_MINT_OFFSET: usize = 200; // mintB offset (192 + 8 discriminator)
+pub(crate) const TOKEN0_MINT_OFFSET: usize = 168; // mintA offset (160 + 8 discriminator)
+pub(crate) const TOKEN1_MINT_OFFSET: usize = 200; // mintB offset (192 + 8 discriminator)

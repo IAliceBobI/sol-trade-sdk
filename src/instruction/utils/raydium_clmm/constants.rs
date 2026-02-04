@@ -14,8 +14,8 @@ pub mod seeds {
 }
 
 /// 常量偏移量
-pub const TOKEN_MINT0_OFFSET: usize = 73;
-pub const TOKEN_MINT1_OFFSET: usize = 105;
+pub(crate) const TOKEN_MINT0_OFFSET: usize = 73;
+pub(crate) const TOKEN_MINT1_OFFSET: usize = 105;
 
 /// 缓存最大容量
 pub const MAX_CACHE_SIZE: usize = 50_000;

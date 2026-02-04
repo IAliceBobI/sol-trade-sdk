@@ -12,10 +12,10 @@ mod quotes;
 mod serum_market;
 
 // 重新导出公共 API
-pub use constants::{
-    DEFAULT_WSOL_USDT_CLMM_POOL, SWAP_BASE_IN_DISCRIMINATOR, SWAP_BASE_OUT_DISCRIMINATOR, accounts,
-    pool_status, seeds,
-};
+pub use constants::{DEFAULT_WSOL_USDT_CLMM_POOL, accounts, pool_status, seeds};
+
+// 内部重新导出（crate 内部可访问）
+pub(crate) use constants::{SWAP_BASE_IN_DISCRIMINATOR, SWAP_BASE_OUT_DISCRIMINATOR};
 
 pub use pool_queries::{
     clear_pool_cache, get_pool_by_address, get_pool_by_address_force, get_pool_by_mint,
@@ -27,7 +27,8 @@ pub use pool_queries::{
 // 内部重新导出（crate 内部可访问）
 pub(crate) use quotes::{quote_exact_in, quote_exact_out};
 
-pub use helpers::{
+// helpers 函数现在是内部实现（pub(crate)）
+pub(crate) use helpers::{
     calculate_effective_volume, is_hot_mint, is_pool_active, is_pool_disabled, is_pool_tradeable,
     is_pool_withdraw_only, select_best_pool_by_volume,
 };

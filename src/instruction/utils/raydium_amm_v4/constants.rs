@@ -34,8 +34,8 @@ pub mod accounts {
         };
 }
 
-pub const SWAP_BASE_IN_DISCRIMINATOR: &[u8] = &[9];
-pub const SWAP_BASE_OUT_DISCRIMINATOR: &[u8] = &[11];
+pub(crate) const SWAP_BASE_IN_DISCRIMINATOR: &[u8] = &[9];
+pub(crate) const SWAP_BASE_OUT_DISCRIMINATOR: &[u8] = &[11];
 
 /// Pool 状态常量
 pub mod pool_status {
@@ -64,11 +64,11 @@ pub mod pool_status {
 /// - token_coin (Pubkey, 32 字节)
 /// - token_pc (Pubkey, 32 字节)
 ///   因此 coin_mint 起始偏移量为 128 + 64 + 144 + 32 + 32 = 400 字节。
-pub const COIN_MINT_OFFSET: usize = 400;
+pub(crate) const COIN_MINT_OFFSET: usize = 400;
 
 /// pc_mint 在 AmmInfo 结构中的偏移量
 /// 即 coin_mint 之后再偏移一个 Pubkey (32 字节)
-pub const PC_MINT_OFFSET: usize = 432;
+pub(crate) const PC_MINT_OFFSET: usize = 432;
 
 /// 缓存最大容量
 pub const MAX_CACHE_SIZE: usize = 50_000;

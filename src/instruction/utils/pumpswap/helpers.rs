@@ -7,7 +7,7 @@ use solana_sdk::pubkey::Pubkey;
 
 /// 判断是否为 Hot Mint（主流桥接资产）
 /// 当前包含：WSOL、USDC、USDT
-pub fn is_hot_mint(mint: &Pubkey) -> bool {
+pub(crate) fn is_hot_mint(mint: &Pubkey) -> bool {
     *mint == WSOL_TOKEN_ACCOUNT || *mint == USDC_MINT || *mint == USDT_MINT
 }
 
@@ -15,7 +15,7 @@ pub fn is_hot_mint(mint: &Pubkey) -> bool {
 ///
 /// 策略：
 /// - LP 供应量越大，说明流动性越好
-pub fn select_best_pool_by_liquidity(
+pub(crate) fn select_best_pool_by_liquidity(
     pools: &[(Pubkey, super::Pool)],
 ) -> Option<(Pubkey, super::Pool)> {
     if pools.is_empty() {
@@ -37,7 +37,7 @@ pub fn select_best_pool_by_liquidity(
     sorted_pools.into_iter().next()
 }
 
-pub fn coin_creator_vault_authority(coin_creator: Pubkey) -> Pubkey {
+pub(crate) fn coin_creator_vault_authority(coin_creator: Pubkey) -> Pubkey {
     let (pump_pool_authority, _) = Pubkey::find_program_address(
         &[b"creator_vault", &coin_creator.to_bytes()],
         &accounts::AMM_PROGRAM,
@@ -45,7 +45,7 @@ pub fn coin_creator_vault_authority(coin_creator: Pubkey) -> Pubkey {
     pump_pool_authority
 }
 
-pub fn coin_creator_vault_ata(coin_creator: Pubkey, quote_mint: Pubkey) -> Pubkey {
+pub(crate) fn coin_creator_vault_ata(coin_creator: Pubkey, quote_mint: Pubkey) -> Pubkey {
     let creator_vault_authority = coin_creator_vault_authority(coin_creator);
 
     get_associated_token_address_with_program_id(
@@ -63,7 +63,7 @@ pub(crate) fn fee_recipient_ata(fee_recipient: Pubkey, quote_mint: Pubkey) -> Pu
     )
 }
 
-pub fn get_user_volume_accumulator_pda(user: &Pubkey) -> Option<Pubkey> {
+pub(crate) fn get_user_volume_accumulator_pda(user: &Pubkey) -> Option<Pubkey> {
     crate::common::fast_fn::get_cached_pda(
         crate::common::fast_fn::PdaCacheKey::PumpSwapUserVolume(*user),
         || {
@@ -75,7 +75,7 @@ pub fn get_user_volume_accumulator_pda(user: &Pubkey) -> Option<Pubkey> {
     )
 }
 
-pub fn get_global_volume_accumulator_pda() -> Option<Pubkey> {
+pub(crate) fn get_global_volume_accumulator_pda() -> Option<Pubkey> {
     let seeds: &[&[u8]; 1] = &[seeds::GLOBAL_VOLUME_ACCUMULATOR_SEED];
     let program_id: &Pubkey = &accounts::AMM_PROGRAM;
     let pda: Option<(Pubkey, u8)> = Pubkey::try_find_program_address(seeds, program_id);
@@ -83,7 +83,7 @@ pub fn get_global_volume_accumulator_pda() -> Option<Pubkey> {
 }
 
 #[inline]
-pub fn get_fee_config_pda() -> Option<Pubkey> {
+pub(crate) fn get_fee_config_pda() -> Option<Pubkey> {
     let seeds: &[&[u8]; 2] = &[seeds::FEE_CONFIG_SEED, accounts::AMM_PROGRAM.as_ref()];
     let program_id: &Pubkey = &accounts::FEE_PROGRAM;
     let pda: Option<(Pubkey, u8)> = Pubkey::try_find_program_address(seeds, program_id);
@@ -96,7 +96,7 @@ pub fn get_fee_config_pda() -> Option<Pubkey> {
 /// - pool_index = [0, 0] (CANONICAL_POOL_INDEX)
 /// - pool_authority = PDA("pool-authority", mint) under PumpFun program
 /// - pool = PDA("pool", [0, 0], pool_authority, mint, wsol_mint) under PumpSwap AMM program
-pub fn calculate_canonical_pool_pda(mint: &Pubkey) -> Option<(Pubkey, Pubkey)> {
+pub(crate) fn calculate_canonical_pool_pda(mint: &Pubkey) -> Option<(Pubkey, Pubkey)> {
     use crate::constants::WSOL_TOKEN_ACCOUNT;
     use crate::instruction::utils::pumpfun::accounts::PUMPFUN;
 

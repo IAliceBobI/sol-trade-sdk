@@ -131,10 +131,10 @@ pub mod accounts {
         };
 }
 
-pub const BUY_DISCRIMINATOR: [u8; 8] = [102, 6, 61, 18, 1, 218, 235, 234];
-pub const BUY_EXACT_QUOTE_IN_DISCRIMINATOR: [u8; 8] = [198, 46, 21, 82, 180, 217, 232, 112];
-pub const SELL_DISCRIMINATOR: [u8; 8] = [51, 230, 133, 164, 1, 127, 131, 173];
+pub(crate) const BUY_DISCRIMINATOR: [u8; 8] = [102, 6, 61, 18, 1, 218, 235, 234];
+pub(crate) const BUY_EXACT_QUOTE_IN_DISCRIMINATOR: [u8; 8] = [198, 46, 21, 82, 180, 217, 232, 112];
+pub(crate) const SELL_DISCRIMINATOR: [u8; 8] = [51, 230, 133, 164, 1, 127, 131, 173];
 
 // 常量偏移量
-pub const BASE_MINT_OFFSET: usize = 43;
-pub const QUOTE_MINT_OFFSET: usize = 75;
+pub(crate) const BASE_MINT_OFFSET: usize = 43;
+pub(crate) const QUOTE_MINT_OFFSET: usize = 75;

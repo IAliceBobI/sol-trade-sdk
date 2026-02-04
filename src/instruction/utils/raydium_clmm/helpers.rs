@@ -14,7 +14,7 @@ pub mod accounts {
 
 /// 判断是否为 Hot Mint（主流桥接资产）
 /// 当前包含：WSOL、USDC、USDT
-pub fn is_hot_mint(mint: &Pubkey) -> bool {
+pub(crate) fn is_hot_mint(mint: &Pubkey) -> bool {
     *mint == SOL_MINT || *mint == USDC_MINT || *mint == USDT_MINT
 }
 
@@ -28,7 +28,7 @@ pub fn is_hot_mint(mint: &Pubkey) -> bool {
 /// (tick_array_pda, bump)
 ///
 /// Note: Reference implementation uses to_be_bytes() for tick index
-pub fn get_tick_array_pda(
+pub(crate) fn get_tick_array_pda(
     pool_id: &Pubkey,
     start_tick_index: i32,
 ) -> Result<(Pubkey, u8), anyhow::Error> {
@@ -47,7 +47,7 @@ pub fn get_tick_array_pda(
 ///
 /// # Returns
 /// (tick_array_bitmap_extension_pda, bump)
-pub fn get_tick_array_bitmap_extension_pda(pool_id: &Pubkey) -> (Pubkey, u8) {
+pub(crate) fn get_tick_array_bitmap_extension_pda(pool_id: &Pubkey) -> (Pubkey, u8) {
     Pubkey::find_program_address(
         &[seeds::POOL_TICK_ARRAY_BITMAP_SEED, pool_id.as_ref()],
         &accounts::RAYDIUM_CLMM,
@@ -68,7 +68,7 @@ pub fn get_tick_array_bitmap_extension_pda(pool_id: &Pubkey) -> (Pubkey, u8) {
 ///
 /// Formula: getTickArrayBitIndex(tickIndex, tickSpacing) * tickCount(tickSpacing)
 /// where tickCount = TICK_ARRAY_SIZE * tickSpacing
-pub fn get_tick_array_start_index(tick_current: i32, tick_spacing: u16) -> i32 {
+pub(crate) fn get_tick_array_start_index(tick_current: i32, tick_spacing: u16) -> i32 {
     let tick_spacing_i32 = tick_spacing as i32;
 
     // Calculate ticks per array (tickCount)
@@ -115,7 +115,7 @@ pub fn get_tick_array_start_index(tick_current: i32, tick_spacing: u16) -> i32 {
 /// # 实现状态
 ///
 /// ✅ 已完成 - 移植自官方实现
-pub fn get_first_initialized_tick_array_start_index(
+pub(crate) fn get_first_initialized_tick_array_start_index(
     pool_state: &crate::instruction::utils::raydium_clmm_types::PoolState,
     zero_for_one: bool,
 ) -> i32 {

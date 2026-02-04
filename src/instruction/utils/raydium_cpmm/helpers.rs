@@ -10,12 +10,12 @@ use super::constants::{accounts, seeds};
 
 /// 判断是否为 Hot Mint（主流桥接资产）
 /// 当前包含：WSOL、USDC、USDT
-pub fn is_hot_mint(mint: &Pubkey) -> bool {
+pub(crate) fn is_hot_mint(mint: &Pubkey) -> bool {
     *mint == WSOL_TOKEN_ACCOUNT || *mint == USDC_MINT || *mint == USDT_MINT
 }
 
 /// 获取 Pool PDA
-pub fn get_pool_pda(amm_config: &Pubkey, mint1: &Pubkey, mint2: &Pubkey) -> Option<Pubkey> {
+pub(crate) fn get_pool_pda(amm_config: &Pubkey, mint1: &Pubkey, mint2: &Pubkey) -> Option<Pubkey> {
     let seeds: &[&[u8]; 4] =
         &[seeds::POOL_SEED, amm_config.as_ref(), mint1.as_ref(), mint2.as_ref()];
     let program_id: &Pubkey = &accounts::RAYDIUM_CPMM;
@@ -24,7 +24,7 @@ pub fn get_pool_pda(amm_config: &Pubkey, mint1: &Pubkey, mint2: &Pubkey) -> Opti
 }
 
 /// 获取 Vault PDA
-pub fn get_vault_pda(pool_state: &Pubkey, mint: &Pubkey) -> Option<Pubkey> {
+pub(crate) fn get_vault_pda(pool_state: &Pubkey, mint: &Pubkey) -> Option<Pubkey> {
     let seeds: &[&[u8]; 3] = &[seeds::POOL_VAULT_SEED, pool_state.as_ref(), mint.as_ref()];
     let program_id: &Pubkey = &accounts::RAYDIUM_CPMM;
     let pda: Option<(Pubkey, u8)> = Pubkey::try_find_program_address(seeds, program_id);
@@ -32,7 +32,7 @@ pub fn get_vault_pda(pool_state: &Pubkey, mint: &Pubkey) -> Option<Pubkey> {
 }
 
 /// 获取 Observation State PDA
-pub fn get_observation_state_pda(pool_state: &Pubkey) -> Option<Pubkey> {
+pub(crate) fn get_observation_state_pda(pool_state: &Pubkey) -> Option<Pubkey> {
     let seeds: &[&[u8]; 2] = &[seeds::OBSERVATION_STATE_SEED, pool_state.as_ref()];
     let program_id: &Pubkey = &accounts::RAYDIUM_CPMM;
     let pda: Option<(Pubkey, u8)> = Pubkey::try_find_program_address(seeds, program_id);
@@ -40,7 +40,7 @@ pub fn get_observation_state_pda(pool_state: &Pubkey) -> Option<Pubkey> {
 }
 
 /// 获取 Token Vault 账户地址
-pub fn get_vault_account(
+pub(crate) fn get_vault_account(
     pool_state: &Pubkey,
     token_mint: &Pubkey,
     protocol_params: &crate::trading::core::params::RaydiumCpmmParams,
@@ -70,7 +70,7 @@ pub fn get_vault_account(
 /// 策略：
 /// - 优先选择已激活且有流动性的池
 /// - LP 供应量越大，说明流动性越好
-pub fn select_best_pool_by_liquidity(pools: &[(Pubkey, PoolState)]) -> Option<(Pubkey, PoolState)> {
+pub(crate) fn select_best_pool_by_liquidity(pools: &[(Pubkey, PoolState)]) -> Option<(Pubkey, PoolState)> {
     if pools.is_empty() {
         return None;
     }

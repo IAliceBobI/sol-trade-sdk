@@ -7,8 +7,7 @@ use crate::{
     common::fast_fn::get_associated_token_address_with_program_id_fast_use_seed,
     constants::trade_consts::DEFAULT_SLIPPAGE,
     instruction::utils::raydium_cpmm::{
-        SWAP_BASE_IN_DISCRIMINATOR, accounts, get_amm_config_fees, get_pool_pda,
-        get_vault_account,
+        SWAP_BASE_IN_DISCRIMINATOR, accounts, get_amm_config_fees, get_pool_pda, get_vault_account,
     },
     trading::core::{
         params::{RaydiumCpmmParams, SwapParams},

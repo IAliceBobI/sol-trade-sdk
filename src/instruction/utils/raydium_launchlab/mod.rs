@@ -28,8 +28,8 @@ pub use types::{
     LaunchLabVestingSchedule, MigrateNftInfo, MintParams, PlatformConfig, VestingParams,
 };
 
-// Re-export helper functions
-pub use helpers::{
+// Re-export helper functions (内部实现)
+pub(crate) use helpers::{
     get_bonding_curve_pda, get_cpswap_authority_pda, get_cpswap_lp_mint_pda,
     get_cpswap_observation_pda, get_cpswap_pool_pda, get_cpswap_vault_pda,
     get_creator_fee_vault_pda, get_event_authority_pda, get_global_config_pda,
@@ -56,8 +56,8 @@ pub use instructions::{
     build_migrate_to_cpswap_instruction, build_sell_exact_in_instruction,
 };
 
-// Re-export serialization functions for backward compatibility
-pub use helpers::{
+// Re-export serialization functions for backward compatibility (内部实现)
+pub(crate) use helpers::{
     serialize_amm_creator_fee_on, serialize_curve_params, serialize_mint_params,
     serialize_vesting_params,
 };
