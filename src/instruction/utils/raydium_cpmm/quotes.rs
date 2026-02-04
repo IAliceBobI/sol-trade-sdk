@@ -35,9 +35,21 @@ pub async fn quote_exact_in(
     )
     .await?;
 
+    // ⚠️ 重要：链上计算使用扣除累积手续费后的储备金
+    // 参考：raydium-cp-swap/programs/cp-swap/src/states/pool.rs::vault_amount_without_fee
+    // 需要从储备金中扣除：protocol_fees + fund_fees
+    // 注意：暂时不考虑 creator_fees，因为它们通常为 0
+    let token0_reserve_without_fees = token0_reserve
+        .saturating_sub(pool_state.protocol_fees_token0)
+        .saturating_sub(pool_state.fund_fees_token0);
+
+    let token1_reserve_without_fees = token1_reserve
+        .saturating_sub(pool_state.protocol_fees_token1)
+        .saturating_sub(pool_state.fund_fees_token1);
+
     let q = crate::utils::calc::raydium_cpmm::compute_swap_amount(
-        token0_reserve,
-        token1_reserve,
+        token0_reserve_without_fees,  // 使用扣除累积手续费后的储备金
+        token1_reserve_without_fees,  // 使用扣除累积手续费后的储备金
         is_token0_in,
         amount_in,
         0,
@@ -92,9 +104,20 @@ pub async fn quote_exact_out(
     )
     .await?;
 
+    // ⚠️ 重要：链上计算使用扣除累积手续费后的储备金
+    // 参考：raydium-cp-swap/programs/cp-swap/src/states/pool.rs::vault_amount_without_fee
+    // 注意：暂时不考虑 creator_fees，因为它们通常为 0
+    let token0_reserve_without_fees = token0_reserve
+        .saturating_sub(pool_state.protocol_fees_token0)
+        .saturating_sub(pool_state.fund_fees_token0);
+
+    let token1_reserve_without_fees = token1_reserve
+        .saturating_sub(pool_state.protocol_fees_token1)
+        .saturating_sub(pool_state.fund_fees_token1);
+
     let result = crate::utils::calc::raydium_cpmm::quote_exact_out(
-        token0_reserve,
-        token1_reserve,
+        token0_reserve_without_fees,  // 使用扣除累积手续费后的储备金
+        token1_reserve_without_fees,  // 使用扣除累积手续费后的储备金
         amount_out,
         is_token0_in,
         fees.trade_fee_rate,
