@@ -156,7 +156,7 @@ async fn test_get_multiple_token_prices() {
 
 /// PIPE Mint 地址
 fn pipe_mint() -> solana_sdk::pubkey::Pubkey {
-    solana_sdk::pubkey::Pubkey::from_str("H6ARHf6YXhGYeQfUzQNGk6rDNnLBQKrenN712K4AQJEG").unwrap()
+    solana_sdk::pubkey::Pubkey::from_str("8ycz3kctoRb4LFrtoYG2r8tRyUYUeGf5Q16M2TEMp7A").unwrap()
 }
 
 /// PRTS Mint 地址
