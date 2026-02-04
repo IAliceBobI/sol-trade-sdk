@@ -6,11 +6,40 @@ use crate::{
     instruction::utils::raydium_cpmm::{
         constants::DEFAULT_WSOL_USDT_CLMM_POOL, fee_queries, pool_queries,
     },
+    instruction::utils::raydium_cpmm_types::PoolStateRaw,
     utils::price::raydium_cpmm::{price_base_in_quote, price_quote_in_base},
     utils::quote::{QuoteExactInResult, QuoteExactOutResult},
 };
 use anyhow::anyhow;
 use solana_sdk::pubkey::Pubkey;
+
+/// 从 Pool 账户原始数据中读取 creator_fees
+///
+/// 注意：由于 Borsh 反序列化的限制，我们当前的 PoolState 结构体不包含 creator_fees 字段
+/// 这个函数通过读取原始字节数据来获取 creator_fees
+///
+/// 参考：raydium-cp-swap/programs/cp-swap/src/states/pool.rs
+async fn get_creator_fees_from_pool_data(
+    rpc: &SolanaRpcClient,
+    pool_address: &Pubkey,
+) -> Result<(u64, u64), anyhow::Error> {
+    let account = rpc.get_account(pool_address).await?;
+
+    // 跳过 discriminator (8 bytes)
+    let data: &[u8] = account.data.as_ref();
+    if data.len() < 8 + 637 {
+        return Ok((0, 0)); // 数据不完整，假设 creator_fees 为 0
+    }
+
+    // 使用 PoolStateRaw 解析（跳过 discriminator）
+    if let Some(raw) = PoolStateRaw::from_bytes(&data[8..]) {
+        let fees0 = raw.get_creator_fees_token0();
+        let fees1 = raw.get_creator_fees_token1();
+        Ok((fees0, fees1))
+    } else {
+        Ok((0, 0))
+    }
+}
 
 /// Quote an exact-in swap against a Raydium CPMM pool.
 ///

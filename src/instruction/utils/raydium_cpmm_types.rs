@@ -54,13 +54,76 @@ pub struct PoolState {
     pub mint0_decimals: u8,
     pub mint1_decimals: u8,
     pub lp_supply: u64,
+    /// ⚠️ 累积的 protocol 手续费（从 swap 手续费中提取）
+    /// Quote 计算时需要从储备金中扣除
+    pub protocol_fees_token0: u64,
+    pub protocol_fees_token1: u64,
+    /// ⚠️ 累积的 fund 手续费（从 swap 手续费中提取）
+    pub fund_fees_token0: u64,
+    pub fund_fees_token1: u64,
+    pub open_time: u64,
+    pub recent_epoch: u64,
+    /// ⚠️ creator_fees 字段在当前 Borsh 反序列化中不可用
+    /// 如需完整支持，需迁移到 zero_copy 模式
+    pub padding: [u64; 31],
+}
+
+/// 链上原始数据的完整结构（使用 repr(C) 确保内存布局一致）
+/// 参考：raydium-cp-swap/programs/cp-swap/src/states/pool.rs
+#[repr(C)]
+#[derive(Debug, Default, Clone, Copy)]
+pub struct PoolStateRaw {
+    pub amm_config: [u8; 32],
+    pub pool_creator: [u8; 32],
+    pub token0_vault: [u8; 32],
+    pub token1_vault: [u8; 32],
+    pub lp_mint: [u8; 32],
+    pub token0_mint: [u8; 32],
+    pub token1_mint: [u8; 32],
+    pub token0_program: [u8; 32],
+    pub token1_program: [u8; 32],
+    pub observation_key: [u8; 32],
+    pub auth_bump: u8,
+    pub status: u8,
+    pub lp_mint_decimals: u8,
+    pub mint0_decimals: u8,
+    pub mint1_decimals: u8,
+    pub lp_supply: u64,
     pub protocol_fees_token0: u64,
     pub protocol_fees_token1: u64,
     pub fund_fees_token0: u64,
     pub fund_fees_token1: u64,
     pub open_time: u64,
     pub recent_epoch: u64,
-    pub padding: [u64; 31],
+    pub creator_fee_on: u8,
+    pub enable_creator_fee: u8,
+    pub padding1: [u8; 6],
+    pub creator_fees_token0: u64,
+    pub creator_fees_token1: u64,
+    pub padding: [u64; 28],
+}
+
+impl PoolStateRaw {
+    /// 从原始字节数组创建 PoolStateRaw
+    pub fn from_bytes(bytes: &[u8]) -> Option<&Self> {
+        let size = std::mem::size_of::<PoolStateRaw>();
+        if bytes.len() < size {
+            return None;
+        }
+        unsafe {
+            Some(&*(bytes.as_ptr() as *const PoolStateRaw))
+        }
+    }
+
+    /// 获取 creator_fees_token0（方便访问）
+    pub fn get_creator_fees_token0(&self) -> u64 {
+        self.creator_fees_token0
+    }
+
+    /// 获取 creator_fees_token1（方便访问）
+    pub fn get_creator_fees_token1(&self) -> u64 {
+        self.creator_fees_token1
+    }
 }
 
 /// 辅助结构体：只包含链上数据的字段（用于 Borsh 反序列化）
