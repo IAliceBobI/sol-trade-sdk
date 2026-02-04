@@ -3,6 +3,34 @@
 /// This module provides a common result type so higher layers can compare pools
 /// using a consistent shape.
 
+use solana_sdk::pubkey::Pubkey;
+
+/// Quote exact-in 参数
+#[derive(Debug, Clone)]
+pub struct QuoteExactInParams {
+    /// Pool 地址
+    pub pool_address: Pubkey,
+    /// 输入代币的 mint 地址
+    pub input_mint: Pubkey,
+    /// 输出代币的 mint 地址
+    pub output_mint: Pubkey,
+    /// 输入金额（最小单位）
+    pub amount_in: u64,
+}
+
+/// Quote exact-out 参数
+#[derive(Debug, Clone)]
+pub struct QuoteExactOutParams {
+    /// Pool 地址
+    pub pool_address: Pubkey,
+    /// 输入代币的 mint 地址
+    pub input_mint: Pubkey,
+    /// 输出代币的 mint 地址
+    pub output_mint: Pubkey,
+    /// 输出金额（最小单位）
+    pub amount_out: u64,
+}
+
 #[derive(Debug, Clone, Copy, Default)]
 pub struct QuoteExactInResult {
     /// Output amount for an exact-in swap (in smallest units).

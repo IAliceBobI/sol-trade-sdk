@@ -2,7 +2,10 @@
 
 use super::helpers::{get_input_mint, get_output_mint, supports_quote};
 use super::types::{TradeBuyParams, TradeSellParams, TradingClient};
-use crate::{QuoteResult, UnifiedResult, UnifiedTradingError};
+use crate::{
+    utils::quote::{QuoteExactInParams, QuoteExactOutParams},
+    QuoteResult, UnifiedResult, UnifiedTradingError,
+};
 
 impl TradingClient {
     /// 本地计算（快速估算）
@@ -35,14 +38,23 @@ impl TradingClient {
         // 3. 根据 DEX 类型调用对应的 quote_exact_in
         let (amount_out, fee_amount) = match &params.extension_params {
             crate::DexParamEnum::RaydiumClmm(clmm_params) => {
-                // 推断方向：input_mint 是否是 token0
-                let zero_for_one = input_mint == clmm_params.token0_mint;
+                // 推断输出 mint
+                let output_mint = if input_mint == clmm_params.token0_mint {
+                    clmm_params.token1_mint
+                } else {
+                    clmm_params.token0_mint
+                };
+
+                let quote_params = QuoteExactInParams {
+                    pool_address: clmm_params.pool_state,
+                    input_mint,
+                    output_mint,
+                    amount_in: params.input_token_amount,
+                };
 
                 let quote = crate::instruction::utils::raydium_clmm::quote_exact_in(
                     &self.rpc,
-                    &clmm_params.pool_state,
-                    params.input_token_amount,
-                    zero_for_one,
+                    quote_params,
                 )
                 .await
                 .map_err(|e| UnifiedTradingError::QuoteFailed(e.to_string()))?;
@@ -50,13 +62,23 @@ impl TradingClient {
             },
 
             crate::DexParamEnum::RaydiumCpmm(cpmm_params) => {
-                let is_token0_in = input_mint == cpmm_params.base_mint;
+                // 推断输出 mint
+                let output_mint = if input_mint == cpmm_params.base_mint {
+                    cpmm_params.quote_mint
+                } else {
+                    cpmm_params.base_mint
+                };
+
+                let quote_params = QuoteExactInParams {
+                    pool_address: cpmm_params.pool_state,
+                    input_mint,
+                    output_mint,
+                    amount_in: params.input_token_amount,
+                };
 
                 let quote = crate::instruction::utils::raydium_cpmm::quote_exact_in(
                     &self.rpc,
-                    &cpmm_params.pool_state,
-                    params.input_token_amount,
-                    is_token0_in,
+                    quote_params,
                 )
                 .await
                 .map_err(|e| UnifiedTradingError::QuoteFailed(e.to_string()))?;
@@ -64,13 +86,23 @@ impl TradingClient {
             },
 
             crate::DexParamEnum::RaydiumAmmV4(amm_params) => {
-                let is_coin_in = input_mint == amm_params.coin_mint;
+                // 推断输出 mint
+                let output_mint = if input_mint == amm_params.coin_mint {
+                    amm_params.pc_mint
+                } else {
+                    amm_params.coin_mint
+                };
+
+                let quote_params = QuoteExactInParams {
+                    pool_address: amm_params.amm,
+                    input_mint,
+                    output_mint,
+                    amount_in: params.input_token_amount,
+                };
 
                 let quote = crate::instruction::utils::raydium_amm_v4::quote_exact_in(
                     &self.rpc,
-                    &amm_params.amm,
-                    params.input_token_amount,
-                    is_coin_in,
+                    quote_params,
                 )
                 .await
                 .map_err(|e| UnifiedTradingError::QuoteFailed(e.to_string()))?;
@@ -78,13 +110,23 @@ impl TradingClient {
             },
 
             crate::DexParamEnum::PumpSwap(pump_params) => {
-                let is_base_in = input_mint == pump_params.base_mint;
+                // 推断输出 mint
+                let output_mint = if input_mint == pump_params.base_mint {
+                    pump_params.quote_mint
+                } else {
+                    pump_params.base_mint
+                };
+
+                let quote_params = QuoteExactInParams {
+                    pool_address: pump_params.pool,
+                    input_mint,
+                    output_mint,
+                    amount_in: params.input_token_amount,
+                };
 
                 let quote = crate::instruction::utils::pumpswap::quote_exact_in(
                     &self.rpc,
-                    &pump_params.pool,
-                    params.input_token_amount,
-                    is_base_in,
+                    quote_params,
                 )
                 .await
                 .map_err(|e| UnifiedTradingError::QuoteFailed(e.to_string()))?;
@@ -133,15 +175,23 @@ impl TradingClient {
         // 3. 根据 DEX 类型调用对应的 quote_exact_in
         let (amount_out, fee_amount) = match &params.extension_params {
             crate::DexParamEnum::RaydiumClmm(clmm_params) => {
-                // 推断方向：mint 是否是 token0
-                // 卖出 mint 时，如果 mint 是 token0，则方向是 token0 -> token1 (zero_for_one = true)
-                let zero_for_one = params.mint == clmm_params.token0_mint;
+                // 推断输出 mint
+                let output_mint = if params.mint == clmm_params.token0_mint {
+                    clmm_params.token1_mint
+                } else {
+                    clmm_params.token0_mint
+                };
+
+                let quote_params = QuoteExactInParams {
+                    pool_address: clmm_params.pool_state,
+                    input_mint: params.mint,
+                    output_mint,
+                    amount_in: params.input_token_amount,
+                };
 
                 let quote = crate::instruction::utils::raydium_clmm::quote_exact_in(
                     &self.rpc,
-                    &clmm_params.pool_state,
-                    params.input_token_amount,
-                    zero_for_one,
+                    quote_params,
                 )
                 .await
                 .map_err(|e| UnifiedTradingError::QuoteFailed(e.to_string()))?;
@@ -149,15 +199,23 @@ impl TradingClient {
             },
 
             crate::DexParamEnum::RaydiumCpmm(cpmm_params) => {
-                // 推断方向：mint 是否是 base_mint (token0)
-                // 卖出 mint 时，如果 mint 是 token0，则方向是 token0 -> token1 (is_token0_in = true)
-                let is_token0_in = params.mint == cpmm_params.base_mint;
+                // 推断输出 mint
+                let output_mint = if params.mint == cpmm_params.base_mint {
+                    cpmm_params.quote_mint
+                } else {
+                    cpmm_params.base_mint
+                };
+
+                let quote_params = QuoteExactInParams {
+                    pool_address: cpmm_params.pool_state,
+                    input_mint: params.mint,
+                    output_mint,
+                    amount_in: params.input_token_amount,
+                };
 
                 let quote = crate::instruction::utils::raydium_cpmm::quote_exact_in(
                     &self.rpc,
-                    &cpmm_params.pool_state,
-                    params.input_token_amount,
-                    is_token0_in,
+                    quote_params,
                 )
                 .await
                 .map_err(|e| UnifiedTradingError::QuoteFailed(e.to_string()))?;
@@ -165,15 +223,23 @@ impl TradingClient {
             },
 
             crate::DexParamEnum::RaydiumAmmV4(amm_params) => {
-                // 推断方向：mint 是否是 coin_mint
-                // 卖出 mint 时，如果 mint 是 coin，则方向是 coin -> pc (is_coin_in = true)
-                let is_coin_in = params.mint == amm_params.coin_mint;
+                // 推断输出 mint
+                let output_mint = if params.mint == amm_params.coin_mint {
+                    amm_params.pc_mint
+                } else {
+                    amm_params.coin_mint
+                };
+
+                let quote_params = QuoteExactInParams {
+                    pool_address: amm_params.amm,
+                    input_mint: params.mint,
+                    output_mint,
+                    amount_in: params.input_token_amount,
+                };
 
                 let quote = crate::instruction::utils::raydium_amm_v4::quote_exact_in(
                     &self.rpc,
-                    &amm_params.amm,
-                    params.input_token_amount,
-                    is_coin_in,
+                    quote_params,
                 )
                 .await
                 .map_err(|e| UnifiedTradingError::QuoteFailed(e.to_string()))?;
@@ -181,15 +247,23 @@ impl TradingClient {
             },
 
             crate::DexParamEnum::PumpSwap(pump_params) => {
-                // 推断方向：mint 是否是 base_mint
-                // 卖出 mint 时，如果 mint 是 base，则方向是 base -> quote (is_base_in = true)
-                let is_base_in = params.mint == pump_params.base_mint;
+                // 推断输出 mint
+                let output_mint = if params.mint == pump_params.base_mint {
+                    pump_params.quote_mint
+                } else {
+                    pump_params.base_mint
+                };
+
+                let quote_params = QuoteExactInParams {
+                    pool_address: pump_params.pool,
+                    input_mint: params.mint,
+                    output_mint,
+                    amount_in: params.input_token_amount,
+                };
 
                 let quote = crate::instruction::utils::pumpswap::quote_exact_in(
                     &self.rpc,
-                    &pump_params.pool,
-                    params.input_token_amount,
-                    is_base_in,
+                    quote_params,
                 )
                 .await
                 .map_err(|e| UnifiedTradingError::QuoteFailed(e.to_string()))?;

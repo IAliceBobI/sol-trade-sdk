@@ -13,6 +13,7 @@ use sol_trade_sdk::{
         clear_pool_cache, get_pool_by_address, quote_exact_in,
     },
     parser::DexParser,
+    utils::quote::QuoteExactInParams,
 };
 use solana_sdk::signer::Signer;
 
@@ -126,17 +127,28 @@ async fn test_cpmm_exact_in_buy_three_stage_verification() {
     println!("阶段 1: 本地计算（quote_exact_in）");
     println!("========================================\n");
 
-    let is_token0_in = wsol_mint.to_string() == pool_state.token0_mint.to_string();
     println!("交易方向: WSOL -> PIPE");
-    println!("is_token0_in: {} (false 表示 WSOL 是 token1 作为输入)", is_token0_in);
 
-    let quote_result =
-        match quote_exact_in(&client.rpc, &pool_address, amount_in, is_token0_in).await {
-            Ok(quote) => quote,
-            Err(e) => {
-                panic!("❌ 本地计算失败: {}", e);
-            },
-        };
+    // 确定输入和输出代币
+    let (input_mint, output_mint) = if wsol_mint == pool_state.token0_mint {
+        (pool_state.token0_mint, pool_state.token1_mint)
+    } else {
+        (pool_state.token1_mint, pool_state.token0_mint)
+    };
+
+    let quote_params = QuoteExactInParams {
+        pool_address,
+        input_mint,
+        output_mint,
+        amount_in,
+    };
+
+    let quote_result = match quote_exact_in(&client.rpc, quote_params).await {
+        Ok(quote) => quote,
+        Err(e) => {
+            panic!("❌ 本地计算失败: {}", e);
+        },
+    };
 
     let local_output = quote_result.amount_out;
     let local_fee = quote_result.fee_amount;

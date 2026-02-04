@@ -2,6 +2,7 @@ use crate::{
     common::{SolanaRpcClient, auto_mock_rpc::PoolRpcClient},
     constants::{SOL_MINT, USDC_MINT, USDT_MINT, WSOL_TOKEN_ACCOUNT},
     utils::price::pumpswap::{price_base_in_quote, price_quote_in_base},
+    utils::quote::{QuoteExactInParams, QuoteExactOutParams},
 };
 use anyhow::anyhow;
 use solana_sdk::pubkey::Pubkey;
@@ -11,21 +12,61 @@ use super::pool_queries::{get_pool_by_address, get_pool_by_address_force, get_to
 
 /// Quote an exact-in swap against a PumpSwap pool.
 ///
-/// - If `is_base_in=true`: base -> quote
-/// - If `is_base_in=false`: quote -> base
+/// # Arguments
+///
+/// * `params` - Quote 参数，包含 pool_address、input_mint、output_mint、amount_in
+///
+/// # Examples
+///
+/// ```ignore
+/// let params = QuoteExactInParams {
+///     pool_address: pool_pubkey,
+///     input_mint: base_mint,
+///     output_mint: quote_mint,
+///     amount_in: 1_000_000,
+/// };
+/// let quote = quote_exact_in(&rpc, params).await?;
+/// ```
 pub async fn quote_exact_in(
     rpc: &SolanaRpcClient,
-    pool_address: &Pubkey,
-    amount_in: u64,
-    is_base_in: bool,
+    params: QuoteExactInParams,
 ) -> Result<crate::utils::quote::QuoteExactInResult, anyhow::Error> {
-    let pool = get_pool_by_address(rpc, pool_address).await?;
+    let pool = get_pool_by_address(rpc, &params.pool_address).await?;
+
+    // 验证 input_mint 和 output_mint 是否在池子中
+    let is_base_in = params.input_mint == pool.base_mint;
+    let is_quote_in = params.input_mint == pool.quote_mint;
+
+    if !is_base_in && !is_quote_in {
+        return Err(anyhow!(
+            "Input mint {} not found in pool {} (base={}, quote={})",
+            params.input_mint,
+            params.pool_address,
+            pool.base_mint,
+            pool.quote_mint
+        ));
+    }
+
+    let expected_output_mint = if is_base_in {
+        pool.quote_mint
+    } else {
+        pool.base_mint
+    };
+
+    if params.output_mint != expected_output_mint {
+        return Err(anyhow!(
+            "Output mint mismatch: expected {}, got {}",
+            expected_output_mint,
+            params.output_mint
+        ));
+    }
+
     let (base_reserve, quote_reserve) = get_token_balances(&pool, rpc).await?;
 
     if is_base_in {
         // base -> quote
         let r = crate::utils::calc::pumpswap::sell_base_input_internal(
-            amount_in,
+            params.amount_in,
             0,
             base_reserve,
             quote_reserve,
@@ -43,7 +84,7 @@ pub async fn quote_exact_in(
     } else {
         // quote -> base
         let r = crate::utils::calc::pumpswap::buy_quote_input_internal(
-            amount_in,
+            params.amount_in,
             0,
             base_reserve,
             quote_reserve,
@@ -51,7 +92,7 @@ pub async fn quote_exact_in(
         )
         .map_err(|e| anyhow::anyhow!(e))?;
         // fee in input token units: amount_in - effective_quote (without fees)
-        let fee_amount = amount_in.saturating_sub(r.internal_quote_without_fees);
+        let fee_amount = params.amount_in.saturating_sub(r.internal_quote_without_fees);
         Ok(crate::utils::quote::QuoteExactInResult {
             amount_out: r.base,
             fee_amount,
@@ -61,35 +102,97 @@ pub async fn quote_exact_in(
     }
 }
 
+/// Quote an exact-in swap against a PumpSwap pool (旧版接口，已废弃).
+///
+/// # Deprecated
+///
+/// 请使用新版本的 `quote_exact_in`，它使用 `QuoteExactInParams` 结构体参数。
+#[deprecated(since = "4.1.0", note = "请使用 quote_exact_in(&rpc, QuoteExactInParams)")]
+pub async fn quote_exact_in_legacy(
+    rpc: &SolanaRpcClient,
+    pool_address: &Pubkey,
+    amount_in: u64,
+    is_base_in: bool,
+) -> Result<crate::utils::quote::QuoteExactInResult, anyhow::Error> {
+    let pool = get_pool_by_address(rpc, pool_address).await?;
+
+    // 构建新版本的参数
+    let (input_mint, output_mint) = if is_base_in {
+        (pool.base_mint, pool.quote_mint)
+    } else {
+        (pool.quote_mint, pool.base_mint)
+    };
+
+    let params = QuoteExactInParams {
+        pool_address: *pool_address,
+        input_mint,
+        output_mint,
+        amount_in,
+    };
+
+    quote_exact_in(rpc, params).await
+}
+
 /// Quote an exact-out swap against a PumpSwap pool.
 ///
-/// - If `is_base_in=true`: base -> quote (卖出 base)
-/// - If `is_base_in=false`: quote -> base (买入 base)
+/// 计算需要多少输入金额才能获得指定的输出金额。
 ///
 /// # Arguments
 ///
-/// * `rpc` - RPC 客户端
-/// * `pool_address` - Pool 地址
-/// * `amount_out` - 期望的输出金额（固定）
-/// * `is_base_in` - 是否 base 为输入代币
+/// * `params` - Quote 参数，包含 pool_address、input_mint、output_mint、amount_out
 ///
-/// # Returns
+/// # Examples
 ///
-/// 返回 `QuoteExactOutResult` 包含所需的输入金额和手续费
+/// ```ignore
+/// let params = QuoteExactOutParams {
+///     pool_address: pool_pubkey,
+///     input_mint: base_mint,
+///     output_mint: quote_mint,
+///     amount_out: 1_000_000,
+/// };
+/// let quote = quote_exact_out(&rpc, params).await?;
+/// ```
 pub async fn quote_exact_out(
     rpc: &SolanaRpcClient,
-    pool_address: &Pubkey,
-    amount_out: u64,
-    is_base_in: bool,
+    params: QuoteExactOutParams,
 ) -> Result<crate::utils::quote::QuoteExactOutResult, anyhow::Error> {
-    let pool = get_pool_by_address(rpc, pool_address).await?;
+    let pool = get_pool_by_address(rpc, &params.pool_address).await?;
+
+    // 验证 input_mint 和 output_mint 是否在池子中
+    let is_base_in = params.input_mint == pool.base_mint;
+    let is_quote_in = params.input_mint == pool.quote_mint;
+
+    if !is_base_in && !is_quote_in {
+        return Err(anyhow!(
+            "Input mint {} not found in pool {} (base={}, quote={})",
+            params.input_mint,
+            params.pool_address,
+            pool.base_mint,
+            pool.quote_mint
+        ));
+    }
+
+    let expected_output_mint = if is_base_in {
+        pool.quote_mint
+    } else {
+        pool.base_mint
+    };
+
+    if params.output_mint != expected_output_mint {
+        return Err(anyhow!(
+            "Output mint mismatch: expected {}, got {}",
+            expected_output_mint,
+            params.output_mint
+        ));
+    }
+
     let (base_reserve, quote_reserve) = get_token_balances(&pool, rpc).await?;
 
     if is_base_in {
         // base -> quote (卖出 base，获得指定数量的 quote)
         // 使用 sell_quote_input_internal 进行逆向计算
         let r = crate::utils::calc::pumpswap::sell_quote_input_internal(
-            amount_out,
+            params.amount_out,
             0, // slippage 在 quote 中不计算
             base_reserve,
             quote_reserve,
@@ -113,7 +216,7 @@ pub async fn quote_exact_out(
         // quote -> base (买入 base，获得指定数量的 base)
         // 使用 buy_base_input_internal 进行逆向计算
         let r = crate::utils::calc::pumpswap::buy_base_input_internal(
-            amount_out,
+            params.amount_out,
             0, // slippage 在 quote 中不计算
             base_reserve,
             quote_reserve,
@@ -131,6 +234,37 @@ pub async fn quote_exact_out(
             extra_accounts_read: 2,
         })
     }
+}
+
+/// Quote an exact-out swap against a PumpSwap pool (旧版接口，已废弃).
+///
+/// # Deprecated
+///
+/// 请使用新版本的 `quote_exact_out`，它使用 `QuoteExactOutParams` 结构体参数。
+#[deprecated(since = "4.1.0", note = "请使用 quote_exact_out(&rpc, QuoteExactOutParams)")]
+pub async fn quote_exact_out_legacy(
+    rpc: &SolanaRpcClient,
+    pool_address: &Pubkey,
+    amount_out: u64,
+    is_base_in: bool,
+) -> Result<crate::utils::quote::QuoteExactOutResult, anyhow::Error> {
+    let pool = get_pool_by_address(rpc, pool_address).await?;
+
+    // 构建新版本的参数
+    let (input_mint, output_mint) = if is_base_in {
+        (pool.base_mint, pool.quote_mint)
+    } else {
+        (pool.quote_mint, pool.base_mint)
+    };
+
+    let params = QuoteExactOutParams {
+        pool_address: *pool_address,
+        input_mint,
+        output_mint,
+        amount_out,
+    };
+
+    quote_exact_out(rpc, params).await
 }
 
 /// 获取任意 Token 在 PumpSwap 上的 USD 价格（通过 X-WSOL 池 + Raydium CLMM WSOL-USD 锚定池）

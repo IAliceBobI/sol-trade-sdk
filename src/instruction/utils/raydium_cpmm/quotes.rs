@@ -8,7 +8,7 @@ use crate::{
     },
     instruction::utils::raydium_cpmm_types::PoolStateRaw,
     utils::price::raydium_cpmm::{price_base_in_quote, price_quote_in_base},
-    utils::quote::{QuoteExactInResult, QuoteExactOutResult},
+    utils::quote::{QuoteExactInParams, QuoteExactInResult, QuoteExactOutParams, QuoteExactOutResult},
 };
 use anyhow::anyhow;
 use solana_sdk::pubkey::Pubkey;
@@ -43,22 +43,61 @@ async fn get_creator_fees_from_pool_data(
 
 /// Quote an exact-in swap against a Raydium CPMM pool.
 ///
-/// - If `is_token0_in=true`: token0 -> token1
-/// - If `is_token0_in=false`: token1 -> token0
+/// # Arguments
+///
+/// * `params` - Quote 参数，包含 pool_address、input_mint、output_mint、amount_in
+///
+/// # Examples
+///
+/// ```ignore
+/// let params = QuoteExactInParams {
+///     pool_address: pool_pubkey,
+///     input_mint: token0_mint,
+///     output_mint: token1_mint,
+///     amount_in: 1_000_000,
+/// };
+/// let quote = quote_exact_in(&rpc, params).await?;
+/// ```
 pub async fn quote_exact_in(
     rpc: &SolanaRpcClient,
-    pool_address: &Pubkey,
-    amount_in: u64,
-    is_token0_in: bool,
+    params: QuoteExactInParams,
 ) -> Result<QuoteExactInResult, anyhow::Error> {
-    let pool_state = pool_queries::get_pool_by_address(rpc, pool_address).await?;
+    let pool_state = pool_queries::get_pool_by_address(rpc, &params.pool_address).await?;
+
+    // 验证 input_mint 和 output_mint 是否在池子中
+    let is_token0_in = params.input_mint == pool_state.token0_mint;
+    let is_token1_in = params.input_mint == pool_state.token1_mint;
+
+    if !is_token0_in && !is_token1_in {
+        return Err(anyhow!(
+            "Input mint {} not found in pool {} (token0={}, token1={})",
+            params.input_mint,
+            params.pool_address,
+            pool_state.token0_mint,
+            pool_state.token1_mint
+        ));
+    }
+
+    let expected_output_mint = if is_token0_in {
+        pool_state.token1_mint
+    } else {
+        pool_state.token0_mint
+    };
+
+    if params.output_mint != expected_output_mint {
+        return Err(anyhow!(
+            "Output mint mismatch: expected {}, got {}",
+            expected_output_mint,
+            params.output_mint
+        ));
+    }
 
     // 获取实际费率（从 amm_config 账户）
     let fees = fee_queries::get_amm_config_fees(rpc, &pool_state.amm_config).await?;
 
     let (token0_reserve, token1_reserve) = pool_queries::get_pool_token_balances(
         rpc,
-        pool_address,
+        &params.pool_address,
         &pool_state.token0_mint,
         &pool_state.token1_mint,
     )
@@ -80,7 +119,7 @@ pub async fn quote_exact_in(
         token0_reserve_without_fees,  // 使用扣除累积手续费后的储备金
         token1_reserve_without_fees,  // 使用扣除累积手续费后的储备金
         is_token0_in,
-        amount_in,
+        params.amount_in,
         0,
         fees.trade_fee_rate,
         fees.protocol_fee_rate,
@@ -94,40 +133,100 @@ pub async fn quote_exact_in(
     })
 }
 
+/// Quote an exact-in swap against a Raydium CPMM pool (旧版接口，已废弃).
+///
+/// # Deprecated
+///
+/// 请使用新版本的 `quote_exact_in`，它使用 `QuoteExactInParams` 结构体参数。
+///
+/// - If `is_token0_in=true`: token0 -> token1
+/// - If `is_token0_in=false`: token1 -> token0
+#[deprecated(since = "4.1.0", note = "请使用 quote_exact_in(&rpc, QuoteExactInParams)")]
+pub async fn quote_exact_in_legacy(
+    rpc: &SolanaRpcClient,
+    pool_address: &Pubkey,
+    amount_in: u64,
+    is_token0_in: bool,
+) -> Result<QuoteExactInResult, anyhow::Error> {
+    let pool_state = pool_queries::get_pool_by_address(rpc, pool_address).await?;
+
+    // 构建新版本的参数
+    let (input_mint, output_mint) = if is_token0_in {
+        (pool_state.token0_mint, pool_state.token1_mint)
+    } else {
+        (pool_state.token1_mint, pool_state.token0_mint)
+    };
+
+    let params = QuoteExactInParams {
+        pool_address: *pool_address,
+        input_mint,
+        output_mint,
+        amount_in,
+    };
+
+    quote_exact_in(rpc, params).await
+}
+
 /// Quote an exact-out swap against a Raydium CPMM pool.
 ///
-/// Calculates the required input amount to obtain a specific output amount.
+/// 计算需要多少输入金额才能获得指定的输出金额。
 ///
 /// # Arguments
 ///
-/// * `rpc` - RPC client
-/// * `pool_address` - Pool address
-/// * `amount_out` - Desired output amount (in smallest units)
-/// * `is_token0_in` - true if token0 is the input, false if token1 is the input
+/// * `params` - Quote 参数，包含 pool_address、input_mint、output_mint、amount_out
 ///
-/// # Returns
+/// # Examples
 ///
-/// Returns `QuoteExactOutResult` containing the required input amount and fees
-///
-/// # Example
 /// ```ignore
-/// let quote = quote_exact_out(&rpc, &pool, 1_000_000, true).await?;
+/// let params = QuoteExactOutParams {
+///     pool_address: pool_pubkey,
+///     input_mint: token0_mint,
+///     output_mint: token1_mint,
+///     amount_out: 1_000_000,
+/// };
+/// let quote = quote_exact_out(&rpc, params).await?;
 /// println!("需要输入: {} tokens", quote.amount_in);
 /// ```
 pub async fn quote_exact_out(
     rpc: &SolanaRpcClient,
-    pool_address: &Pubkey,
-    amount_out: u64,
-    is_token0_in: bool,
+    params: QuoteExactOutParams,
 ) -> Result<QuoteExactOutResult, anyhow::Error> {
-    let pool_state = pool_queries::get_pool_by_address(rpc, pool_address).await?;
+    let pool_state = pool_queries::get_pool_by_address(rpc, &params.pool_address).await?;
+
+    // 验证 input_mint 和 output_mint 是否在池子中
+    let is_token0_in = params.input_mint == pool_state.token0_mint;
+    let is_token1_in = params.input_mint == pool_state.token1_mint;
+
+    if !is_token0_in && !is_token1_in {
+        return Err(anyhow!(
+            "Input mint {} not found in pool {} (token0={}, token1={})",
+            params.input_mint,
+            params.pool_address,
+            pool_state.token0_mint,
+            pool_state.token1_mint
+        ));
+    }
+
+    let expected_output_mint = if is_token0_in {
+        pool_state.token1_mint
+    } else {
+        pool_state.token0_mint
+    };
+
+    if params.output_mint != expected_output_mint {
+        return Err(anyhow!(
+            "Output mint mismatch: expected {}, got {}",
+            expected_output_mint,
+            params.output_mint
+        ));
+    }
 
     // 获取实际费率（从 amm_config 账户）
     let fees = fee_queries::get_amm_config_fees(rpc, &pool_state.amm_config).await?;
 
     let (token0_reserve, token1_reserve) = pool_queries::get_pool_token_balances(
         rpc,
-        pool_address,
+        &params.pool_address,
         &pool_state.token0_mint,
         &pool_state.token1_mint,
     )
@@ -147,7 +246,7 @@ pub async fn quote_exact_out(
     let result = crate::utils::calc::raydium_cpmm::quote_exact_out(
         token0_reserve_without_fees,  // 使用扣除累积手续费后的储备金
         token1_reserve_without_fees,  // 使用扣除累积手续费后的储备金
-        amount_out,
+        params.amount_out,
         is_token0_in,
         fees.trade_fee_rate,
         fees.protocol_fee_rate,
@@ -161,6 +260,37 @@ pub async fn quote_exact_out(
         price_impact_bps: result.price_impact_bps,
         extra_accounts_read: 2,
     })
+}
+
+/// Quote an exact-out swap against a Raydium CPMM pool (旧版接口，已废弃).
+///
+/// # Deprecated
+///
+/// 请使用新版本的 `quote_exact_out`，它使用 `QuoteExactOutParams` 结构体参数。
+#[deprecated(since = "4.1.0", note = "请使用 quote_exact_out(&rpc, QuoteExactOutParams)")]
+pub async fn quote_exact_out_legacy(
+    rpc: &SolanaRpcClient,
+    pool_address: &Pubkey,
+    amount_out: u64,
+    is_token0_in: bool,
+) -> Result<QuoteExactOutResult, anyhow::Error> {
+    let pool_state = pool_queries::get_pool_by_address(rpc, pool_address).await?;
+
+    // 构建新版本的参数
+    let (input_mint, output_mint) = if is_token0_in {
+        (pool_state.token0_mint, pool_state.token1_mint)
+    } else {
+        (pool_state.token1_mint, pool_state.token0_mint)
+    };
+
+    let params = QuoteExactOutParams {
+        pool_address: *pool_address,
+        input_mint,
+        output_mint,
+        amount_out,
+    };
+
+    quote_exact_out(rpc, params).await
 }
 
 /// 获取任意 Token 在 Raydium CPMM 上的 USD 价格（通过 X-WSOL 池 + Raydium CLMM WSOL-USD 锚定池）

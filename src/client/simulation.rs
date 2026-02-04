@@ -4,6 +4,7 @@ use super::helpers::{get_input_mint, get_output_mint};
 use super::types::{TradeBuyParams, TradeSellParams, TradingClient};
 use crate::trading::core::params::SwapParams;
 use crate::trading::core::traits::InstructionBuilder;
+use crate::utils::quote::{QuoteExactInParams, QuoteExactOutParams};
 use crate::{DexType, SimulationResult, TradeTokenType, UnifiedResult, UnifiedTradingError};
 use solana_sdk::signature::Signer;
 
@@ -39,34 +40,46 @@ async fn get_raydium_cpmm_fee(
     pool_address: &solana_sdk::pubkey::Pubkey,
     swap_params: &SwapParams,
 ) -> Result<u64, String> {
-    let base_mint = match &swap_params.protocol_params {
-        crate::trading::core::params::DexParamEnum::RaydiumCpmm(p) => p.base_mint,
+    let params = match &swap_params.protocol_params {
+        crate::trading::core::params::DexParamEnum::RaydiumCpmm(p) => p,
         _ => return Err("Invalid DEX params".to_string()),
     };
-
-    let is_token0_in = swap_params.input_mint == base_mint;
 
     // 根据模式调用不同的 quote 函数，并提取 fee_amount
     if let Some(amount_out) = swap_params.fixed_output_amount {
         // exact_out 模式
-        let result = crate::instruction::utils::raydium_cpmm::quote_exact_out(
-            rpc,
-            pool_address,
+        let output_mint = if swap_params.input_mint == params.base_mint {
+            params.quote_mint
+        } else {
+            params.base_mint
+        };
+
+        let quote_params = QuoteExactOutParams {
+            pool_address: *pool_address,
+            input_mint: swap_params.input_mint,
+            output_mint,
             amount_out,
-            is_token0_in,
-        )
-        .await;
+        };
+
+        let result = crate::instruction::utils::raydium_cpmm::quote_exact_out(rpc, quote_params).await;
         result.map(|q| q.fee_amount).map_err(|e| format!("Quote failed: {}", e))
     } else {
         // exact_in 模式
         let amount_in = swap_params.input_amount.unwrap_or(0);
-        let result = crate::instruction::utils::raydium_cpmm::quote_exact_in(
-            rpc,
-            pool_address,
+        let output_mint = if swap_params.input_mint == params.base_mint {
+            params.quote_mint
+        } else {
+            params.base_mint
+        };
+
+        let quote_params = QuoteExactInParams {
+            pool_address: *pool_address,
+            input_mint: swap_params.input_mint,
+            output_mint,
             amount_in,
-            is_token0_in,
-        )
-        .await;
+        };
+
+        let result = crate::instruction::utils::raydium_cpmm::quote_exact_in(rpc, quote_params).await;
         result.map(|q| q.fee_amount).map_err(|e| format!("Quote failed: {}", e))
     }
 }
@@ -77,34 +90,46 @@ async fn get_raydium_amm_v4_fee(
     pool_address: &solana_sdk::pubkey::Pubkey,
     swap_params: &SwapParams,
 ) -> Result<u64, String> {
-    let coin_mint = match &swap_params.protocol_params {
-        crate::trading::core::params::DexParamEnum::RaydiumAmmV4(p) => p.coin_mint,
+    let params = match &swap_params.protocol_params {
+        crate::trading::core::params::DexParamEnum::RaydiumAmmV4(p) => p,
         _ => return Err("Invalid DEX params".to_string()),
     };
-
-    let is_coin_in = swap_params.input_mint == coin_mint;
 
     // 根据模式调用不同的 quote 函数，并提取 fee_amount
     if let Some(amount_out) = swap_params.fixed_output_amount {
         // exact_out 模式
-        let result = crate::instruction::utils::raydium_amm_v4::quote_exact_out(
-            rpc,
-            pool_address,
+        let output_mint = if swap_params.input_mint == params.coin_mint {
+            params.pc_mint
+        } else {
+            params.coin_mint
+        };
+
+        let quote_params = QuoteExactOutParams {
+            pool_address: *pool_address,
+            input_mint: swap_params.input_mint,
+            output_mint,
             amount_out,
-            is_coin_in,
-        )
-        .await;
+        };
+
+        let result = crate::instruction::utils::raydium_amm_v4::quote_exact_out(rpc, quote_params).await;
         result.map(|q| q.fee_amount).map_err(|e| format!("Quote failed: {}", e))
     } else {
         // exact_in 模式
         let amount_in = swap_params.input_amount.unwrap_or(0);
-        let result = crate::instruction::utils::raydium_amm_v4::quote_exact_in(
-            rpc,
-            pool_address,
+        let output_mint = if swap_params.input_mint == params.coin_mint {
+            params.pc_mint
+        } else {
+            params.coin_mint
+        };
+
+        let quote_params = QuoteExactInParams {
+            pool_address: *pool_address,
+            input_mint: swap_params.input_mint,
+            output_mint,
             amount_in,
-            is_coin_in,
-        )
-        .await;
+        };
+
+        let result = crate::instruction::utils::raydium_amm_v4::quote_exact_in(rpc, quote_params).await;
         result.map(|q| q.fee_amount).map_err(|e| format!("Quote failed: {}", e))
     }
 }
@@ -115,34 +140,46 @@ async fn get_raydium_clmm_fee(
     pool_address: &solana_sdk::pubkey::Pubkey,
     swap_params: &SwapParams,
 ) -> Result<u64, String> {
-    let token0_mint = match &swap_params.protocol_params {
-        crate::trading::core::params::DexParamEnum::RaydiumClmm(p) => p.token0_mint,
+    let params = match &swap_params.protocol_params {
+        crate::trading::core::params::DexParamEnum::RaydiumClmm(p) => p,
         _ => return Err("Invalid DEX params".to_string()),
     };
-
-    let zero_for_one = swap_params.input_mint == token0_mint;
 
     // 根据模式调用不同的 quote 函数，并提取 fee_amount
     if let Some(amount_out) = swap_params.fixed_output_amount {
         // exact_out 模式
-        let result = crate::instruction::utils::raydium_clmm::quote_exact_out(
-            rpc,
-            pool_address,
+        let output_mint = if swap_params.input_mint == params.token0_mint {
+            params.token1_mint
+        } else {
+            params.token0_mint
+        };
+
+        let quote_params = QuoteExactOutParams {
+            pool_address: *pool_address,
+            input_mint: swap_params.input_mint,
+            output_mint,
             amount_out,
-            zero_for_one,
-        )
-        .await;
+        };
+
+        let result = crate::instruction::utils::raydium_clmm::quote_exact_out(rpc, quote_params).await;
         result.map(|q| q.fee_amount).map_err(|e| format!("Quote failed: {}", e))
     } else {
         // exact_in 模式
         let amount_in = swap_params.input_amount.unwrap_or(0);
-        let result = crate::instruction::utils::raydium_clmm::quote_exact_in(
-            rpc,
-            pool_address,
+        let output_mint = if swap_params.input_mint == params.token0_mint {
+            params.token1_mint
+        } else {
+            params.token0_mint
+        };
+
+        let quote_params = QuoteExactInParams {
+            pool_address: *pool_address,
+            input_mint: swap_params.input_mint,
+            output_mint,
             amount_in,
-            zero_for_one,
-        )
-        .await;
+        };
+
+        let result = crate::instruction::utils::raydium_clmm::quote_exact_in(rpc, quote_params).await;
         result.map(|q| q.fee_amount).map_err(|e| format!("Quote failed: {}", e))
     }
 }
@@ -153,34 +190,46 @@ async fn get_pumpswap_fee(
     pool_address: &solana_sdk::pubkey::Pubkey,
     swap_params: &SwapParams,
 ) -> Result<u64, String> {
-    let base_mint = match &swap_params.protocol_params {
-        crate::trading::core::params::DexParamEnum::PumpSwap(p) => p.base_mint,
+    let params = match &swap_params.protocol_params {
+        crate::trading::core::params::DexParamEnum::PumpSwap(p) => p,
         _ => return Err("Invalid DEX params".to_string()),
     };
-
-    let is_base_in = swap_params.input_mint == base_mint;
 
     // 根据模式调用不同的 quote 函数，并提取 fee_amount
     if let Some(amount_out) = swap_params.fixed_output_amount {
         // exact_out 模式
-        let result = crate::instruction::utils::pumpswap::quote_exact_out(
-            rpc,
-            pool_address,
+        let output_mint = if swap_params.input_mint == params.base_mint {
+            params.quote_mint
+        } else {
+            params.base_mint
+        };
+
+        let quote_params = QuoteExactOutParams {
+            pool_address: *pool_address,
+            input_mint: swap_params.input_mint,
+            output_mint,
             amount_out,
-            is_base_in,
-        )
-        .await;
+        };
+
+        let result = crate::instruction::utils::pumpswap::quote_exact_out(rpc, quote_params).await;
         result.map(|q| q.fee_amount).map_err(|e| format!("Quote failed: {}", e))
     } else {
         // exact_in 模式
         let amount_in = swap_params.input_amount.unwrap_or(0);
-        let result = crate::instruction::utils::pumpswap::quote_exact_in(
-            rpc,
-            pool_address,
+        let output_mint = if swap_params.input_mint == params.base_mint {
+            params.quote_mint
+        } else {
+            params.base_mint
+        };
+
+        let quote_params = QuoteExactInParams {
+            pool_address: *pool_address,
+            input_mint: swap_params.input_mint,
+            output_mint,
             amount_in,
-            is_base_in,
-        )
-        .await;
+        };
+
+        let result = crate::instruction::utils::pumpswap::quote_exact_in(rpc, quote_params).await;
         result.map(|q| q.fee_amount).map_err(|e| format!("Quote failed: {}", e))
     }
 }
