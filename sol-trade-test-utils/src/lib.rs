@@ -28,11 +28,21 @@
 pub mod airdrop;
 pub mod token;
 pub mod ensure;
+pub mod cpmm_test_params;
 
 // 重新导出常用类型
 pub use airdrop::airdrop_and_wait;
 pub use token::{get_mint_info, mint_token_to, set_token_balance, transfer_token_to, MintInfo};
 pub use ensure::{ensure_cpmm_liquidity, ensure_sol_balance, ensure_token_balance};
+
+// 重新导出 CPMM 测试参数构建器
+pub use cpmm_test_params::{
+    create_test_gas_fee_strategy,
+    pipe_mint, pipe_wsol_pool, prts_mint, usdc_mint, usdc_prts_pool, wsol_mint,
+    CpmmLiquidityBuilder, PipeWsolBuyParamsBuilder, PipeWsolLiquidityBuilder,
+    PipeWsolSellParamsBuilder, UsdcPrtsBuyParamsBuilder, UsdcPrtsSellParamsBuilder,
+    PIPE_MINT, PIPE_WSOL_POOL, PRTS_MINT, USDC_MINT, USDC_PRTS_POOL, WSOL_MINT,
+};
 
 // 导入常用类型
 use solana_sdk::signature::Keypair;

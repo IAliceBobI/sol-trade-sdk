@@ -23,8 +23,7 @@ use std::sync::Arc;
 use sol_trade_test_utils::{ensure_ata_with_balance, get_simulation_test_keypair};
 
 // 导入 CPMM 测试参数工具
-mod cpmm_test_params;
-use cpmm_test_params::{pipe_mint, pipe_wsol_pool, wsol_mint};
+use sol_trade_test_utils::{pipe_mint, pipe_wsol_pool, wsol_mint};
 
 #[tokio::test]
 #[serial_test::serial(cpmm_exact_in_buy_complete)]

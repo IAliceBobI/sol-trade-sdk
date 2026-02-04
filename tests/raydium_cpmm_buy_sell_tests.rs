@@ -29,8 +29,7 @@ use test_helpers::{create_test_client, print_balances, print_token_balance};
 use sol_trade_test_utils::set_token_balance;
 
 // 使用参数构造工具模块
-mod cpmm_test_params;
-use cpmm_test_params::*;
+use sol_trade_test_utils::cpmm_test_params::*;
 
 /// 测试：Raydium CPMM 完整买入-卖出流程
 ///

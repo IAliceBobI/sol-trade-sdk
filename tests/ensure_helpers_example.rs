@@ -10,8 +10,7 @@ use std::sync::Arc;
 use sol_trade_test_utils::{get_simulation_test_keypair, ensure_sol_balance, ensure_token_balance};
 
 // 导入 CPMM 测试参数工具
-mod cpmm_test_params;
-use cpmm_test_params::{pipe_mint, pipe_wsol_pool, wsol_mint};
+use sol_trade_test_utils::{pipe_mint, pipe_wsol_pool, wsol_mint};
 
 #[tokio::test]
 #[serial_test::serial]
