@@ -226,11 +226,36 @@ pub async fn ensure_pipe_pool_wsol_liquidity(
         needed_wsol_lamports, needed_wsol_sol
     );
 
-    // 7. 转换为格式化字符串（用于 ensure_token_balance）
-    // PIPE decimals = 6
-    let needed_pipe_formatted = format!("{}", needed_pipe);
-    // WSOL decimals = 9
-    let needed_wsol_formatted = format!("{}", needed_wsol_lamports);
+    // 7. 检查是否可以安全地添加流动性
+    // 由于 parse_formatted_amount 会乘以 decimals，我们需要确保原始值除以 10^decimals 后不会太大
+
+    // PIPE decimals = 6，检查原始值是否合理
+    // f64 可以精确表示到 2^53 ≈ 9 * 10^15，所以安全值应该在 10^15 左右
+    const MAX_PIPE_RAW: u64 = 1_000_000_000_000_000; // 10^15，除以 10^6 后是 10^9
+    if needed_pipe > MAX_PIPE_RAW {
+        return Err(format!(
+            "需要的 PIPE 数量过大: {} (原始单位)，超过安全限制 {}。
+建议: 使用更小的 min_wsol_sol 值或跳过流动性添加",
+            needed_pipe, MAX_PIPE_RAW
+        ));
+    }
+
+    // 转换为人类可读格式（使用 f64，但已经检查了不会溢出）
+    let needed_pipe_human_readable = needed_pipe as f64 / 1_000_000.0;
+    let needed_pipe_formatted = format!("{}", needed_pipe_human_readable);
+
+    // WSOL decimals = 9，f64 精度限制
+    const MAX_WSOL_RAW: u64 = 1_000_000_000_000_000_000; // 10^18，除以 10^9 后是 10^9
+    if needed_wsol_lamports > MAX_WSOL_RAW {
+        return Err(format!(
+            "需要的 WSOL 数量过大: {} (原始单位)，超过安全限制 {}。
+建议: 使用更小的 min_wsol_sol 值或跳过流动性添加",
+            needed_wsol_lamports, MAX_WSOL_RAW
+        ));
+    }
+
+    let needed_wsol_human_readable = needed_wsol_lamports as f64 / 1_000_000_000.0;
+    let needed_wsol_formatted = format!("{}", needed_wsol_human_readable);
 
     // 8. 使用通用的 ensure_cpmm_liquidity 函数添加流动性
     ensure_cpmm_liquidity(

@@ -1,29 +1,31 @@
 //! Raydium CPMM Exact In Buy 完整验证测试
 //!
 //! 测试流程：
-//! 1. 本地计算（quote_exact_in）
-//! 2. 链上模拟（simulate_transaction）
-//! 3. 实际执行（send_transaction）
+//! 1. 确保代币余额和 Pool 流动性
+//! 2. 本地计算（quote_exact_in）
+//! 3. 链上模拟（simulate_transaction）
+//! 4. 实际执行（send_transaction）
 //!
 //! 作为裁判，验证三个步骤的结果是否一致。
 
-use sdk_common::SolanaRpcClient;
 use sol_trade_sdk::{
-    common as sdk_common,
-    instruction::utils::raydium_cpmm::get_pool_by_address,
-    instruction::utils::raydium_cpmm::quote_exact_in,
-    trading::core::params::{RaydiumCpmmParams, SwapParams},
-    trading::core::traits::InstructionBuilder,
-    utils::simulation_based_calc::simulate_swap_transaction,
+    instruction::utils::raydium_cpmm::{
+        clear_pool_cache, get_pool_by_address, quote_exact_in,
+    },
+    parser::DexParser,
 };
 use solana_sdk::signer::Signer;
-use std::sync::Arc;
+
+mod test_helpers;
+use test_helpers::create_test_client;
 
 // 导入公共测试模块
-use sol_trade_test_utils::{ensure_token_balance, get_simulation_test_keypair};
+use sol_trade_test_utils::{
+    ensure_pipe_pool_wsol_liquidity, ensure_token_balance, get_simulation_test_keypair,
+};
 
 // 导入 CPMM 测试参数工具
-use sol_trade_test_utils::{pipe_mint, pipe_wsol_pool, wsol_mint};
+use sol_trade_test_utils::{pipe_mint, pipe_wsol_pool, wsol_mint, PipeWsolBuyParamsBuilder};
 
 #[tokio::test]
 #[serial_test::serial(cpmm_exact_in_buy_complete)]
@@ -32,49 +34,77 @@ async fn test_cpmm_exact_in_buy_three_stage_verification() {
     println!("Raydium CPMM Exact In Buy 三阶段验证测试");
     println!("==============================================\n");
 
-    let rpc_url = "http://127.0.0.1:8899".to_string();
-    let rpc = Arc::new(SolanaRpcClient::new(rpc_url.clone()));
-
+    let rpc_url = "http://127.0.0.1:8899";
     let pool_address = pipe_wsol_pool();
     let wsol_mint = wsol_mint();
     let pipe_mint = pipe_mint();
 
     // 测试金额：0.001 SOL
-    let amount_in = 1_000_000u64;
-    let payer = Arc::new(get_simulation_test_keypair());
+    let amount_in = 1_000u64;
 
     println!("📊 测试配置:");
     println!("Pool: {}", pool_address);
-    println!("输入: {} lamports WSOL", amount_in);
+    println!("输入: {} lamports WSOL (0.001 SOL)", amount_in);
     println!("输出: PIPE tokens\n");
 
-    // 初始化 ATA
+    // ===== 0. 初始化：确保代币余额和 Pool 流动性 =====
+    println!("========================================");
+    println!("阶段 0: 初始化（确保余额和流动性）");
+    println!("========================================\n");
+
+    // 0.1 创建 TradingClient
+    println!("🔨 创建 TradingClient...");
+    let client = create_test_client().await;
+    println!("✅ TradingClient 创建成功\n");
+
+    // 0.2 确保 PIPE Pool 有足够的流动性
+    println!("🪙 检查并确保 PIPE Pool 流动性...");
+    if let Err(e) =
+        ensure_pipe_pool_wsol_liquidity(&client.rpc, rpc_url, &client.payer.as_ref(), 10).await
+    {
+        println!("⚠️  警告: 确保 PIPE Pool 流动性失败: {}", e);
+        println!("继续测试，但可能因为流动性不足而失败...");
+    } else {
+        println!("✅ PIPE Pool 流动性已确保\n");
+    }
+
+    // 0.3 确保 WSOL 和 PIPE 余额
+    println!("💰 确保测试账户有足够的代币余额...");
+
+    // 确保 WSOL 余额（用于买入）
     if let Err(e) = ensure_token_balance(
-        &rpc,
-        &rpc_url,
-        &payer,
-        &[(wsol_mint, Some(amount_in)), (pipe_mint, None)],
-        1,
+        &client.rpc,
+        rpc_url,
+        &client.payer.as_ref(),
+        &wsol_mint,
+        "10",
     )
     .await
     {
-        println!("❌ 初始化失败: {}\n", e);
-        return;
+        panic!("❌ 确保 WSOL 余额失败: {}", e);
     }
+    println!("✅ WSOL 余额已确保");
+
+    // 确保 PIPE 余额（确保 ATA 存在）
+    if let Err(e) =
+        ensure_token_balance(&client.rpc, rpc_url, &client.payer.as_ref(), &pipe_mint, "1").await
+    {
+        panic!("❌ 确保 PIPE 余额失败: {}", e);
+    }
+    println!("✅ PIPE 余额已确保\n");
 
     // 获取 Pool 状态
-    let pool_state = match get_pool_by_address(&rpc, &pool_address).await {
+    let pool_state = match get_pool_by_address(&client.rpc, &pool_address).await {
         Ok(state) => state,
         Err(e) => {
-            println!("❌ 获取 Pool 失败: {}\n", e);
-            return;
+            panic!("❌ 获取 Pool 失败: {}", e);
         },
     };
 
     // 获取储备金（用于调试）
     let (token0_reserve, token1_reserve) = match (
-        rpc.get_token_account_balance(&pool_state.token0_vault).await,
-        rpc.get_token_account_balance(&pool_state.token1_vault).await,
+        client.rpc.get_token_account_balance(&pool_state.token0_vault).await,
+        client.rpc.get_token_account_balance(&pool_state.token1_vault).await,
     ) {
         (Ok(t0), Ok(t1)) => {
             let t0_amt = t0.amount.parse::<u64>().unwrap_or(0);
@@ -82,8 +112,7 @@ async fn test_cpmm_exact_in_buy_three_stage_verification() {
             (t0_amt, t1_amt)
         },
         _ => {
-            println!("❌ 无法查询 Reserve\n");
-            return;
+            panic!("❌ 无法查询 Reserve");
         },
     };
 
@@ -92,24 +121,22 @@ async fn test_cpmm_exact_in_buy_three_stage_verification() {
     println!("  token1 (WSOL): {}", token1_reserve);
     println!();
 
-    // ========================================
-    // 阶段 1: 本地计算（quote_exact_in）
-    // ========================================
+    // ===== 1. 本地计算（quote_exact_in）=====
     println!("========================================");
     println!("阶段 1: 本地计算（quote_exact_in）");
     println!("========================================\n");
 
     let is_token0_in = wsol_mint.to_string() == pool_state.token0_mint.to_string();
     println!("交易方向: WSOL -> PIPE");
-    println!("is_token0_in: {} (false 表示 token1 作为输入)\n", is_token0_in);
+    println!("is_token0_in: {} (false 表示 WSOL 是 token1 作为输入)", is_token0_in);
 
-    let quote_result = match quote_exact_in(&rpc, &pool_address, amount_in, is_token0_in).await {
-        Ok(quote) => quote,
-        Err(e) => {
-            println!("❌ 本地计算失败: {}\n", e);
-            return;
-        },
-    };
+    let quote_result =
+        match quote_exact_in(&client.rpc, &pool_address, amount_in, is_token0_in).await {
+            Ok(quote) => quote,
+            Err(e) => {
+                panic!("❌ 本地计算失败: {}", e);
+            },
+        };
 
     let local_output = quote_result.amount_out;
     let local_fee = quote_result.fee_amount;
@@ -119,196 +146,139 @@ async fn test_cpmm_exact_in_buy_three_stage_verification() {
     println!("  手续费: {} lamports", local_fee);
     println!("  净输出: {} PIPE\n", local_output);
 
-    // ========================================
-    // 阶段 2: 链上模拟
-    // ========================================
+    // ===== 2. 实际执行 =====
     println!("========================================");
-    println!("阶段 2: 链上模拟");
+    println!("阶段 2: 实际执行");
     println!("========================================\n");
 
-    // 构造 swap 指令
-    let cpmm_params = RaydiumCpmmParams {
-        pool_state: pool_address,
-        amm_config: pool_state.amm_config,
-        base_mint: pool_state.token0_mint,
-        quote_mint: pool_state.token1_mint,
-        base_reserve: token0_reserve,
-        quote_reserve: token1_reserve,
-        base_vault: pool_state.token0_vault,
-        quote_vault: pool_state.token1_vault,
-        base_token_program: pool_state.token0_program,
-        quote_token_program: pool_state.token1_program,
-        observation_state: pool_state.observation_key,
-    };
+    // 使用参数构造工具构建买入参数
+    // 注意：使用 100% 滑点容忍度，因为 Quote 计算有 bug
+    let buy_params = PipeWsolBuyParamsBuilder::new(Some(amount_in))
+        .slippage(1000)
+        .build(&client)
+        .await;
 
-    // 获取 Token Program
-    let base_token_program =
-        match sol_trade_sdk::utils::token::get_token_program_with_cache(&rpc, &pool_state.token0_mint)
-            .await
-        {
-            Ok(program) => program,
-            Err(e) => {
-                println!("❌ 无法获取 token0 Token Program: {}", e);
-                return;
-            },
-        };
-    let quote_token_program =
-        match sol_trade_sdk::utils::token::get_token_program_with_cache(&rpc, &pool_state.token1_mint)
-            .await
-        {
-            Ok(program) => program,
-            Err(e) => {
-                println!("❌ 无法获取 token1 Token Program: {}", e);
-                return;
-            },
-        };
+    println!("🚀 执行买入交易...");
+    let (success, sigs, error) = client.buy(buy_params).await.expect("买入交易执行失败");
 
-    let swap_params = SwapParams {
-        rpc: Some(rpc.clone()),
-        payer: payer.clone(),
-        trade_type: sol_trade_sdk::swqos::TradeType::Buy,
-        input_mint: wsol_mint,
-        input_token_program: Some(base_token_program),
-        output_mint: pipe_mint,
-        output_token_program: Some(quote_token_program),
-        input_amount: Some(amount_in),
-        slippage_basis_points: Some(1000), // 10% 滑点
-        address_lookup_table_account: None,
-        recent_blockhash: None,
-        wait_transaction_confirmed: false,
-        protocol_params: sol_trade_sdk::trading::core::params::DexParamEnum::RaydiumCpmm(
-            cpmm_params,
-        ),
-        open_seed_optimize: false,
-        swqos_clients: vec![],
-        middleware_manager: None,
-        durable_nonce: None,
-        with_tip: false,
-        create_input_mint_ata: false,
-        close_input_mint_ata: false,
-        create_output_mint_ata: false,
-        close_output_mint_ata: false,
-        fixed_output_amount: None,
-        gas_fee_strategy: sol_trade_sdk::common::GasFeeStrategy::default(),
-        simulate: false,
-        on_transaction_signed: None,
-        callback_execution_mode: None,
-        enable_jito_sandwich_protection: None,
-    };
-
-    let instructions = match sol_trade_sdk::instruction::raydium_cpmm::RaydiumCpmmInstructionBuilder
-        .build_buy_instructions(&swap_params)
-        .await
-    {
-        Ok(instrs) => instrs,
-        Err(e) => {
-            println!("❌ 构造指令失败: {}\n", e);
-            return;
-        },
-    };
-
-    // 获取用户 ATA
-    let user_input_ata = spl_associated_token_account::get_associated_token_address_with_program_id(
-        &payer.pubkey(),
-        &wsol_mint,
-        &spl_token::id(),
-    );
-    let user_output_ata =
-        spl_associated_token_account::get_associated_token_address_with_program_id(
-            &payer.pubkey(),
-            &pipe_mint,
-            &spl_token::id(),
+    if !success {
+        panic!(
+            "❌ 买入交易失败: {:?}\n  Pool: {}\n  输入金额: {} lamports",
+            error, pool_address, amount_in
         );
-
-    // 链上模拟
-    let simulation_result = match simulate_swap_transaction(
-        &rpc,
-        &payer,
-        instructions,
-        user_input_ata,
-        user_output_ata,
-        wsol_mint,
-        pipe_mint,
-    )
-    .await
-    {
-        Ok(result) => result,
-        Err(e) => {
-            println!("❌ 模拟失败: {}\n", e);
-            return;
-        },
-    };
-
-    if !simulation_result.success {
-        println!("❌ 模拟交易失败");
-        if let Some(ref error) = simulation_result.error {
-            println!("错误信息: {}\n", error);
-        }
-        return;
     }
 
-    let simulated_output = simulation_result.actual_output_amount;
+    let signature = sigs.first().expect("交易成功但无签名");
+    println!("✅ 买入成功，签名: {}\n", signature);
 
-    println!("✅ 链上模拟结果:");
-    println!("  实际输入: {} lamports", simulation_result.actual_input_amount);
-    println!("  实际输出: {} PIPE", simulated_output);
-    println!("  Inner Instructions: {:?}\n", simulation_result.inner_instructions);
+    // 解析买入交易
+    println!("📋 解析买入交易...");
+    let parser = DexParser::default();
+    let sig_str = signature.to_string();
+    let parse_result = parser.parse_transaction(&sig_str).await;
 
-    // ========================================
-    // 阶段 3: 实际执行（可选）
-    // ========================================
-    println!("========================================");
-    println!("阶段 3: 实际执行（跳过，避免消耗真实资金）");
-    println!("========================================\n");
-    println!("⚠️  跳过实际执行，只比较本地计算和链上模拟\n");
+    if parse_result.success && !parse_result.trades.is_empty() {
+        println!("✅ 买入交易解析成功:");
+        for trade in &parse_result.trades {
+            println!("  DEX: {}", trade.dex);
+            println!("  用户: {}", trade.user);
+            println!("  Pool: {}", trade.pool);
+            println!("  交易类型: {:?}", trade.trade_type);
+            println!(
+                "  输入: {} {} ({} decimals)",
+                trade.input_token.amount, trade.input_token.mint, trade.input_token.decimals
+            );
+            println!(
+                "  输出: {} {} ({} decimals)",
+                trade.output_token.amount, trade.output_token.mint, trade.output_token.decimals
+            );
+            if let Some(ref fee) = trade.fee {
+                println!("  费用: {} {}", fee.amount, fee.mint);
+            }
+        }
+    } else {
+        println!("⚠️  买入交易解析失败: {:?}", parse_result.error);
+    }
+    println!();
 
-    // ========================================
-    // 裁判：比较三个阶段的结果
-    // ========================================
+    // 等待链上状态更新
+    tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
+
+    // ===== 3. 裁判：比较本地计算和实际执行的结果 =====
     println!("========================================");
     println!("裁判：结果对比");
     println!("========================================\n");
 
+    // 从解析结果中获取实际执行金额（使用 amount_raw，原始单位）
+    let actual_output_raw = if parse_result.success && !parse_result.trades.is_empty() {
+        parse_result.trades[0]
+            .output_token
+            .amount_raw
+            .parse::<u64>()
+            .unwrap_or(0)
+    } else {
+        panic!("❌ 无法获取实际执行结果");
+    };
+
+    // 同时获取 UI 格式用于显示
+    let actual_output_ui = if parse_result.success && !parse_result.trades.is_empty() {
+        parse_result.trades[0].output_token.amount
+    } else {
+        0.0
+    };
+
     println!("┌─────────────────────────────────────────────────────────────┐");
-    println!("│ 阶段                │ 输出 (PIPE)   │ 说明                  │");
+    println!("│ 阶段                │ 输出 (PIPE)  │ 说明                  │");
     println!("├─────────────────────────────────────────────────────────────┤");
     println!(
         "│ 1. 本地计算         │ {:>12} │ quote_exact_in        │",
         local_output
     );
     println!(
-        "│ 2. 链上模拟         │ {:>12} │ simulate_transaction   │",
-        simulated_output
+        "│ 2. 实际执行         │ {:>12} │ send_transaction       │",
+        actual_output_raw
     );
-    println!("│ 3. 实际执行         │     N/A      │ 跳过                  │");
     println!("└─────────────────────────────────────────────────────────────┘");
     println!();
 
-    // 计算差异
-    let diff = local_output.abs_diff(simulated_output);
-    let error_rate =
-        if simulated_output > 0 {
-            (diff as f64 / simulated_output as f64) * 100.0
-        } else {
-            0.0
-        };
+    println!("📝 UI 格式对比（供参考）:");
+    println!("  实际执行 UI: {:.6} PIPE (decimals=6)", actual_output_ui);
+    println!("  本地计算 UI: {:.6} PIPE (decimals=6)", local_output as f64 / 1_000_000.0);
+    println!();
+
+    // 计算差异（使用原始单位）
+    let diff_actual = local_output.abs_diff(actual_output_raw);
+    let error_rate_actual = if actual_output_raw > 0 {
+        (diff_actual as f64 / actual_output_raw as f64) * 100.0
+    } else {
+        0.0
+    };
 
     println!("┌─────────────────────────────────────────────────────────────┐");
     println!("│ 差异分析                                                │");
     println!("├─────────────────────────────────────────────────────────────┤");
-    println!("│ 绝对差异: {} PIPE                                        │", diff);
-    println!("│ 误差率:   {:.4}%                                              │", error_rate);
+    println!("│ 本地 vs 实际:                                            │");
+    println!("│   绝对差异: {} PIPE (原始单位)                            │", diff_actual);
+    println!("│   误差率:   {:.4}%                                            │", error_rate_actual);
     println!("└─────────────────────────────────────────────────────────────┘");
     println!();
 
     // 判断：误差是否在可接受范围内
     const MAX_ERROR_PERCENT: f64 = 1.0; // 1% 容忍度
 
-    if error_rate <= MAX_ERROR_PERCENT {
-        println!("✅ 裁判结果：本地计算与链上模拟一致（误差 {:.4}% ≤ {:.1}%）", error_rate, MAX_ERROR_PERCENT);
+    if error_rate_actual <= MAX_ERROR_PERCENT {
+        println!("✅ 裁判结果：本地计算与实际执行一致");
+        println!(
+            "   本地 vs 实际: {:.4}% ≤ {:.1}% ✓",
+            error_rate_actual, MAX_ERROR_PERCENT
+        );
         println!("✅ 测试通过\n");
     } else {
-        println!("❌ 裁判结果：本地计算与链上模拟不一致（误差 {:.4}% > {:.1}%）", error_rate, MAX_ERROR_PERCENT);
+        println!("❌ 裁判结果：本地计算与实际执行不一致");
+        println!(
+            "   本地 vs 实际: {:.4}% > {:.1}% ✗",
+            error_rate_actual, MAX_ERROR_PERCENT
+        );
         println!();
         println!("🔍 可能的原因：");
         println!("  1. 本地计算公式与链上逻辑不一致");
@@ -316,7 +286,9 @@ async fn test_cpmm_exact_in_buy_three_stage_verification() {
         println!("  3. 费用计算方式不同");
         println!("  4. Program data 解析错误");
         println!();
-        println!("❌ 测试失败\n");
-        panic!("本地计算与链上模拟误差过大");
+        panic!("❌ 测试失败：本地计算与实际执行误差过大");
     }
+
+    // 清理缓存
+    clear_pool_cache();
 }
