@@ -40,7 +40,6 @@ fn format_token_amount(amount: u64, decimals: u8) -> String {
 
 #[tokio::test]
 #[serial_test::serial]
-#[ignore = "需要本地测试节点"]
 async fn test_add_liquidity_to_cpmm_pool() {
     println!("\n========================================");
     println!("测试: 向 CPMM 池子添加流动性");

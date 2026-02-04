@@ -23,7 +23,6 @@ use std::str::FromStr;
 /// 3. 打印前几个 Pool 的基本信息
 #[tokio::test]
 #[serial_test::serial]
-#[ignore = "需要本地测试节点"]
 async fn test_list_pools_by_mint_wsol() {
     println!("\n=== 测试：列出所有包含 WSOL 的 Raydium CPMM Pool ===");
 
@@ -74,7 +73,6 @@ async fn test_list_pools_by_mint_wsol() {
 /// 2. 验证返回的 Pool 列表非空
 #[tokio::test]
 #[serial_test::serial]
-#[ignore = "需要本地测试节点"]
 async fn test_list_pools_by_mint_usdc() {
     println!("\n=== 测试：列出所有包含 USDC 的 Raydium CPMM Pool ===");
 
@@ -125,7 +123,6 @@ async fn test_list_pools_by_mint_usdc() {
 /// 3. 验证 Pool 包含指定的 Token
 #[tokio::test]
 #[serial_test::serial]
-#[ignore = "需要本地测试节点"]
 async fn test_get_pool_by_mint() {
     println!("\n=== 测试：获取最优 Pool（基于流动性排序） ===");
 
@@ -180,7 +177,6 @@ async fn test_get_pool_by_mint() {
 /// 2. 验证 Token2022 和 Token Pool 的分类
 #[tokio::test]
 #[serial_test::serial]
-#[ignore = "需要本地测试节点"]
 async fn test_pool_classification() {
     println!("\n=== 测试：Pool 列表和分类功能 ===");
 
