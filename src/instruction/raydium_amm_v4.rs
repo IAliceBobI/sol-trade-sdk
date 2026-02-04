@@ -199,7 +199,21 @@ impl InstructionBuilder for RaydiumAmmV4InstructionBuilder {
         }
 
         // Create buy instruction
-        // 使用 amm_info 中的 Serum 相关账户（如果可用），否则使用默认值
+        // ========================================
+        // ⚠️ 限制：不支持 Orderbook Pool
+        // ========================================
+        // 当前实现仅适用于 status=5 (SWAP_ONLY) 的 Pool
+        // 对于启用 Orderbook 的 Pool (status=1 INITIALIZED, status=6 ACTIVE)：
+        // - 需要正确的 Serum Market 子账户地址（当前使用占位符）
+        // - 需要正确派生 vault_signer PDA（当前使用占位符）
+        // - 参考: temp/serum-dex/dex/src/state.rs (Market 结构)
+        // - 参考: temp/raydium-amm/program/src/processor.rs:2210-2247 (账户验证)
+        //
+        // TODO: 实现完整的 Serum Market 支持
+        // 1. 使用 serum_market.rs 解析 Market 子账户
+        // 2. 使用 parse_vault_signer_nonce() 获取正确的 nonce
+        // 3. 验证账户顺序（17-18 个账户）
+        // ========================================
         let (serum_program, serum_market, open_orders) = if let Some(ref info) = amm_info {
             (info.serum_dex, info.market, info.open_orders)
         } else {
@@ -208,23 +222,23 @@ impl InstructionBuilder for RaydiumAmmV4InstructionBuilder {
         };
 
         let accounts: [AccountMeta; 17] = [
-            crate::constants::TOKEN_PROGRAM_META, // Token Program (readonly)
-            AccountMeta::new(protocol_params.amm, false), // Amm
-            accounts::AUTHORITY_META,             // Authority (readonly)
-            AccountMeta::new(open_orders, false), // Amm Open Orders
-            AccountMeta::new(protocol_params.token_coin, false), // Pool Coin Token Account
-            AccountMeta::new(protocol_params.token_pc, false), // Pool Pc Token Account
-            AccountMeta::new_readonly(serum_program, false), // Serum Program
-            AccountMeta::new(serum_market, false), // Serum Market
-            AccountMeta::new(serum_market, false), // Serum Bids (从 market 派生，这里简化处理)
-            AccountMeta::new(serum_market, false), // Serum Asks (从 market 派生，这里简化处理)
-            AccountMeta::new(serum_market, false), // Serum Event Queue (从 market 派生，这里简化处理)
-            AccountMeta::new(serum_market, false), // Serum Coin Vault Account (从 market 派生，这里简化处理)
-            AccountMeta::new(serum_market, false), // Serum Pc Vault Account (从 market 派生，这里简化处理)
-            AccountMeta::new(serum_market, false), // Serum Vault Signer (从 market 派生，这里简化处理)
-            AccountMeta::new(user_source_token_account, false), // User Source Token Account
-            AccountMeta::new(user_destination_token_account, false), // User Destination Token Account
-            AccountMeta::new(params.payer.pubkey(), true),           // User Source Owner
+            crate::constants::TOKEN_PROGRAM_META, // 0: Token Program (readonly)
+            AccountMeta::new(protocol_params.amm, false), // 1: Amm
+            accounts::AUTHORITY_META,             // 2: Authority (readonly)
+            AccountMeta::new(open_orders, false), // 3: Amm Open Orders
+            AccountMeta::new(protocol_params.token_coin, false), // 4: Pool Coin Token Account
+            AccountMeta::new(protocol_params.token_pc, false), // 5: Pool Pc Token Account
+            AccountMeta::new_readonly(serum_program, false), // 6: Serum Program
+            AccountMeta::new(serum_market, false), // 7: Serum Market
+            AccountMeta::new(serum_market, false), // 8: Serum Bids (占位符)
+            AccountMeta::new(serum_market, false), // 9: Serum Asks (占位符)
+            AccountMeta::new(serum_market, false), // 10: Serum Event Queue (占位符)
+            AccountMeta::new(serum_market, false), // 11: Serum Coin Vault (占位符)
+            AccountMeta::new(serum_market, false), // 12: Serum Pc Vault (占位符)
+            AccountMeta::new(serum_market, false), // 13: Serum Vault Signer (占位符)
+            AccountMeta::new(user_source_token_account, false), // 14: User Source Token Account
+            AccountMeta::new(user_destination_token_account, false), // 15: User Destination Token Account
+            AccountMeta::new(params.payer.pubkey(), true),           // 16: User Source Owner
         ];
         // Create instruction data
         // 根据模式选择正确的指令类型和参数
@@ -406,7 +420,21 @@ impl InstructionBuilder for RaydiumAmmV4InstructionBuilder {
         }
 
         // Create sell instruction
-        // 使用 amm_info 中的 Serum 相关账户（如果可用），否则使用默认值
+        // ========================================
+        // ⚠️ 限制：不支持 Orderbook Pool
+        // ========================================
+        // 当前实现仅适用于 status=5 (SWAP_ONLY) 的 Pool
+        // 对于启用 Orderbook 的 Pool (status=1 INITIALIZED, status=6 ACTIVE)：
+        // - 需要正确的 Serum Market 子账户地址（当前使用占位符）
+        // - 需要正确派生 vault_signer PDA（当前使用占位符）
+        // - 参考: temp/serum-dex/dex/src/state.rs (Market 结构)
+        // - 参考: temp/raydium-amm/program/src/processor.rs:2210-2247 (账户验证)
+        //
+        // TODO: 实现完整的 Serum Market 支持
+        // 1. 使用 serum_market.rs 解析 Market 子账户
+        // 2. 使用 parse_vault_signer_nonce() 获取正确的 nonce
+        // 3. 验证账户顺序（17-18 个账户）
+        // ========================================
         let (serum_program, serum_market, open_orders) = if let Some(ref info) = amm_info {
             (info.serum_dex, info.market, info.open_orders)
         } else {
@@ -415,23 +443,23 @@ impl InstructionBuilder for RaydiumAmmV4InstructionBuilder {
         };
 
         let accounts: [AccountMeta; 17] = [
-            crate::constants::TOKEN_PROGRAM_META, // Token Program (readonly)
-            AccountMeta::new(protocol_params.amm, false), // Amm
-            accounts::AUTHORITY_META,             // Authority (readonly)
-            AccountMeta::new(open_orders, false), // Amm Open Orders
-            AccountMeta::new(protocol_params.token_coin, false), // Pool Coin Token Account
-            AccountMeta::new(protocol_params.token_pc, false), // Pool Pc Token Account
-            AccountMeta::new_readonly(serum_program, false), // Serum Program
-            AccountMeta::new(serum_market, false), // Serum Market
-            AccountMeta::new(serum_market, false), // Serum Bids (从 market 派生，这里简化处理)
-            AccountMeta::new(serum_market, false), // Serum Asks (从 market 派生，这里简化处理)
-            AccountMeta::new(serum_market, false), // Serum Event Queue (从 market 派生，这里简化处理)
-            AccountMeta::new(serum_market, false), // Serum Coin Vault Account (从 market 派生，这里简化处理)
-            AccountMeta::new(serum_market, false), // Serum Pc Vault Account (从 market 派生，这里简化处理)
-            AccountMeta::new(serum_market, false), // Serum Vault Signer (从 market 派生，这里简化处理)
-            AccountMeta::new(user_source_token_account, false), // User Source Token Account
-            AccountMeta::new(user_destination_token_account, false), // User Destination Token Account
-            AccountMeta::new(params.payer.pubkey(), true),           // User Source Owner
+            crate::constants::TOKEN_PROGRAM_META, // 0: Token Program (readonly)
+            AccountMeta::new(protocol_params.amm, false), // 1: Amm
+            accounts::AUTHORITY_META,             // 2: Authority (readonly)
+            AccountMeta::new(open_orders, false), // 3: Amm Open Orders
+            AccountMeta::new(protocol_params.token_coin, false), // 4: Pool Coin Token Account
+            AccountMeta::new(protocol_params.token_pc, false), // 5: Pool Pc Token Account
+            AccountMeta::new_readonly(serum_program, false), // 6: Serum Program
+            AccountMeta::new(serum_market, false), // 7: Serum Market
+            AccountMeta::new(serum_market, false), // 8: Serum Bids (占位符)
+            AccountMeta::new(serum_market, false), // 9: Serum Asks (占位符)
+            AccountMeta::new(serum_market, false), // 10: Serum Event Queue (占位符)
+            AccountMeta::new(serum_market, false), // 11: Serum Coin Vault (占位符)
+            AccountMeta::new(serum_market, false), // 12: Serum Pc Vault (占位符)
+            AccountMeta::new(serum_market, false), // 13: Serum Vault Signer (占位符)
+            AccountMeta::new(user_source_token_account, false), // 14: User Source Token Account
+            AccountMeta::new(user_destination_token_account, false), // 15: User Destination Token Account
+            AccountMeta::new(params.payer.pubkey(), true),           // 16: User Source Owner
         ];
         // Create instruction data
         // 根据模式选择正确的指令类型和参数
