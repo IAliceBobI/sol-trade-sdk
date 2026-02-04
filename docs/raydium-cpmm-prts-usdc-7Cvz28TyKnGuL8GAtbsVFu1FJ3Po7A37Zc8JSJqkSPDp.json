@@ -1,0 +1,160 @@
+{
+  "amm_config": {
+    "type": "pubkey",
+    "data": "D4FPEruKEHrG5TenZ2mpDGEfu1iUvTiqBxvpU8HLBvC2"
+  },
+  "pool_creator": {
+    "type": "pubkey",
+    "data": "6jRFJ4CVNuzdawedE6u9CcA2bK1UuAbvpAWLn3eCReW"
+  },
+  "token_0_vault": {
+    "type": "pubkey",
+    "data": "HYuXxtUhtHQbwr7dSHDry6wUV4oqcTvSQgWxYp8Jakpx"
+  },
+  "token_1_vault": {
+    "type": "pubkey",
+    "data": "nky38vubmfKNQebNKmynAKsnT15zpfYzoJRVdERhv2F"
+  },
+  "lp_mint": {
+    "type": "pubkey",
+    "data": "GRScbBiPDANsa13Tu7HJDCNkBuTPAqc66mgueEy1dgV1"
+  },
+  "token_0_mint": {
+    "type": "pubkey",
+    "data": "3PQkX8yfuxoe9kuBoLCEZoxzi9LG4w8Ci2JWWGNfPRTS"
+  },
+  "token_1_mint": {
+    "type": "pubkey",
+    "data": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
+  },
+  "token_0_program": {
+    "type": "pubkey",
+    "data": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb"
+  },
+  "token_1_program": {
+    "type": "pubkey",
+    "data": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+  },
+  "observation_key": {
+    "type": "pubkey",
+    "data": "63rGLHFABsQojSG8FK7t29kdwMWfkYoshR7JVNwFGJ1r"
+  },
+  "auth_bump": {
+    "type": "u8",
+    "data": 253
+  },
+  "status": {
+    "type": "u8",
+    "data": 0
+  },
+  "lp_mint_decimals": {
+    "type": "u8",
+    "data": 9
+  },
+  "mint_0_decimals": {
+    "type": "u8",
+    "data": 9
+  },
+  "mint_1_decimals": {
+    "type": "u8",
+    "data": 6
+  },
+  "lp_supply": {
+    "type": "u64",
+    "data": "96474526340919"
+  },
+  "protocol_fees_token_0": {
+    "type": "u64",
+    "data": "143529923721524"
+  },
+  "protocol_fees_token_1": {
+    "type": "u64",
+    "data": "2619589"
+  },
+  "fund_fees_token_0": {
+    "type": "u64",
+    "data": "56652707513949"
+  },
+  "fund_fees_token_1": {
+    "type": "u64",
+    "data": "4308785"
+  },
+  "open_time": {
+    "type": "u64",
+    "data": "1743789600"
+  },
+  "recent_epoch": {
+    "type": "u64",
+    "data": "920"
+  },
+  "creator_fee_on": {
+    "type": "u8",
+    "data": 0
+  },
+  "enable_creator_fee": {
+    "type": "bool",
+    "data": false
+  },
+  "padding1": {
+    "type": {
+      "array": [
+        "u8",
+        6
+      ]
+    },
+    "data": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ]
+  },
+  "creator_fees_token_0": {
+    "type": "u64",
+    "data": "0"
+  },
+  "creator_fees_token_1": {
+    "type": "u64",
+    "data": "0"
+  },
+  "padding": {
+    "type": {
+      "array": [
+        "u64",
+        28
+      ]
+    },
+    "data": [
+      "0",
+      "0",
+      "0",
+      "0",
+      "0",
+      "0",
+      "0",
+      "0",
+      "0",
+      "0",
+      "0",
+      "0",
+      "0",
+      "0",
+      "0",
+      "0",
+      "0",
+      "0",
+      "0",
+      "0",
+      "0",
+      "0",
+      "0",
+      "0",
+      "0",
+      "0",
+      "0",
+      "0"
+    ]
+  }
+}
