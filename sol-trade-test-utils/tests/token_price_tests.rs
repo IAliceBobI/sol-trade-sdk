@@ -149,6 +149,11 @@ async fn test_get_multiple_token_prices() {
 
 // ============ Helper Functions ============
 
+// cpmm pool: BnYsRpYvJpz6biY3hV6U9smChVePCJ6YyupVDfcnXpTp, wsol-pipe(pipe 8ycz3kctoRb4LFrtoYG2r8tRyUYUeGf5Q16M2TEMp7A token)
+// cpmm pool: CVPpJXyiPNRgD3a8SjmXkC1cKdHtry1PF9BVG6dYoxjk, usdc-ring(ring A3569FJtxQ9qstaE1ToZDt8uAwkTQyMRf8xy669DbUZz token)
+// cpmm pool: 7Cvz28TyKnGuL8GAtbsVFu1FJ3Po7A37Zc8JSJqkSPDp, usdc-prts(prts 3PQkX8yfuxoe9kuBoLCEZoxzi9LG4w8Ci2JWWGNfPRTS token2022)
+// cpmm pool: GarGiGTMQrZyot44J9hc71NeGNeEaxnq3nefKxBruEsS, usdc-cib(cib GarGiGTMQrZyot44J9hc71NeGNeEaxnq3nefKxBruEsS token2022)
+
 /// PIPE Mint 地址
 fn pipe_mint() -> solana_sdk::pubkey::Pubkey {
     solana_sdk::pubkey::Pubkey::from_str("H6ARHf6YXhGYeQfUzQNGk6rDNnLBQKrenN712K4AQJEG").unwrap()
@@ -156,15 +161,15 @@ fn pipe_mint() -> solana_sdk::pubkey::Pubkey {
 
 /// PRTS Mint 地址
 fn prts_mint() -> solana_sdk::pubkey::Pubkey {
-    solana_sdk::pubkey::Pubkey::from_str("4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R").unwrap()
+    solana_sdk::pubkey::Pubkey::from_str("3PQkX8yfuxoe9kuBoLCEZoxzi9LG4w8Ci2JWWGNfPRTS").unwrap()
 }
 
 /// PIPE-WSOL Pool 地址
 fn pipe_wsol_pool() -> solana_sdk::pubkey::Pubkey {
-    solana_sdk::pubkey::Pubkey::from_str("7qbRF6YsyGuLUVs6Y1q64bdVrfebeWfnvRNaQwCXRSYy").unwrap()
+    solana_sdk::pubkey::Pubkey::from_str("BnYsRpYvJpz6biY3hV6U9smChVePCJ6YyupVDfcnXpTp").unwrap()
 }
 
 /// USDC-PRTS Pool 地址
 fn usdc_prts_pool() -> solana_sdk::pubkey::Pubkey {
-    solana_sdk::pubkey::Pubkey::from_str("6Ztm5VUYnh5zGtVAKGVuPGcHyKqKhwbDZKP4K1RNfEB1").unwrap()
+    solana_sdk::pubkey::Pubkey::from_str("7Cvz28TyKnGuL8GAtbsVFu1FJ3Po7A37Zc8JSJqkSPDp").unwrap()
 }
