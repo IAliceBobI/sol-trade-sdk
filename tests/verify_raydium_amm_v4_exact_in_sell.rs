@@ -3,6 +3,7 @@
 //! 运行测试:
 //!     cargo nextest run verify_raydium_amm_v4_exact_in_sell -- --nocapture
 
+use base64::{Engine, engine::general_purpose::STANDARD};
 use sol_trade_sdk::{
     TradingClient,
     common::{GasFeeStrategy, SolanaRpcClient, TradeConfig},
@@ -313,7 +314,7 @@ async fn test_raydium_amm_v4_exact_in_sell_with_simulation() {
         for log in logs.iter() {
             if log.starts_with("Program log: ray_log:") {
                 let encoded = log.split("Program log: ray_log: ").nth(1).unwrap_or("");
-                if let Ok(decoded) = base64::decode(encoded) {
+                if let Ok(decoded) = STANDARD.decode(encoded) {
                     if decoded.len() >= 57 {
                         let out_amount = u64::from_le_bytes(decoded[49..57].try_into().unwrap());
                         found_output = Some(out_amount);

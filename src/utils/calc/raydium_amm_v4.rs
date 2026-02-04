@@ -18,7 +18,7 @@
 //! - 支持滑点计算
 
 use crate::instruction::utils::raydium_amm_v4::accounts::{
-    SWAP_FEE_DENOMINATOR, SWAP_FEE_NUMERATOR, TRADE_FEE_DENOMINATOR, TRADE_FEE_NUMERATOR,
+    SWAP_FEE_DENOMINATOR, SWAP_FEE_NUMERATOR, TRADE_FEE_NUMERATOR,
 };
 
 /// Computes trading fee using ceiling division.
@@ -42,6 +42,7 @@ fn compute_trading_fee(amount: u64, fee_rate: u64, fee_denominator: u64) -> u64 
 ///
 /// # Returns
 /// The calculated protocol or fund fee
+#[allow(dead_code)]
 fn compute_protocol_fund_fee(amount: u64, fee_rate: u64, fee_denominator: u64) -> u64 {
     let numerator = (amount as u128) * (fee_rate as u128);
     (numerator / fee_denominator as u128) as u64

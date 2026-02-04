@@ -11,7 +11,7 @@ use sol_trade_sdk::liquidity::cpmm::{
 };
 use sol_trade_sdk::{
     TradingClient,
-    common::{GasFeeStrategy, SolanaRpcClient, TradeConfig},
+    common::{SolanaRpcClient, TradeConfig},
     instruction::utils::raydium_cpmm::get_pool_by_address,
 };
 use solana_sdk::{pubkey::Pubkey, signer::Signer, transaction::Transaction};
@@ -293,9 +293,9 @@ async fn test_swap_after_adding_liquidity() {
     // 使用 TradingClient 执行一笔买入
     let trade_config =
         TradeConfig::new(rpc_url, vec![], solana_commitment_config::CommitmentConfig::confirmed());
-    let client = TradingClient::new(payer.clone(), trade_config).await;
+    let _client = TradingClient::new(payer.clone(), trade_config).await;
 
-    let pipe_mint = Pubkey::from_str(PIPE_MINT).unwrap();
+    let _pipe_mint = Pubkey::from_str(PIPE_MINT).unwrap();
 
     // TODO: 实现 swap 测试
     println!("⚠️  Swap 测试待实现\n");

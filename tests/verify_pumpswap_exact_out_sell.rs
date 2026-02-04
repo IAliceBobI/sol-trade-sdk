@@ -7,11 +7,10 @@
 
 use sol_trade_sdk::{
     common::SolanaRpcClient,
-    constants::{TOKEN_2022_PROGRAM, TOKEN_PROGRAM},
     instruction::utils::pumpswap::{get_pool_by_address, quote_exact_out},
     trading::core::params::{PumpSwapParams, SwapParams},
     trading::core::traits::InstructionBuilder,
-    utils::simulation_based_calc::{simulate_swap_transaction, verify_calculation_accuracy},
+    utils::simulation_based_calc::simulate_swap_transaction,
 };
 use solana_sdk::{pubkey::Pubkey, signer::Signer};
 use std::str::FromStr;

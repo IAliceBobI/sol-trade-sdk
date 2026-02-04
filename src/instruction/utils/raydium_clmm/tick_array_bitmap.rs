@@ -166,6 +166,7 @@ fn search_lowest_bit_in_range(bitmap: U1024, start: usize, end: usize) -> Option
 /// 查找最高有效位（从高位到低位第一个非零位）
 ///
 /// 返回最高有效位的位置（0-1023）
+#[allow(dead_code)]
 fn most_significant_bit(x: U1024) -> Option<u32> {
     if x.is_zero() {
         None
@@ -180,6 +181,7 @@ fn most_significant_bit(x: U1024) -> Option<u32> {
 /// 查找最低有效位（从低位到高位第一个非零位）
 ///
 /// 返回最低有效位的位置（0-1023）
+#[allow(dead_code)]
 fn least_significant_bit(x: U1024) -> Option<u32> {
     if x.is_zero() {
         None

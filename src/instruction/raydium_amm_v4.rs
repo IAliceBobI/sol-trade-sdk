@@ -19,6 +19,7 @@ use solana_sdk::{
 ///
 /// WSOL 固定使用 TOKEN_PROGRAM
 /// USDC 自动检测（支持 Token-2022）
+#[allow(dead_code)]
 fn get_input_token_program(is_wsol: bool) -> &'static solana_sdk::pubkey::Pubkey {
     if is_wsol {
         &crate::constants::TOKEN_PROGRAM
@@ -237,7 +238,7 @@ impl InstructionBuilder for RaydiumAmmV4InstructionBuilder {
         // 如果 max_amount_in 刚好等于计算值，扣除费用后可能无法得到足够的输出
         let (param1, param2) = if params.fixed_output_amount.is_some() {
             // exact_out: 添加滑点缓冲到 max_amount_in
-            let slippage_bps = params.slippage_basis_points.unwrap_or(DEFAULT_SLIPPAGE) as u64;
+            let slippage_bps = params.slippage_basis_points.unwrap_or(DEFAULT_SLIPPAGE);
             let max_amount_in = amount_in.saturating_add((amount_in * slippage_bps / 10000).max(1));
             (max_amount_in, minimum_amount_out)
         } else {
@@ -444,7 +445,7 @@ impl InstructionBuilder for RaydiumAmmV4InstructionBuilder {
         // 在 exact_out 模式下，需要添加滑点缓冲到 max_amount_in
         let (param1, param2) = if params.fixed_output_amount.is_some() {
             // exact_out: 添加滑点缓冲到 max_amount_in
-            let slippage_bps = params.slippage_basis_points.unwrap_or(DEFAULT_SLIPPAGE) as u64;
+            let slippage_bps = params.slippage_basis_points.unwrap_or(DEFAULT_SLIPPAGE);
             let max_amount_in = amount_in.saturating_add((amount_in * slippage_bps / 10000).max(1));
             (max_amount_in, minimum_amount_out)
         } else {

@@ -87,7 +87,7 @@ pub fn build_deposit_instruction(params: CpmmDepositParams, owner: Pubkey) -> In
     data.extend_from_slice(&params.maximum_token_1_amount.to_le_bytes());
 
     // 构建账户列表（按 Anchor CPI 账户顺序）
-    let mut accounts = vec![
+    let accounts = vec![
         // 0. owner (signer)
         AccountMeta::new_readonly(owner, true),
         // 1. authority (PDA)
