@@ -4,7 +4,6 @@
 //! - 使用 `get_pool_by_address` 获取指定 CPMM Pool 的信息
 //! - 基于 PoolState 构建 `RaydiumCpmmParams`
 //! - 通过 `SolanaTrade` 执行一条完整的 Raydium CPMM 买入 -> 卖出交易流程
-//! - 获取 CPMM token 的 USD 价格
 //!
 //! 测试假设：
 //! - 本地 RPC `http://127.0.0.1:8899` 已接入主网数据（例如使用 surfpool）
@@ -14,13 +13,12 @@
 //! 运行测试:
 //!     cargo test --test raydium_cpmm_buy_sell_tests -- --nocapture
 //!
-//! 注意：Pool 列表功能测试已移至 sol-trade-test-utils/tests/list_pools_tests.rs
+//! 注意：
+//! - Pool 列表功能测试已移至 sol-trade-test-utils/tests/list_pools_tests.rs
+//! - Token 价格获取测试已移至 sol-trade-test-utils/tests/token_price_tests.rs
 
 use sol_trade_sdk::{
-    common::auto_mock_rpc::AutoMockRpcClient,
-    instruction::utils::raydium_cpmm::{
-        clear_pool_cache, get_pool_by_address, get_pool_by_mint, get_token_price_in_usd_with_pool,
-    },
+    instruction::utils::raydium_cpmm::{clear_pool_cache, get_pool_by_address, get_pool_by_mint},
     parser::DexParser,
     trading::core::params::RaydiumCpmmParams,
 };
@@ -242,51 +240,6 @@ async fn test_raydium_cpmm_buy_sell_complete() {
     assert!(sol_diff < 0, "由于手续费和滑点，SOL 应该净减少");
 
     println!("\n=== Raydium CPMM 买入-卖出完整流程测试通过 ===");
-}
-
-/// 测试：基于 WSOL mint 查找 CPMM Pool，并验证缓存与强制刷新
-///
-/// 步骤：
-/// 1. 清空 CPMM 缓存
-/// 2. 使用 `get_pool_by_mint` 基于 WSOL mint 查找 Pool（应从链上扫描）
-/// 3. 再次调用 `get_pool_by_mint`（应命中缓存，结果相同）
-/// 测试：获取 CPMM token 的 USD 价格（Auto Mock 加速）
-#[tokio::test]
-#[serial_test::serial(global_dex_cache)]
-async fn test_get_cpmm_token_price_in_usd() {
-    println!("=== 测试：获取 CPMM token 的 USD 价格 (Auto Mock 加速) ===");
-
-    let token_mint = pipe_mint();
-    let pool_address = pipe_wsol_pool();
-    let rpc_url = "http://127.0.0.1:8899";
-
-    // 使用 Auto Mock RPC 客户端（使用独立命名空间）
-    let auto_mock_client = AutoMockRpcClient::new_with_namespace(
-        rpc_url.to_string(),
-        Some("raydium_cpmm_buy_sell_tests".to_string()),
-    );
-
-    println!("Token Mint: {}", token_mint);
-    println!("Pool 地址: {}", pool_address);
-    println!("WSOL-USDT 锚定池: 使用默认锚定池");
-
-    // 调用价格计算函数（使用 AutoMock 版本）
-    let result: Result<f64, anyhow::Error> =
-        get_token_price_in_usd_with_pool(&auto_mock_client, &token_mint, &pool_address, None).await;
-
-    // 验证结果
-    assert!(result.is_ok(), "Failed to get token price in USD: {:?}", result.err());
-
-    let price_usd = result.unwrap();
-    println!("✅ Token USD 价格: ${:.8}", price_usd);
-
-    // 验证价格合理性
-    assert!(price_usd > 0.0, "Price should be positive");
-    assert!(price_usd < 1000.0, "Price should be reasonable (< $1000)");
-    println!("✅ 价格范围验证通过");
-    println!("✅ 首次运行：从 RPC 获取并保存（约 2-3 秒）");
-    println!("✅ 后续运行：从缓存加载（约 0.01 秒）");
-    println!("✅ 速度提升：约 100-200 倍！");
 }
 
 
