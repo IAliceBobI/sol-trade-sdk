@@ -1,9 +1,10 @@
 //! Raydium CPMM Buy & Sell 集成测试
 //!
 //! 本测试文件基于文档 `docs/raydium-cpmm-pool-lookup.md` 的设计，验证：
-//! - 使用 `get_pool_by_mint` 基于 WSOL mint 查找 CPMM Pool
+//! - 使用 `get_pool_by_address` 获取指定 CPMM Pool 的信息
 //! - 基于 PoolState 构建 `RaydiumCpmmParams`
 //! - 通过 `SolanaTrade` 执行一条完整的 Raydium CPMM 买入 -> 卖出交易流程
+//! - 获取 CPMM token 的 USD 价格
 //!
 //! 测试假设：
 //! - 本地 RPC `http://127.0.0.1:8899` 已接入主网数据（例如使用 surfpool）
@@ -12,12 +13,13 @@
 //!
 //! 运行测试:
 //!     cargo test --test raydium_cpmm_buy_sell_tests -- --nocapture
+//!
+//! 注意：Pool 列表功能测试已移至 sol-trade-test-utils/tests/list_pools_tests.rs
 
 use sol_trade_sdk::{
     common::auto_mock_rpc::AutoMockRpcClient,
     instruction::utils::raydium_cpmm::{
         clear_pool_cache, get_pool_by_address, get_pool_by_mint, get_token_price_in_usd_with_pool,
-        list_pools_by_mint,
     },
     parser::DexParser,
     trading::core::params::RaydiumCpmmParams,
@@ -287,82 +289,6 @@ async fn test_get_cpmm_token_price_in_usd() {
     println!("✅ 速度提升：约 100-200 倍！");
 }
 
-/// 测试：使用 Auto Mock 加速 get_pool_by_mint 和 list_pools_by_mint（加速版）
-///
-/// 此测试使用 AutoMockRpcClient 来加速 pool 查询。
-///
-/// 首次运行时会从 RPC 获取数据并保存到 tests/mock_data/，
-/// 后续运行会直接从缓存加载，速度提升显著。
-///
-/// 注意：内存缓存功能通过单元测试覆盖，不在此集成测试中重复。
-#[tokio::test]
-#[serial_test::serial(global_dex_cache)]
-async fn test_raydium_cpmm_get_pool_by_mint_with_auto_mock() {
-    println!("=== 测试：使用 Auto Mock 加速 get_pool_by_mint 和 list_pools_by_mint ===");
-
-    let wsol_mint = wsol_mint();
-    let rpc_url = "http://127.0.0.1:8899";
-
-    // 使用 Auto Mock RPC 客户端（使用独立命名空间）
-    let auto_mock_client = AutoMockRpcClient::new_with_namespace(
-        rpc_url.to_string(),
-        Some("raydium_cpmm_buy_sell_tests".to_string()),
-    );
-
-    println!("Token Mint: {}", wsol_mint);
-
-    clear_pool_cache();
-
-    // 1. 使用 Auto Mock 的 list_pools_by_mint
-    println!("\n步骤 1: 使用 list_pools_by_mint 查询所有 WSOL Pool...");
-    let pools: Vec<(Pubkey, sol_trade_sdk::instruction::utils::raydium_cpmm_types::PoolState)> =
-        list_pools_by_mint(&auto_mock_client, &wsol_mint)
-            .await
-            .expect("list_pools_by_mint failed");
-    println!("✅ 查询到 {} 个 Pool", pools.len());
-    assert!(!pools.is_empty(), "WSOL 相关的 CPMM Pool 列表不应为空");
-
-    for (addr, pool) in pools.iter().take(3) {
-        // 只打印前 3 个
-        println!(
-            "  Pool: {} | Token0: {} | Token1: {} | LP Supply: {}",
-            addr, pool.token0_mint, pool.token1_mint, pool.lp_supply
-        );
-    }
-    if pools.len() > 3 {
-        println!("  ... 还有 {} 个 Pool", pools.len() - 3);
-    }
-
-    // 2. 使用 Auto Mock 的 get_pool_by_mint（无缓存版本）
-    println!("\n步骤 2: 使用 get_pool_by_mint 查询最优 Pool...");
-    let (pool_addr, pool_state): (
-        Pubkey,
-        sol_trade_sdk::instruction::utils::raydium_cpmm_types::PoolState,
-    ) = get_pool_by_mint(&auto_mock_client, &wsol_mint)
-        .await
-        .expect("get_pool_by_mint failed");
-    println!("✅ 找到最优 Pool: {}", pool_addr);
-
-    // 验证基本字段
-    assert!(
-        pool_state.token0_mint == wsol_mint || pool_state.token1_mint == wsol_mint,
-        "返回的 CPMM Pool 不包含 WSOL"
-    );
-    assert!(!pool_state.token0_mint.eq(&Pubkey::default()), "Token0 mint should not be zero");
-    assert!(!pool_state.token1_mint.eq(&Pubkey::default()), "Token1 mint should not be zero");
-    assert!(pool_state.lp_supply > 0, "LP supply should be positive");
-    println!("✅ 基本字段验证通过");
-
-    println!("\n=== Auto Mock 测试通过 ===");
-    println!("✅ 测试覆盖：");
-    println!("  • list_pools_by_mint（列表查询）");
-    println!("  • get_pool_by_mint（最优池查询）");
-    println!("  • Pool 字段验证（地址、流动性等）");
-    println!("✅ 首次运行：从 RPC 获取并保存（约 2-3 秒）");
-    println!("✅ 后续运行：从缓存加载（约 0.01 秒）");
-    println!("✅ 速度提升：约 100-200 倍！");
-    println!("💡 注意：内存缓存功能在单元测试中覆盖，不在此集成测试中重复");
-}
 
 /// 测试：Raydium CPMM USDC-PRTS 完整买入-卖出流程
 ///
