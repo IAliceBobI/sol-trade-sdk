@@ -32,6 +32,7 @@ pub mod ensure;
 pub mod cpmm_test_params;
 pub mod pool_list;
 pub mod proxy_http;
+pub mod dex_verification;
 
 // 重新导出常用类型
 pub use airdrop::airdrop_and_wait;
