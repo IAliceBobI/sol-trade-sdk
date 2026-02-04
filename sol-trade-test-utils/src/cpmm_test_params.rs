@@ -30,7 +30,7 @@ pub const PIPE_WSOL_POOL: &str = "BnYsRpYvJpz6biY3hV6U9smChVePCJ6YyupVDfcnXpTp";
 pub const PRTS_MINT: &str = "3PQkX8yfuxoe9kuBoLCEZoxzi9LG4w8Ci2JWWGNfPRTS";
 
 /// USDC-PRTS CPMM Pool
-pub const USDC_PRTS_POOL: &str = "7Cvz28TyKnGuL8CAtbsVFu1FJ3Po7A37Zc8JSJqkSPDp";
+pub const USDC_PRTS_POOL: &str = "7Cvz28TyKnGuL8GAtbsVFu1FJ3Po7A37Zc8JSJqkSPDp";
 
 // ==================== Gas 费策略 ====================
 

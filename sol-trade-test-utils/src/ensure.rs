@@ -14,7 +14,8 @@ use solana_sdk::{
 use spl_associated_token_account::get_associated_token_address_with_program_id;
 use std::sync::Arc;
 
-use sol_trade_sdk::instruction::utils::raydium_cpmm::get_pool_by_address;
+use sol_trade_sdk::common::auto_mock_rpc::AutoMockRpcClient;
+use sol_trade_sdk::instruction::utils::raydium_cpmm::{get_pool_by_address, list_pools_by_mint};
 use sol_trade_sdk::liquidity::cpmm::{build_deposit_instruction, CpmmDepositParams};
 
 /// 确保账户有足够的 SOL 余额
@@ -234,6 +235,152 @@ pub async fn ensure_pipe_pool_wsol_liquidity(
         needed_lp,
         &needed_pipe_formatted,
         &needed_wsol_formatted,
+    )
+    .await
+}
+
+/// 确保 USDC-PRTS Pool 有足够的 USDC 流动性
+///
+/// 便捷函数，专门用于确保 USDC-PRTS pool 有指定数量的 USDC 流动性。
+/// 如果当前 USDC vault 余额不足，会自动添加流动性以达到目标值。
+///
+/// ⚠️ 仅适用于测试环境
+///
+/// # 参数
+/// * `rpc_client` - RPC 客户端
+/// * `rpc_url` - RPC URL
+/// * `payer` - 账户 Keypair
+/// * `min_usdc` - 最小 USDC 流动性（USDC 单位，如 1000 表示 1000 USDC）
+///
+/// # 示例
+/// ```ignore
+/// // 确保 USDC-PRTS pool 至少有 1000 USDC 的流动性
+/// ensure_usdc_prts_pool_usdc_liquidity(
+///     &rpc,
+///     "http://127.0.0.1:8899",
+///     &payer,
+///     1000,  // 1000 USDC
+/// ).await?;
+/// ```
+pub async fn ensure_usdc_prts_pool_usdc_liquidity(
+    rpc_client: &Arc<RpcClient>,
+    rpc_url: &str,
+    payer: &Keypair,
+    min_usdc: u64,
+) -> Result<(), String> {
+    use crate::cpmm_test_params::{prts_mint, usdc_mint, usdc_prts_pool};
+
+    let pool_address = usdc_prts_pool();
+    let min_usdc_units = min_usdc * 1_000_000; // USDC decimals = 6
+
+    println!("🪙 检查 USDC-PRTS Pool 流动性...");
+    println!("   Pool: {}", pool_address);
+    println!("   目标 USDC 流动性: {} USDC ({} units)", min_usdc, min_usdc_units);
+
+    // 1. 使用 AutoMockRpcClient 和 list_pools_by_mint 获取池子状态（与 list_usdc_pools 一致）
+    let auto_mock_client = AutoMockRpcClient::new_with_namespace(
+        rpc_url.to_string(),
+        Some("ensure_usdc_prts_pool_usdc_liquidity".to_string()),
+    );
+
+    // 使用 list_pools_by_mint 查找所有 USDC pool，然后找到 USDC-PRTS pool
+    let usdc_mint_key = usdc_mint();
+    let prts_mint_key = prts_mint();
+
+    let pools = list_pools_by_mint(&auto_mock_client, &usdc_mint_key)
+        .await
+        .map_err(|e| format!("获取 USDC Pool 列表失败: {}", e))?;
+
+    // 查找 USDC-PRTS pool（通过 PRTS mint）
+    let pool_state = pools
+        .iter()
+        .find(|(_, pool)| {
+            pool.token0_mint == prts_mint_key || pool.token1_mint == prts_mint_key
+        })
+        .map(|(_, state)| state.clone())
+        .ok_or_else(|| format!("未找到 USDC-PRTS Pool，PRTS mint: {}", prts_mint_key))?;
+
+    // 2. 确定哪个 vault 是 USDC（根据 mint 地址判断）
+    let usdc_mint = crate::cpmm_test_params::usdc_mint();
+    let (usdc_vault, prts_vault) = if pool_state.token0_mint == usdc_mint {
+        (pool_state.token0_vault, pool_state.token1_vault)
+    } else {
+        (pool_state.token1_vault, pool_state.token0_vault)
+    };
+
+    // 3. 检查当前 USDC vault 余额
+    let current_usdc_balance = match auto_mock_client
+        .get_token_account_balance(&usdc_vault)
+        .await
+    {
+        Ok(balance_info) => balance_info.amount.parse::<u64>().unwrap_or(0),
+        Err(_) => 0,
+    };
+
+    let current_usdc = current_usdc_balance / 1_000_000;
+
+    println!(
+        "   当前 USDC 流动性: {} USDC ({} units)",
+        current_usdc, current_usdc_balance
+    );
+
+    // 4. 如果流动性充足，直接返回
+    if current_usdc_balance >= min_usdc_units {
+        println!("✅ 流动性充足\n");
+        return Ok(());
+    }
+
+    // 5. 计算需要添加的流动性
+    let needed_usdc_units = min_usdc_units - current_usdc_balance;
+    let needed_usdc = needed_usdc_units / 1_000_000;
+
+    println!(
+        "💰 流动性不足，需要添加 {} USDC 的流动性...\n",
+        needed_usdc
+    );
+
+    // 6. 获取当前 PRTS vault 余额
+    let current_prts_balance = match auto_mock_client
+        .get_token_account_balance(&prts_vault)
+        .await
+    {
+        Ok(balance_info) => balance_info.amount.parse::<u64>().unwrap_or(0),
+        Err(_) => 0,
+    };
+
+    // 7. 根据 CPMM 公式计算需要添加的 PRTS 和 LP 数量
+    // 公式: (added_usdc / current_usdc) = (added_lp / current_lp) = (added_prts / current_prts)
+    let multiplier = (needed_usdc_units as u128) * 1000 / (current_usdc_balance as u128);
+    let needed_lp =
+        (pool_state.lp_supply as u128 * multiplier / 1000) as u64;
+    let needed_prts = ((current_prts_balance as u128 * multiplier) / 1000) as u64;
+
+    println!("📐 计算需要添加的流动性:");
+    println!("   LP Token: {} (约 {:.2} 亿)", needed_lp, needed_lp as f64 / 100_000_000.0);
+    println!(
+        "   USDC: {} ({} USDC)",
+        needed_usdc_units, needed_usdc
+    );
+    println!(
+        "   PRTS: {} (约 {:.2} 亿)\n",
+        needed_prts,
+        needed_prts as f64 / 100_000_000.0
+    );
+
+    // 8. 转换为格式化字符串（用于 ensure_token_balance）
+    // USDC decimals = 6, PRTS decimals = 6 (Token2022)
+    let needed_usdc_formatted = format!("{}", needed_usdc_units);
+    let needed_prts_formatted = format!("{}", needed_prts);
+
+    // 9. 使用通用的 ensure_cpmm_liquidity 函数添加流动性
+    ensure_cpmm_liquidity(
+        rpc_client,
+        rpc_url,
+        payer,
+        &pool_address,
+        needed_lp,
+        &needed_usdc_formatted,
+        &needed_prts_formatted,
     )
     .await
 }

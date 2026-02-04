@@ -51,7 +51,27 @@ ensure_pipe_pool_wsol_liquidity(
 2. 如果不足 1000 SOL，自动计算并添加所需流动性
 3. 自动按比例添加 PIPE token
 
-### 5. 确保 CPMM 流动性（通用）
+### 5. 确保 USDC-PRTS Pool 流动性（推荐）
+
+```rust
+use sol_trade_test_utils::ensure_usdc_prts_pool_usdc_liquidity;
+
+// 确保 USDC-PRTS pool 至少有 1000 USDC 的流动性
+// 如果不足，会自动添加流动性
+ensure_usdc_prts_pool_usdc_liquidity(
+    &rpc,
+    "http://127.0.0.1:8899",
+    &payer,
+    1000,  // 1000 USDC
+).await?;
+```
+
+与 PIPE Pool 类似，函数会：
+1. 检查当前 USDC-PRTS pool 的 USDC vault 余额
+2. 如果不足 1000 USDC，自动计算并添加所需流动性
+3. 自动按比例添加 PRTS token
+
+### 6. 确保 CPMM 流动性（通用）
 
 ```rust
 use sol_trade_test_utils::ensure_cpmm_liquidity;

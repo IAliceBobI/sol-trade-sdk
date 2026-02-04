@@ -40,6 +40,7 @@ pub use ensure::{
     ensure_pipe_pool_wsol_liquidity,
     ensure_sol_balance,
     ensure_token_balance,
+    ensure_usdc_prts_pool_usdc_liquidity,
 };
 
 // 重新导出 CPMM 测试参数构建器

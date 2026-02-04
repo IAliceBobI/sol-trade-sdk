@@ -27,7 +27,7 @@ use solana_sdk::{pubkey::Pubkey, signer::Signer};
 mod test_helpers;
 use test_helpers::{create_test_client, print_balances, print_token_balance};
 use sol_trade_test_utils::{
-    ensure_pipe_pool_wsol_liquidity, set_token_balance,
+    ensure_pipe_pool_wsol_liquidity, ensure_usdc_prts_pool_usdc_liquidity, set_token_balance,
 };
 
 // 使用参数构造工具模块
@@ -278,6 +278,17 @@ async fn test_raydium_cpmm_buy_sell_usdc_prts() {
 
     let payer_pubkey = client.payer.as_ref().pubkey();
     println!("测试钱包: {}", payer_pubkey);
+
+    // ===== 0. 确保 USDC-PRTS Pool 有足够的流动性 =====
+    println!("\n🪙 检查并确保 USDC-PRTS Pool 流动性...");
+    if let Err(e) =
+        ensure_usdc_prts_pool_usdc_liquidity(&client.rpc, rpc_url, &client.payer.as_ref(), 100).await
+    {
+        println!("⚠️  警告: 确保 USDC-PRTS Pool 流动性失败: {}", e);
+        println!("继续测试，但可能因为流动性不足而失败...");
+    } else {
+        println!("✅ USDC-PRTS Pool 流动性已确保");
+    }
 
     let usdc_mint = usdc_mint();
     let prts_mint = prts_mint();
