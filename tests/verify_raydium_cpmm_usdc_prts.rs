@@ -9,7 +9,7 @@ use sol_trade_sdk::{DexType, TradingClient};
 use sol_trade_test_utils::{
     dex_verification::{
         cleanup_pool_cache, run_dex_three_stage_verification, verify_three_stage_accuracy,
-        DexVerifyConfig, OperationType, ParamsBuilder, RaydiumCpmmPoolRegistry,
+        BuyParamsBuilder, DexVerifyConfig, OperationType, RaydiumCpmmPoolRegistry,
         TradeDirection,
     },
     ensure_token_balance, usdc_mint, UsdcPrtsBuyParamsBuilder,
@@ -18,7 +18,7 @@ use sol_trade_test_utils::{
 // 参数构建器结构体
 struct UsdcPrtsParamsBuilder;
 
-impl ParamsBuilder for UsdcPrtsParamsBuilder {
+impl BuyParamsBuilder for UsdcPrtsParamsBuilder {
     #[allow(clippy::manual_async_fn)]
     fn build(&self, client: &TradingClient, amount: u64) -> impl std::future::Future<Output = sol_trade_sdk::TradeBuyParams> + Send {
         async move {

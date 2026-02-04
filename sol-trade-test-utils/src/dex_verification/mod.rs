@@ -42,7 +42,13 @@ pub use types::{
     DexVerifyConfig, OperationType, PoolConfig, TokenProgramType, TradeDirection,
 };
 pub use framework::{
-    cleanup_pool_cache, run_dex_three_stage_verification, verify_three_stage_accuracy,
-    ExecutionResult, ParamsBuilder, ThreeStageResult,
+    cleanup_pool_cache,
+    run_dex_three_stage_verification,
+    run_dex_three_stage_verification_sell,
+    verify_three_stage_accuracy,
+    BuyParamsBuilder,
+    ExecutionResult,
+    SellParamsBuilder,
+    ThreeStageResult,
 };
 pub use pool_registry::{RaydiumCpmmPoolRegistry, RaydiumClmmPoolRegistry};
