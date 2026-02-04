@@ -45,5 +45,6 @@ CLAUDE.md
 
 json
 
-tests/mock_data
+mock_data/
+
 

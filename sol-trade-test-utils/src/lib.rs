@@ -5,6 +5,7 @@
 //! - 设置 Token 余额
 //! - 确保账户余额
 //! - 添加流动性
+//! - 列出和查询 Pool
 //!
 //! # 示例
 //!
@@ -29,6 +30,7 @@ pub mod airdrop;
 pub mod token;
 pub mod ensure;
 pub mod cpmm_test_params;
+pub mod pool_list;
 
 // 重新导出常用类型
 pub use airdrop::airdrop_and_wait;
@@ -43,6 +45,9 @@ pub use cpmm_test_params::{
     PipeWsolSellParamsBuilder, UsdcPrtsBuyParamsBuilder, UsdcPrtsSellParamsBuilder,
     PIPE_MINT, PIPE_WSOL_POOL, PRTS_MINT, USDC_MINT, USDC_PRTS_POOL, WSOL_MINT,
 };
+
+// 重新导出 Pool 列出工具
+pub use pool_list::{list_and_classify_pools, list_usdc_pools, print_pool_classification, PoolClassification, PoolInfo};
 
 // 导入常用类型
 use solana_sdk::signature::Keypair;
