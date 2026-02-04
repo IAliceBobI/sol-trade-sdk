@@ -34,6 +34,7 @@ pub mod accounts {
 }
 
 pub(crate) const SWAP_BASE_IN_DISCRIMINATOR: &[u8] = &[143, 190, 90, 218, 196, 30, 51, 222];
+#[allow(dead_code)]
 pub(crate) const SWAP_BASE_OUT_DISCRIMINATOR: &[u8] = &[55, 217, 98, 86, 163, 74, 180, 173];
 
 /// 缓存大小限制

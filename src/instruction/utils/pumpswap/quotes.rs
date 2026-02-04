@@ -1,3 +1,6 @@
+// 允许未使用的 legacy 函数（保留用于向后兼容）
+#![allow(dead_code)]
+
 use crate::{
     common::{SolanaRpcClient, auto_mock_rpc::PoolRpcClient},
     constants::{SOL_MINT, USDC_MINT, USDT_MINT, WSOL_TOKEN_ACCOUNT},
@@ -107,6 +110,7 @@ pub(crate) async fn quote_exact_in(
 /// # Deprecated
 ///
 /// 请使用新版本的 `quote_exact_in`，它使用 `QuoteExactInParams` 结构体参数。
+#[allow(dead_code)]
 #[deprecated(since = "4.1.0", note = "请使用 quote_exact_in(&rpc, QuoteExactInParams)")]
 pub async fn quote_exact_in_legacy(
     rpc: &SolanaRpcClient,

@@ -35,6 +35,7 @@ pub mod accounts {
 }
 
 pub(crate) const SWAP_BASE_IN_DISCRIMINATOR: &[u8] = &[9];
+#[allow(dead_code)]
 pub(crate) const SWAP_BASE_OUT_DISCRIMINATOR: &[u8] = &[11];
 
 /// Pool 状态常量

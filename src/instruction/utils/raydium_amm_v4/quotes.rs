@@ -1,4 +1,6 @@
 // Quote 计算函数
+// 允许未使用的 legacy 函数（保留用于向后兼容）
+#![allow(dead_code)]
 
 use crate::common::SolanaRpcClient;
 use crate::utils::calc::raydium_amm_v4::quote_exact_out as calc_quote_exact_out;

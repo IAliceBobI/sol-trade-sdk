@@ -13,6 +13,9 @@
 //   - 在 SwapState 中累计手续费
 //   - 修改 compute_swap_amount_with_tick_arrays 返回完整结果
 
+// 允许未使用的 legacy 函数（保留用于向后兼容）
+#![allow(dead_code)]
+
 use anyhow::anyhow;
 use solana_sdk::pubkey::Pubkey;
 

@@ -47,6 +47,7 @@ pub(crate) fn is_pool_active(amm_info: &AmmInfo) -> bool {
 /// 检查 pool 是否已禁用
 ///
 /// 已禁用的 pool 不能进行交易。
+#[allow(dead_code)]
 pub(crate) fn is_pool_disabled(amm_info: &AmmInfo) -> bool {
     amm_info.status == super::constants::pool_status::DISABLED
 }
@@ -54,6 +55,7 @@ pub(crate) fn is_pool_disabled(amm_info: &AmmInfo) -> bool {
 /// 检查 pool 是否只能提现
 ///
 /// 只能提现的 pool 不能进行交易，只能提取流动性。
+#[allow(dead_code)]
 pub(crate) fn is_pool_withdraw_only(amm_info: &AmmInfo) -> bool {
     amm_info.status == super::constants::pool_status::WITHDRAW_ONLY
 }

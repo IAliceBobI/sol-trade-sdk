@@ -18,12 +18,10 @@ mod quotes;
 pub use constants::{DEFAULT_WSOL_USDT_CLMM_POOL, accounts, seeds};
 
 // 内部重新导出（crate 内部可访问）
-pub(crate) use constants::{SWAP_BASE_IN_DISCRIMINATOR, SWAP_BASE_OUT_DISCRIMINATOR};
+pub(crate) use constants::SWAP_BASE_IN_DISCRIMINATOR;
 
 // helpers 函数现在是内部实现（pub(crate)）
-pub(crate) use helpers::{
-    get_observation_state_pda, get_pool_pda, get_vault_account, get_vault_pda, is_hot_mint,
-};
+pub(crate) use helpers::{get_pool_pda, get_vault_account};
 
 pub use pool_queries::{
     clear_pool_cache, get_pool_by_address, get_pool_by_address_force, get_pool_by_mint,

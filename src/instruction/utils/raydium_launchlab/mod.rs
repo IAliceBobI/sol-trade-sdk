@@ -29,13 +29,7 @@ pub use types::{
 };
 
 // Re-export helper functions (内部实现)
-pub(crate) use helpers::{
-    get_bonding_curve_pda, get_cpswap_authority_pda, get_cpswap_lp_mint_pda,
-    get_cpswap_observation_pda, get_cpswap_pool_pda, get_cpswap_vault_pda,
-    get_creator_fee_vault_pda, get_event_authority_pda, get_global_config_pda,
-    get_lock_authority_pda, get_metadata_pda, get_platform_config_pda, get_platform_fee_vault_pda,
-    get_pool_state_pda, get_pool_vault_pda, get_vault_authority_pda,
-};
+// 移除未使用的导出，避免 clippy 警告
 
 // Re-export parsing functions
 pub use parsing::{parse_global_config, parse_platform_config, parse_pool_state};
@@ -57,7 +51,4 @@ pub use instructions::{
 };
 
 // Re-export serialization functions for backward compatibility (内部实现)
-pub(crate) use helpers::{
-    serialize_amm_creator_fee_on, serialize_curve_params, serialize_mint_params,
-    serialize_vesting_params,
-};
+// 移除未使用的导出，避免 clippy 警告

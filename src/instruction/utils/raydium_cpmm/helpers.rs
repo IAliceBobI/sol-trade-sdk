@@ -32,6 +32,7 @@ pub(crate) fn get_vault_pda(pool_state: &Pubkey, mint: &Pubkey) -> Option<Pubkey
 }
 
 /// 获取 Observation State PDA
+#[allow(dead_code)]
 pub(crate) fn get_observation_state_pda(pool_state: &Pubkey) -> Option<Pubkey> {
     let seeds: &[&[u8]; 2] = &[seeds::OBSERVATION_STATE_SEED, pool_state.as_ref()];
     let program_id: &Pubkey = &accounts::RAYDIUM_CPMM;

@@ -75,6 +75,7 @@ pub(crate) fn get_user_volume_accumulator_pda(user: &Pubkey) -> Option<Pubkey> {
     )
 }
 
+#[allow(dead_code)]
 pub(crate) fn get_global_volume_accumulator_pda() -> Option<Pubkey> {
     let seeds: &[&[u8]; 1] = &[seeds::GLOBAL_VOLUME_ACCUMULATOR_SEED];
     let program_id: &Pubkey = &accounts::AMM_PROGRAM;
@@ -83,6 +84,7 @@ pub(crate) fn get_global_volume_accumulator_pda() -> Option<Pubkey> {
 }
 
 #[inline]
+#[allow(dead_code)]
 pub(crate) fn get_fee_config_pda() -> Option<Pubkey> {
     let seeds: &[&[u8]; 2] = &[seeds::FEE_CONFIG_SEED, accounts::AMM_PROGRAM.as_ref()];
     let program_id: &Pubkey = &accounts::FEE_PROGRAM;
