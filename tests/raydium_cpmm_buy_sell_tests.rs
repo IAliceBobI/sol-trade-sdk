@@ -27,7 +27,7 @@ use solana_sdk::{pubkey::Pubkey, signer::Signer};
 mod test_helpers;
 use test_helpers::{create_test_client, print_balances, print_token_balance};
 use sol_trade_test_utils::{
-    ensure_pipe_pool_wsol_liquidity, ensure_usdc_prts_pool_usdc_liquidity, set_token_balance,
+    ensure_pipe_pool_wsol_liquidity, ensure_token_balance, ensure_usdc_prts_pool_usdc_liquidity, set_token_balance,
 };
 
 // 使用参数构造工具模块
@@ -298,13 +298,20 @@ async fn test_raydium_cpmm_buy_sell_usdc_prts() {
         .await
         .expect("Failed to fetch initial USDC balance");
 
-    // ===== 1. 使用 surfnet_setTokenAccount 空投 USDC =====
-    println!("\n💧 使用 surfnet_setTokenAccount 空投 USDC...");
-    let usdc_amount = "1000"; // 1000 USDC
-    set_token_balance(&client.rpc, rpc_url, client.payer.as_ref(), &usdc_mint, usdc_amount)
+    // ===== 1. 使用 ensure_token_balance 确保足够的 USDC 和 PRTS =====
+    println!("\n💧 确保测试账户有足够的代币余额...");
+
+    // 确保 USDC 余额（用于买入）
+    ensure_token_balance(&client.rpc, rpc_url, client.payer.as_ref(), &usdc_mint, "1000")
         .await
-        .expect("Failed to set USDC balance");
-    println!("✅ USDC 空投完成");
+        .expect("Failed to ensure USDC balance");
+    println!("✅ USDC 余额已确保");
+
+    // 确保 PRTS 余额（用于卖出测试）
+    ensure_token_balance(&client.rpc, rpc_url, client.payer.as_ref(), &prts_mint, "100000000")
+        .await
+        .expect("Failed to ensure PRTS balance");
+    println!("✅ PRTS 余额已确保");
 
     // ===== 2. 使用指定的 CPMM Pool (USDC-PRTS) =====
     let pool_address = usdc_prts_pool();
