@@ -18,9 +18,9 @@ pub async fn get_mint_info(
     rpc_client: &Arc<RpcClient>,
     mint: &Pubkey,
 ) -> Result<MintInfo, String> {
-    Ok(sol_trade_sdk::utils::token::get_mint_info(rpc_client, mint)
+    sol_trade_sdk::utils::token::get_mint_info(rpc_client, mint)
         .await
-        .map_err(|e| format!("获取 mint 信息失败: {}", e))?)
+        .map_err(|e| format!("获取 mint 信息失败: {}", e))
 }
 
 /// 将格式化的 amount 字符串（如 "1.22"）转换为原始单位（u64）

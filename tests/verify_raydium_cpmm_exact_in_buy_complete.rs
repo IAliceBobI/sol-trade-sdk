@@ -15,14 +15,13 @@ use sol_trade_sdk::{
     parser::DexParser,
     utils::quote::QuoteExactInParams,
 };
-use solana_sdk::signer::Signer;
 
 mod test_helpers;
 use test_helpers::create_test_client;
 
 // 导入公共测试模块
 use sol_trade_test_utils::{
-    ensure_pipe_pool_wsol_liquidity, ensure_token_balance, get_simulation_test_keypair,
+    ensure_pipe_pool_wsol_liquidity, ensure_token_balance,
 };
 
 // 导入 CPMM 测试参数工具
@@ -61,7 +60,7 @@ async fn test_cpmm_exact_in_buy_three_stage_verification() {
     // 0.2 确保 PIPE Pool 有足够的流动性
     println!("🪙 检查并确保 PIPE Pool 流动性...");
     if let Err(e) =
-        ensure_pipe_pool_wsol_liquidity(&client.rpc, rpc_url, &client.payer.as_ref(), 10).await
+        ensure_pipe_pool_wsol_liquidity(&client.rpc, rpc_url, client.payer.as_ref(), 10).await
     {
         println!("⚠️  警告: 确保 PIPE Pool 流动性失败: {}", e);
         println!("继续测试，但可能因为流动性不足而失败...");
@@ -76,7 +75,7 @@ async fn test_cpmm_exact_in_buy_three_stage_verification() {
     if let Err(e) = ensure_token_balance(
         &client.rpc,
         rpc_url,
-        &client.payer.as_ref(),
+        client.payer.as_ref(),
         &wsol_mint,
         "10",
     )
@@ -88,7 +87,7 @@ async fn test_cpmm_exact_in_buy_three_stage_verification() {
 
     // 确保 PIPE 余额（确保 ATA 存在）
     if let Err(e) =
-        ensure_token_balance(&client.rpc, rpc_url, &client.payer.as_ref(), &pipe_mint, "1").await
+        ensure_token_balance(&client.rpc, rpc_url, client.payer.as_ref(), &pipe_mint, "1").await
     {
         panic!("❌ 确保 PIPE 余额失败: {}", e);
     }

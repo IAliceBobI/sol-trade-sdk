@@ -124,6 +124,7 @@ pub async fn quote_exact_in(
 ///
 /// 请使用新版本的 `quote_exact_in`，它使用 `QuoteExactInParams` 结构体参数。
 #[deprecated(since = "4.1.0", note = "请使用 quote_exact_in(&rpc, QuoteExactInParams)")]
+#[allow(dead_code)]
 pub async fn quote_exact_in_legacy(
     rpc: &SolanaRpcClient,
     pool_address: &Pubkey,
@@ -241,6 +242,7 @@ pub async fn quote_exact_out(
 ///
 /// 请使用新版本的 `quote_exact_out`，它使用 `QuoteExactOutParams` 结构体参数。
 #[deprecated(since = "4.1.0", note = "请使用 quote_exact_out(&rpc, QuoteExactOutParams)")]
+#[allow(dead_code)]
 pub async fn quote_exact_out_legacy(
     rpc: &SolanaRpcClient,
     pool_address: &Pubkey,

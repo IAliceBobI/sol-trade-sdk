@@ -19,6 +19,7 @@ use solana_sdk::pubkey::Pubkey;
 /// 这个函数通过读取原始字节数据来获取 creator_fees
 ///
 /// 参考：raydium-cp-swap/programs/cp-swap/src/states/pool.rs
+#[allow(dead_code)]
 async fn get_creator_fees_from_pool_data(
     rpc: &SolanaRpcClient,
     pool_address: &Pubkey,
@@ -142,6 +143,7 @@ pub async fn quote_exact_in(
 /// - If `is_token0_in=true`: token0 -> token1
 /// - If `is_token0_in=false`: token1 -> token0
 #[deprecated(since = "4.1.0", note = "请使用 quote_exact_in(&rpc, QuoteExactInParams)")]
+#[allow(dead_code)]
 pub async fn quote_exact_in_legacy(
     rpc: &SolanaRpcClient,
     pool_address: &Pubkey,
@@ -268,6 +270,7 @@ pub async fn quote_exact_out(
 ///
 /// 请使用新版本的 `quote_exact_out`，它使用 `QuoteExactOutParams` 结构体参数。
 #[deprecated(since = "4.1.0", note = "请使用 quote_exact_out(&rpc, QuoteExactOutParams)")]
+#[allow(dead_code)]
 pub async fn quote_exact_out_legacy(
     rpc: &SolanaRpcClient,
     pool_address: &Pubkey,

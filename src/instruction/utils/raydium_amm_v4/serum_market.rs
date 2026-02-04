@@ -56,6 +56,7 @@ pub struct MarketState {
 /// Market 账户数据（包含头部 padding）
 #[repr(C)]
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct MarketAccountData {
     /// 头部 "serum" 魔数
     pub header: [u8; MARKET_HEADER_LEN],
@@ -122,6 +123,7 @@ pub fn parse_market_account(data: &[u8]) -> Result<MarketState, anyhow::Error> {
 ///
 /// # 返回
 /// 返回 vault_signer_nonce
+#[allow(dead_code)]
 pub fn parse_vault_signer_nonce(data: &[u8]) -> Result<u64, anyhow::Error> {
     // 检查数据长度
     if data.len() < MARKET_HEADER_LEN + 40 {

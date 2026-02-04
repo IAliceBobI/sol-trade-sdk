@@ -3,7 +3,7 @@
 use super::helpers::{get_input_mint, get_output_mint, supports_quote};
 use super::types::{TradeBuyParams, TradeSellParams, TradingClient};
 use crate::{
-    utils::quote::{QuoteExactInParams, QuoteExactOutParams},
+    utils::quote::QuoteExactInParams,
     QuoteResult, UnifiedResult, UnifiedTradingError,
 };
 

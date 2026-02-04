@@ -2,7 +2,6 @@
 ///
 /// This module provides a common result type so higher layers can compare pools
 /// using a consistent shape.
-
 use solana_sdk::pubkey::Pubkey;
 
 /// Quote exact-in 参数

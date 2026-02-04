@@ -18,16 +18,16 @@
 //! - Token 价格获取测试已移至 sol-trade-test-utils/tests/token_price_tests.rs
 
 use sol_trade_sdk::{
-    instruction::utils::raydium_cpmm::{clear_pool_cache, get_pool_by_address, get_pool_by_mint},
+    instruction::utils::raydium_cpmm::get_pool_by_address,
     parser::DexParser,
     trading::core::params::RaydiumCpmmParams,
 };
-use solana_sdk::{pubkey::Pubkey, signer::Signer};
+use solana_sdk::signer::Signer;
 
 mod test_helpers;
 use test_helpers::{create_test_client, print_balances, print_token_balance};
 use sol_trade_test_utils::{
-    ensure_pipe_pool_wsol_liquidity, ensure_token_balance, ensure_usdc_prts_pool_usdc_liquidity, set_token_balance,
+    ensure_pipe_pool_wsol_liquidity, ensure_token_balance, ensure_usdc_prts_pool_usdc_liquidity,
 };
 
 // 使用参数构造工具模块
@@ -63,7 +63,7 @@ async fn test_raydium_cpmm_buy_sell_complete() {
     // ===== 0. 确保 PIPE Pool 有足够的流动性 =====
     println!("\n🪙 检查并确保 PIPE Pool 流动性...");
     if let Err(e) =
-        ensure_pipe_pool_wsol_liquidity(&client.rpc, rpc_url, &client.payer.as_ref(), 100).await
+        ensure_pipe_pool_wsol_liquidity(&client.rpc, rpc_url, client.payer.as_ref(), 100).await
     {
         println!("⚠️  警告: 确保 PIPE Pool 流动性失败: {}", e);
         println!("继续测试，但可能因为流动性不足而失败...");
@@ -282,7 +282,7 @@ async fn test_raydium_cpmm_buy_sell_usdc_prts() {
     // ===== 0. 确保 USDC-PRTS Pool 有足够的流动性 =====
     println!("\n🪙 检查并确保 USDC-PRTS Pool 流动性...");
     if let Err(e) =
-        ensure_usdc_prts_pool_usdc_liquidity(&client.rpc, rpc_url, &client.payer.as_ref(), 100).await
+        ensure_usdc_prts_pool_usdc_liquidity(&client.rpc, rpc_url, client.payer.as_ref(), 100).await
     {
         println!("⚠️  警告: 确保 USDC-PRTS Pool 流动性失败: {}", e);
         println!("继续测试，但可能因为流动性不足而失败...");
