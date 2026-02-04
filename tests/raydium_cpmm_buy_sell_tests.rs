@@ -28,6 +28,8 @@ use std::str::FromStr;
 
 mod test_helpers;
 use test_helpers::{create_test_client, print_balances, print_token_balance};
+mod common;
+use common::{set_token_balance};
 
 /// 已知的 WSOL mint
 const WSOL_MINT: &str = "So11111111111111111111111111111111111111112";
@@ -37,6 +39,15 @@ const PIPE_MINT: &str = "8ycz3kctoRb4LFrtoYG2r8tRyUYUeGf5Q16M2TEMp7A";
 
 /// PIPE Token CPMM Pool
 const PIPE_POOL: &str = "BnYsRpYvJpz6biY3hV6U9smChVePCJ6YyupVDfcnXpTp";
+
+/// PRTS Token Mint (Token-2022)
+const PRTS_MINT: &str = "3PQkX8yfuxoe9kuBoLCEZoxzi9LG4w8Ci2JWWGNfPRTS";
+
+/// USDC Mint
+const USDC_MINT: &str = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
+
+/// USDC-PRTS CPMM Pool
+const USDC_PRTS_POOL: &str = "7Cvz28TyKnGuL8GAtbsVFu1FJ3Po7A37Zc8JSJqkSPDp";
 
 /// 测试：Raydium CPMM 完整买入-卖出流程
 ///
@@ -424,4 +435,278 @@ async fn test_raydium_cpmm_get_pool_by_mint_with_auto_mock() {
     println!("✅ 后续运行：从缓存加载（约 0.01 秒）");
     println!("✅ 速度提升：约 100-200 倍！");
     println!("💡 注意：内存缓存功能在单元测试中覆盖，不在此集成测试中重复");
+}
+
+/// 测试：Raydium CPMM USDC-PRTS 完整买入-卖出流程
+///
+/// 流程：
+/// 1. 使用 `set_token_balance` 空投 USDC（通过 surfnet_setTokenAccount RPC）
+/// 2. 使用指定的 CPMM Pool (USDC-PRTS)
+/// 3. 使用 USDC 买入 PRTS 代币
+/// 4. 再将全部 PRTS 代币卖出换回 USDC
+/// 5. 验证 Token 余额变化和 USDC 净变化
+///
+/// 注意：
+/// - PRTS 是 Token-2022 代币
+/// - 使用测试节点的 surfnet_setTokenAccount RPC 方法设置余额
+#[tokio::test]
+#[serial_test::serial(global_dex_cache)]
+async fn test_raydium_cpmm_buy_sell_usdc_prts() {
+    println!("\n=== 测试：Raydium CPMM USDC-PRTS 完整买卖流程 ===");
+
+    let client = create_test_client().await;
+    let rpc_url = "http://127.0.0.1:8899";
+
+    let payer_pubkey = client.payer.as_ref().pubkey();
+    println!("测试钱包: {}", payer_pubkey);
+
+    // 记录初始 USDC 余额
+    let usdc_mint = Pubkey::from_str(USDC_MINT).unwrap();
+    let _initial_usdc = print_token_balance(rpc_url, &payer_pubkey, &usdc_mint, "USDC")
+        .await
+        .expect("Failed to fetch initial USDC balance");
+
+    // ===== 1. 使用 surfnet_setTokenAccount 空投 USDC =====
+    println!("\n💧 使用 surfnet_setTokenAccount 空投 USDC...");
+    let usdc_amount = "1000"; // 1000 USDC
+    set_token_balance(&client.rpc, rpc_url, client.payer.as_ref(), &usdc_mint, usdc_amount)
+        .await
+        .expect("Failed to set USDC balance");
+    println!("✅ USDC 空投完成");
+
+    // ===== 2. 使用指定的 CPMM Pool (USDC-PRTS) =====
+    let pool_address = Pubkey::from_str(USDC_PRTS_POOL)
+        .unwrap_or_else(|_| panic!("Invalid pool address: {}", USDC_PRTS_POOL));
+    let prts_mint = Pubkey::from_str(PRTS_MINT)
+        .unwrap_or_else(|_| panic!("Invalid PRTS mint: {}", PRTS_MINT));
+
+    println!("\n🔍 使用指定的 Raydium CPMM Pool: {}", pool_address);
+    println!("   PRTS Mint: {} (Token-2022)", prts_mint);
+
+    // 从 pool 地址获取 pool state
+    let pool_state = get_pool_by_address(&client.rpc, &pool_address)
+        .await
+        .expect("Failed to get CPMM pool state");
+
+    println!("Pool 信息:");
+    println!("  token0_mint: {}", pool_state.token0_mint);
+    println!("  token1_mint: {}", pool_state.token1_mint);
+
+    // 验证池确实包含 USDC 和 PRTS
+    assert!(
+        pool_state.token0_mint == usdc_mint || pool_state.token1_mint == usdc_mint,
+        "CPMM Pool 必须包含 USDC",
+    );
+    assert!(
+        pool_state.token0_mint == prts_mint || pool_state.token1_mint == prts_mint,
+        "CPMM Pool 必须包含 PRTS",
+    );
+
+    // 记录空投后的 USDC 余额
+    let usdc_after_airdrop = print_token_balance(rpc_url, &payer_pubkey, &usdc_mint, "USDC")
+        .await
+        .expect("Failed to fetch USDC balance after airdrop");
+
+    // 记录初始 PRTS 余额
+    let initial_prts = print_token_balance(rpc_url, &payer_pubkey, &prts_mint, "PRTS")
+        .await
+        .expect("Failed to fetch initial PRTS balance");
+
+    // ===== 3. 从 Pool 地址构建 RaydiumCpmmParams =====
+    println!("\n🧮 从 Pool 构建 RaydiumCpmmParams...");
+    let cpmm_params = RaydiumCpmmParams::from_pool_address_by_rpc(&client.rpc, &pool_address)
+        .await
+        .expect("Failed to build RaydiumCpmmParams from pool address");
+
+    // 调试：打印关键账户信息
+    println!("CPMM 参数信息:");
+    println!("  pool_state: {}", cpmm_params.pool_state);
+    println!("  amm_config: {}", cpmm_params.amm_config);
+    println!("  base_mint: {}", cpmm_params.base_mint);
+    println!("  quote_mint: {}", cpmm_params.quote_mint);
+    println!("  base_vault: {}", cpmm_params.base_vault);
+    println!("  quote_vault: {}", cpmm_params.quote_vault);
+    println!("  base_token_program: {}", cpmm_params.base_token_program);
+    println!("  quote_token_program: {}", cpmm_params.quote_token_program);
+    println!("  observation_state: {}", cpmm_params.observation_state);
+
+    // ===== 4. 使用 USDC 买入 PRTS 代币 =====
+    println!("\n💰 第一步：买入 PRTS 代币 (Raydium CPMM)");
+
+    // USDC decimals = 6，100 USDC = 100_000_000
+    let input_amount = 100_000_000u64; // 100 USDC
+    let gas_fee_strategy = GasFeeStrategy::new();
+    gas_fee_strategy.set_global_fee_strategy(150_000, 150_000, 500_000, 500_000, 0.001, 0.001);
+
+    let recent_blockhash =
+        client.rpc.get_latest_blockhash().await.expect("Failed to get latest blockhash");
+
+    let buy_params = TradeBuyParams {
+        dex_type: DexType::RaydiumCpmm,
+        input_token_type: TradeTokenType::USDC,
+        mint: prts_mint,
+        input_token_amount: input_amount,
+        slippage_basis_points: Some(10000), // 10% 容忍度
+        recent_blockhash: Some(recent_blockhash),
+        extension_params: DexParamEnum::RaydiumCpmm(cpmm_params.clone()),
+        address_lookup_table_account: None,
+        wait_transaction_confirmed: true,
+        create_input_token_ata: true,
+        close_input_token_ata: false,
+        create_mint_ata: true,
+        durable_nonce: None,
+        enable_jito_sandwich_protection: Some(false),
+        fixed_output_token_amount: None,
+        gas_fee_strategy: gas_fee_strategy.clone(),
+        simulate: false,
+        on_transaction_signed: None,
+        callback_execution_mode: None,
+    };
+
+    let (success_buy, buy_sigs, error_buy) =
+        client.buy(buy_params).await.expect("Raydium CPMM 买入交易执行失败");
+    if !success_buy {
+        panic!(
+            "❌ 买入交易失败: {:?}\n  Pool: {}\n  Target Mint: {}\n  输入金额: {} (100 USDC)",
+            error_buy, pool_address, prts_mint, input_amount
+        );
+    }
+    println!("✅ 买入成功，签名: {:?}", buy_sigs.first());
+
+    // 解析买入交易
+    if let Some(buy_sig) = buy_sigs.first() {
+        println!("\n📋 解析买入交易...");
+        let parser = DexParser::default();
+        let buy_sig_str = buy_sig.to_string();
+        let parse_result = parser.parse_transaction(&buy_sig_str).await;
+
+        if parse_result.success && !parse_result.trades.is_empty() {
+            println!("✅ 买入交易解析成功:");
+            for trade in &parse_result.trades {
+                println!("  DEX: {}", trade.dex);
+                println!("  用户: {}", trade.user);
+                println!("  Pool: {}", trade.pool);
+                println!("  交易类型: {:?}", trade.trade_type);
+                println!(
+                    "  输入: {} {} ({} decimals)",
+                    trade.input_token.amount, trade.input_token.mint, trade.input_token.decimals
+                );
+                println!(
+                    "  输出: {} {} ({} decimals)",
+                    trade.output_token.amount, trade.output_token.mint, trade.output_token.decimals
+                );
+                if let Some(ref fee) = trade.fee {
+                    println!("  费用: {} {}", fee.amount, fee.mint);
+                }
+            }
+        } else {
+            println!("⚠️  买入交易解析失败: {:?}", parse_result.error);
+        }
+    }
+
+    // 买入后的代币余额
+    let prts_after_buy = print_token_balance(rpc_url, &payer_pubkey, &prts_mint, "PRTS")
+        .await
+        .expect("Failed to fetch PRTS balance after buy");
+    assert!(prts_after_buy > initial_prts, "买入后 PRTS 余额应增加");
+
+    // ===== 5. 卖出全部 PRTS 代币换回 USDC =====
+    println!("\n💸 第二步：卖出全部 PRTS 代币 (Raydium CPMM)");
+
+    let cpmm_params_sell = RaydiumCpmmParams::from_pool_address_by_rpc(&client.rpc, &pool_address)
+        .await
+        .expect("Failed to build RaydiumCpmmParams for sell");
+
+    let recent_blockhash_sell = client
+        .rpc
+        .get_latest_blockhash()
+        .await
+        .expect("Failed to get latest blockhash for sell");
+
+    let sell_params = TradeSellParams {
+        dex_type: DexType::RaydiumCpmm,
+        output_token_type: TradeTokenType::USDC,
+        mint: prts_mint,
+        input_token_amount: prts_after_buy,
+        slippage_basis_points: Some(10000),
+        recent_blockhash: Some(recent_blockhash_sell),
+        with_tip: false,
+        extension_params: DexParamEnum::RaydiumCpmm(cpmm_params_sell),
+        address_lookup_table_account: None,
+        wait_transaction_confirmed: true,
+        create_output_token_ata: true,
+        close_output_token_ata: false,
+        close_mint_token_ata: false,
+        durable_nonce: None,
+        enable_jito_sandwich_protection: Some(false),
+        fixed_output_token_amount: None,
+        gas_fee_strategy,
+        simulate: false,
+        on_transaction_signed: None,
+        callback_execution_mode: None,
+    };
+
+    let (success_sell, sell_sigs, error_sell) =
+        client.sell(sell_params).await.expect("Raydium CPMM 卖出交易执行失败");
+    if !success_sell {
+        panic!(
+            "❌ 卖出交易失败: {:?}\n  Pool: {}\n  Target Mint: {}\n  卖出数量: {}",
+            error_sell, pool_address, prts_mint, prts_after_buy
+        );
+    }
+    println!("✅ 卖出成功，签名: {:?}", sell_sigs.first());
+
+    // 解析卖出交易
+    if let Some(sell_sig) = sell_sigs.first() {
+        println!("\n📋 解析卖出交易...");
+        let parser = DexParser::default();
+        let sell_sig_str = sell_sig.to_string();
+        let parse_result = parser.parse_transaction(&sell_sig_str).await;
+
+        if parse_result.success && !parse_result.trades.is_empty() {
+            println!("✅ 卖出交易解析成功:");
+            for trade in &parse_result.trades {
+                println!("  DEX: {}", trade.dex);
+                println!("  用户: {}", trade.user);
+                println!("  Pool: {}", trade.pool);
+                println!("  交易类型: {:?}", trade.trade_type);
+                println!(
+                    "  输入: {} {} ({} decimals)",
+                    trade.input_token.amount, trade.input_token.mint, trade.input_token.decimals
+                );
+                println!(
+                    "  输出: {} {} ({} decimals)",
+                    trade.output_token.amount, trade.output_token.mint, trade.output_token.decimals
+                );
+                if let Some(ref fee) = trade.fee {
+                    println!("  费用: {} {}", fee.amount, fee.mint);
+                }
+            }
+        } else {
+            println!("⚠️  卖出交易解析失败: {:?}", parse_result.error);
+        }
+    }
+
+    // 等待链上状态更新
+    tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
+
+    // ===== 6. 验证最终余额 =====
+    let final_usdc = print_token_balance(rpc_url, &payer_pubkey, &usdc_mint, "USDC")
+        .await
+        .expect("Failed to fetch final USDC balance");
+    let final_prts = print_token_balance(rpc_url, &payer_pubkey, &prts_mint, "PRTS")
+        .await
+        .expect("Failed to fetch final PRTS balance");
+
+    println!("\n📊 完整流程结果:");
+    let uscd_diff = (final_usdc as i128) - (usdc_after_airdrop as i128);
+    println!("  - USDC 净变化: {} lamports ({:.6} USDC)", uscd_diff, uscd_diff as f64 / 1e6);
+    println!("  - 最终 PRTS 余额: {}", final_prts);
+
+    // PRTS 应基本被卖出（可能存在极小 dust，但在典型场景下应为 0）
+    assert_eq!(final_prts, 0, "卖出后 PRTS 余额应为 0");
+    // 由于手续费和滑点，USDC 净变化应为负
+    assert!(uscd_diff < 0, "由于手续费和滑点，USDC 应该净减少");
+
+    println!("\n=== Raydium CPMM USDC-PRTS 买入-卖出完整流程测试通过 ===");
 }
