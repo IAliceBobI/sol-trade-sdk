@@ -105,20 +105,47 @@ async fn test_add_liquidity_to_cpmm_pool() {
         },
     };
 
-    // 3. 设置测试账户余额
+    // 3. 计算要添加的流动性数量
+    // 使用当前池子流动性的 50% 作为添加目标
+    // 这样可以确保测试在任何状态下都能正常运行
+    let liquidity_percentage = 50; // 添加 50% 的当前池子流动性
+    let lp_token_amount = (pool_state.lp_supply as u128 * liquidity_percentage as u128 / 100) as u64;
+
+    println!("🪙 要添加的 LP 代币: {} ({}% of current pool)", lp_token_amount, liquidity_percentage);
+    println!();
+
+    // 4. 根据 CPMM 公式计算需要的代币数量
+    // 公式: token_amount = (lp_amount / total_lp_supply) * vault_reserve
+    let multiplier = liquidity_percentage as u128; // 因为是百分比，所以直接使用
+
+    // 计算需要的代币数量（加上 20% buffer 作为滑点容错）
+    let needed_token0 = ((token0_reserve as u128 * multiplier) as u64).saturating_mul(120) / 100 / 100;
+    let needed_token1 = ((token1_reserve as u128 * multiplier) as u64).saturating_mul(120) / 100 / 100;
+
+    println!("📐 计算需要的代币数量:");
+    println!("  Token0 (PIPE): {} (raw: {})", format_token_amount(needed_token0, pool_state.mint0_decimals), needed_token0);
+    println!("  Token1 (WSOL): {} (raw: {})", format_token_amount(needed_token1, pool_state.mint1_decimals), needed_token1);
+    println!("  Multiplier: {}x", multiplier);
+    println!();
+
+    // 5. 使用 set_token_balance 设置代币余额
+    // 注意：直接使用 set_token_balance 而不是 ensure_token_balance
+    // 因为 ensure_token_balance 检查当前余额时，u64::MAX 会被认为"充足"
+    // 但转账时 u64::MAX 会导致溢出
     println!("💰 设置测试账户代币余额...\n");
 
     use sol_trade_test_utils::set_token_balance;
 
-    // 设置 PIPE 余额（150 亿 PIPE）
-    let pipe_amount_str = "15000000000";
+    // 转换为格式化字符串（直接使用 raw units）
+    // PIPE decimals = 6, WSOL decimals = 9
+    let pipe_amount_str = &format!("{}", needed_token0);
+    let wsol_amount_str = &format!("{}", needed_token1);
+
     if let Err(e) = set_token_balance(&rpc, &rpc_url, &payer, &pipe_mint, pipe_amount_str).await {
         println!("❌ 设置 PIPE 余额失败: {}\n", e);
         panic!("设置 PIPE 余额失败");
     }
 
-    // 设置 WSOL 余额（50,000 WSOL）
-    let wsol_amount_str = "50000";
     if let Err(e) = set_token_balance(&rpc, &rpc_url, &payer, &wsol_mint, wsol_amount_str).await {
         println!("❌ 设置 WSOL 余额失败: {}\n", e);
         panic!("设置 WSOL 余额失败");
@@ -126,17 +153,11 @@ async fn test_add_liquidity_to_cpmm_pool() {
 
     println!("✅ 代币余额设置成功\n");
 
-    // 4. 计算要铸造的 LP 代币数量（680 亿）
-    let lp_token_amount = 68_000_000_000_u64;
-
-    println!("🪙 要铸造的 LP 代币: {}", lp_token_amount);
-    println!();
-
-    // 5. 使用构建器构建 Deposit 指令
+    // 6. 使用构建器构建 Deposit 指令
     let (deposit_instruction, calculated_amounts, owner_lp_token) =
         PipeWsolLiquidityBuilder::new(lp_token_amount)
-            .max_pipe(12_000_000_000_000_000) // 120 亿 PIPE
-            .max_wsol(100_000_000_000)        // 100,000 WSOL
+            .max_pipe(needed_token0)
+            .max_wsol(needed_token1)
             .build_instruction(payer.pubkey(), &pool_state, token0_reserve, token1_reserve);
 
     // 6. 显示计算结果

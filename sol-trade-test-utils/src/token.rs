@@ -25,27 +25,33 @@ pub async fn get_mint_info(
 
 /// 将格式化的 amount 字符串（如 "1.22"）转换为原始单位（u64）
 pub fn parse_formatted_amount(amount_str: &str, decimals: u8) -> Result<u64, String> {
-    // 先尝试解析为小数格式（如 "1.22"）
-    if let Ok(amount) = amount_str.parse::<f64>() {
+    // 先尝试解析为原始单位格式（如 "2000000" 或 "2_000_000"）
+    let cleaned_str = amount_str.replace('_', "").trim().to_string();
+
+    // 检查是否包含小数点
+    if cleaned_str.contains('.') {
+        // 小数格式（如 "1.22"）- 使用 f64 解析
+        let amount = cleaned_str.parse::<f64>().map_err(|e| {
+            format!("Invalid decimal amount format: {}", e)
+        })?;
+
         if amount < 0.0 {
             return Err("Amount cannot be negative".to_string());
         }
 
         let multiplier = 10_f64.powi(decimals as i32);
         let amount_u64 = (amount * multiplier).round() as u64;
-        return Ok(amount_u64);
+        Ok(amount_u64)
+    } else {
+        // 原始单位格式 - 直接解析为 u64
+        let amount_u64 = cleaned_str.parse::<u64>().map_err(|e| {
+            format!(
+                "Invalid amount format: {} (expected decimal like '1.22' or raw units like '2000000')",
+                e
+            )
+        })?;
+        Ok(amount_u64)
     }
-
-    // 如果小数解析失败，尝试解析为原始单位格式（如 "2000000" 或 "2_000_000"）
-    let cleaned_str = amount_str.replace('_', "");
-    let amount_u64 = cleaned_str.parse::<u64>().map_err(|e| {
-        format!(
-            "Invalid amount format: {} (expected decimal like '1.22' or raw units like '2000000')",
-            e
-        )
-    })?;
-
-    Ok(amount_u64)
 }
 
 /// 调用 surfnet_setTokenAccount RPC 方法设置代币余额
@@ -58,27 +64,23 @@ async fn call_surfnet_set_token_account(
 ) -> Result<(), String> {
     let http_client = reqwest::Client::new();
 
-    let request_body = serde_json::json!({
-        "jsonrpc": "2.0",
-        "id": 1,
-        "method": "surfnet_setTokenAccount",
-        "params": [
-            owner,
-            mint,
-            {
-                "amount": amount,
-                "state": "initialized",
-                "closeAuthority": null,
-                "delegate": null,
-                "delegatedAmount": null,
-            },
-            token_program,
-        ]
-    });
+    // 手动构造 JSON 以避免大数字的精度问题
+    // serde_json::json! 宏在处理大 u64 值时可能会使用 f64，导致精度丢失
+    let token_program_json = if let Some(tp) = token_program {
+        format!("\"{}\"", tp)
+    } else {
+        "null".to_string()
+    };
+
+    let request_body = format!(
+        r#"{{"jsonrpc":"2.0","id":1,"method":"surfnet_setTokenAccount","params":["{}","{}",{{"amount":{},"state":"initialized","closeAuthority":null,"delegate":null,"delegatedAmount":null}},{}]}}"#,
+        owner, mint, amount, token_program_json
+    );
 
     let response = http_client
         .post(rpc_url)
-        .json(&request_body)
+        .header("Content-Type", "application/json")
+        .body(request_body)
         .send()
         .await
         .map_err(|e| format!("HTTP request failed: {}", e))?;
