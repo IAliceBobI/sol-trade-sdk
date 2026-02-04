@@ -15,7 +15,7 @@ use std::str::FromStr;
 use std::sync::Arc;
 
 // 导入公共测试模块
-use sol_trade_test_utils::{ensure_ata_with_balance, get_simulation_test_keypair};
+use sol_trade_test_utils::{ensure_token_balance, get_simulation_test_keypair};
 
 /// WSOL-USDC Pool on Raydium AMM V4
 const SOL_USDC_POOL: &str = "58oQChx4yWmvKdwLLZzBi4ChoCc2fqCUWBkwMihLYQo2";
@@ -54,7 +54,7 @@ async fn test_raydium_amm_v4_exact_out_buy_with_simulation() {
     println!("计算: 需要 WSOL 输入\n");
 
     // 初始化 ATA
-    if let Err(e) = ensure_ata_with_balance(
+    if let Err(e) = ensure_token_balance(
         &rpc,
         &rpc_url,
         &payer,

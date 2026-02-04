@@ -20,7 +20,7 @@ use solana_sdk::signer::Signer;
 use std::sync::Arc;
 
 // 导入公共测试模块
-use sol_trade_test_utils::{ensure_ata_with_balance, get_simulation_test_keypair};
+use sol_trade_test_utils::{ensure_token_balance, get_simulation_test_keypair};
 
 // 导入 CPMM 测试参数工具
 use sol_trade_test_utils::{pipe_mint, pipe_wsol_pool, wsol_mint};
@@ -49,7 +49,7 @@ async fn test_cpmm_exact_in_buy_three_stage_verification() {
     println!("输出: PIPE tokens\n");
 
     // 初始化 ATA
-    if let Err(e) = ensure_ata_with_balance(
+    if let Err(e) = ensure_token_balance(
         &rpc,
         &rpc_url,
         &payer,

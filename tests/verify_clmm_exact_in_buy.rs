@@ -17,7 +17,7 @@ use std::str::FromStr;
 use std::sync::Arc;
 
 // 导入公共模块
-use sol_trade_test_utils::{ensure_ata_with_balance, get_simulation_test_keypair};
+use sol_trade_test_utils::{ensure_token_balance, get_simulation_test_keypair};
 
 /// WSOL-JUP CLMM Pool
 const WSOL_JUP_POOL: &str = "EZVkeboWeXygtq8LMyENHyXdF5wpYrtExRNH9UwB1qYw";
@@ -56,7 +56,7 @@ async fn test_clmm_exact_in_buy_with_simulation() {
     println!("期望输出: JUP tokens\n");
 
     // 初始化 ATA
-    if let Err(e) = ensure_ata_with_balance(
+    if let Err(e) = ensure_token_balance(
         &rpc,
         &rpc_url,
         &payer,

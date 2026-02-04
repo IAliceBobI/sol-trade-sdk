@@ -99,13 +99,19 @@ pub async fn ensure_token_balance(
         Err(_) => 0,
     };
 
-    // 解析目标金额
-    let target_amount = parse_formatted_amount(amount_formatted, mint_info.decimals)?;
+    // 解析目标金额（使用小数格式，如 "1000.0" 表示 1000 USDC）
+    let decimal_formatted = if !amount_formatted.contains('.') {
+        format!("{}.0", amount_formatted) // 确保是小数格式
+    } else {
+        amount_formatted.to_string()
+    };
+
+    let target_amount = parse_formatted_amount(&decimal_formatted, mint_info.decimals)?;
 
     if current_amount >= target_amount {
         println!(
-            "✅ Token 余额充足: {} ({} decimals)",
-            amount_formatted, mint_info.decimals
+            "✅ Token 余额充足: {} ({} decimals, {} raw units)",
+            amount_formatted, mint_info.decimals, current_amount
         );
         return Ok(());
     }
@@ -115,7 +121,7 @@ pub async fn ensure_token_balance(
         amount_formatted, current_amount, target_amount
     );
 
-    crate::token::set_token_balance(rpc_client, rpc_url, payer, mint, amount_formatted).await
+    crate::token::set_token_balance(rpc_client, rpc_url, payer, mint, &decimal_formatted).await
 }
 
 /// 确保 PIPE Pool 有足够的 WSOL 流动性
@@ -488,23 +494,28 @@ pub async fn ensure_cpmm_liquidity(
     // 5. 构建添加流动性指令
     println!("\n🔨 构建添加流动性指令...");
 
-    // 派生 ATA 地址
+    // 派生 ATA 地址（使用正确的 Token Program）
+    // 获取各 mint 的 Token Program
+    let lp_token_program = get_mint_info(rpc_client, &pool_state.lp_mint).await?.token_program;
+    let token_0_program = get_mint_info(rpc_client, &pool_state.token0_mint).await?.token_program;
+    let token_1_program = get_mint_info(rpc_client, &pool_state.token1_mint).await?.token_program;
+
     let owner_lp_token = get_associated_token_address_with_program_id(
         &payer_pubkey,
         &pool_state.lp_mint,
-        &spl_token::id(),
+        &lp_token_program,
     );
 
     let token_0_account = get_associated_token_address_with_program_id(
         &payer_pubkey,
         &pool_state.token0_mint,
-        &spl_token::id(),
+        &token_0_program,
     );
 
     let token_1_account = get_associated_token_address_with_program_id(
         &payer_pubkey,
         &pool_state.token1_mint,
-        &spl_token::id(),
+        &token_1_program,
     );
 
     // 解析目标金额作为最大值
@@ -515,6 +526,8 @@ pub async fn ensure_cpmm_liquidity(
     let max_token1 = parse_formatted_amount(token1_amount_formatted, mint_info1.decimals)?;
 
     // 构建 deposit 指令
+    // 注意：token_program 参数在 CPMM 中需要根据具体池子的 token 使用
+    // 这里使用 token_0 的 Token Program（大部分池子使用传统 Token Program）
     let deposit_params = CpmmDepositParams {
         pool_state: *pool_address,
         owner_lp_token,
@@ -528,7 +541,7 @@ pub async fn ensure_cpmm_liquidity(
         lp_token_amount: lp_token_amount - current_lp_supply, // 只添加差值
         maximum_token_0_amount: max_token0,
         maximum_token_1_amount: max_token1,
-        token_program: spl_token::id(),
+        token_program: token_0_program,  // 使用正确的 Token Program
     };
 
     let deposit_instruction = build_deposit_instruction(deposit_params, payer_pubkey);
@@ -545,7 +558,7 @@ pub async fn ensure_cpmm_liquidity(
                 &payer_pubkey,
                 &payer_pubkey,
                 &pool_state.lp_mint,
-                &spl_token::id(),
+                &lp_token_program,  // 使用正确的 Token Program
             );
         instructions.push(create_lp_ata_instruction);
     }

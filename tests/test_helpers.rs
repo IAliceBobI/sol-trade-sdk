@@ -159,7 +159,7 @@ pub async fn print_balances(
     Ok((sol_balance, wsol_amount))
 }
 
-/// 获取指定 mint 的 Token 余额
+/// 获取指定 mint 的 Token 余额（自动检测 Token Program）
 ///
 /// # 参数
 /// * `rpc_url` - RPC URL
@@ -177,38 +177,29 @@ pub async fn get_token_balance(
 ) -> Result<u64, Box<dyn std::error::Error>> {
     let client = RpcClient::new(rpc_url.to_string());
 
-    // 尝试 TOKEN_PROGRAM
-    let ata = get_associated_token_address_with_program_id_fast(payer, mint, &TOKEN_PROGRAM);
-    if let Ok(token) = client.get_token_account_balance(&ata).await {
-        let amount: u64 = token.amount.parse().unwrap_or_else(|e| {
-            println!(
-                "⚠️  解析 token amount 字符串失败: {}，原始值: '{}'，账户: {}，使用 TOKEN_PROGRAM",
-                e, token.amount, ata
-            );
-            0
-        });
-        return Ok(amount);
-    }
+    // 先查询 mint 账户获取 Token Program
+    let mint_account = client.get_account(mint).await?;
+    let token_program = mint_account.owner;
 
-    // 尝试 TOKEN_PROGRAM_2022
-    let ata2022 =
-        get_associated_token_address_with_program_id_fast(payer, mint, &TOKEN_PROGRAM_2022);
-    if let Ok(token) = client.get_token_account_balance(&ata2022).await {
-        let amount: u64 = token.amount.parse().unwrap_or_else(|e| {
-            println!(
-                "⚠️  解析 token amount 字符串失败: {}，原始值: '{}'，账户: {}，使用 TOKEN_PROGRAM_2022",
-                e, token.amount, ata2022
-            );
-            0
-        });
-        return Ok(amount);
-    }
+    // 使用正确的 Token Program 计算 ATA
+    let ata = get_associated_token_address_with_program_id_fast(payer, mint, &token_program);
 
-    // 账户不存在，返回 0
-    Ok(0)
+    match client.get_token_account_balance(&ata).await {
+        Ok(token) => {
+            let amount: u64 = token.amount.parse().unwrap_or_else(|e| {
+                println!(
+                    "⚠️  解析 token amount 字符串失败: {}，原始值: '{}'，账户: {}",
+                    e, token.amount, ata
+                );
+                0
+            });
+            Ok(amount)
+        },
+        Err(_) => Ok(0), // 账户不存在，返回 0
+    }
 }
 
-/// 打印指定 mint 的 Token 余额并返回
+/// 打印指定 mint 的 Token 余额并返回（自动检测 Token Program）
 ///
 /// # 参数
 /// * `rpc_url` - RPC URL
@@ -225,8 +216,30 @@ pub async fn print_token_balance(
     mint: &Pubkey,
     token_name: &str,
 ) -> Result<u64, Box<dyn std::error::Error>> {
-    let balance = get_token_balance(rpc_url, payer, mint).await?;
-    let ata = get_associated_token_address_with_program_id_fast(payer, mint, &TOKEN_PROGRAM);
+    let client = RpcClient::new(rpc_url.to_string());
+
+    // 先查询 mint 账户获取 Token Program
+    let mint_account = client.get_account(mint).await?;
+    let token_program = mint_account.owner;
+
+    // 使用正确的 Token Program 计算 ATA
+    let ata = get_associated_token_address_with_program_id_fast(payer, mint, &token_program);
+
+    // 查询余额
+    let balance = match client.get_token_account_balance(&ata).await {
+        Ok(token) => {
+            let amount: u64 = token.amount.parse().unwrap_or_else(|e| {
+                println!(
+                    "⚠️  解析 token amount 字符串失败: {}，原始值: '{}'，账户: {}",
+                    e, token.amount, ata
+                );
+                0
+            });
+            amount
+        },
+        Err(_) => 0,
+    };
+
     println!("  🪙 {} 余额: {}", token_name, balance);
     println!("     Mint: {}", mint);
     println!("     ATA: {}", ata);

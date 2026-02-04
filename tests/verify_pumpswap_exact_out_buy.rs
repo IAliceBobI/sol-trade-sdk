@@ -17,7 +17,7 @@ use std::str::FromStr;
 use std::sync::Arc;
 
 // 导入公共模块
-use sol_trade_test_utils::{ensure_ata_with_balance, get_simulation_test_keypair};
+use sol_trade_test_utils::{ensure_token_balance, get_simulation_test_keypair};
 
 /// PUMP Token Pool
 const PUMP_POOL: &str = "539m4mVWt6iduB6W8rDGPMarzNCMesuqY5eUTiiYHAgR";
@@ -56,7 +56,7 @@ async fn test_pumpswap_exact_out_buy_with_simulation() {
     println!("计算: 需要 WSOL 输入\n");
 
     // 初始化 ATA
-    if let Err(e) = ensure_ata_with_balance(
+    if let Err(e) = ensure_token_balance(
         &rpc,
         &rpc_url,
         &payer,

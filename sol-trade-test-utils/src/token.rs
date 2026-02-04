@@ -24,24 +24,73 @@ pub async fn get_mint_info(
 }
 
 /// 将格式化的 amount 字符串（如 "1.22"）转换为原始单位（u64）
+///
+/// 使用精确的字符串解析和整数运算，避免 f64 精度问题
 pub fn parse_formatted_amount(amount_str: &str, decimals: u8) -> Result<u64, String> {
     // 先尝试解析为原始单位格式（如 "2000000" 或 "2_000_000"）
     let cleaned_str = amount_str.replace('_', "").trim().to_string();
 
     // 检查是否包含小数点
     if cleaned_str.contains('.') {
-        // 小数格式（如 "1.22"）- 使用 f64 解析
-        let amount = cleaned_str.parse::<f64>().map_err(|e| {
-            format!("Invalid decimal amount format: {}", e)
-        })?;
-
-        if amount < 0.0 {
-            return Err("Amount cannot be negative".to_string());
+        // 小数格式（如 "1.22"）- 使用精确的字符串解析
+        let parts: Vec<&str> = cleaned_str.split('.').collect();
+        if parts.len() != 2 {
+            return Err(format!("Invalid decimal format: '{}'", cleaned_str));
         }
 
-        let multiplier = 10_f64.powi(decimals as i32);
-        let amount_u64 = (amount * multiplier).round() as u64;
-        Ok(amount_u64)
+        let integer_part = parts[0].trim();
+        let decimal_part = parts[1].trim();
+
+        // 解析整数部分
+        let integer_value: u128 = if integer_part.is_empty() || integer_part == "0" {
+            0
+        } else {
+            integer_part.parse().map_err(|e| {
+                format!("Invalid integer part '{}': {}", integer_part, e)
+            })?
+        };
+
+        // 解析小数部分
+        let decimal_value: u128 = if decimal_part.is_empty() {
+            0
+        } else {
+            // 移除小数部分末尾的 0（不影响精度）
+            let trimmed = decimal_part.trim_end_matches('0');
+            if trimmed.is_empty() {
+                0
+            } else {
+                trimmed.parse().map_err(|e| {
+                    format!("Invalid decimal part '{}': {}", trimmed, e)
+                })?
+            }
+        };
+
+        // 计算小数部分的长度
+        let decimal_len = decimal_part.len() as u32;
+
+        // 计算: integer * 10^decimals + decimal * 10^(decimals - decimal_len)
+        let multiplier = 10_u128.pow(u32::from(decimals));
+        let decimal_multiplier = if decimal_len <= u32::from(decimals) {
+            10_u128.pow(u32::from(decimals) - decimal_len)
+        } else {
+            return Err(format!(
+                "Decimal part too long: {} digits (max {})",
+                decimal_len, decimals
+            ));
+        };
+
+        let result = integer_value.saturating_mul(multiplier)
+            .saturating_add(decimal_value.saturating_mul(decimal_multiplier));
+
+        // 检查是否溢出 u64
+        if result > u64::MAX as u128 {
+            return Err(format!(
+                "Amount too large: {} (exceeds u64::MAX)",
+                cleaned_str
+            ));
+        }
+
+        Ok(result as u64)
     } else {
         // 原始单位格式 - 直接解析为 u64
         let amount_u64 = cleaned_str.parse::<u64>().map_err(|e| {
