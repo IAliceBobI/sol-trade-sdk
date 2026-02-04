@@ -23,7 +23,9 @@ pub use pool_queries::{
     list_pools_by_mint,
 };
 
-pub use quotes::{quote_exact_in, quote_exact_out};
+// quote_exact_in 和 quote_exact_out 现在是内部实现，使用 client.buy_quote() / client.sell_quote() 代替
+// 内部重新导出（crate 内部可访问）
+pub(crate) use quotes::{quote_exact_in, quote_exact_out};
 
 pub use helpers::{
     calculate_effective_volume, is_hot_mint, is_pool_active, is_pool_disabled, is_pool_tradeable,

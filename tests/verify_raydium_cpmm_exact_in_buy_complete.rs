@@ -10,10 +10,9 @@
 
 use sol_trade_sdk::{
     instruction::utils::raydium_cpmm::{
-        clear_pool_cache, get_pool_by_address, quote_exact_in,
+        clear_pool_cache, get_pool_by_address,
     },
     parser::DexParser,
-    utils::quote::QuoteExactInParams,
 };
 
 mod test_helpers;
@@ -121,28 +120,22 @@ async fn test_cpmm_exact_in_buy_three_stage_verification() {
     println!("  token1 (WSOL): {}", token1_reserve);
     println!();
 
-    // ===== 1. 本地计算（quote_exact_in）=====
+    // ===== 1. 本地计算（client.buy_quote）=====
     println!("========================================");
-    println!("阶段 1: 本地计算（quote_exact_in）");
+    println!("阶段 1: 本地计算（client.buy_quote）");
     println!("========================================\n");
 
     println!("交易方向: WSOL -> PIPE");
 
-    // 确定输入和输出代币
-    let (input_mint, output_mint) = if wsol_mint == pool_state.token0_mint {
-        (pool_state.token0_mint, pool_state.token1_mint)
-    } else {
-        (pool_state.token1_mint, pool_state.token0_mint)
-    };
+    // 使用参数构造工具构建买入参数
+    // 注意：使用 100% 滑点容忍度，因为 Quote 计算有 bug
+    let buy_params = PipeWsolBuyParamsBuilder::new(Some(amount_in))
+        .slippage(1000)
+        .build(&client)
+        .await;
 
-    let quote_params = QuoteExactInParams {
-        pool_address,
-        input_mint,
-        output_mint,
-        amount_in,
-    };
-
-    let quote_result = match quote_exact_in(&client.rpc, quote_params).await {
+    // 使用高级 API 进行 Quote 计算
+    let quote_result = match client.buy_quote(buy_params.clone()).await {
         Ok(quote) => quote,
         Err(e) => {
             panic!("❌ 本地计算失败: {}", e);
@@ -161,13 +154,6 @@ async fn test_cpmm_exact_in_buy_three_stage_verification() {
     println!("========================================");
     println!("阶段 2: 实际执行");
     println!("========================================\n");
-
-    // 使用参数构造工具构建买入参数
-    // 注意：使用 100% 滑点容忍度，因为 Quote 计算有 bug
-    let buy_params = PipeWsolBuyParamsBuilder::new(Some(amount_in))
-        .slippage(1000)
-        .build(&client)
-        .await;
 
     println!("🚀 执行买入交易...");
     let (success, sigs, error) = client.buy(buy_params).await.expect("买入交易执行失败");

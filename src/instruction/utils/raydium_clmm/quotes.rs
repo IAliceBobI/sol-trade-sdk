@@ -46,7 +46,7 @@ use super::{
 /// };
 /// let quote = quote_exact_in(&rpc, params).await?;
 /// ```
-pub async fn quote_exact_in(
+pub(crate) async fn quote_exact_in(
     rpc: &SolanaRpcClient,
     params: QuoteExactInParams,
 ) -> Result<crate::utils::quote::QuoteExactInResult, anyhow::Error> {
@@ -203,7 +203,7 @@ pub async fn quote_exact_in_legacy(
 /// # Returns
 ///
 /// 返回 `QuoteExactOutResult` 包含所需的输入金额和手续费
-pub async fn quote_exact_out(
+pub(crate) async fn quote_exact_out(
     rpc: &SolanaRpcClient,
     params: QuoteExactOutParams,
 ) -> Result<crate::utils::calc::raydium_clmm::QuoteExactOutResult, anyhow::Error> {

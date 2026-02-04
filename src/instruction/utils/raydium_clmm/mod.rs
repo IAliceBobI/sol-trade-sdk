@@ -21,5 +21,8 @@ pub use constants::*;
 pub use helpers::*;
 pub use pool_queries::*;
 pub use price::*;
-pub use quotes::*;
+// quote_exact_in 和 quote_exact_out 现在是内部实现，使用 client.buy_quote() / client.sell_quote() 代替
 pub use tick_array_bitmap::*;
+
+// 内部重新导出（crate 内部可访问）
+pub(crate) use quotes::{quote_exact_in, quote_exact_out};

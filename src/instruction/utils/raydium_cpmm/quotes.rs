@@ -59,7 +59,7 @@ async fn get_creator_fees_from_pool_data(
 /// };
 /// let quote = quote_exact_in(&rpc, params).await?;
 /// ```
-pub async fn quote_exact_in(
+pub(crate) async fn quote_exact_in(
     rpc: &SolanaRpcClient,
     params: QuoteExactInParams,
 ) -> Result<QuoteExactInResult, anyhow::Error> {
@@ -189,7 +189,7 @@ pub async fn quote_exact_in_legacy(
 /// let quote = quote_exact_out(&rpc, params).await?;
 /// println!("需要输入: {} tokens", quote.amount_in);
 /// ```
-pub async fn quote_exact_out(
+pub(crate) async fn quote_exact_out(
     rpc: &SolanaRpcClient,
     params: QuoteExactOutParams,
 ) -> Result<QuoteExactOutResult, anyhow::Error> {

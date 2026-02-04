@@ -25,7 +25,7 @@ use solana_sdk::pubkey::Pubkey;
 /// let quote = quote_exact_in(&rpc, params).await?;
 /// println!("预期输出: {} USDC", quote.amount_out);
 /// ```
-pub async fn quote_exact_in(
+pub(crate) async fn quote_exact_in(
     rpc: &SolanaRpcClient,
     params: QuoteExactInParams,
 ) -> Result<crate::utils::quote::QuoteExactInResult, anyhow::Error> {
@@ -170,7 +170,7 @@ pub async fn quote_exact_in_legacy(
 /// let quote = quote_exact_out(&rpc, params).await?;
 /// println!("需要输入: {} lamports", quote.amount_in);
 /// ```
-pub async fn quote_exact_out(
+pub(crate) async fn quote_exact_out(
     rpc: &SolanaRpcClient,
     params: QuoteExactOutParams,
 ) -> Result<crate::utils::quote::QuoteExactOutResult, anyhow::Error> {

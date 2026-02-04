@@ -29,9 +29,10 @@ pub use pool_queries::{
     get_pool_by_mint_force, get_pool_token_balances, list_pools_by_mint,
 };
 
-pub use quotes::{
-    get_token_price_in_usd, get_token_price_in_usd_with_pool, quote_exact_in, quote_exact_out,
-};
+pub use quotes::{get_token_price_in_usd, get_token_price_in_usd_with_pool};
+
+// 内部重新导出（crate 内部可访问）
+pub(crate) use quotes::{quote_exact_in, quote_exact_out};
 
 pub use fee_queries::{FeeRates, clear_amm_config_cache, get_amm_config_fees};
 

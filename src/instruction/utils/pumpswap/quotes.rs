@@ -27,7 +27,7 @@ use super::pool_queries::{get_pool_by_address, get_pool_by_address_force, get_to
 /// };
 /// let quote = quote_exact_in(&rpc, params).await?;
 /// ```
-pub async fn quote_exact_in(
+pub(crate) async fn quote_exact_in(
     rpc: &SolanaRpcClient,
     params: QuoteExactInParams,
 ) -> Result<crate::utils::quote::QuoteExactInResult, anyhow::Error> {
@@ -152,7 +152,7 @@ pub async fn quote_exact_in_legacy(
 /// };
 /// let quote = quote_exact_out(&rpc, params).await?;
 /// ```
-pub async fn quote_exact_out(
+pub(crate) async fn quote_exact_out(
     rpc: &SolanaRpcClient,
     params: QuoteExactOutParams,
 ) -> Result<crate::utils::quote::QuoteExactOutResult, anyhow::Error> {
