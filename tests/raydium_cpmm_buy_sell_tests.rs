@@ -41,11 +41,19 @@ const PIPE_POOL: &str = "BnYsRpYvJpz6biY3hV6U9smChVePCJ6YyupVDfcnXpTp";
 /// 测试：Raydium CPMM 完整买入-卖出流程
 ///
 /// 流程：
-/// 1. 通过 `get_pool_by_mint` 基于 WSOL mint 查找一个 CPMM 池
-/// 2. 选择该池中非 WSOL 的另一侧 Token 作为目标代币
-/// 3. 使用 SOL 买入目标代币
-/// 4. 再将全部目标代币卖出换回 SOL
-/// 5. 验证 Token 余额变化和 SOL 净变化
+/// 1. 使用指定的 CPMM Pool (PIPE-WSOL)
+/// 2. 使用 SOL 买入目标代币
+/// 3. 再将全部目标代币卖出换回 SOL
+/// 4. 验证 Token 余额变化和 SOL 净变化
+///
+/// ⚠️ 已知问题：
+/// 此测试使用的池 (PIPE-WSOL) 的 observation_state 账户未初始化。
+/// Raydium CPMM 程序要求 observation_state 账户必须存在且已初始化，
+/// 否则会返回错误 0xbc4 "The program expected this account to be already initialized"。
+///
+/// 要修复此测试，需要：
+/// 1. 找一个 observation_state 已初始化的 CPMM 池，或
+/// 2. 初始化此池的 observation_state 账户
 #[tokio::test]
 #[serial_test::serial(global_dex_cache)]
 async fn test_raydium_cpmm_buy_sell_complete() {
@@ -65,7 +73,7 @@ async fn test_raydium_cpmm_buy_sell_complete() {
     // ===== 1. 使用指定的 CPMM Pool (PIPE-WSOL) =====
     let pool_address = Pubkey::from_str("BnYsRpYvJpz6biY3hV6U9smChVePCJ6YyupVDfcnXpTp")
         .unwrap_or_else(|_| {
-            panic!("Invalid pool address: BnYsRpYvJpz6biY3hV6U9smChVePCJ6YyupVDfcnXpTp")
+            panic!("Invalid pool address: HJPjoWUrhoZzkNfRpZvJe5dCA5hgXq8sxkY8XEsEi9D")
         });
     let wsol_mint =
         Pubkey::from_str(WSOL_MINT).unwrap_or_else(|_| panic!("Invalid WSOL mint: {}", WSOL_MINT));
@@ -107,6 +115,18 @@ async fn test_raydium_cpmm_buy_sell_complete() {
         .await
         .expect("Failed to build RaydiumCpmmParams from pool address");
 
+    // 调试：打印关键账户信息
+    println!("CPMM 参数信息:");
+    println!("  pool_state: {}", cpmm_params.pool_state);
+    println!("  amm_config: {}", cpmm_params.amm_config);
+    println!("  base_mint: {}", cpmm_params.base_mint);
+    println!("  quote_mint: {}", cpmm_params.quote_mint);
+    println!("  base_vault: {}", cpmm_params.base_vault);
+    println!("  quote_vault: {}", cpmm_params.quote_vault);
+    println!("  base_token_program: {}", cpmm_params.base_token_program);
+    println!("  quote_token_program: {}", cpmm_params.quote_token_program);
+    println!("  observation_state: {}", cpmm_params.observation_state);
+
     // ===== 3. 使用 SOL 买入目标代币 =====
     println!("\n💰 第一步：买入目标代币 (Raydium CPMM)");
 
@@ -139,9 +159,12 @@ async fn test_raydium_cpmm_buy_sell_complete() {
         callback_execution_mode: None,
     };
 
-    let (success_buy, buy_sigs, _error_buy) =
+    let (success_buy, buy_sigs, error_buy) =
         client.buy(buy_params).await.expect("Raydium CPMM 买入交易执行失败");
-    assert!(success_buy, "买入交易应成功");
+    if !success_buy {
+        panic!("❌ 买入交易失败: {:?}\n  Pool: {}\n  Target Mint: {}\n  输入金额: {} lamports",
+               error_buy, pool_address, target_mint, input_amount);
+    }
     println!("✅ 买入成功，签名: {:?}", buy_sigs.first());
 
     // 解析买入交易
@@ -217,9 +240,12 @@ async fn test_raydium_cpmm_buy_sell_complete() {
         callback_execution_mode: None,
     };
 
-    let (success_sell, sell_sigs, _error_sell) =
+    let (success_sell, sell_sigs, error_sell) =
         client.sell(sell_params).await.expect("Raydium CPMM 卖出交易执行失败");
-    assert!(success_sell, "卖出交易应成功");
+    if !success_sell {
+        panic!("❌ 卖出交易失败: {:?}\n  Pool: {}\n  Target Mint: {}\n  卖出数量: {}",
+               error_sell, pool_address, target_mint, token_after_buy);
+    }
     println!("✅ 卖出成功，签名: {:?}", sell_sigs.first());
 
     // 解析卖出交易

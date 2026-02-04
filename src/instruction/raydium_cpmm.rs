@@ -23,6 +23,83 @@ use solana_sdk::{
     signer::Signer,
 };
 
+/// ⚠️ 重要说明：Raydium CPMM 指令构建逻辑
+///
+/// ## 当前实现（老版本逻辑）
+/// 参考：git rev fcf947bfa3d57d0927239fc3de9a5519c5a0f002
+///
+/// 当前代码使用简化逻辑，**假设交易总是涉及 WSOL 或 USDC 作为输入或输出**：
+/// - 买入：输入固定为 WSOL/USDC，输出为目标代币
+/// - 卖出：输入为目标代币，输出固定为 WSOL/USDC
+/// - Token Program 固定为 TOKEN_PROGRAM（不支持 Token-2022）
+///
+/// ### 买入逻辑示例：
+/// ```rust
+/// // 假设：如果 base_mint 是 WSOL/USDC，则输入是 base
+/// let is_base_in = protocol_params.base_mint == WSOL/USDC;
+/// // 输入 token 固定为 WSOL/USDC
+/// // 输出 token 为目标代币
+/// ```
+///
+/// ### 卖出逻辑示例：
+/// ```rust
+/// // 假设：如果 quote_mint 是 WSOL/USDC，则输出是 quote
+/// let is_quote_out = protocol_params.quote_mint == WSOL/USDC;
+/// // 输入 token 为目标代币
+/// // 输出 token 固定为 WSOL/USDC
+/// ```
+///
+/// ## 这种逻辑的限制
+/// 1. 只支持 WSOL/USDC 作为基础货币
+/// 2. 不支持代币到代币的直接交换（必须经过 WSOL/USDC）
+/// 3. 不支持 Token-2022 程序
+/// 4. 无法灵活处理任意代币对的 swap
+///
+/// ## 未来改进方向（Swap Output 估算）
+/// 后续需要支持更通用的 swap output 估算功能时，需要修改为：
+///
+/// ### 1. 动态输入/输出检测
+/// ```rust
+/// // 买入：根据实际输入代币判断
+/// let is_base_in = params.input_mint == protocol_params.base_mint;
+///
+/// // 卖出：根据实际输出代币判断
+/// let is_base_out = params.output_mint == protocol_params.base_mint;
+/// ```
+///
+/// ### 2. 动态 Token Program 支持
+/// ```rust
+/// // 支持检测 Token-2022
+/// let input_token_program = get_token_program_cached(&params.input_mint)
+///     .unwrap_or(TOKEN_PROGRAM);
+/// let output_token_program = get_token_program_cached(&params.output_mint)
+///     .unwrap_or(TOKEN_PROGRAM);
+/// ```
+///
+/// ### 3. 任意代币对支持
+/// - 不再假设 WSOL/USDC 必须是输入或输出
+/// - 支持代币到代币的直接交换
+/// - 支持 Token-2022 程序
+///
+/// ## 修改影响范围
+/// 修改逻辑时需要注意以下测试和代码：
+/// - `verify_raydium_cpmm_exact_in_*` 测试（链上模拟验证）
+/// - `verify_raydium_cpmm_exact_out_*` 测试（链上模拟验证）
+/// - `test_raydium_cpmm_buy_sell_complete`（集成测试）
+/// - 所有依赖 CPMM swap 的代码
+///
+/// ## 修改建议
+/// 在修改为通用逻辑前，建议：
+/// 1. 添加新的配置选项（如 `support_token_2022: bool`）
+/// 2. 保持向后兼容（保留旧逻辑作为 fallback）
+/// 3. 逐步迁移到新逻辑
+/// 4. 完整测试所有支持的代币对
+/// 5. 确保 verify 测试仍然通过
+///
+/// ## 参考代码
+/// - 老版本：git rev fcf947bfa3d57d0927239fc3de9a5519c5a0f002
+/// - 官方代码：/opt/projects/sol-trade-sdk/temp/dex/raydium-cp-swap/client/src/instructions/amm_instructions.rs
+///
 /// 获取输入 Token（WSOL/USDC）的 Token Program
 ///
 /// WSOL 固定使用 TOKEN_PROGRAM
@@ -99,8 +176,20 @@ impl InstructionBuilder for RaydiumCpmmInstructionBuilder {
         // ========================================
         // Trade calculation and account address preparation
         // ========================================
-        // is_base_in: true = base (token0) 作为输入, false = quote (token1) 作为输入
-        let is_base_in = params.input_mint == protocol_params.base_mint;
+        // 🔴 需要修改：Swap Output 估算功能需要这里改为动态检测
+        //
+        // 当前逻辑（老版本）：假设 base_mint 是 WSOL/USDC，则输入是 base
+        // 参考：git rev fcf947bfa3d57d0927239fc3de9a5519c5a0f002
+        //
+        // 未来逻辑：
+        // let is_base_in = params.input_mint == protocol_params.base_mint;
+        //
+        // 影响：
+        // - compute_swap_amount 的方向参数
+        // - mint_token_program 的选择
+        // - 输入/输出 token 账户的确定
+        let is_base_in = protocol_params.base_mint == crate::constants::WSOL_TOKEN_ACCOUNT
+            || protocol_params.base_mint == crate::constants::USDC_TOKEN_ACCOUNT;
         let mint_token_program = if is_base_in {
             protocol_params.quote_token_program
         } else {
@@ -134,36 +223,51 @@ impl InstructionBuilder for RaydiumCpmmInstructionBuilder {
             None => result.min_amount_out,
         };
 
-        // 获取输入 token 的 program（支持 Token-2022）
-        let input_token_program = crate::utils::token::get_token_program_cached(&params.input_mint)
-            .unwrap_or(crate::constants::TOKEN_PROGRAM);
+        // 🔴 需要修改：Swap Output 估算功能需要这里改为动态检测
+        //
+        // 当前逻辑（老版本）：输入固定为 WSOL/USDC，使用 TOKEN_PROGRAM
+        // 参考：git rev fcf947bfa3d57d0927239fc3de9a5519c5a0f002
+        //
+        // 未来逻辑：
+        // let input_token_program = get_token_program_cached(&params.input_mint)?;
+        // let input_token_account = get_associated_token_address_with_program_id_fast_use_seed(
+        //     &params.payer.pubkey(),
+        //     &params.input_mint,  // 使用实际输入代币
+        //     &input_token_program,
+        //     params.open_seed_optimize,
+        // );
         let input_token_account = get_associated_token_address_with_program_id_fast_use_seed(
             &params.payer.pubkey(),
-            &params.input_mint,
-            &input_token_program,
+            if is_wsol {
+                &crate::constants::WSOL_TOKEN_ACCOUNT
+            } else {
+                &crate::constants::USDC_TOKEN_ACCOUNT
+            },
+            &crate::constants::TOKEN_PROGRAM,
             params.open_seed_optimize,
         );
-        // 获取输出 token 的 program（支持 Token-2022）
-        let output_token_program =
-            crate::utils::token::get_token_program_cached(&params.output_mint)
-                .unwrap_or(crate::constants::TOKEN_PROGRAM);
         let output_token_account = get_associated_token_address_with_program_id_fast_use_seed(
             &params.payer.pubkey(),
             &params.output_mint,
-            &output_token_program,
+            &mint_token_program,
             params.open_seed_optimize,
         );
 
-        let input_vault_account =
-            get_vault_account(&pool_state, &params.input_mint, protocol_params);
+        let input_vault_account = get_vault_account(
+            &pool_state,
+            if is_wsol {
+                &crate::constants::WSOL_TOKEN_ACCOUNT
+            } else {
+                &crate::constants::USDC_TOKEN_ACCOUNT
+            },
+            protocol_params,
+        );
         let output_vault_account =
             get_vault_account(&pool_state, &params.output_mint, protocol_params);
 
-        let observation_state_account = if protocol_params.observation_state == Pubkey::default() {
-            get_observation_state_pda(&pool_state).unwrap()
-        } else {
-            protocol_params.observation_state
-        };
+        // 直接使用 protocol_params 中的 observation_state（来自 pool.observation_key）
+        // 参考官方代码: /opt/projects/sol-trade-sdk/temp/dex/raydium-cp-swap/client/src/main.rs:572
+        let observation_state_account = protocol_params.observation_state;
 
         // ========================================
         // Build instructions
@@ -188,6 +292,21 @@ impl InstructionBuilder for RaydiumCpmmInstructionBuilder {
         }
 
         // Create buy instruction
+        // 🔴 需要修改：Swap Output 估算功能需要这里改为动态检测
+        //
+        // 当前逻辑（老版本）：Input Token Program 固定为 TOKEN_PROGRAM
+        // 参考：git rev fcf947bfa3d57d0927239fc3de9a5519c5a0f002
+        //
+        // 未来逻辑：
+        // AccountMeta::new_readonly(input_token_program, false),   // 动态输入程序
+        // AccountMeta::new_readonly(output_token_program, false),  // 动态输出程序
+        // AccountMeta::new_readonly(params.input_mint, false),    // 动态输入 mint
+        // AccountMeta::new_readonly(params.output_mint, false),   // 动态输出 mint
+        //
+        // 影响：
+        // - 支持 Token-2022 程序
+        // - 支持任意代币对
+        // - verify_raydium_cpmm_* 测试需要更新
         let accounts: [AccountMeta; 13] = [
             AccountMeta::new(params.payer.pubkey(), true), // Payer (signer)
             accounts::AUTHORITY_META,                      // Authority (readonly)
@@ -197,16 +316,13 @@ impl InstructionBuilder for RaydiumCpmmInstructionBuilder {
             AccountMeta::new(output_token_account, false), // Output Token Account
             AccountMeta::new(input_vault_account, false),  // Input Vault Account
             AccountMeta::new(output_vault_account, false), // Output Vault Account
-            AccountMeta::new_readonly(mint_token_program, false), // Input Token Program (readonly)
-            AccountMeta::new_readonly(
-                if is_base_in {
-                    protocol_params.quote_token_program
-                } else {
-                    protocol_params.base_token_program
-                },
-                false,
-            ), // Output Token Program (readonly)
-            AccountMeta::new_readonly(params.input_mint, false), // Input token mint (readonly)
+            crate::constants::TOKEN_PROGRAM_META,          // Input Token Program (readonly)
+            AccountMeta::new_readonly(mint_token_program, false), // Output Token Program (readonly)
+            if is_wsol {
+                crate::constants::WSOL_TOKEN_ACCOUNT_META
+            } else {
+                crate::constants::USDC_TOKEN_ACCOUNT_META
+            }, // Input token mint (readonly)
             AccountMeta::new_readonly(params.output_mint, false), // Output token mint (readonly)
             AccountMeta::new(observation_state_account, false), // Observation State Account
         ];
@@ -274,12 +390,24 @@ impl InstructionBuilder for RaydiumCpmmInstructionBuilder {
         // ========================================
         // Trade calculation and account address preparation
         // ========================================
-        // is_base_in: true = base (token0) 作为输入, false = quote (token1) 作为输入
-        let is_base_in = params.input_mint == protocol_params.base_mint;
-        let mint_token_program = if is_base_in {
-            protocol_params.quote_token_program
-        } else {
+        // 🔴 需要修改：Swap Output 估算功能需要这里改为动态检测
+        //
+        // 当前逻辑（老版本）：如果 quote_mint 是 WSOL/USDC，则输出是 quote
+        // 参考：git rev fcf947bfa3d57d0927239fc3de9a5519c5a0f002
+        //
+        // 未来逻辑：
+        // let is_base_out = params.output_mint == protocol_params.base_mint;
+        //
+        // 影响：
+        // - compute_swap_amount 的方向参数
+        // - mint_token_program 的选择
+        // - 输入/输出 token 账户的确定
+        let is_quote_out = protocol_params.quote_mint == crate::constants::WSOL_TOKEN_ACCOUNT
+            || protocol_params.quote_mint == crate::constants::USDC_TOKEN_ACCOUNT;
+        let mint_token_program = if is_quote_out {
             protocol_params.base_token_program
+        } else {
+            protocol_params.quote_token_program
         };
 
         let minimum_amount_out: u64 = match params.fixed_output_amount {
@@ -296,7 +424,7 @@ impl InstructionBuilder for RaydiumCpmmInstructionBuilder {
                 compute_swap_amount(
                     protocol_params.base_reserve,
                     protocol_params.quote_reserve,
-                    is_base_in,
+                    is_quote_out,
                     params.input_amount.unwrap_or(0),
                     params.slippage_basis_points.unwrap_or(DEFAULT_SLIPPAGE),
                     fees.trade_fee_rate,
@@ -307,36 +435,40 @@ impl InstructionBuilder for RaydiumCpmmInstructionBuilder {
             },
         };
 
-        // 获取输入 token 的 program（支持 Token-2022）
-        let input_token_program = crate::utils::token::get_token_program_cached(&params.input_mint)
-            .unwrap_or(crate::constants::TOKEN_PROGRAM);
+        // 老版本逻辑：输出固定为 WSOL/USDC，使用 TOKEN_PROGRAM
+        // 参考：git rev fcf947bfa3d57d0927239fc3de9a5519c5a0f002
+        let output_token_account = get_associated_token_address_with_program_id_fast_use_seed(
+            &params.payer.pubkey(),
+            if is_wsol {
+                &crate::constants::WSOL_TOKEN_ACCOUNT
+            } else {
+                &crate::constants::USDC_TOKEN_ACCOUNT
+            },
+            &crate::constants::TOKEN_PROGRAM,
+            params.open_seed_optimize,
+        );
         let input_token_account = get_associated_token_address_with_program_id_fast_use_seed(
             &params.payer.pubkey(),
             &params.input_mint,
-            &input_token_program,
-            params.open_seed_optimize,
-        );
-        // 获取输出 token 的 program（支持 Token-2022）
-        let output_token_program =
-            crate::utils::token::get_token_program_cached(&params.output_mint)
-                .unwrap_or(crate::constants::TOKEN_PROGRAM);
-        let output_token_account = get_associated_token_address_with_program_id_fast_use_seed(
-            &params.payer.pubkey(),
-            &params.output_mint,
-            &output_token_program,
+            &mint_token_program,
             params.open_seed_optimize,
         );
 
-        let output_vault_account =
-            get_vault_account(&pool_state, &params.output_mint, protocol_params);
+        let output_vault_account = get_vault_account(
+            &pool_state,
+            if is_wsol {
+                &crate::constants::WSOL_TOKEN_ACCOUNT
+            } else {
+                &crate::constants::USDC_TOKEN_ACCOUNT
+            },
+            protocol_params,
+        );
         let input_vault_account =
             get_vault_account(&pool_state, &params.input_mint, protocol_params);
 
-        let observation_state_account = if protocol_params.observation_state == Pubkey::default() {
-            get_observation_state_pda(&pool_state).unwrap()
-        } else {
-            protocol_params.observation_state
-        };
+        // 直接使用 protocol_params 中的 observation_state（来自 pool.observation_key）
+        // 参考官方代码: /opt/projects/sol-trade-sdk/temp/dex/raydium-cp-swap/client/src/main.rs:572
+        let observation_state_account = protocol_params.observation_state;
 
         // ========================================
         // Build instructions
@@ -348,8 +480,21 @@ impl InstructionBuilder for RaydiumCpmmInstructionBuilder {
         }
 
         // Create sell instruction
-        let output_token_program_meta =
-            AccountMeta::new_readonly(*get_input_token_program(is_wsol), false);
+        // 🔴 需要修改：Swap Output 估算功能需要这里改为动态检测
+        //
+        // 当前逻辑（老版本）：Input Token Program 使用 mint_token_program，Output Token Program 固定为 TOKEN_PROGRAM
+        // 参考：git rev fcf947bfa3d57d0927239fc3de9a5519c5a0f002
+        //
+        // 未来逻辑：
+        // AccountMeta::new_readonly(input_token_program, false),   // 动态输入程序
+        // AccountMeta::new_readonly(output_token_program, false),  // 动态输出程序
+        // AccountMeta::new_readonly(params.input_mint, false),    // 动态输入 mint
+        // AccountMeta::new_readonly(params.output_mint, false),   // 动态输出 mint
+        //
+        // 影响：
+        // - 支持 Token-2022 程序
+        // - 支持任意代币对
+        // - verify_raydium_cpmm_* 测试需要更新
         let accounts: [AccountMeta; 13] = [
             AccountMeta::new(params.payer.pubkey(), true), // Payer (signer)
             accounts::AUTHORITY_META,                      // Authority (readonly)
@@ -360,9 +505,13 @@ impl InstructionBuilder for RaydiumCpmmInstructionBuilder {
             AccountMeta::new(input_vault_account, false),  // Input Vault Account
             AccountMeta::new(output_vault_account, false), // Output Vault Account
             AccountMeta::new_readonly(mint_token_program, false), // Input Token Program (readonly)
-            output_token_program_meta,                     // Output Token Program (readonly)
+            crate::constants::TOKEN_PROGRAM_META,          // Output Token Program (readonly)
             AccountMeta::new_readonly(params.input_mint, false), // Input token mint (readonly)
-            AccountMeta::new_readonly(params.output_mint, false), // Output token mint (readonly)
+            if is_wsol {
+                crate::constants::WSOL_TOKEN_ACCOUNT_META
+            } else {
+                crate::constants::USDC_TOKEN_ACCOUNT_META
+            }, // Output token mint (readonly)
             AccountMeta::new(observation_state_account, false), // Observation State Account
         ];
         // Create instruction data
