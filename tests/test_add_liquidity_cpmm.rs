@@ -10,8 +10,7 @@ use sol_trade_sdk::liquidity::cpmm::{
     CpmmDepositParams, build_deposit_instruction, calculate_deposit_amounts,
 };
 use sol_trade_sdk::{
-    TradingClient,
-    common::{SolanaRpcClient, TradeConfig},
+    common::SolanaRpcClient,
     instruction::utils::raydium_cpmm::get_pool_by_address,
 };
 use solana_sdk::{pubkey::Pubkey, signer::Signer, transaction::Transaction};
@@ -21,6 +20,28 @@ use std::sync::Arc;
 // 导入公共测试模块
 mod common;
 use common::{get_simulation_test_keypair, set_token_balance};
+
+/// 格式化代币数量为可读格式
+fn format_token_amount(amount: u64, decimals: u8) -> String {
+    if decimals == 0 {
+        return amount.to_string();
+    }
+
+    let divisor = 10_u64.pow(decimals as u32);
+    let whole = amount / divisor;
+    let fraction = amount % divisor;
+
+    if fraction == 0 {
+        whole.to_string()
+    } else {
+        // 去掉尾部的零
+        let fraction_str = fraction.to_string();
+        let trimmed = fraction_str.trim_end_matches('0');
+        format!("{}.{:0<width$}", whole, trimmed, width = decimals as usize)
+            .trim_end_matches('.')
+            .to_string()
+    }
+}
 
 /// PIPE-WSOL CPMM Pool
 const PIPE_WSOL_POOL: &str = "BnYsRpYvJpz6biY3hV6U9smChVePCJ6YyupVDfcnXpTp";
@@ -71,6 +92,9 @@ async fn test_add_liquidity_to_cpmm_pool() {
     println!("  LP Mint: {}", pool_state.lp_mint);
     println!();
 
+    // 记录初始 LP Supply（用于后续验证）
+    let initial_lp_supply = pool_state.lp_supply;
+
     // 2. 获取当前金库余额
     let token0_balance = rpc.get_token_account_balance(&pool_state.token0_vault).await;
     let token1_balance = rpc.get_token_account_balance(&pool_state.token1_vault).await;
@@ -80,8 +104,18 @@ async fn test_add_liquidity_to_cpmm_pool() {
             let t0_amt = t0.amount.parse::<u64>().unwrap_or(0);
             let t1_amt = t1.amount.parse::<u64>().unwrap_or(0);
             println!("📊 当前金库余额:");
-            println!("  Token0 (PIPE): {} (decimals=6)", t0_amt);
-            println!("  Token1 (WSOL): {} lamports", t1_amt);
+            println!(
+                "  Token0 (PIPE): {} (raw: {}, decimals={})",
+                format_token_amount(t0_amt, pool_state.mint0_decimals),
+                t0_amt,
+                pool_state.mint0_decimals
+            );
+            println!(
+                "  Token1 (WSOL): {} (raw: {}, decimals={})",
+                format_token_amount(t1_amt, pool_state.mint1_decimals),
+                t1_amt,
+                pool_state.mint1_decimals
+            );
             println!();
             (t0_amt, t1_amt)
         },
@@ -235,9 +269,38 @@ async fn test_add_liquidity_to_cpmm_pool() {
             println!("✅ 交易成功: {}", signature);
             println!();
 
-            // 9. 验证金库余额变化
+            // 9. 验证 Pool LP Supply 变化
             std::thread::sleep(std::time::Duration::from_secs(2));
 
+            println!("📊 验证流动性添加结果...\n");
+
+            match get_pool_by_address(&rpc, &pool_address).await {
+                Ok(new_pool_state) => {
+                    let lp_supply_increase = new_pool_state.lp_supply.saturating_sub(initial_lp_supply);
+
+                    println!("🪙 LP Supply 变化:");
+                    println!("  添加前: {}", initial_lp_supply);
+                    println!("  添加后: {}", new_pool_state.lp_supply);
+                    println!("  增加: {}", lp_supply_increase);
+                    println!();
+
+                    // 验证 LP supply 是否增加了预期的数量（允许小幅误差）
+                    if lp_supply_increase >= lp_token_amount {
+                        println!("✅ LP Supply 验证通过（增加量 >= 预期值）");
+                    } else {
+                        println!(
+                            "⚠️  LP Supply 增加不足: 预期 {}, 实际 {}",
+                            lp_token_amount, lp_supply_increase
+                        );
+                    }
+                    println!();
+                },
+                Err(e) => {
+                    println!("❌ 无法获取更新后的 Pool 状态: {}\n", e);
+                },
+            }
+
+            // 10. 验证金库余额变化
             let new_token0_balance = rpc.get_token_account_balance(&pool_state.token0_vault).await;
             let new_token1_balance = rpc.get_token_account_balance(&pool_state.token1_vault).await;
 
@@ -245,25 +308,35 @@ async fn test_add_liquidity_to_cpmm_pool() {
                 let new_t0_amt = new_t0.amount.parse::<u64>().unwrap_or(0);
                 let new_t1_amt = new_t1.amount.parse::<u64>().unwrap_or(0);
 
+                let t0_increase = new_t0_amt.saturating_sub(token0_reserve);
+                let t1_increase = new_t1_amt.saturating_sub(token1_reserve);
+
                 println!("📊 更新后的金库余额:");
                 println!(
-                    "  Token0 (PIPE): {} (增加: {})",
+                    "  Token0 (PIPE): {} (raw: {}, 增加: {})",
+                    format_token_amount(new_t0_amt, pool_state.mint0_decimals),
                     new_t0_amt,
-                    new_t0_amt.saturating_sub(token0_reserve)
+                    format_token_amount(t0_increase, pool_state.mint0_decimals)
                 );
                 println!(
-                    "  Token1 (WSOL): {} (增加: {})",
+                    "  Token1 (WSOL): {} (raw: {}, 增加: {})",
+                    format_token_amount(new_t1_amt, pool_state.mint1_decimals),
                     new_t1_amt,
-                    new_t1_amt.saturating_sub(token1_reserve)
+                    format_token_amount(t1_increase, pool_state.mint1_decimals)
                 );
                 println!();
             }
 
-            // 10. 验证用户 LP 代币余额
+            // 11. 验证用户 LP 代币余额
             match rpc.get_token_account_balance(&owner_lp_token).await {
                 Ok(lp_balance) => {
                     let lp_amt = lp_balance.amount.parse::<u64>().unwrap_or(0);
-                    println!("🪙 用户 LP 代币余额: {}", lp_amt);
+                    println!(
+                        "🪙 用户 LP 代币余额: {} (raw: {}, decimals={})",
+                        format_token_amount(lp_amt, pool_state.lp_mint_decimals),
+                        lp_amt,
+                        pool_state.lp_mint_decimals
+                    );
                     println!();
                 },
                 Err(e) => {
@@ -277,26 +350,4 @@ async fn test_add_liquidity_to_cpmm_pool() {
             println!("❌ 交易失败: {}\n", e);
         },
     }
-}
-
-/// 使用 TradingClient 测试 swap（验证流动性已添加）
-#[tokio::test]
-#[serial_test::serial(add_liquidity_test)]
-async fn test_swap_after_adding_liquidity() {
-    println!("\n========================================");
-    println!("测试: 添加流动性后的 Swap");
-    println!("========================================\n");
-
-    let rpc_url = "http://127.0.0.1:8899".to_string();
-    let payer = Arc::new(get_simulation_test_keypair());
-
-    // 使用 TradingClient 执行一笔买入
-    let trade_config =
-        TradeConfig::new(rpc_url, vec![], solana_commitment_config::CommitmentConfig::confirmed());
-    let _client = TradingClient::new(payer.clone(), trade_config).await;
-
-    let _pipe_mint = Pubkey::from_str(PIPE_MINT).unwrap();
-
-    // TODO: 实现 swap 测试
-    println!("⚠️  Swap 测试待实现\n");
 }
