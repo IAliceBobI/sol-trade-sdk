@@ -48,6 +48,9 @@ cpmm pool: GarGiGTMQrZyot44J9hc71NeGNeEaxnq3nefKxBruEsS, usdc-cib(cib GarGiGTMQr
 
 ammv4 pool: 58oQChx4yWmvKdwLLZzBi4ChoCc2fqCUWBkwMihLYQo2, usdc-wsol
 
+pumpswap pool: Dwczp92NX3ngbE2HeTUH4p5dcQxrpDF2AJMbW581gq1E, bonk-wsol, bonk token: DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263
+pumpswap pool: 539m4mVWt6iduB6W8rDGPMarzNCMesuqY5eUTiiYHAgR, pump-wsol, pump token2022: pumpCmXqMfrsAkQ5r49WcJnRayYRqmXz6ae8H7H9Dfn
+
 # other
 
 Raydium  Orca   Meteora

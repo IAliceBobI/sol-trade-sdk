@@ -59,6 +59,8 @@ pub use pool_list::{
     list_and_classify_pools, list_usdc_pools, print_pool_classification, PoolClassification, PoolInfo,
     // AMM V4
     list_and_classify_amm_v4_pools, list_usdc_amm_v4_pools, list_wsol_amm_v4_pools, print_amm_v4_pool_classification, AmmV4PoolClassification, AmmV4PoolInfo,
+    // PumpSwap
+    list_and_classify_pumpswap_pools, list_wsol_pumpswap_pools, print_pumpswap_pool_classification, PumpSwapPoolClassification, PumpSwapPoolInfo,
 };
 
 // 导入常用类型
