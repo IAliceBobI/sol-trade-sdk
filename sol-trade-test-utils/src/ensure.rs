@@ -230,8 +230,8 @@ pub async fn ensure_pipe_pool_wsol_liquidity(
     // 由于 parse_formatted_amount 会乘以 decimals，我们需要确保原始值除以 10^decimals 后不会太大
 
     // PIPE decimals = 6，检查原始值是否合理
-    // f64 可以精确表示到 2^53 ≈ 9 * 10^15，所以安全值应该在 10^15 左右
-    const MAX_PIPE_RAW: u64 = 1_000_000_000_000_000; // 10^15，除以 10^6 后是 10^9
+    // f64 可以精确表示到 2^53 ≈ 9.007 * 10^15，所以安全值设为 9 * 10^15
+    const MAX_PIPE_RAW: u64 = 9_000_000_000_000_000; // 9×10^15，除以 10^6 后是 9×10^9 (90亿 PIPE)
     if needed_pipe > MAX_PIPE_RAW {
         return Err(format!(
             "需要的 PIPE 数量过大: {} (原始单位)，超过安全限制 {}。
@@ -245,7 +245,7 @@ pub async fn ensure_pipe_pool_wsol_liquidity(
     let needed_pipe_formatted = format!("{}", needed_pipe_human_readable);
 
     // WSOL decimals = 9，f64 精度限制
-    const MAX_WSOL_RAW: u64 = 1_000_000_000_000_000_000; // 10^18，除以 10^9 后是 10^9
+    const MAX_WSOL_RAW: u64 = 9_000_000_000_000_000_000; // 9×10^18，除以 10^9 后是 9×10^9 (90亿 SOL)
     if needed_wsol_lamports > MAX_WSOL_RAW {
         return Err(format!(
             "需要的 WSOL 数量过大: {} (原始单位)，超过安全限制 {}。

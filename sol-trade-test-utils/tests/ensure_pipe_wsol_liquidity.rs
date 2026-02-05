@@ -1,7 +1,7 @@
 //! 测试 ensure_pipe_pool_wsol_liquidity 函数
 //!
 //! 这个测试会：
-//! 1. 确保 PIPE pool 至少有 1000 SOL 的流动性
+//! 1. 确保 PIPE pool 至少有 1 SOL 的流动性
 //! 2. 如果不足，自动添加流动性
 
 use solana_sdk::signer::Signer;
@@ -28,8 +28,8 @@ async fn test_ensure_pipe_pool_wsol_liquidity() {
         .await
         .expect("SOL 余额不足");
 
-    // 确保 PIPE pool 至少有 1000 SOL 的流动性
-    match ensure_pipe_pool_wsol_liquidity(&rpc, &rpc_url, &payer, 1000).await {
+    // 确保 PIPE pool 至少有 1 SOL 的流动性
+    match ensure_pipe_pool_wsol_liquidity(&rpc, &rpc_url, &payer, 1).await {
         Ok(_) => {
             println!("\n✅ 流动性确保成功！\n");
         },

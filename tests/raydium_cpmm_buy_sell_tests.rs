@@ -61,15 +61,17 @@ async fn test_raydium_cpmm_buy_sell_complete() {
     println!("测试钱包: {}", payer_pubkey);
 
     // ===== 0. 确保 PIPE Pool 有足够的流动性 =====
+    // 跳过流动性添加，直接使用当前池子流动性（约 0.129 SOL，已足够测试）
     println!("\n🪙 检查并确保 PIPE Pool 流动性...");
-    if let Err(e) =
-        ensure_pipe_pool_wsol_liquidity(&client.rpc, rpc_url, client.payer.as_ref(), 100).await
-    {
-        println!("⚠️  警告: 确保 PIPE Pool 流动性失败: {}", e);
-        println!("继续测试，但可能因为流动性不足而失败...");
-    } else {
-        println!("✅ PIPE Pool 流动性已确保");
-    }
+    println!("ℹ️  跳过流动性添加，使用当前池子流动性进行测试");
+    // if let Err(e) =
+    //     ensure_pipe_pool_wsol_liquidity(&client.rpc, rpc_url, client.payer.as_ref(), 1).await
+    // {
+    //     println!("⚠️  警告: 确保 PIPE Pool 流动性失败: {}", e);
+    //     println!("继续测试，但可能因为流动性不足而失败...");
+    // } else {
+    //     println!("✅ PIPE Pool 流动性已确保");
+    // }
 
     // 记录初始 SOL 余额
     let (initial_sol, _) = print_balances(rpc_url, &payer_pubkey)

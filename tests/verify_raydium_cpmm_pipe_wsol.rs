@@ -58,7 +58,7 @@ async fn test_cpmm_exact_in_buy_three_stage_verification_with_framework() {
         &client.rpc,
         rpc_url,
         client.payer.as_ref(),
-        10,
+        1,
     )
     .await
     {

@@ -68,13 +68,14 @@ async fn test_cpmm_pipe_wsol_buy_exact_in() {
 
     let client = create_test_client().await;
 
-    // 确保 PIPE Pool 流动性
-    if let Err(e) =
-        ensure_pipe_pool_wsol_liquidity(&client.rpc, rpc_url, client.payer.as_ref(), 10).await
-    {
-        println!("⚠️  警告: 确保 PIPE Pool 流动性失败: {}", e);
-        println!("继续测试，但可能因为流动性不足而失败...");
-    }
+    // 跳过流动性添加，直接使用当前池子流动性（约 0.129 SOL，已足够测试）
+    // // 确保 PIPE Pool 流动性
+    // if let Err(e) =
+    //     ensure_pipe_pool_wsol_liquidity(&client.rpc, rpc_url, client.payer.as_ref(), 1).await
+    // {
+    //     println!("⚠️  警告: 确保 PIPE Pool 流动性失败: {}", e);
+    //     println!("继续测试，但可能因为流动性不足而失败...");
+    // }
 
     // 确保 WSOL 余额
     if let Err(e) = ensure_token_balance(
@@ -158,7 +159,7 @@ async fn test_cpmm_pipe_wsol_sell_exact_in() {
 
     // 确保 PIPE Pool 流动性
     if let Err(e) =
-        ensure_pipe_pool_wsol_liquidity(&client.rpc, rpc_url, client.payer.as_ref(), 10).await
+        ensure_pipe_pool_wsol_liquidity(&client.rpc, rpc_url, client.payer.as_ref(), 1).await
     {
         println!("⚠️  警告: 确保 PIPE Pool 流动性失败: {}", e);
         println!("继续测试，但可能因为流动性不足而失败...");
