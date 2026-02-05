@@ -50,6 +50,7 @@ pub use framework::{
     ExecutionResult,
     SellParamsBuilder,
     ThreeStageResult,
+    TransactionType,
 };
 pub use pool_registry::{
     PumpSwapPoolRegistry, RaydiumAmmV4PoolRegistry, RaydiumClmmPoolRegistry, RaydiumCpmmPoolRegistry,

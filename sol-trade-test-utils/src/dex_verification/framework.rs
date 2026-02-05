@@ -13,9 +13,18 @@ use sol_trade_sdk::{
     TradingClient,
 };
 
+/// 交易类型（用于显示说明）
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TransactionType {
+    Buy,
+    Sell,
+}
+
 /// 三阶段验证结果
 #[derive(Debug)]
 pub struct ThreeStageResult {
+    /// 操作类型
+    pub operation_type: TransactionType,
     /// 阶段 1: 本地计算结果
     pub quote_result: QuoteResult,
     /// 阶段 2: 链上模拟结果
@@ -101,7 +110,7 @@ where
 /// let config = DexVerifyConfig {
 ///     dex_type: DexType::RaydiumCpmm,
 ///     pool: PoolConfig::new(...),
-///     operation: OperationType::BuyExactIn,
+///     operation: TransactionType::BuyExactIn,
 ///     direction: TradeDirection::Token1ToToken0,
 ///     input_amount: 1_000,
 /// };
@@ -261,6 +270,7 @@ where
     tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
 
     Ok(ThreeStageResult {
+        operation_type: TransactionType::Buy,
         quote_result,
         simulation_result,
         execution_result,
@@ -290,16 +300,22 @@ pub fn verify_three_stage_accuracy(
     let sim_output = result.simulation_result.amount_out;
     let actual_output = result.execution_result.amount_out;
 
+    // 根据操作类型确定说明文本
+    let op_name = match result.operation_type {
+        TransactionType::Buy => "buy",
+        TransactionType::Sell => "sell",
+    };
+
     println!("┌─────────────────────────────────────────────────────────────┐");
     println!("│ 阶段                │ 输出 (原始单位) │ 说明                  │");
     println!("├─────────────────────────────────────────────────────────────┤");
     println!(
-        "│ 1. 本地计算         │ {:>12} │ buy_quote              │",
-        local_output
+        "│ 1. 本地计算         │ {:>12} │ {}_quote              │",
+        local_output, op_name
     );
     println!(
-        "│ 2. 链上模拟         │ {:>12} │ buy_simulate           │",
-        sim_output
+        "│ 2. 链上模拟         │ {:>12} │ {}_simulate           │",
+        sim_output, op_name
     );
     println!(
         "│ 3. 实际执行         │ {:>12} │ send_transaction       │",
@@ -576,6 +592,7 @@ where
     tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
 
     Ok(ThreeStageResult {
+        operation_type: TransactionType::Sell,
         quote_result,
         simulation_result,
         execution_result,
@@ -589,6 +606,7 @@ mod tests {
     #[test]
     fn test_verify_accuracy_with_zero_diff() {
         let result = ThreeStageResult {
+            operation_type: TransactionType::Buy,
             quote_result: QuoteResult {
                 amount_out: 1000,
                 fee_amount: 10,
@@ -621,6 +639,7 @@ mod tests {
     #[test]
     fn test_verify_accuracy_with_small_diff() {
         let result = ThreeStageResult {
+            operation_type: TransactionType::Buy,
             quote_result: QuoteResult {
                 amount_out: 1000,
                 fee_amount: 10,
@@ -654,6 +673,7 @@ mod tests {
     #[test]
     fn test_verify_accuracy_with_large_diff() {
         let result = ThreeStageResult {
+            operation_type: TransactionType::Buy,
             quote_result: QuoteResult {
                 amount_out: 1000,
                 fee_amount: 10,
