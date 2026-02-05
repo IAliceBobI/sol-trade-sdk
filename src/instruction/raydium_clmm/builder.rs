@@ -300,6 +300,7 @@ impl InstructionBuilder for RaydiumClmmInstructionBuilder {
             &protocol_params.pool_state,
             pool_state.tick_current,
             pool_state.tick_spacing,
+            pool_state.tick_array_bitmap,
             zero_for_one,
         )?;
 
@@ -624,6 +625,7 @@ impl InstructionBuilder for RaydiumClmmInstructionBuilder {
             &protocol_params.pool_state,
             pool_state.tick_current,
             pool_state.tick_spacing,
+            pool_state.tick_array_bitmap,
             zero_for_one,
         )?;
 

@@ -43,11 +43,13 @@ pub fn get_swap_tick_arrays(
     pool_state: &Pubkey,
     pool_state_tick_current: i32,
     pool_state_tick_spacing: u16,
+    pool_state_tick_array_bitmap: [u64; 16],
     zero_for_one: bool,
 ) -> Result<TickArraysInfo> {
     let pool_state_struct = crate::instruction::utils::raydium_clmm_types::PoolState {
         tick_current: pool_state_tick_current,
         tick_spacing: pool_state_tick_spacing,
+        tick_array_bitmap: pool_state_tick_array_bitmap,
         ..Default::default()
     };
 

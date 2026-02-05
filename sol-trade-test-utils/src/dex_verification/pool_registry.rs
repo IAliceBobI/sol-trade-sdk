@@ -99,6 +99,23 @@ impl RaydiumClmmPoolRegistry {
             10,
         )
     }
+
+    /// SOLETT-WSOL (Token2022/Token - 混合 Pool)
+    ///
+    /// - Pool: CYJQ19fbryujjHFDiik6GZmVpPuqi4Ew31orj43cAupT
+    /// - SOLETT: RRiB8JNqJvSQ3YJqFASQ3h5BBHPK1KHFrHgCFhxHjoM (Token-2022 Program)
+    /// - WSOL: So11111111111111111111111111111111111111112 (Token Program)
+    pub fn solett_wsol() -> PoolConfig {
+        PoolConfig::new(
+            Pubkey::from_str("CYJQ19fbryujjHFDiik6GZmVpPuqi4Ew31orj43cAupT").unwrap(),
+            "SOLETT-WSOL",
+            Pubkey::from_str("RRiB8JNqJvSQ3YJqFASQ3h5BBHPK1KHFrHgCFhxHjoM").unwrap(),
+            super::TokenProgramType::Token2022,
+            Pubkey::from_str("So11111111111111111111111111111111111111112").unwrap(),
+            super::TokenProgramType::Token,
+            10,
+        )
+    }
 }
 
 /// Raydium AMM V4 Pool 注册表
