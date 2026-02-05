@@ -204,3 +204,157 @@ impl DiscriminatorRegistry {
         matches!(instr_type, InstructionType::Swap | InstructionType::Buy | InstructionType::Sell)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// 测试 Raydium CLMM discriminator 识别
+    #[test]
+    fn test_discriminator_registry_clmm() {
+        let registry = DiscriminatorRegistry::default();
+
+        // openPosition - 应该被识别为流动性操作
+        let open_position = [135, 128, 47, 77, 15, 152, 240, 49];
+        assert!(registry.is_liquidity_discriminator(
+            DexProtocol::RaydiumClmm,
+            &open_position
+        ));
+
+        // 非 registered discriminator - 不应该是流动性操作
+        let unknown = [0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF];
+        assert!(!registry.is_liquidity_discriminator(
+            DexProtocol::RaydiumClmm,
+            &unknown
+        ));
+    }
+
+    /// 测试 PumpSwap discriminator 识别
+    #[test]
+    fn test_discriminator_registry_pumpswap() {
+        let registry = DiscriminatorRegistry::default();
+
+        // BUY 操作
+        let buy = [102, 6, 61, 18, 1, 218, 235, 234];
+        assert!(registry.is_swap_discriminator(
+            DexProtocol::PumpSwap,
+            &buy
+        ));
+        assert!(!registry.is_liquidity_discriminator(
+            DexProtocol::PumpSwap,
+            &buy
+        ));
+
+        // SELL 操作
+        let sell = [51, 230, 133, 164, 1, 127, 131, 173];
+        assert!(registry.is_swap_discriminator(
+            DexProtocol::PumpSwap,
+            &sell
+        ));
+
+        // 创建池子 - 应该是流动性操作
+        let create_pool = [233, 146, 209, 142, 207, 104, 64, 188];
+        assert!(registry.is_liquidity_discriminator(
+            DexProtocol::PumpSwap,
+            &create_pool
+        ));
+        assert!(!registry.is_swap_discriminator(
+            DexProtocol::PumpSwap,
+            &create_pool
+        ));
+    }
+
+    /// 测试 Raydium CPMM discriminator 识别
+    #[test]
+    fn test_discriminator_registry_raydium_cpmm() {
+        let registry = DiscriminatorRegistry::default();
+
+        // SWAP 操作
+        let swap = [0x8f, 0xbe, 0x5a, 0xda, 0xc4, 0x1e, 0x33, 0xde];
+        assert!(registry.is_swap_discriminator(
+            DexProtocol::RaydiumCpmm,
+            &swap
+        ));
+        assert!(!registry.is_liquidity_discriminator(
+            DexProtocol::RaydiumCpmm,
+            &swap
+        ));
+
+        // 添加流动性 - 应该是流动性操作
+        let add_liquidity = [242, 35, 198, 137, 82, 225, 242, 182];
+        assert!(registry.is_liquidity_discriminator(
+            DexProtocol::RaydiumCpmm,
+            &add_liquidity
+        ));
+    }
+
+    /// 测试 Raydium V4 discriminator 识别（1字节 discriminator）
+    #[test]
+    fn test_discriminator_registry_raydium_v4() {
+        let registry = DiscriminatorRegistry::default();
+
+        // SWAP 操作（discriminator = 9）
+        let swap = [9, 0, 0, 0, 0, 0, 0, 0];
+        assert!(registry.is_swap_discriminator(
+            DexProtocol::RaydiumV4,
+            &swap
+        ));
+
+        // 添加流动性操作（discriminator = 1）
+        let add_liquidity = [1, 0, 0, 0, 0, 0, 0, 0];
+        assert!(registry.is_liquidity_discriminator(
+            DexProtocol::RaydiumV4,
+            &add_liquidity
+        ));
+    }
+
+    /// 测试未知 discriminator
+    #[test]
+    fn test_unknown_discriminator() {
+        let registry = DiscriminatorRegistry::default();
+
+        let unknown = [0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF];
+
+        // 对于所有协议，未知的 discriminator 都应该返回 Unknown
+        assert!(!registry.is_swap_discriminator(
+            DexProtocol::RaydiumClmm,
+            &unknown
+        ));
+        assert!(!registry.is_liquidity_discriminator(
+            DexProtocol::RaydiumClmm,
+            &unknown
+        ));
+
+        assert_eq!(
+            registry.identify(DexProtocol::PumpSwap, &unknown),
+            InstructionType::Unknown
+        );
+    }
+
+    /// 测试数据长度不足的情况
+    #[test]
+    fn test_insufficient_data_length() {
+        let registry = DiscriminatorRegistry::default();
+
+        // 空数据
+        let empty = [];
+        assert_eq!(
+            registry.identify(DexProtocol::RaydiumClmm, &empty),
+            InstructionType::Unknown
+        );
+
+        // 数据长度不足 8 字节（对于非 V4 协议）
+        let short = [0x01, 0x02, 0x03];
+        assert_eq!(
+            registry.identify(DexProtocol::RaydiumCpmm, &short),
+            InstructionType::Unknown
+        );
+
+        // V4 协议只需要 1 字节
+        let v4_short = [9];
+        assert_eq!(
+            registry.identify(DexProtocol::RaydiumV4, &v4_short),
+            InstructionType::Swap
+        );
+    }
+}

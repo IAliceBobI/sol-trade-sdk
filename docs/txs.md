@@ -46,6 +46,8 @@ cpmm pool: CVPpJXyiPNRgD3a8SjmXkC1cKdHtry1PF9BVG6dYoxjk, usdc-ring(ring A3569FJt
 cpmm pool: 7Cvz28TyKnGuL8GAtbsVFu1FJ3Po7A37Zc8JSJqkSPDp, usdc-prts(prts 3PQkX8yfuxoe9kuBoLCEZoxzi9LG4w8Ci2JWWGNfPRTS token2022)
 cpmm pool: GarGiGTMQrZyot44J9hc71NeGNeEaxnq3nefKxBruEsS, usdc-cib(cib GarGiGTMQrZyot44J9hc71NeGNeEaxnq3nefKxBruEsS token2022)
 
+clmm pool: ExcBWu8fGPdJiaF1b1z3iEef38sjQJks8xvj6M85pPY6, usdt-wsol(usdt Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB)
+
 ammv4 pool: 58oQChx4yWmvKdwLLZzBi4ChoCc2fqCUWBkwMihLYQo2, usdc-wsol
 
 pumpswap pool: Dwczp92NX3ngbE2HeTUH4p5dcQxrpDF2AJMbW581gq1E, bonk-wsol, bonk token: DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263
