@@ -69,11 +69,8 @@ pub(crate) async fn quote_exact_in(
         ));
     }
 
-    let expected_output_mint = if is_token0_in {
-        pool_state.token_mint1
-    } else {
-        pool_state.token_mint0
-    };
+    let expected_output_mint =
+        if is_token0_in { pool_state.token_mint1 } else { pool_state.token_mint0 };
 
     if params.output_mint != expected_output_mint {
         return Err(anyhow!(
@@ -226,11 +223,8 @@ pub(crate) async fn quote_exact_out(
         ));
     }
 
-    let expected_output_mint = if is_token0_in {
-        pool_state.token_mint1
-    } else {
-        pool_state.token_mint0
-    };
+    let expected_output_mint =
+        if is_token0_in { pool_state.token_mint1 } else { pool_state.token_mint0 };
 
     if params.output_mint != expected_output_mint {
         return Err(anyhow!(

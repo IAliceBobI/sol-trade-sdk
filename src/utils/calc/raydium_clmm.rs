@@ -291,10 +291,14 @@ pub fn calculate_swap_amount_with_tick_arrays(
                 .amount_specified_remaining
                 .checked_sub(swap_step.amount_in + swap_step.fee_amount)
                 .ok_or("amount underflow")?;
-            state.amount_calculated =
-                state.amount_calculated.checked_add(swap_step.amount_out).ok_or("amount overflow")?;
-            state.fee_amount =
-                state.fee_amount.checked_add(swap_step.fee_amount).ok_or("fee amount overflow")?;
+            state.amount_calculated = state
+                .amount_calculated
+                .checked_add(swap_step.amount_out)
+                .ok_or("amount overflow")?;
+            state.fee_amount = state
+                .fee_amount
+                .checked_add(swap_step.fee_amount)
+                .ok_or("fee amount overflow")?;
 
             // 跳出循环
             break;

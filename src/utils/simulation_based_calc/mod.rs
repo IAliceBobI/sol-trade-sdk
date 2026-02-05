@@ -20,8 +20,8 @@ mod helpers;
 mod simulator;
 mod types;
 
-pub use types::SimulatedSwapResult;
 pub use simulator::simulate_swap_transaction;
+pub use types::SimulatedSwapResult;
 
 use anyhow::{Result, anyhow};
 

@@ -10,7 +10,9 @@ use crate::{
     },
     instruction::utils::raydium_cpmm_types::PoolStateRaw,
     utils::price::raydium_cpmm::{price_base_in_quote, price_quote_in_base},
-    utils::quote::{QuoteExactInParams, QuoteExactInResult, QuoteExactOutParams, QuoteExactOutResult},
+    utils::quote::{
+        QuoteExactInParams, QuoteExactInResult, QuoteExactOutParams, QuoteExactOutResult,
+    },
 };
 use anyhow::anyhow;
 use solana_sdk::pubkey::Pubkey;
@@ -103,11 +105,8 @@ pub(crate) async fn quote_exact_in(
         ));
     }
 
-    let expected_output_mint = if is_token0_in {
-        pool_state.token1_mint
-    } else {
-        pool_state.token0_mint
-    };
+    let expected_output_mint =
+        if is_token0_in { pool_state.token1_mint } else { pool_state.token0_mint };
 
     if params.output_mint != expected_output_mint {
         return Err(anyhow!(
@@ -141,8 +140,8 @@ pub(crate) async fn quote_exact_in(
         .saturating_sub(pool_state.fund_fees_token1);
 
     let q = crate::utils::calc::raydium_cpmm::compute_swap_amount(
-        token0_reserve_without_fees,  // 使用扣除累积手续费后的储备金
-        token1_reserve_without_fees,  // 使用扣除累积手续费后的储备金
+        token0_reserve_without_fees, // 使用扣除累积手续费后的储备金
+        token1_reserve_without_fees, // 使用扣除累积手续费后的储备金
         is_token0_in,
         params.amount_in,
         0,
@@ -233,11 +232,8 @@ pub(crate) async fn quote_exact_out(
         ));
     }
 
-    let expected_output_mint = if is_token0_in {
-        pool_state.token1_mint
-    } else {
-        pool_state.token0_mint
-    };
+    let expected_output_mint =
+        if is_token0_in { pool_state.token1_mint } else { pool_state.token0_mint };
 
     if params.output_mint != expected_output_mint {
         return Err(anyhow!(
@@ -270,8 +266,8 @@ pub(crate) async fn quote_exact_out(
         .saturating_sub(pool_state.fund_fees_token1);
 
     let result = crate::utils::calc::raydium_cpmm::quote_exact_out(
-        token0_reserve_without_fees,  // 使用扣除累积手续费后的储备金
-        token1_reserve_without_fees,  // 使用扣除累积手续费后的储备金
+        token0_reserve_without_fees, // 使用扣除累积手续费后的储备金
+        token1_reserve_without_fees, // 使用扣除累积手续费后的储备金
         params.amount_out,
         is_token0_in,
         fees.trade_fee_rate,

@@ -50,11 +50,7 @@ pub(crate) async fn quote_exact_in(
         ));
     }
 
-    let expected_output_mint = if is_base_in {
-        pool.quote_mint
-    } else {
-        pool.base_mint
-    };
+    let expected_output_mint = if is_base_in { pool.quote_mint } else { pool.base_mint };
 
     if params.output_mint != expected_output_mint {
         return Err(anyhow!(
@@ -176,11 +172,7 @@ pub(crate) async fn quote_exact_out(
         ));
     }
 
-    let expected_output_mint = if is_base_in {
-        pool.quote_mint
-    } else {
-        pool.base_mint
-    };
+    let expected_output_mint = if is_base_in { pool.quote_mint } else { pool.base_mint };
 
     if params.output_mint != expected_output_mint {
         return Err(anyhow!(

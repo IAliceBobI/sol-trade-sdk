@@ -108,18 +108,21 @@ impl InstructionBuilder for RaydiumCpmmInstructionBuilder {
         };
 
         // 直接通过 mint 匹配获取 Token Program（使用标准化后的 mint）
-        let input_token_program = get_token_program_for_mint(&normalized_input_mint, protocol_params);
-        let output_token_program = get_token_program_for_mint(&normalized_output_mint, protocol_params);
+        let input_token_program =
+            get_token_program_for_mint(&normalized_input_mint, protocol_params);
+        let output_token_program =
+            get_token_program_for_mint(&normalized_output_mint, protocol_params);
 
         // Swap 方向：输入是否为 base token（使用标准化后的 mint）
         let is_base_in = normalized_input_mint == protocol_params.base_mint;
 
         // 计算 ATA
-        let input_token_account = crate::common::fast_fn::get_associated_token_address_with_program_id_fast(
-            &params.payer.pubkey(),
-            &normalized_input_mint,
-            &input_token_program,
-        );
+        let input_token_account =
+            crate::common::fast_fn::get_associated_token_address_with_program_id_fast(
+                &params.payer.pubkey(),
+                &normalized_input_mint,
+                &input_token_program,
+            );
 
         let output_token_account = get_associated_token_address_with_program_id_fast_use_seed(
             &params.payer.pubkey(),
@@ -183,18 +186,18 @@ impl InstructionBuilder for RaydiumCpmmInstructionBuilder {
 
         // Swap 指令
         let accounts: [AccountMeta; 13] = [
-            AccountMeta::new(params.payer.pubkey(), true),           // Payer
-            accounts::AUTHORITY_META,                               // Authority
-            AccountMeta::new(protocol_params.amm_config, false),    // Amm Config
-            AccountMeta::new(pool_state, false),                    // Pool State
-            AccountMeta::new(input_token_account, false),           // Input Token Account
-            AccountMeta::new(output_token_account, false),          // Output Token Account
-            AccountMeta::new(input_vault_account, false),           // Input Vault
-            AccountMeta::new(output_vault_account, false),          // Output Vault
-            AccountMeta::new_readonly(input_token_program, false),  // Input Token Program
+            AccountMeta::new(params.payer.pubkey(), true), // Payer
+            accounts::AUTHORITY_META,                      // Authority
+            AccountMeta::new(protocol_params.amm_config, false), // Amm Config
+            AccountMeta::new(pool_state, false),           // Pool State
+            AccountMeta::new(input_token_account, false),  // Input Token Account
+            AccountMeta::new(output_token_account, false), // Output Token Account
+            AccountMeta::new(input_vault_account, false),  // Input Vault
+            AccountMeta::new(output_vault_account, false), // Output Vault
+            AccountMeta::new_readonly(input_token_program, false), // Input Token Program
             AccountMeta::new_readonly(output_token_program, false), // Output Token Program
             AccountMeta::new_readonly(normalized_input_mint, false), // Input Mint (使用标准化后的地址)
-            AccountMeta::new_readonly(normalized_output_mint, false),   // Output Mint (使用标准化后的地址)
+            AccountMeta::new_readonly(normalized_output_mint, false), // Output Mint (使用标准化后的地址)
             AccountMeta::new(protocol_params.observation_state, false), // Observation State
         ];
 
@@ -272,8 +275,10 @@ impl InstructionBuilder for RaydiumCpmmInstructionBuilder {
         };
 
         // 直接通过 mint 匹配获取 Token Program（使用标准化后的 mint）
-        let input_token_program = get_token_program_for_mint(&normalized_input_mint, protocol_params);
-        let output_token_program = get_token_program_for_mint(&normalized_output_mint, protocol_params);
+        let input_token_program =
+            get_token_program_for_mint(&normalized_input_mint, protocol_params);
+        let output_token_program =
+            get_token_program_for_mint(&normalized_output_mint, protocol_params);
 
         // Swap 方向：输入是否为 base token（使用标准化后的 mint）
         let is_base_in = normalized_input_mint == protocol_params.base_mint;
@@ -320,7 +325,7 @@ impl InstructionBuilder for RaydiumCpmmInstructionBuilder {
                     fees.fund_fee_rate,
                 )
                 .min_amount_out
-            }
+            },
         };
 
         // ========================================
@@ -331,7 +336,8 @@ impl InstructionBuilder for RaydiumCpmmInstructionBuilder {
         // 创建输出 token ATA（如果需要）
         if params.create_output_mint_ata {
             if is_wsol {
-                instructions.extend(crate::trading::common::create_wsol_ata(&params.payer.pubkey()));
+                instructions
+                    .extend(crate::trading::common::create_wsol_ata(&params.payer.pubkey()));
             } else if is_usdc {
                 // USDC ATA 创建使用对应的 Token Program
                 instructions.extend(
@@ -348,18 +354,18 @@ impl InstructionBuilder for RaydiumCpmmInstructionBuilder {
 
         // Swap 指令
         let accounts: [AccountMeta; 13] = [
-            AccountMeta::new(params.payer.pubkey(), true),           // Payer
-            accounts::AUTHORITY_META,                               // Authority
-            AccountMeta::new(protocol_params.amm_config, false),    // Amm Config
-            AccountMeta::new(pool_state, false),                    // Pool State
-            AccountMeta::new(input_token_account, false),           // Input Token Account
-            AccountMeta::new(output_token_account, false),          // Output Token Account
-            AccountMeta::new(input_vault_account, false),           // Input Vault
-            AccountMeta::new(output_vault_account, false),          // Output Vault
-            AccountMeta::new_readonly(input_token_program, false),  // Input Token Program
+            AccountMeta::new(params.payer.pubkey(), true), // Payer
+            accounts::AUTHORITY_META,                      // Authority
+            AccountMeta::new(protocol_params.amm_config, false), // Amm Config
+            AccountMeta::new(pool_state, false),           // Pool State
+            AccountMeta::new(input_token_account, false),  // Input Token Account
+            AccountMeta::new(output_token_account, false), // Output Token Account
+            AccountMeta::new(input_vault_account, false),  // Input Vault
+            AccountMeta::new(output_vault_account, false), // Output Vault
+            AccountMeta::new_readonly(input_token_program, false), // Input Token Program
             AccountMeta::new_readonly(output_token_program, false), // Output Token Program
-            AccountMeta::new_readonly(normalized_input_mint, false),    // Input Mint (使用标准化后的地址)
-            AccountMeta::new_readonly(normalized_output_mint, false),   // Output Mint (使用标准化后的地址)
+            AccountMeta::new_readonly(normalized_input_mint, false), // Input Mint (使用标准化后的地址)
+            AccountMeta::new_readonly(normalized_output_mint, false), // Output Mint (使用标准化后的地址)
             AccountMeta::new(protocol_params.observation_state, false), // Observation State
         ];
 

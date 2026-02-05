@@ -257,10 +257,7 @@ mod tests {
 
     #[test]
     fn test_calculate_deposit_amounts() {
-        let pool_state = PoolState {
-            lp_supply: 1000,
-            ..Default::default()
-        };
+        let pool_state = PoolState { lp_supply: 1000, ..Default::default() };
 
         let token_0_vault = 100_000;
         let token_1_vault = 50_000;

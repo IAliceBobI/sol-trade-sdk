@@ -110,9 +110,7 @@ impl PoolStateRaw {
         if bytes.len() < size {
             return None;
         }
-        unsafe {
-            Some(&*(bytes.as_ptr() as *const PoolStateRaw))
-        }
+        unsafe { Some(&*(bytes.as_ptr() as *const PoolStateRaw)) }
     }
 
     /// 获取 creator_fees_token0（方便访问）

@@ -2,10 +2,7 @@
 
 use super::helpers::{get_input_mint, get_output_mint, supports_quote};
 use super::types::{TradeBuyParams, TradeSellParams, TradingClient};
-use crate::{
-    utils::quote::QuoteExactInParams,
-    QuoteResult, UnifiedResult, UnifiedTradingError,
-};
+use crate::{QuoteResult, UnifiedResult, UnifiedTradingError, utils::quote::QuoteExactInParams};
 
 impl TradingClient {
     /// 本地计算（快速估算）
@@ -124,12 +121,10 @@ impl TradingClient {
                     amount_in: params.input_token_amount,
                 };
 
-                let quote = crate::instruction::utils::pumpswap::quote_exact_in(
-                    &self.rpc,
-                    quote_params,
-                )
-                .await
-                .map_err(|e| UnifiedTradingError::QuoteFailed(e.to_string()))?;
+                let quote =
+                    crate::instruction::utils::pumpswap::quote_exact_in(&self.rpc, quote_params)
+                        .await
+                        .map_err(|e| UnifiedTradingError::QuoteFailed(e.to_string()))?;
                 (quote.amount_out, quote.fee_amount)
             },
 
@@ -261,12 +256,10 @@ impl TradingClient {
                     amount_in: params.input_token_amount,
                 };
 
-                let quote = crate::instruction::utils::pumpswap::quote_exact_in(
-                    &self.rpc,
-                    quote_params,
-                )
-                .await
-                .map_err(|e| UnifiedTradingError::QuoteFailed(e.to_string()))?;
+                let quote =
+                    crate::instruction::utils::pumpswap::quote_exact_in(&self.rpc, quote_params)
+                        .await
+                        .map_err(|e| UnifiedTradingError::QuoteFailed(e.to_string()))?;
                 (quote.amount_out, quote.fee_amount)
             },
 

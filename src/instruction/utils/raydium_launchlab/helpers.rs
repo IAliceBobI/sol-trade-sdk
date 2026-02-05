@@ -121,7 +121,9 @@ pub(crate) fn get_event_authority_pda() -> Result<(Pubkey, u8), anyhow::Error> {
 }
 
 /// Calculate platform config PDA (seeds: ["platform_config", platform_admin])
-pub(crate) fn get_platform_config_pda(platform_admin: &Pubkey) -> Result<(Pubkey, u8), anyhow::Error> {
+pub(crate) fn get_platform_config_pda(
+    platform_admin: &Pubkey,
+) -> Result<(Pubkey, u8), anyhow::Error> {
     Pubkey::try_find_program_address(
         &[seeds::PLATFORM_CONFIG_SEED, platform_admin.as_ref()],
         &accounts::LAUNCHLAB_PROGRAM,
@@ -246,7 +248,9 @@ pub(crate) fn get_cpswap_vault_pda(
 
 /// Calculate CPMM observation PDA
 /// Seeds: ["observation", cpswap_pool]
-pub(crate) fn get_cpswap_observation_pda(cpswap_pool: &Pubkey) -> Result<(Pubkey, u8), anyhow::Error> {
+pub(crate) fn get_cpswap_observation_pda(
+    cpswap_pool: &Pubkey,
+) -> Result<(Pubkey, u8), anyhow::Error> {
     use crate::instruction::utils::raydium_cpmm::seeds as cpmm_seeds;
     Pubkey::try_find_program_address(
         &[cpmm_seeds::OBSERVATION_STATE_SEED, cpswap_pool.as_ref()],

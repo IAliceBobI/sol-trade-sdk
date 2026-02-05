@@ -48,11 +48,7 @@ pub(crate) async fn quote_exact_in(
         ));
     }
 
-    let expected_output_mint = if is_coin_in {
-        amm_info.pc_mint
-    } else {
-        amm_info.coin_mint
-    };
+    let expected_output_mint = if is_coin_in { amm_info.pc_mint } else { amm_info.coin_mint };
 
     if params.output_mint != expected_output_mint {
         return Err(anyhow!(
@@ -193,11 +189,7 @@ pub(crate) async fn quote_exact_out(
         ));
     }
 
-    let expected_output_mint = if is_coin_in {
-        amm_info.pc_mint
-    } else {
-        amm_info.coin_mint
-    };
+    let expected_output_mint = if is_coin_in { amm_info.pc_mint } else { amm_info.coin_mint };
 
     if params.output_mint != expected_output_mint {
         return Err(anyhow!(
@@ -221,13 +213,8 @@ pub(crate) async fn quote_exact_out(
         .map_err(|_| anyhow!("Failed to parse pc reserve"))?;
 
     // 4. 使用数学计算函数
-    let result = calc_quote_exact_out(
-        coin_reserve,
-        pc_reserve,
-        params.amount_out,
-        is_coin_in,
-    )
-    .map_err(|e| anyhow!("Quote exact out failed: {}", e))?;
+    let result = calc_quote_exact_out(coin_reserve, pc_reserve, params.amount_out, is_coin_in)
+        .map_err(|e| anyhow!("Quote exact out failed: {}", e))?;
 
     // 5. 返回统一格式
     Ok(crate::utils::quote::QuoteExactOutResult {

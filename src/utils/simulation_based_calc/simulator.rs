@@ -13,9 +13,11 @@ use solana_sdk::{
     signature::{Keypair, Signer},
     transaction::Transaction,
 };
-use solana_transaction_status::{UiInnerInstructions, UiInstruction, UiParsedInstruction, UiTransactionEncoding};
-use std::sync::Arc;
+use solana_transaction_status::{
+    UiInnerInstructions, UiInstruction, UiParsedInstruction, UiTransactionEncoding,
+};
 use std::str::FromStr;
+use std::sync::Arc;
 
 /// 构造并模拟 swap 交易
 ///
@@ -190,17 +192,15 @@ fn extract_transfer_amounts_from_parsed_inner_instructions(
     for outer_ix in inner_ixs {
         for ui_instruction in &outer_ix.instructions {
             match ui_instruction {
-                UiInstruction::Parsed(ui_parsed_instruction) => {
-                    match ui_parsed_instruction {
-                        UiParsedInstruction::Parsed(_) => {
-                            if let Some(amount) =
-                                extract_amount_from_ui_parsed_instruction(ui_parsed_instruction)
-                            {
-                                amounts.push((outer_ix.index, amount));
-                            }
-                        },
-                        UiParsedInstruction::PartiallyDecoded(_) => {},
-                    }
+                UiInstruction::Parsed(ui_parsed_instruction) => match ui_parsed_instruction {
+                    UiParsedInstruction::Parsed(_) => {
+                        if let Some(amount) =
+                            extract_amount_from_ui_parsed_instruction(ui_parsed_instruction)
+                        {
+                            amounts.push((outer_ix.index, amount));
+                        }
+                    },
+                    UiParsedInstruction::PartiallyDecoded(_) => {},
                 },
                 UiInstruction::Compiled(compiled) => {
                     if let Ok(decoded) = base64::Engine::decode(
@@ -338,12 +338,10 @@ fn parse_raydium_cpmm_program_data(logs: &[String]) -> Option<(u64, u64)> {
         return None;
     }
 
-    let has_pumpswap_program = logs.iter().any(|log| {
-        log.contains("pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA")
-    });
-    let has_program_data = logs.iter().any(|log| {
-        log.contains("Program data:")
-    });
+    let has_pumpswap_program = logs
+        .iter()
+        .any(|log| log.contains("pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA"));
+    let has_program_data = logs.iter().any(|log| log.contains("Program data:"));
 
     if has_pumpswap_program && has_program_data {
         return None;
@@ -446,9 +444,9 @@ fn parse_pumpswap_program_data(
 ) -> Option<(u64, u64)> {
     use base64::Engine;
 
-    let has_pumpswap = logs.iter().any(|log| {
-        log.contains("pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA")
-    });
+    let has_pumpswap = logs
+        .iter()
+        .any(|log| log.contains("pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA"));
 
     if !has_pumpswap {
         return None;
@@ -547,7 +545,6 @@ fn parse_pumpswap_program_data(
     None
 }
 
-
 /// 从程序日志中解析 Token Transfer 金额
 fn parse_transfer_amounts_from_logs(
     logs: &[String],
@@ -562,9 +559,9 @@ fn parse_transfer_amounts_from_logs(
         return None;
     }
 
-    let is_pumpswap = logs.iter().any(|log| {
-        log.contains("pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA")
-    });
+    let is_pumpswap = logs
+        .iter()
+        .any(|log| log.contains("pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA"));
 
     if is_pumpswap {
         return None;
@@ -640,7 +637,8 @@ fn extract_pumpswap_discriminator(
     use solana_sdk::pubkey::Pubkey;
 
     // PumpSwap AMM Program ID
-    let pumpswap_program_id = Pubkey::from_str("pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA").ok()?;
+    let pumpswap_program_id =
+        Pubkey::from_str("pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA").ok()?;
 
     // 查找 PumpSwap 指令
     for ix in instructions {

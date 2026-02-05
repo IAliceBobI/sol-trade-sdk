@@ -61,7 +61,8 @@ async fn get_raydium_cpmm_fee(
             amount_out,
         };
 
-        let result = crate::instruction::utils::raydium_cpmm::quote_exact_out(rpc, quote_params).await;
+        let result =
+            crate::instruction::utils::raydium_cpmm::quote_exact_out(rpc, quote_params).await;
         result.map(|q| q.fee_amount).map_err(|e| format!("Quote failed: {}", e))
     } else {
         // exact_in 模式
@@ -79,7 +80,8 @@ async fn get_raydium_cpmm_fee(
             amount_in,
         };
 
-        let result = crate::instruction::utils::raydium_cpmm::quote_exact_in(rpc, quote_params).await;
+        let result =
+            crate::instruction::utils::raydium_cpmm::quote_exact_in(rpc, quote_params).await;
         result.map(|q| q.fee_amount).map_err(|e| format!("Quote failed: {}", e))
     }
 }
@@ -111,7 +113,8 @@ async fn get_raydium_amm_v4_fee(
             amount_out,
         };
 
-        let result = crate::instruction::utils::raydium_amm_v4::quote_exact_out(rpc, quote_params).await;
+        let result =
+            crate::instruction::utils::raydium_amm_v4::quote_exact_out(rpc, quote_params).await;
         result.map(|q| q.fee_amount).map_err(|e| format!("Quote failed: {}", e))
     } else {
         // exact_in 模式
@@ -129,7 +132,8 @@ async fn get_raydium_amm_v4_fee(
             amount_in,
         };
 
-        let result = crate::instruction::utils::raydium_amm_v4::quote_exact_in(rpc, quote_params).await;
+        let result =
+            crate::instruction::utils::raydium_amm_v4::quote_exact_in(rpc, quote_params).await;
         result.map(|q| q.fee_amount).map_err(|e| format!("Quote failed: {}", e))
     }
 }
@@ -161,7 +165,8 @@ async fn get_raydium_clmm_fee(
             amount_out,
         };
 
-        let result = crate::instruction::utils::raydium_clmm::quote_exact_out(rpc, quote_params).await;
+        let result =
+            crate::instruction::utils::raydium_clmm::quote_exact_out(rpc, quote_params).await;
         result.map(|q| q.fee_amount).map_err(|e| format!("Quote failed: {}", e))
     } else {
         // exact_in 模式
@@ -179,7 +184,8 @@ async fn get_raydium_clmm_fee(
             amount_in,
         };
 
-        let result = crate::instruction::utils::raydium_clmm::quote_exact_in(rpc, quote_params).await;
+        let result =
+            crate::instruction::utils::raydium_clmm::quote_exact_in(rpc, quote_params).await;
         result.map(|q| q.fee_amount).map_err(|e| format!("Quote failed: {}", e))
     }
 }

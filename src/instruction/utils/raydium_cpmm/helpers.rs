@@ -55,7 +55,9 @@ pub(crate) fn get_vault_account(
         token_mint
     };
 
-    if protocol_params.base_mint == *normalized_mint && protocol_params.base_vault != Pubkey::default() {
+    if protocol_params.base_mint == *normalized_mint
+        && protocol_params.base_vault != Pubkey::default()
+    {
         protocol_params.base_vault
     } else if protocol_params.quote_mint == *normalized_mint
         && protocol_params.quote_vault != Pubkey::default()
@@ -71,7 +73,9 @@ pub(crate) fn get_vault_account(
 /// 策略：
 /// - 优先选择已激活且有流动性的池
 /// - LP 供应量越大，说明流动性越好
-pub(crate) fn select_best_pool_by_liquidity(pools: &[(Pubkey, PoolState)]) -> Option<(Pubkey, PoolState)> {
+pub(crate) fn select_best_pool_by_liquidity(
+    pools: &[(Pubkey, PoolState)],
+) -> Option<(Pubkey, PoolState)> {
     if pools.is_empty() {
         return None;
     }
