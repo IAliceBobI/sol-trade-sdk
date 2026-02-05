@@ -22,8 +22,6 @@ use sol_trade_sdk::instruction::utils::raydium_clmm::{
 use solana_sdk::pubkey::Pubkey;
 use std::str::FromStr;
 
-mod test_helpers;
-
 /// 已知的 SOL Token Mint (WSOL)
 const WSOL_MINT: &str = "So11111111111111111111111111111111111111112";
 
