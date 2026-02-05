@@ -29,8 +29,8 @@ async fn list_usdc_amm_v4_pools_test() {
             println!("Token 配对: {} 个", classification.token_pools.len());
 
             // 基本断言（确保至少有一些 Pool）
-            let total_pools = classification.token2022_pools.len()
-                + classification.token_pools.len();
+            let total_pools =
+                classification.token2022_pools.len() + classification.token_pools.len();
 
             assert!(total_pools > 0, "应该至少找到一个 USDC AMM V4 Pool");
         },
@@ -39,7 +39,6 @@ async fn list_usdc_amm_v4_pools_test() {
             println!("提示：本地测试节点可能不支持 AMM V4 Pool 查询");
             println!("建议使用付费 RPC 服务（Helius, QuickNode, Triton）");
             panic!("RPC 节点不支持 AMM V4 Pool 查询");
-        }
+        },
     }
 }
-

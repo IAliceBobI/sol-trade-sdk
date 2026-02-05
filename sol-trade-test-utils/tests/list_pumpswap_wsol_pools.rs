@@ -6,14 +6,13 @@
 //! 运行测试:
 //!     cargo nextest run --package sol-trade-test-utils test_list_pumpswap_wsol_pools -- --nocapture
 
+use serial_test::serial;
 use sol_trade_sdk::{
-    common::auto_mock_rpc::AutoMockRpcClient,
-    constants::TOKEN_PROGRAM,
+    common::auto_mock_rpc::AutoMockRpcClient, constants::TOKEN_PROGRAM,
     instruction::utils::pumpswap::get_pool_by_mint,
 };
 use solana_sdk::pubkey::Pubkey;
 use std::str::FromStr;
-use serial_test::serial;
 
 #[tokio::test]
 #[serial]
@@ -45,11 +44,8 @@ async fn test_list_pumpswap_wsol_pools() {
                 let is_wsol_pair = pool.base_mint == wsol_mint || pool.quote_mint == wsol_mint;
 
                 if is_wsol_pair {
-                    let other_mint = if pool.base_mint == wsol_mint {
-                        pool.quote_mint
-                    } else {
-                        pool.base_mint
-                    };
+                    let other_mint =
+                        if pool.base_mint == wsol_mint { pool.quote_mint } else { pool.base_mint };
 
                     if let Ok(account) = rpc.get_account(&other_mint).await {
                         if account.owner == TOKEN_PROGRAM {

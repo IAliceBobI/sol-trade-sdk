@@ -8,11 +8,7 @@
 
 use sol_trade_sdk::common::SolanaRpcClient;
 use sol_trade_test_utils::{
-    get_simulation_test_keypair,
-    pipe_mint,
-    pipe_wsol_pool,
-    wsol_mint,
-    PipeWsolLiquidityBuilder,
+    get_simulation_test_keypair, pipe_mint, pipe_wsol_pool, wsol_mint, PipeWsolLiquidityBuilder,
 };
 use std::sync::Arc;
 
@@ -109,9 +105,13 @@ async fn test_add_liquidity_to_cpmm_pool() {
     // 使用当前池子流动性的 50% 作为添加目标
     // 这样可以确保测试在任何状态下都能正常运行
     let liquidity_percentage = 50; // 添加 50% 的当前池子流动性
-    let lp_token_amount = (pool_state.lp_supply as u128 * liquidity_percentage as u128 / 100) as u64;
+    let lp_token_amount =
+        (pool_state.lp_supply as u128 * liquidity_percentage as u128 / 100) as u64;
 
-    println!("🪙 要添加的 LP 代币: {} ({}% of current pool)", lp_token_amount, liquidity_percentage);
+    println!(
+        "🪙 要添加的 LP 代币: {} ({}% of current pool)",
+        lp_token_amount, liquidity_percentage
+    );
     println!();
 
     // 4. 根据 CPMM 公式计算需要的代币数量
@@ -119,12 +119,22 @@ async fn test_add_liquidity_to_cpmm_pool() {
     let multiplier = liquidity_percentage as u128; // 因为是百分比，所以直接使用
 
     // 计算需要的代币数量（加上 20% buffer 作为滑点容错）
-    let needed_token0 = ((token0_reserve as u128 * multiplier) as u64).saturating_mul(120) / 100 / 100;
-    let needed_token1 = ((token1_reserve as u128 * multiplier) as u64).saturating_mul(120) / 100 / 100;
+    let needed_token0 =
+        ((token0_reserve as u128 * multiplier) as u64).saturating_mul(120) / 100 / 100;
+    let needed_token1 =
+        ((token1_reserve as u128 * multiplier) as u64).saturating_mul(120) / 100 / 100;
 
     println!("📐 计算需要的代币数量:");
-    println!("  Token0 (PIPE): {} (raw: {})", format_token_amount(needed_token0, pool_state.mint0_decimals), needed_token0);
-    println!("  Token1 (WSOL): {} (raw: {})", format_token_amount(needed_token1, pool_state.mint1_decimals), needed_token1);
+    println!(
+        "  Token0 (PIPE): {} (raw: {})",
+        format_token_amount(needed_token0, pool_state.mint0_decimals),
+        needed_token0
+    );
+    println!(
+        "  Token1 (WSOL): {} (raw: {})",
+        format_token_amount(needed_token1, pool_state.mint1_decimals),
+        needed_token1
+    );
     println!("  Multiplier: {}x", multiplier);
     println!();
 
@@ -246,10 +256,8 @@ async fn test_add_liquidity_to_cpmm_pool() {
             }
 
             // 11. 验证金库余额变化
-            let new_token0_balance =
-                rpc.get_token_account_balance(&pool_state.token0_vault).await;
-            let new_token1_balance =
-                rpc.get_token_account_balance(&pool_state.token1_vault).await;
+            let new_token0_balance = rpc.get_token_account_balance(&pool_state.token0_vault).await;
+            let new_token1_balance = rpc.get_token_account_balance(&pool_state.token1_vault).await;
 
             if let (Ok(new_t0), Ok(new_t1)) = (new_token0_balance, new_token1_balance) {
                 let new_t0_amt = new_t0.amount.parse::<u64>().unwrap_or(0);

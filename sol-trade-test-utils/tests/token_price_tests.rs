@@ -28,10 +28,8 @@ async fn test_get_pipe_token_price_in_usd() {
     let rpc_url = "http://127.0.0.1:8899";
 
     // 使用 Auto Mock RPC 客户端（使用独立命名空间）
-    let auto_mock_client = AutoMockRpcClient::new_with_namespace(
-        rpc_url.to_string(),
-        Some("pipe_price".to_string()),
-    );
+    let auto_mock_client =
+        AutoMockRpcClient::new_with_namespace(rpc_url.to_string(), Some("pipe_price".to_string()));
 
     println!("Token Mint: {}", pipe_mint);
     println!("Pool 地址: {}", pipe_wsol_pool);
@@ -39,7 +37,8 @@ async fn test_get_pipe_token_price_in_usd() {
 
     // 调用价格计算函数
     let result: Result<f64, anyhow::Error> =
-        get_token_price_in_usd_with_pool(&auto_mock_client, &pipe_mint, &pipe_wsol_pool, None).await;
+        get_token_price_in_usd_with_pool(&auto_mock_client, &pipe_mint, &pipe_wsol_pool, None)
+            .await;
 
     // 验证结果
     assert!(result.is_ok(), "Failed to get token price in USD: {:?}", result.err());
@@ -73,17 +72,16 @@ async fn test_get_prts_token_price_in_usd() {
     let usdc_prts_pool = usdc_prts_pool();
     let rpc_url = "http://127.0.0.1:8899";
 
-    let auto_mock_client = AutoMockRpcClient::new_with_namespace(
-        rpc_url.to_string(),
-        Some("prts_price".to_string()),
-    );
+    let auto_mock_client =
+        AutoMockRpcClient::new_with_namespace(rpc_url.to_string(), Some("prts_price".to_string()));
 
     println!("Token Mint: {}", prts_mint);
     println!("Pool 地址: {}", usdc_prts_pool);
     println!("锚定池: USDC-USDT（默认）");
 
     let result: Result<f64, anyhow::Error> =
-        get_token_price_in_usd_with_pool(&auto_mock_client, &prts_mint, &usdc_prts_pool, None).await;
+        get_token_price_in_usd_with_pool(&auto_mock_client, &prts_mint, &usdc_prts_pool, None)
+            .await;
 
     assert!(result.is_ok(), "Failed to get token price in USD: {:?}", result.err());
 
@@ -116,27 +114,19 @@ async fn test_get_multiple_token_prices() {
 
     // 测试 PIPE
     println!("\n📊 测试 PIPE 价格...");
-    let pipe_price = get_token_price_in_usd_with_pool(
-        &auto_mock_client,
-        &pipe_mint(),
-        &pipe_wsol_pool(),
-        None,
-    )
-    .await
-    .expect("Failed to get PIPE price");
+    let pipe_price =
+        get_token_price_in_usd_with_pool(&auto_mock_client, &pipe_mint(), &pipe_wsol_pool(), None)
+            .await
+            .expect("Failed to get PIPE price");
     println!("   PIPE: ${:.8}", pipe_price);
     assert!(pipe_price > 0.0 && pipe_price < 1000.0);
 
     // 测试 PRTS
     println!("\n📊 测试 PRTS 价格...");
-    let prts_price = get_token_price_in_usd_with_pool(
-        &auto_mock_client,
-        &prts_mint(),
-        &usdc_prts_pool(),
-        None,
-    )
-    .await
-    .expect("Failed to get PRTS price");
+    let prts_price =
+        get_token_price_in_usd_with_pool(&auto_mock_client, &prts_mint(), &usdc_prts_pool(), None)
+            .await
+            .expect("Failed to get PRTS price");
     println!("   PRTS: ${:.8}", prts_price);
     assert!(prts_price > 0.0 && prts_price < 1000.0);
 

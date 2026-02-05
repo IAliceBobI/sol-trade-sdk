@@ -30,11 +30,14 @@ async fn show_wsol_clmm_pools() {
         println!("🪙 Top 10 WSOL-Token2022 CLMM Pools");
         println!("═══════════════════════════════════════════════════════════════════");
 
-        for (i, (pool_addr, pool_info, other_mint)) in classification.token2022_pools.iter().enumerate() {
+        for (i, (pool_addr, pool_info, other_mint)) in
+            classification.token2022_pools.iter().enumerate()
+        {
             println!("\n【{}】", i + 1);
             println!("  🏊 Pool Address:        {}", pool_addr);
             println!("  🔀 Pair Token Mint:    {}", other_mint);
-            println!("  💧 Liquidity:          {} ({:.2} M)",
+            println!(
+                "  💧 Liquidity:          {} ({:.2} M)",
                 pool_info.liquidity,
                 pool_info.liquidity as f64 / 1_000_000.0
             );
@@ -47,11 +50,14 @@ async fn show_wsol_clmm_pools() {
         println!("💰 Top 10 WSOL-Token CLMM Pools");
         println!("═══════════════════════════════════════════════════════════════════");
 
-        for (i, (pool_addr, pool_info, other_mint)) in classification.token_pools.iter().take(10).enumerate() {
+        for (i, (pool_addr, pool_info, other_mint)) in
+            classification.token_pools.iter().take(10).enumerate()
+        {
             println!("\n【{}】", i + 1);
             println!("  🏊 Pool Address:        {}", pool_addr);
             println!("  🔀 Pair Token Mint:    {}", other_mint);
-            println!("  💧 Liquidity:          {} ({:.2} M)",
+            println!(
+                "  💧 Liquidity:          {} ({:.2} M)",
                 pool_info.liquidity,
                 pool_info.liquidity as f64 / 1_000_000.0
             );

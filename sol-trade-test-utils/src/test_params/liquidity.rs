@@ -79,11 +79,12 @@ impl CpmmLiquidityBuilder {
         token_1_vault_amount: u64,
     ) -> (CpmmDepositParams, Option<(u64, u64)>, Pubkey) {
         // 派生用户 ATA 地址
-        let owner_lp_token = spl_associated_token_account::get_associated_token_address_with_program_id(
-            &payer,
-            &pool_state.lp_mint,
-            &spl_token::id(),
-        );
+        let owner_lp_token =
+            spl_associated_token_account::get_associated_token_address_with_program_id(
+                &payer,
+                &pool_state.lp_mint,
+                &spl_token::id(),
+            );
 
         let token_0_account =
             spl_associated_token_account::get_associated_token_address_with_program_id(
@@ -209,8 +210,7 @@ impl PipeWsolLiquidityBuilder {
         token_0_vault_amount: u64,
         token_1_vault_amount: u64,
     ) -> (CpmmDepositParams, Option<(u64, u64)>, Pubkey) {
-        self.inner
-            .build(payer, pool_state, token_0_vault_amount, token_1_vault_amount)
+        self.inner.build(payer, pool_state, token_0_vault_amount, token_1_vault_amount)
     }
 
     /// 构建流动性添加指令

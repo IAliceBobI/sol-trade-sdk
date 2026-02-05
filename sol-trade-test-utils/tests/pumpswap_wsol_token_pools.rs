@@ -6,14 +6,13 @@
 //! 运行测试:
 //!     cargo nextest run --package sol-trade-test-utils pumpswap_wsol_token_pools -- --nocapture
 
+use serial_test::serial;
 use sol_trade_sdk::{
-    common::auto_mock_rpc::AutoMockRpcClient,
-    constants::TOKEN_PROGRAM,
+    common::auto_mock_rpc::AutoMockRpcClient, constants::TOKEN_PROGRAM,
     instruction::utils::pumpswap::get_pool_by_mint,
 };
 use solana_sdk::pubkey::Pubkey;
 use std::str::FromStr;
-use serial_test::serial;
 
 /// 已知的 Token 配置
 struct TokenConfig {
@@ -74,17 +73,15 @@ async fn test_pumpswap_wsol_token_pools() {
                 }
 
                 // 确定配对 Token
-                let other_mint = if pool.base_mint == wsol_mint {
-                    pool.quote_mint
-                } else {
-                    pool.base_mint
-                };
+                let other_mint =
+                    if pool.base_mint == wsol_mint { pool.quote_mint } else { pool.base_mint };
 
                 // 查询 Token Program
                 match rpc.get_account(&other_mint).await {
                     Ok(account) => {
                         let is_token = account.owner == TOKEN_PROGRAM;
-                        let is_token2022 = account.owner == sol_trade_sdk::constants::TOKEN_2022_PROGRAM;
+                        let is_token2022 =
+                            account.owner == sol_trade_sdk::constants::TOKEN_2022_PROGRAM;
 
                         if is_token {
                             println!("  ✅ WSOL + Token (纯 Token)");
@@ -106,13 +103,13 @@ async fn test_pumpswap_wsol_token_pools() {
                     Err(e) => {
                         println!("  ❌ 无法查询 Token Program: {}", e);
                         println!();
-                    }
+                    },
                 }
             },
             Err(e) => {
                 println!("  ❌ 未找到 Pool: {}", e);
                 println!();
-            }
+            },
         }
     }
 

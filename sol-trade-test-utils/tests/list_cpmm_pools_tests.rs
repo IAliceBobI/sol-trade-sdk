@@ -202,15 +202,9 @@ async fn test_pool_classification() {
 
     // 验证分类结果
     println!("\n📊 分类验证:");
-    println!(
-        "  Token2022 配对: {} 个",
-        classification.token2022_pools.len()
-    );
+    println!("  Token2022 配对: {} 个", classification.token2022_pools.len());
     println!("  Token 配对: {} 个", classification.token_pools.len());
-    println!(
-        "  未知程序配对: {} 个",
-        classification.unknown_pools.len()
-    );
+    println!("  未知程序配对: {} 个", classification.unknown_pools.len());
 
     let total_pools = classification.token2022_pools.len()
         + classification.token_pools.len()

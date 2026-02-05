@@ -9,10 +9,22 @@ use sol_trade_sdk::{
     common::auto_mock_rpc::AutoMockRpcClient,
     constants::TOKEN_2022_PROGRAM,
     instruction::utils::{
-        raydium_cpmm::{clear_pool_cache as cpmm_clear_pool_cache, list_pools_by_mint as cpmm_list_pools_by_mint},
-        raydium_amm_v4::{clear_pool_cache as amm_v4_clear_pool_cache, list_pools_by_mint as amm_v4_list_pools_by_mint},
-        raydium_clmm::{clear_pool_cache as clmm_clear_pool_cache, list_pools_by_mint as clmm_list_pools_by_mint},
-        pumpswap::{clear_pool_cache as pumpswap_clear_pool_cache, list_pools_by_mint as pumpswap_list_pools_by_mint},
+        pumpswap::{
+            clear_pool_cache as pumpswap_clear_pool_cache,
+            list_pools_by_mint as pumpswap_list_pools_by_mint,
+        },
+        raydium_amm_v4::{
+            clear_pool_cache as amm_v4_clear_pool_cache,
+            list_pools_by_mint as amm_v4_list_pools_by_mint,
+        },
+        raydium_clmm::{
+            clear_pool_cache as clmm_clear_pool_cache,
+            list_pools_by_mint as clmm_list_pools_by_mint,
+        },
+        raydium_cpmm::{
+            clear_pool_cache as cpmm_clear_pool_cache,
+            list_pools_by_mint as cpmm_list_pools_by_mint,
+        },
     },
 };
 
@@ -131,10 +143,7 @@ pub async fn list_and_classify_pools(
             (false, pool.token0_mint, pool.token0_program)
         };
 
-        let pool_info = PoolInfo {
-            pool_address: *addr,
-            lp_supply: pool.lp_supply,
-        };
+        let pool_info = PoolInfo { pool_address: *addr, lp_supply: pool.lp_supply };
 
         if token_program == TOKEN_2022_PROGRAM {
             token2022_pools.push((*addr, pool_info, other_mint));
@@ -145,11 +154,7 @@ pub async fn list_and_classify_pools(
         }
     }
 
-    Ok(PoolClassification {
-        token2022_pools,
-        token_pools,
-        unknown_pools,
-    })
+    Ok(PoolClassification { token2022_pools, token_pools, unknown_pools })
 }
 
 /// 打印 Pool 分类统计结果
@@ -161,25 +166,15 @@ pub fn print_pool_classification(classification: &PoolClassification, show_limit
     let limit = show_limit.unwrap_or(10);
 
     println!("📊 统计结果:");
-    println!(
-        "  • Token2022 配对: {} 个",
-        classification.token2022_pools.len()
-    );
+    println!("  • Token2022 配对: {} 个", classification.token2022_pools.len());
     println!("  • Token 配对: {} 个", classification.token_pools.len());
-    println!(
-        "  • 未知程序配对: {} 个\n",
-        classification.unknown_pools.len()
-    );
+    println!("  • 未知程序配对: {} 个\n", classification.unknown_pools.len());
 
     // 显示 Token2022 配对
     if !classification.token2022_pools.is_empty() {
-        println!(
-            "═══════════════════════════════════════════════════════════════"
-        );
+        println!("═══════════════════════════════════════════════════════════════");
         println!("🪙 Token2022 配对 (显示前 {} 个)", limit);
-        println!(
-            "═══════════════════════════════════════════════════════════════\n"
-        );
+        println!("═══════════════════════════════════════════════════════════════\n");
 
         for (i, (addr, pool, other_mint)) in
             classification.token2022_pools.iter().take(limit).enumerate()
@@ -195,13 +190,9 @@ pub fn print_pool_classification(classification: &PoolClassification, show_limit
 
     // 显示 Token 配对
     if !classification.token_pools.is_empty() {
-        println!(
-            "═══════════════════════════════════════════════════════════════"
-        );
+        println!("═══════════════════════════════════════════════════════════════");
         println!("💰 Token 配对 (显示前 {} 个)", limit);
-        println!(
-            "═══════════════════════════════════════════════════════════════\n"
-        );
+        println!("═══════════════════════════════════════════════════════════════\n");
 
         for (i, (addr, pool, other_mint)) in
             classification.token_pools.iter().take(limit).enumerate()
@@ -217,13 +208,9 @@ pub fn print_pool_classification(classification: &PoolClassification, show_limit
 
     // 显示未知程序的配对
     if !classification.unknown_pools.is_empty() {
-        println!(
-            "═══════════════════════════════════════════════════════════════"
-        );
+        println!("═══════════════════════════════════════════════════════════════");
         println!("❓ 未知程序配对 (显示前 {} 个)", limit.min(5));
-        println!(
-            "═══════════════════════════════════════════════════════════════\n"
-        );
+        println!("═══════════════════════════════════════════════════════════════\n");
 
         for (i, (addr, pool, other_mint, token_program)) in
             classification.unknown_pools.iter().take(limit.min(5)).enumerate()
@@ -294,11 +281,8 @@ pub async fn list_and_classify_amm_v4_pools(
 
     for (addr, amm) in pools.iter() {
         // 判断 mint 是 coin_mint 还是 pc_mint
-        let (_is_coin, other_mint) = if amm.coin_mint == *mint {
-            (true, amm.pc_mint)
-        } else {
-            (false, amm.coin_mint)
-        };
+        let (_is_coin, other_mint) =
+            if amm.coin_mint == *mint { (true, amm.pc_mint) } else { (false, amm.coin_mint) };
 
         // 使用 AutoMockRpcClient 的异步 get_account 方法查询配对 Token Mint 账户
         let token_program = match rpc_client.get_account(&other_mint).await {
@@ -310,13 +294,10 @@ pub async fn list_and_classify_amm_v4_pools(
                 // 查询失败，跳过
                 eprintln!("查询 Token Mint 账户失败 {}: {}", other_mint, e);
                 continue;
-            }
+            },
         };
 
-        let pool_info = AmmV4PoolInfo {
-            pool_address: *addr,
-            lp_amount: amm.lp_amount,
-        };
+        let pool_info = AmmV4PoolInfo { pool_address: *addr, lp_amount: amm.lp_amount };
 
         if token_program == TOKEN_2022_PROGRAM {
             token2022_pools.push((*addr, pool_info, other_mint));
@@ -326,10 +307,7 @@ pub async fn list_and_classify_amm_v4_pools(
         // 未知程序的 Pool 不统计
     }
 
-    Ok(AmmV4PoolClassification {
-        token2022_pools,
-        token_pools,
-    })
+    Ok(AmmV4PoolClassification { token2022_pools, token_pools })
 }
 
 /// 打印 AMM V4 Pool 分类统计结果
@@ -344,24 +322,14 @@ pub fn print_amm_v4_pool_classification(
     let limit = show_limit.unwrap_or(10);
 
     println!("📊 AMM V4 Pool 统计结果:");
-    println!(
-        "  • Token2022 配对: {} 个",
-        classification.token2022_pools.len()
-    );
-    println!(
-        "  • Token 配对: {} 个\n",
-        classification.token_pools.len()
-    );
+    println!("  • Token2022 配对: {} 个", classification.token2022_pools.len());
+    println!("  • Token 配对: {} 个\n", classification.token_pools.len());
 
     // 显示 Token2022 配对
     if !classification.token2022_pools.is_empty() {
-        println!(
-            "═══════════════════════════════════════════════════════════════"
-        );
+        println!("═══════════════════════════════════════════════════════════════");
         println!("🪙 Token2022 配对 (显示前 {} 个)", limit);
-        println!(
-            "═══════════════════════════════════════════════════════════════\n"
-        );
+        println!("═══════════════════════════════════════════════════════════════\n");
 
         for (i, (addr, pool, other_mint)) in
             classification.token2022_pools.iter().take(limit).enumerate()
@@ -377,13 +345,9 @@ pub fn print_amm_v4_pool_classification(
 
     // 显示 Token 配对
     if !classification.token_pools.is_empty() {
-        println!(
-            "═══════════════════════════════════════════════════════════════"
-        );
+        println!("═══════════════════════════════════════════════════════════════");
         println!("💰 Token 配对 (显示前 {} 个)", limit);
-        println!(
-            "═══════════════════════════════════════════════════════════════\n"
-        );
+        println!("═══════════════════════════════════════════════════════════════\n");
 
         for (i, (addr, pool, other_mint)) in
             classification.token_pools.iter().take(limit).enumerate()
@@ -484,11 +448,8 @@ pub async fn list_and_classify_pumpswap_pools(
 
     for (addr, pool) in pools.iter() {
         // 判断 mint 是 base_mint 还是 quote_mint
-        let (_is_base, other_mint) = if pool.base_mint == *mint {
-            (true, pool.quote_mint)
-        } else {
-            (false, pool.base_mint)
-        };
+        let (_is_base, other_mint) =
+            if pool.base_mint == *mint { (true, pool.quote_mint) } else { (false, pool.base_mint) };
 
         // 使用 AutoMockRpcClient 的异步 get_account 方法查询配对 Token Mint 账户
         let token_program = match rpc_client.get_account(&other_mint).await {
@@ -500,13 +461,10 @@ pub async fn list_and_classify_pumpswap_pools(
                 // 查询失败，跳过
                 eprintln!("查询 Token Mint 账户失败 {}: {}", other_mint, e);
                 continue;
-            }
+            },
         };
 
-        let pool_info = PumpSwapPoolInfo {
-            pool_address: *addr,
-            lp_supply: pool.lp_supply,
-        };
+        let pool_info = PumpSwapPoolInfo { pool_address: *addr, lp_supply: pool.lp_supply };
 
         if token_program == TOKEN_2022_PROGRAM {
             token2022_pools.push((*addr, pool_info, other_mint));
@@ -516,10 +474,7 @@ pub async fn list_and_classify_pumpswap_pools(
         // 未知程序的 Pool 不统计
     }
 
-    Ok(PumpSwapPoolClassification {
-        token2022_pools,
-        token_pools,
-    })
+    Ok(PumpSwapPoolClassification { token2022_pools, token_pools })
 }
 
 /// 打印 PumpSwap Pool 分类统计结果
@@ -534,24 +489,14 @@ pub fn print_pumpswap_pool_classification(
     let limit = show_limit.unwrap_or(10);
 
     println!("📊 PumpSwap Pool 统计结果:");
-    println!(
-        "  • Token2022 配对: {} 个",
-        classification.token2022_pools.len()
-    );
-    println!(
-        "  • Token 配对: {} 个\n",
-        classification.token_pools.len()
-    );
+    println!("  • Token2022 配对: {} 个", classification.token2022_pools.len());
+    println!("  • Token 配对: {} 个\n", classification.token_pools.len());
 
     // 显示 Token2022 配对
     if !classification.token2022_pools.is_empty() {
-        println!(
-            "═══════════════════════════════════════════════════════════════"
-        );
+        println!("═══════════════════════════════════════════════════════════════");
         println!("🪙 Token2022 配对 (显示前 {} 个)", limit);
-        println!(
-            "═══════════════════════════════════════════════════════════════\n"
-        );
+        println!("═══════════════════════════════════════════════════════════════\n");
 
         for (i, (addr, pool, other_mint)) in
             classification.token2022_pools.iter().take(limit).enumerate()
@@ -567,13 +512,9 @@ pub fn print_pumpswap_pool_classification(
 
     // 显示 Token 配对
     if !classification.token_pools.is_empty() {
-        println!(
-            "═══════════════════════════════════════════════════════════════"
-        );
+        println!("═══════════════════════════════════════════════════════════════");
         println!("💰 Token 配对 (显示前 {} 个)", limit);
-        println!(
-            "═══════════════════════════════════════════════════════════════\n"
-        );
+        println!("═══════════════════════════════════════════════════════════════\n");
 
         for (i, (addr, pool, other_mint)) in
             classification.token_pools.iter().take(limit).enumerate()
@@ -645,11 +586,8 @@ pub async fn list_and_classify_clmm_pools(
     let queries: Vec<_> = pools
         .iter()
         .map(|(addr, pool)| {
-            let other_mint = if pool.token_mint0 == *mint {
-                pool.token_mint1
-            } else {
-                pool.token_mint0
-            };
+            let other_mint =
+                if pool.token_mint0 == *mint { pool.token_mint1 } else { pool.token_mint0 };
             (*addr, pool.clone(), other_mint)
         })
         .collect();
@@ -663,13 +601,10 @@ pub async fn list_and_classify_clmm_pools(
                     Err(_) => {
                         // 查询失败，返回 None
                         return None;
-                    }
+                    },
                 };
 
-                let pool_info = ClmmPoolInfo {
-                    pool_address: addr,
-                    liquidity: pool.liquidity,
-                };
+                let pool_info = ClmmPoolInfo { pool_address: addr, liquidity: pool.liquidity };
 
                 Some((addr, pool_info, other_mint, token_program))
             }
@@ -690,10 +625,7 @@ pub async fn list_and_classify_clmm_pools(
         }
     }
 
-    Ok(ClmmPoolClassification {
-        token2022_pools,
-        token_pools,
-    })
+    Ok(ClmmPoolClassification { token2022_pools, token_pools })
 }
 
 /// 打印 CLMM Pool 分类统计结果
@@ -708,24 +640,14 @@ pub fn print_clmm_pool_classification(
     let limit = show_limit.unwrap_or(10);
 
     println!("📊 CLMM Pool 统计结果:");
-    println!(
-        "  • Token2022 配对: {} 个",
-        classification.token2022_pools.len()
-    );
-    println!(
-        "  • Token 配对: {} 个\n",
-        classification.token_pools.len()
-    );
+    println!("  • Token2022 配对: {} 个", classification.token2022_pools.len());
+    println!("  • Token 配对: {} 个\n", classification.token_pools.len());
 
     // 显示 Token2022 配对
     if !classification.token2022_pools.is_empty() {
-        println!(
-            "═══════════════════════════════════════════════════════════════"
-        );
+        println!("═══════════════════════════════════════════════════════════════");
         println!("🪙 Token2022 配对 (显示前 {} 个)", limit);
-        println!(
-            "═══════════════════════════════════════════════════════════════\n"
-        );
+        println!("═══════════════════════════════════════════════════════════════\n");
 
         for (i, (addr, pool, other_mint)) in
             classification.token2022_pools.iter().take(limit).enumerate()
@@ -741,13 +663,9 @@ pub fn print_clmm_pool_classification(
 
     // 显示 Token 配对
     if !classification.token_pools.is_empty() {
-        println!(
-            "═══════════════════════════════════════════════════════════════"
-        );
+        println!("═══════════════════════════════════════════════════════════════");
         println!("💰 Token 配对 (显示前 {} 个)", limit);
-        println!(
-            "═══════════════════════════════════════════════════════════════\n"
-        );
+        println!("═══════════════════════════════════════════════════════════════\n");
 
         for (i, (addr, pool, other_mint)) in
             classification.token_pools.iter().take(limit).enumerate()
@@ -790,4 +708,3 @@ pub async fn list_wsol_clmm_pools(
 
     Ok(classification)
 }
-

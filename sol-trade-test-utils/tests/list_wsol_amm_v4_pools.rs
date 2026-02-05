@@ -9,9 +9,11 @@
 //! 运行测试:
 //!     cargo test --package sol-trade-test-utils list_wsol_amm_v4_pools_test -- --ignored
 
-use solana_sdk::pubkey::Pubkey;
 use sol_trade_sdk::common::auto_mock_rpc::AutoMockRpcClient;
-use sol_trade_test_utils::pool_list::{list_and_classify_amm_v4_pools, print_amm_v4_pool_classification};
+use sol_trade_test_utils::pool_list::{
+    list_and_classify_amm_v4_pools, print_amm_v4_pool_classification,
+};
+use solana_sdk::pubkey::Pubkey;
 use std::str::FromStr;
 
 #[tokio::test]
@@ -41,8 +43,8 @@ async fn list_wsol_amm_v4_pools_test() {
             println!("Token 配对: {} 个", classification.token_pools.len());
 
             // 基本断言（确保至少有一些 Pool）
-            let total_pools = classification.token2022_pools.len()
-                + classification.token_pools.len();
+            let total_pools =
+                classification.token2022_pools.len() + classification.token_pools.len();
 
             assert!(total_pools > 0, "应该至少找到一个 WSOL AMM V4 Pool");
         },
@@ -51,6 +53,6 @@ async fn list_wsol_amm_v4_pools_test() {
             println!("提示：本地测试节点可能不支持 AMM V4 Pool 查询");
             println!("建议使用付费 RPC 服务（Helius, QuickNode, Triton）");
             panic!("RPC 节点不支持 AMM V4 Pool 查询");
-        }
+        },
     }
 }

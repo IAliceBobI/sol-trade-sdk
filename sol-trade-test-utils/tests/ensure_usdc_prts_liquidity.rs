@@ -4,11 +4,11 @@
 //! 1. 确保 USDC-PRTS pool 至少有 1000 USDC 的流动性
 //! 2. 如果不足，自动添加流动性
 
-use solana_sdk::signer::Signer;
 use sol_trade_sdk::common::SolanaRpcClient;
 use sol_trade_test_utils::{
     ensure_sol_balance, ensure_usdc_prts_pool_usdc_liquidity, get_simulation_test_keypair,
 };
+use solana_sdk::signer::Signer;
 use std::sync::Arc;
 
 #[tokio::test]

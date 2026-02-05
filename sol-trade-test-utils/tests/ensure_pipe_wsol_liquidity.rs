@@ -4,11 +4,11 @@
 //! 1. 确保 PIPE pool 至少有 1 SOL 的流动性
 //! 2. 如果不足，自动添加流动性
 
-use solana_sdk::signer::Signer;
 use sol_trade_sdk::common::SolanaRpcClient;
 use sol_trade_test_utils::{
     ensure_pipe_pool_wsol_liquidity, ensure_sol_balance, get_simulation_test_keypair,
 };
+use solana_sdk::signer::Signer;
 use std::sync::Arc;
 
 #[tokio::test]

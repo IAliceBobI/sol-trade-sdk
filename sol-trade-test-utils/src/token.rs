@@ -14,10 +14,7 @@ use std::sync::Arc;
 pub use sol_trade_sdk::utils::token::MintInfo;
 
 /// 查询 mint 的 decimals 和 token_program
-pub async fn get_mint_info(
-    rpc_client: &Arc<RpcClient>,
-    mint: &Pubkey,
-) -> Result<MintInfo, String> {
+pub async fn get_mint_info(rpc_client: &Arc<RpcClient>, mint: &Pubkey) -> Result<MintInfo, String> {
     sol_trade_sdk::utils::token::get_mint_info(rpc_client, mint)
         .await
         .map_err(|e| format!("获取 mint 信息失败: {}", e))
@@ -45,9 +42,9 @@ pub fn parse_formatted_amount(amount_str: &str, decimals: u8) -> Result<u64, Str
         let integer_value: u128 = if integer_part.is_empty() || integer_part == "0" {
             0
         } else {
-            integer_part.parse().map_err(|e| {
-                format!("Invalid integer part '{}': {}", integer_part, e)
-            })?
+            integer_part
+                .parse()
+                .map_err(|e| format!("Invalid integer part '{}': {}", integer_part, e))?
         };
 
         // 解析小数部分
@@ -59,9 +56,9 @@ pub fn parse_formatted_amount(amount_str: &str, decimals: u8) -> Result<u64, Str
             if trimmed.is_empty() {
                 0
             } else {
-                trimmed.parse().map_err(|e| {
-                    format!("Invalid decimal part '{}': {}", trimmed, e)
-                })?
+                trimmed
+                    .parse()
+                    .map_err(|e| format!("Invalid decimal part '{}': {}", trimmed, e))?
             }
         };
 
@@ -79,15 +76,13 @@ pub fn parse_formatted_amount(amount_str: &str, decimals: u8) -> Result<u64, Str
             ));
         };
 
-        let result = integer_value.saturating_mul(multiplier)
+        let result = integer_value
+            .saturating_mul(multiplier)
             .saturating_add(decimal_value.saturating_mul(decimal_multiplier));
 
         // 检查是否溢出 u64
         if result > u64::MAX as u128 {
-            return Err(format!(
-                "Amount too large: {} (exceeds u64::MAX)",
-                cleaned_str
-            ));
+            return Err(format!("Amount too large: {} (exceeds u64::MAX)", cleaned_str));
         }
 
         Ok(result as u64)
@@ -115,11 +110,8 @@ async fn call_surfnet_set_token_account(
 
     // 手动构造 JSON 以避免大数字的精度问题
     // serde_json::json! 宏在处理大 u64 值时可能会使用 f64，导致精度丢失
-    let token_program_json = if let Some(tp) = token_program {
-        format!("\"{}\"", tp)
-    } else {
-        "null".to_string()
-    };
+    let token_program_json =
+        if let Some(tp) = token_program { format!("\"{}\"", tp) } else { "null".to_string() };
 
     let request_body = format!(
         r#"{{"jsonrpc":"2.0","id":1,"method":"surfnet_setTokenAccount","params":["{}","{}",{{"amount":{},"state":"initialized","closeAuthority":null,"delegate":null,"delegatedAmount":null}},{}]}}"#,
@@ -134,7 +126,8 @@ async fn call_surfnet_set_token_account(
         .await
         .map_err(|e| format!("HTTP request failed: {}", e))?;
 
-    let response_text = response.text().await.map_err(|e| format!("Failed to read response: {}", e))?;
+    let response_text =
+        response.text().await.map_err(|e| format!("Failed to read response: {}", e))?;
     let response_json: Value =
         serde_json::from_str(&response_text).map_err(|e| format!("Failed to parse JSON: {}", e))?;
 
@@ -195,11 +188,8 @@ pub async fn set_token_balance(
     );
 
     // 计算 ATA 地址
-    let ata_address = get_associated_token_address_with_program_id(
-        &payer_pubkey,
-        mint,
-        &mint_info.token_program,
-    );
+    let ata_address =
+        get_associated_token_address_with_program_id(&payer_pubkey, mint, &mint_info.token_program);
 
     println!("   计算 ATA 地址: {}", ata_address);
 

@@ -7,10 +7,8 @@
 
 use super::types::DexVerifyConfig;
 use sol_trade_sdk::{
-    instruction::utils::raydium_cpmm::clear_pool_cache,
-    parser::DexParser,
-    QuoteResult, SimulationResult,
-    TradingClient,
+    instruction::utils::raydium_cpmm::clear_pool_cache, parser::DexParser, QuoteResult,
+    SimulationResult, TradingClient,
 };
 
 /// 交易类型（用于显示说明）
@@ -52,7 +50,11 @@ pub struct ExecutionResult {
 #[allow(clippy::manual_async_fn)]
 pub trait BuyParamsBuilder: Send + Sync {
     /// 构建买入交易参数
-    fn build(&self, client: &TradingClient, amount: u64) -> impl std::future::Future<Output = sol_trade_sdk::TradeBuyParams> + Send;
+    fn build(
+        &self,
+        client: &TradingClient,
+        amount: u64,
+    ) -> impl std::future::Future<Output = sol_trade_sdk::TradeBuyParams> + Send;
 }
 
 /// 函数指针类型的买入参数构建器实现
@@ -62,10 +64,12 @@ where
     Fut: std::future::Future<Output = sol_trade_sdk::TradeBuyParams> + Send,
 {
     #[allow(clippy::manual_async_fn)]
-    fn build(&self, client: &TradingClient, amount: u64) -> impl std::future::Future<Output = sol_trade_sdk::TradeBuyParams> + Send {
-        async move {
-            self(client, amount).await
-        }
+    fn build(
+        &self,
+        client: &TradingClient,
+        amount: u64,
+    ) -> impl std::future::Future<Output = sol_trade_sdk::TradeBuyParams> + Send {
+        async move { self(client, amount).await }
     }
 }
 
@@ -75,7 +79,11 @@ where
 #[allow(clippy::manual_async_fn)]
 pub trait SellParamsBuilder: Send + Sync {
     /// 构建卖出交易参数
-    fn build(&self, client: &TradingClient, amount: u64) -> impl std::future::Future<Output = sol_trade_sdk::TradeSellParams> + Send;
+    fn build(
+        &self,
+        client: &TradingClient,
+        amount: u64,
+    ) -> impl std::future::Future<Output = sol_trade_sdk::TradeSellParams> + Send;
 }
 
 /// 函数指针类型的卖出参数构建器实现
@@ -85,10 +93,12 @@ where
     Fut: std::future::Future<Output = sol_trade_sdk::TradeSellParams> + Send,
 {
     #[allow(clippy::manual_async_fn)]
-    fn build(&self, client: &TradingClient, amount: u64) -> impl std::future::Future<Output = sol_trade_sdk::TradeSellParams> + Send {
-        async move {
-            self(client, amount).await
-        }
+    fn build(
+        &self,
+        client: &TradingClient,
+        amount: u64,
+    ) -> impl std::future::Future<Output = sol_trade_sdk::TradeSellParams> + Send {
+        async move { self(client, amount).await }
     }
 }
 
@@ -209,18 +219,8 @@ where
     println!("  输出金额: {}", simulation_result.amount_out);
     println!("  手续费: {}", simulation_result.fee_amount);
     println!("  计算单元: {} CU", simulation_result.compute_units);
-    println!(
-        "  交易费用: {} lamports",
-        simulation_result.transaction_fee
-    );
-    println!(
-        "  状态: {}\n",
-        if simulation_result.success {
-            "成功"
-        } else {
-            "失败"
-        }
-    );
+    println!("  交易费用: {} lamports", simulation_result.transaction_fee);
+    println!("  状态: {}\n", if simulation_result.success { "成功" } else { "失败" });
 
     // ===== 阶段 3: 实际执行 =====
     println!("========================================");
@@ -228,10 +228,7 @@ where
     println!("========================================\n");
 
     println!("🚀 执行买入交易...");
-    let (success, sigs, error) = client
-        .buy(buy_params)
-        .await
-        .expect("买入交易执行失败");
+    let (success, sigs, error) = client.buy(buy_params).await.expect("买入交易执行失败");
 
     if !success {
         return Err(format!(
@@ -263,9 +260,7 @@ where
         );
         println!(
             "  输出: {} {} ({} decimals)",
-            trade.output_token.amount,
-            trade.output_token.mint,
-            trade.output_token.decimals
+            trade.output_token.amount, trade.output_token.mint, trade.output_token.decimals
         );
         if let Some(ref fee) = trade.fee {
             println!("  费用: {} {}", fee.amount, fee.mint);
@@ -338,18 +333,9 @@ pub fn verify_three_stage_accuracy(
         println!("┌─────────────────────────────────────────────────────────────┐");
         println!("│ 阶段                │ 输出 (原始单位) │ 说明                  │");
         println!("├─────────────────────────────────────────────────────────────┤");
-        println!(
-            "│ 1. 本地计算         │ {:>12} │ 已跳过（不准确）         │",
-            local_output
-        );
-        println!(
-            "│ 2. 链上模拟         │ {:>12} │ {}_simulate           │",
-            sim_output, op_name
-        );
-        println!(
-            "│ 3. 实际执行         │ {:>12} │ send_transaction       │",
-            actual_output
-        );
+        println!("│ 1. 本地计算         │ {:>12} │ 已跳过（不准确）         │", local_output);
+        println!("│ 2. 链上模拟         │ {:>12} │ {}_simulate           │", sim_output, op_name);
+        println!("│ 3. 实际执行         │ {:>12} │ send_transaction       │", actual_output);
         println!("└─────────────────────────────────────────────────────────────┘");
         println!();
 
@@ -365,10 +351,7 @@ pub fn verify_three_stage_accuracy(
         println!("│ 差异分析（仅验证模拟 vs 实际）                            │");
         println!("├─────────────────────────────────────────────────────────────┤");
         println!("│ 模拟 vs 实际:                                            │");
-        println!(
-            "│   绝对差异: {} (原始单位)                            │",
-            diff_actual_sim
-        );
+        println!("│   绝对差异: {} (原始单位)                            │", diff_actual_sim);
         println!(
             "│   误差率:   {:.4}%                                         │",
             error_rate_actual_sim
@@ -400,18 +383,9 @@ pub fn verify_three_stage_accuracy(
         println!("┌─────────────────────────────────────────────────────────────┐");
         println!("│ 阶段                │ 输出 (原始单位) │ 说明                  │");
         println!("├─────────────────────────────────────────────────────────────┤");
-        println!(
-            "│ 1. 本地计算         │ {:>12} │ {}_quote              │",
-            local_output, op_name
-        );
-        println!(
-            "│ 2. 链上模拟         │ {:>12} │ {}_simulate           │",
-            sim_output, op_name
-        );
-        println!(
-            "│ 3. 实际执行         │ {:>12} │ send_transaction       │",
-            actual_output
-        );
+        println!("│ 1. 本地计算         │ {:>12} │ {}_quote              │", local_output, op_name);
+        println!("│ 2. 链上模拟         │ {:>12} │ {}_simulate           │", sim_output, op_name);
+        println!("│ 3. 实际执行         │ {:>12} │ send_transaction       │", actual_output);
         println!("└─────────────────────────────────────────────────────────────┘");
         println!();
 
@@ -420,11 +394,8 @@ pub fn verify_three_stage_accuracy(
         let diff_actual_sim = sim_output.abs_diff(actual_output);
         let diff_actual_local = local_output.abs_diff(actual_output);
 
-        let error_rate_sim_local = if sim_output > 0 {
-            (diff_sim_local as f64 / sim_output as f64) * 100.0
-        } else {
-            0.0
-        };
+        let error_rate_sim_local =
+            if sim_output > 0 { (diff_sim_local as f64 / sim_output as f64) * 100.0 } else { 0.0 };
 
         let error_rate_actual_sim = if actual_output > 0 {
             (diff_actual_sim as f64 / actual_output as f64) * 100.0
@@ -442,27 +413,21 @@ pub fn verify_three_stage_accuracy(
         println!("│ 差异分析                                                │");
         println!("├─────────────────────────────────────────────────────────────┤");
         println!("│ 本地 vs 模拟:                                            │");
+        println!("│   绝对差异: {} (原始单位)                            │", diff_sim_local);
         println!(
-            "│   绝对差异: {} (原始单位)                            │",
-            diff_sim_local
+            "│   误差率:   {:.4}%                                         │",
+            error_rate_sim_local
         );
-        println!("│   误差率:   {:.4}%                                         │", error_rate_sim_local);
         println!("│                                                         │");
         println!("│ 模拟 vs 实际:                                            │");
-        println!(
-            "│   绝对差异: {} (原始单位)                            │",
-            diff_actual_sim
-        );
+        println!("│   绝对差异: {} (原始单位)                            │", diff_actual_sim);
         println!(
             "│   误差率:   {:.4}%                                         │",
             error_rate_actual_sim
         );
         println!("│                                                         │");
         println!("│ 本地 vs 实际:                                            │");
-        println!(
-            "│   绝对差异: {} (原始单位)                            │",
-            diff_actual_local
-        );
+        println!("│   绝对差异: {} (原始单位)                            │", diff_actual_local);
         println!(
             "│   误差率:   {:.4}%                                         │",
             error_rate_actual_local
@@ -477,10 +442,7 @@ pub fn verify_three_stage_accuracy(
 
         if local_sim_ok && sim_actual_ok && local_actual_ok {
             println!("✅ 裁判结果：三阶段结果一致");
-            println!(
-                "   本地 vs 模拟: {:.4}% ≤ {:.1}% ✓",
-                error_rate_sim_local, max_error_percent
-            );
+            println!("   本地 vs 模拟: {:.4}% ≤ {:.1}% ✓", error_rate_sim_local, max_error_percent);
             println!(
                 "   模拟 vs 实际: {:.4}% ≤ {:.1}% ✓",
                 error_rate_actual_sim, max_error_percent
@@ -617,18 +579,8 @@ where
     println!("  输出金额: {}", simulation_result.amount_out);
     println!("  手续费: {}", simulation_result.fee_amount);
     println!("  计算单元: {} CU", simulation_result.compute_units);
-    println!(
-        "  交易费用: {} lamports",
-        simulation_result.transaction_fee
-    );
-    println!(
-        "  状态: {}\n",
-        if simulation_result.success {
-            "成功"
-        } else {
-            "失败"
-        }
-    );
+    println!("  交易费用: {} lamports", simulation_result.transaction_fee);
+    println!("  状态: {}\n", if simulation_result.success { "成功" } else { "失败" });
 
     // ===== 阶段 3: 实际执行 =====
     println!("========================================");
@@ -636,10 +588,7 @@ where
     println!("========================================\n");
 
     println!("🚀 执行卖出交易...");
-    let (success, sigs, error) = client
-        .sell(sell_params)
-        .await
-        .expect("卖出交易执行失败");
+    let (success, sigs, error) = client.sell(sell_params).await.expect("卖出交易执行失败");
 
     if !success {
         return Err(format!(
@@ -671,9 +620,7 @@ where
         );
         println!(
             "  输出: {} {} ({} decimals)",
-            trade.output_token.amount,
-            trade.output_token.mint,
-            trade.output_token.decimals
+            trade.output_token.amount, trade.output_token.mint, trade.output_token.decimals
         );
         if let Some(ref fee) = trade.fee {
             println!("  费用: {} {}", fee.amount, fee.mint);

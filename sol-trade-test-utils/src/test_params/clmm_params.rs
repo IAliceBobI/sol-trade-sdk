@@ -79,11 +79,8 @@ impl UsdtWsolClmmBuyParamsBuilder {
             token1_program,
         };
 
-        let recent_blockhash = client
-            .rpc
-            .get_latest_blockhash()
-            .await
-            .expect("Failed to get latest blockhash");
+        let recent_blockhash =
+            client.rpc.get_latest_blockhash().await.expect("Failed to get latest blockhash");
 
         TradeBuyParams {
             dex_type: DexType::RaydiumClmm,
@@ -171,11 +168,8 @@ impl UsdtWsolClmmSellParamsBuilder {
             token1_program,
         };
 
-        let recent_blockhash = client
-            .rpc
-            .get_latest_blockhash()
-            .await
-            .expect("Failed to get latest blockhash");
+        let recent_blockhash =
+            client.rpc.get_latest_blockhash().await.expect("Failed to get latest blockhash");
 
         TradeSellParams {
             dex_type: DexType::RaydiumClmm,
@@ -266,11 +260,8 @@ impl SolettWsolClmmBuyParamsBuilder {
             token1_program,
         };
 
-        let recent_blockhash = client
-            .rpc
-            .get_latest_blockhash()
-            .await
-            .expect("Failed to get latest blockhash");
+        let recent_blockhash =
+            client.rpc.get_latest_blockhash().await.expect("Failed to get latest blockhash");
 
         TradeBuyParams {
             dex_type: DexType::RaydiumClmm,
@@ -358,11 +349,8 @@ impl SolettWsolClmmSellParamsBuilder {
             token1_program,
         };
 
-        let recent_blockhash = client
-            .rpc
-            .get_latest_blockhash()
-            .await
-            .expect("Failed to get latest blockhash");
+        let recent_blockhash =
+            client.rpc.get_latest_blockhash().await.expect("Failed to get latest blockhash");
 
         TradeSellParams {
             dex_type: DexType::RaydiumClmm,

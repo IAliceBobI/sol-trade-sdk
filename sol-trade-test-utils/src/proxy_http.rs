@@ -123,7 +123,8 @@ mod tests {
     #[ignore]
     async fn test_get_balance() {
         let pubkey = "8be6dbPmZH1URHXyFTbY876QuVunrD8wTZhHGXjEdrvj";
-        let result = get_solana_balance_with_proxy("https://api.testnet.solana.com", None, pubkey).await;
+        let result =
+            get_solana_balance_with_proxy("https://api.testnet.solana.com", None, pubkey).await;
         assert!(result.is_ok());
         println!("Balance: {} lamports", result.unwrap());
     }

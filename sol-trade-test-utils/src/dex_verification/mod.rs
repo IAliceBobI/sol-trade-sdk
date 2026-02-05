@@ -33,25 +33,18 @@
 //! run_dex_three_stage_verification(&client, config).await?;
 //! ```
 
-mod types;
 mod framework;
 mod pool_registry;
+mod types;
 
 // 重新导出常用类型
-pub use types::{
-    DexVerifyConfig, OperationType, PoolConfig, TokenProgramType, TradeDirection,
-};
 pub use framework::{
-    cleanup_pool_cache,
-    run_dex_three_stage_verification,
-    run_dex_three_stage_verification_sell,
-    verify_three_stage_accuracy,
-    BuyParamsBuilder,
-    ExecutionResult,
-    SellParamsBuilder,
-    ThreeStageResult,
-    TransactionType,
+    cleanup_pool_cache, run_dex_three_stage_verification, run_dex_three_stage_verification_sell,
+    verify_three_stage_accuracy, BuyParamsBuilder, ExecutionResult, SellParamsBuilder,
+    ThreeStageResult, TransactionType,
 };
 pub use pool_registry::{
-    PumpSwapPoolRegistry, RaydiumAmmV4PoolRegistry, RaydiumClmmPoolRegistry, RaydiumCpmmPoolRegistry,
+    PumpSwapPoolRegistry, RaydiumAmmV4PoolRegistry, RaydiumClmmPoolRegistry,
+    RaydiumCpmmPoolRegistry,
 };
+pub use types::{DexVerifyConfig, OperationType, PoolConfig, TokenProgramType, TradeDirection};

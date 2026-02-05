@@ -22,8 +22,7 @@ async fn list_wsol_clmm_pools() {
     println!("Token 配对: {} 个", classification.token_pools.len());
 
     // 基本断言（确保至少有一些 Pool）
-    let total_pools = classification.token2022_pools.len()
-        + classification.token_pools.len();
+    let total_pools = classification.token2022_pools.len() + classification.token_pools.len();
 
     assert!(total_pools > 0, "应该至少找到一个 WSOL CLMM Pool");
 }

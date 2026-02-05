@@ -168,20 +168,15 @@ pub async fn ensure_pipe_pool_wsol_liquidity(
         .map_err(|e| format!("获取池子状态失败: {}", e))?;
 
     // 2. 检查当前 WSOL vault 余额
-    let current_wsol_balance = match rpc_client
-        .get_token_account_balance(&pool_state.token1_vault)
-        .await
-    {
-        Ok(balance_info) => balance_info.amount.parse::<u64>().unwrap_or(0),
-        Err(_) => 0,
-    };
+    let current_wsol_balance =
+        match rpc_client.get_token_account_balance(&pool_state.token1_vault).await {
+            Ok(balance_info) => balance_info.amount.parse::<u64>().unwrap_or(0),
+            Err(_) => 0,
+        };
 
     let current_wsol_sol = current_wsol_balance / 1_000_000_000;
 
-    println!(
-        "   当前 WSOL 流动性: {} SOL ({} lamports)",
-        current_wsol_sol, current_wsol_balance
-    );
+    println!("   当前 WSOL 流动性: {} SOL ({} lamports)", current_wsol_sol, current_wsol_balance);
 
     // 3. 如果流动性充足，直接返回
     if current_wsol_balance >= min_wsol_lamports {
@@ -193,38 +188,25 @@ pub async fn ensure_pipe_pool_wsol_liquidity(
     let needed_wsol_lamports = min_wsol_lamports - current_wsol_balance;
     let needed_wsol_sol = needed_wsol_lamports / 1_000_000_000;
 
-    println!(
-        "💰 流动性不足，需要添加 {} SOL 的流动性...\n",
-        needed_wsol_sol
-    );
+    println!("💰 流动性不足，需要添加 {} SOL 的流动性...\n", needed_wsol_sol);
 
     // 5. 获取当前 PIPE vault 余额
-    let current_pipe_balance = match rpc_client
-        .get_token_account_balance(&pool_state.token0_vault)
-        .await
-    {
-        Ok(balance_info) => balance_info.amount.parse::<u64>().unwrap_or(0),
-        Err(_) => 0,
-    };
+    let current_pipe_balance =
+        match rpc_client.get_token_account_balance(&pool_state.token0_vault).await {
+            Ok(balance_info) => balance_info.amount.parse::<u64>().unwrap_or(0),
+            Err(_) => 0,
+        };
 
     // 6. 根据 CPMM 公式计算需要添加的 PIPE 和 LP 数量
     // 公式: (added_wsol / current_wsol) = (added_lp / current_lp) = (added_pipe / current_pipe)
     let multiplier = (needed_wsol_lamports as u128) * 1000 / (current_wsol_balance as u128);
-    let needed_lp =
-        (pool_state.lp_supply as u128 * multiplier / 1000) as u64;
+    let needed_lp = (pool_state.lp_supply as u128 * multiplier / 1000) as u64;
     let needed_pipe = ((current_pipe_balance as u128 * multiplier) / 1000) as u64;
 
     println!("📐 计算需要添加的流动性:");
     println!("   LP Token: {} (约 {:.2} 亿)", needed_lp, needed_lp as f64 / 100_000_000.0);
-    println!(
-        "   PIPE: {} (约 {:.2} 亿)",
-        needed_pipe,
-        needed_pipe as f64 / 100_000_000.0
-    );
-    println!(
-        "   WSOL: {} ({} SOL)\n",
-        needed_wsol_lamports, needed_wsol_sol
-    );
+    println!("   PIPE: {} (约 {:.2} 亿)", needed_pipe, needed_pipe as f64 / 100_000_000.0);
+    println!("   WSOL: {} ({} SOL)\n", needed_wsol_lamports, needed_wsol_sol);
 
     // 7. 检查是否可以安全地添加流动性
     // 由于 parse_formatted_amount 会乘以 decimals，我们需要确保原始值除以 10^decimals 后不会太大
@@ -325,9 +307,7 @@ pub async fn ensure_usdc_prts_pool_usdc_liquidity(
     // 查找 USDC-PRTS pool（通过 PRTS mint）
     let pool_state = pools
         .iter()
-        .find(|(_, pool)| {
-            pool.token0_mint == prts_mint_key || pool.token1_mint == prts_mint_key
-        })
+        .find(|(_, pool)| pool.token0_mint == prts_mint_key || pool.token1_mint == prts_mint_key)
         .map(|(_, state)| state.clone())
         .ok_or_else(|| format!("未找到 USDC-PRTS Pool，PRTS mint: {}", prts_mint_key))?;
 
@@ -340,20 +320,14 @@ pub async fn ensure_usdc_prts_pool_usdc_liquidity(
     };
 
     // 3. 检查当前 USDC vault 余额
-    let current_usdc_balance = match auto_mock_client
-        .get_token_account_balance(&usdc_vault)
-        .await
-    {
+    let current_usdc_balance = match auto_mock_client.get_token_account_balance(&usdc_vault).await {
         Ok(balance_info) => balance_info.amount.parse::<u64>().unwrap_or(0),
         Err(_) => 0,
     };
 
     let current_usdc = current_usdc_balance / 1_000_000;
 
-    println!(
-        "   当前 USDC 流动性: {} USDC ({} units)",
-        current_usdc, current_usdc_balance
-    );
+    println!("   当前 USDC 流动性: {} USDC ({} units)", current_usdc, current_usdc_balance);
 
     // 4. 如果流动性充足，直接返回
     if current_usdc_balance >= min_usdc_units {
@@ -365,16 +339,10 @@ pub async fn ensure_usdc_prts_pool_usdc_liquidity(
     let needed_usdc_units = min_usdc_units - current_usdc_balance;
     let needed_usdc = needed_usdc_units / 1_000_000;
 
-    println!(
-        "💰 流动性不足，需要添加 {} USDC 的流动性...\n",
-        needed_usdc
-    );
+    println!("💰 流动性不足，需要添加 {} USDC 的流动性...\n", needed_usdc);
 
     // 6. 获取当前 PRTS vault 余额
-    let current_prts_balance = match auto_mock_client
-        .get_token_account_balance(&prts_vault)
-        .await
-    {
+    let current_prts_balance = match auto_mock_client.get_token_account_balance(&prts_vault).await {
         Ok(balance_info) => balance_info.amount.parse::<u64>().unwrap_or(0),
         Err(_) => 0,
     };
@@ -382,21 +350,13 @@ pub async fn ensure_usdc_prts_pool_usdc_liquidity(
     // 7. 根据 CPMM 公式计算需要添加的 PRTS 和 LP 数量
     // 公式: (added_usdc / current_usdc) = (added_lp / current_lp) = (added_prts / current_prts)
     let multiplier = (needed_usdc_units as u128) * 1000 / (current_usdc_balance as u128);
-    let needed_lp =
-        (pool_state.lp_supply as u128 * multiplier / 1000) as u64;
+    let needed_lp = (pool_state.lp_supply as u128 * multiplier / 1000) as u64;
     let needed_prts = ((current_prts_balance as u128 * multiplier) / 1000) as u64;
 
     println!("📐 计算需要添加的流动性:");
     println!("   LP Token: {} (约 {:.2} 亿)", needed_lp, needed_lp as f64 / 100_000_000.0);
-    println!(
-        "   USDC: {} ({} USDC)",
-        needed_usdc_units, needed_usdc
-    );
-    println!(
-        "   PRTS: {} (约 {:.2} 亿)\n",
-        needed_prts,
-        needed_prts as f64 / 100_000_000.0
-    );
+    println!("   USDC: {} ({} USDC)", needed_usdc_units, needed_usdc);
+    println!("   PRTS: {} (约 {:.2} 亿)\n", needed_prts, needed_prts as f64 / 100_000_000.0);
 
     // 8. 转换为格式化字符串（用于 ensure_token_balance）
     // USDC decimals = 6, PRTS decimals = 6 (Token2022)
@@ -464,10 +424,7 @@ pub async fn ensure_cpmm_liquidity(
     // 2. 检查当前 LP supply
     let current_lp_supply = pool_state.lp_supply;
     if current_lp_supply >= lp_token_amount {
-        println!(
-            "✅ 流动性充足: {} LP (目标: {} LP)",
-            current_lp_supply, lp_token_amount
-        );
+        println!("✅ 流动性充足: {} LP (目标: {} LP)", current_lp_supply, lp_token_amount);
         return Ok(());
     }
 
@@ -500,12 +457,8 @@ pub async fn ensure_cpmm_liquidity(
     .await?;
 
     // 4. 获取当前金库余额
-    let token0_balance = rpc_client
-        .get_token_account_balance(&pool_state.token0_vault)
-        .await;
-    let token1_balance = rpc_client
-        .get_token_account_balance(&pool_state.token1_vault)
-        .await;
+    let token0_balance = rpc_client.get_token_account_balance(&pool_state.token0_vault).await;
+    let token1_balance = rpc_client.get_token_account_balance(&pool_state.token1_vault).await;
 
     let (_token0_reserve, _token1_reserve) = match (token0_balance, token1_balance) {
         (Ok(t0), Ok(t1)) => {
@@ -566,7 +519,7 @@ pub async fn ensure_cpmm_liquidity(
         lp_token_amount: lp_token_amount - current_lp_supply, // 只添加差值
         maximum_token_0_amount: max_token0,
         maximum_token_1_amount: max_token1,
-        token_program: token_0_program,  // 使用正确的 Token Program
+        token_program: token_0_program, // 使用正确的 Token Program
     };
 
     let deposit_instruction = build_deposit_instruction(deposit_params, payer_pubkey);
@@ -583,7 +536,7 @@ pub async fn ensure_cpmm_liquidity(
                 &payer_pubkey,
                 &payer_pubkey,
                 &pool_state.lp_mint,
-                &lp_token_program,  // 使用正确的 Token Program
+                &lp_token_program, // 使用正确的 Token Program
             );
         instructions.push(create_lp_ata_instruction);
     }
@@ -622,10 +575,7 @@ pub async fn ensure_cpmm_liquidity(
             println!("\n✅ 流动性添加成功！");
             println!("   之前 LP Supply: {}", current_lp_supply);
             println!("   之后 LP Supply: {}", new_lp_supply);
-            println!(
-                "   增加: {}",
-                new_lp_supply.saturating_sub(current_lp_supply)
-            );
+            println!("   增加: {}", new_lp_supply.saturating_sub(current_lp_supply));
         },
         Err(e) => {
             println!("⚠️  无法验证: {}", e);

@@ -1,7 +1,7 @@
 //! DEX 验证框架核心类型定义
 
-use solana_sdk::pubkey::Pubkey;
 use sol_trade_sdk::DexType;
+use solana_sdk::pubkey::Pubkey;
 use std::fmt;
 
 /// Token Program 类型
@@ -88,12 +88,7 @@ impl PoolConfig {
 
 impl fmt::Display for PoolConfig {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "{} ({})",
-            self.pool_name,
-            self.pool_type_description()
-        )
+        write!(f, "{} ({})", self.pool_name, self.pool_type_description())
     }
 }
 
@@ -180,11 +175,7 @@ pub struct DexVerifyConfig {
 
 impl fmt::Display for DexVerifyConfig {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "{:?} - {} - {} - {}",
-            self.dex_type, self.pool, self.operation, self.direction
-        )
+        write!(f, "{:?} - {} - {} - {}", self.dex_type, self.pool, self.operation, self.direction)
     }
 }
 
@@ -226,7 +217,6 @@ impl DexVerifyConfig {
 mod tests {
     use super::*;
     use solana_sdk::pubkey::Pubkey;
-    
 
     #[test]
     fn test_pool_config_detection() {
