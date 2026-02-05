@@ -12,6 +12,7 @@
 use solana_sdk::pubkey::Pubkey;
 use sol_trade_sdk::common::auto_mock_rpc::AutoMockRpcClient;
 use sol_trade_test_utils::pool_list::{list_and_classify_amm_v4_pools, print_amm_v4_pool_classification};
+use std::str::FromStr;
 
 #[tokio::test]
 #[ignore = "需要支持 getProgramAccounts 的 RPC 节点"]
