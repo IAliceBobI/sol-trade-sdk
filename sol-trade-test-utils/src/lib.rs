@@ -50,11 +50,13 @@ pub use test_params::{
     create_test_gas_fee_strategy,
     pipe_mint, pipe_wsol_pool, prts_mint, usdc_mint, usdc_prts_pool, wsol_mint,
     pump_mint, pump_wsol_pool,
+    bonk_mint, bonk_wsol_pool,
     CpmmLiquidityBuilder, PipeWsolBuyParamsBuilder, PipeWsolLiquidityBuilder,
     PipeWsolSellParamsBuilder, UsdcPrtsBuyParamsBuilder, UsdcPrtsSellParamsBuilder,
     PumpWsolBuyParamsBuilder, PumpWsolSellParamsBuilder,
+    BonkWsolBuyParamsBuilder, BonkWsolSellParamsBuilder,
     PIPE_MINT, PIPE_WSOL_POOL, PRTS_MINT, USDC_MINT, USDC_PRTS_POOL, WSOL_MINT,
-    PUMP_MINT, PUMP_WSOL_POOL,
+    PUMP_MINT, PUMP_WSOL_POOL, BONK_MINT, BONK_WSOL_POOL,
 };
 
 // 重新导出 Pool 列出工具

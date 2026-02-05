@@ -128,6 +128,23 @@ impl PumpSwapPoolRegistry {
             10,
         )
     }
+
+    /// BONK-WSOL (Token/Token)
+    ///
+    /// - Pool: Dwczp92NX3ngbE2HeTUH4p5dcQxrpDF2AJMbW581gq1E
+    /// - BONK: DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263 (Token Program)
+    /// - WSOL: So11111111111111111111111111111111111111112 (Token Program)
+    pub fn bonk_wsol() -> PoolConfig {
+        PoolConfig::new(
+            Pubkey::from_str("Dwczp92NX3ngbE2HeTUH4p5dcQxrpDF2AJMbW581gq1E").unwrap(),
+            "BONK-WSOL",
+            Pubkey::from_str("DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263").unwrap(),
+            super::TokenProgramType::Token,
+            Pubkey::from_str("So11111111111111111111111111111111111111112").unwrap(),
+            super::TokenProgramType::Token,
+            10,
+        )
+    }
 }
 
 #[cfg(test)]
