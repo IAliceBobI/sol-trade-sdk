@@ -153,7 +153,7 @@ pub async fn ensure_pipe_pool_wsol_liquidity(
     payer: &Keypair,
     min_wsol_sol: u64,
 ) -> Result<(), String> {
-    use crate::cpmm_test_params::pipe_wsol_pool;
+    use crate::test_params::pipe_wsol_pool;
 
     let pool_address = pipe_wsol_pool();
     let min_wsol_lamports = min_wsol_sol * 1_000_000_000; // 转换为 lamports
@@ -299,7 +299,7 @@ pub async fn ensure_usdc_prts_pool_usdc_liquidity(
     payer: &Keypair,
     min_usdc: u64,
 ) -> Result<(), String> {
-    use crate::cpmm_test_params::{prts_mint, usdc_mint, usdc_prts_pool};
+    use crate::test_params::{prts_mint, usdc_mint, usdc_prts_pool};
 
     let pool_address = usdc_prts_pool();
     let min_usdc_units = min_usdc * 1_000_000; // USDC decimals = 6
@@ -332,7 +332,7 @@ pub async fn ensure_usdc_prts_pool_usdc_liquidity(
         .ok_or_else(|| format!("未找到 USDC-PRTS Pool，PRTS mint: {}", prts_mint_key))?;
 
     // 2. 确定哪个 vault 是 USDC（根据 mint 地址判断）
-    let usdc_mint = crate::cpmm_test_params::usdc_mint();
+    let usdc_mint = crate::test_params::usdc_mint();
     let (usdc_vault, prts_vault) = if pool_state.token0_mint == usdc_mint {
         (pool_state.token0_vault, pool_state.token1_vault)
     } else {

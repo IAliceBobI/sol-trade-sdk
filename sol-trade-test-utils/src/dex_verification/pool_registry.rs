@@ -108,6 +108,28 @@ impl RaydiumAmmV4PoolRegistry {
     }
 }
 
+/// PumpSwap Pool 注册表
+pub struct PumpSwapPoolRegistry;
+
+impl PumpSwapPoolRegistry {
+    /// PUMP-WSOL (Token2022/Token - 混合 Pool)
+    ///
+    /// - Pool: 539m4mVWt6iduB6W8rDGPMarzNCMesuqY5eUTiiYHAgR
+    /// - PUMP: pumpCmXqMfrsAkQ5r49WcJnRayYRqmXz6ae8H7H9Dfn (Token-2022 Program)
+    /// - WSOL: So11111111111111111111111111111111111111112 (Token Program)
+    pub fn pump_wsol() -> PoolConfig {
+        PoolConfig::new(
+            Pubkey::from_str("539m4mVWt6iduB6W8rDGPMarzNCMesuqY5eUTiiYHAgR").unwrap(),
+            "PUMP-WSOL",
+            Pubkey::from_str("pumpCmXqMfrsAkQ5r49WcJnRayYRqmXz6ae8H7H9Dfn").unwrap(),
+            super::TokenProgramType::Token2022,
+            Pubkey::from_str("So11111111111111111111111111111111111111112").unwrap(),
+            super::TokenProgramType::Token,
+            10,
+        )
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -51,4 +51,6 @@ pub use framework::{
     SellParamsBuilder,
     ThreeStageResult,
 };
-pub use pool_registry::{RaydiumAmmV4PoolRegistry, RaydiumClmmPoolRegistry, RaydiumCpmmPoolRegistry};
+pub use pool_registry::{
+    PumpSwapPoolRegistry, RaydiumAmmV4PoolRegistry, RaydiumClmmPoolRegistry, RaydiumCpmmPoolRegistry,
+};

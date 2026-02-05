@@ -31,7 +31,7 @@ use sol_trade_test_utils::{
 };
 
 // 使用参数构造工具模块
-use sol_trade_test_utils::cpmm_test_params::*;
+use sol_trade_test_utils::test_params::*;
 
 /// 测试：Raydium CPMM 完整买入-卖出流程
 ///
