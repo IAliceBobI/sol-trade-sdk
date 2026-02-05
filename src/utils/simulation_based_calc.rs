@@ -427,6 +427,39 @@ fn parse_raydium_amm_v4_ray_log(logs: &[String]) -> Option<(u64, u64)> {
 
 /// 从 Raydium AMM V4 的 ray_log base64 数据中解析 swap 结果
 ///
+/// 根据 Raydium AMM V4 官方源码（/opt/projects/sol-trade-sdk/temp/dex/raydium-amm/program/src/log.rs）
+/// 的数据结构解析：
+///
+/// SwapBaseInLog 结构 (exact_in):
+/// ```rust
+/// pub struct SwapBaseInLog {
+///     pub log_type: u8,       // Offset 0: 3
+///     // 1 byte padding
+///     pub amount_in: u64,      // Offset 1-8
+///     pub minimum_out: u64,    // Offset 9-16
+///     pub direction: u64,      // Offset 17-24
+///     pub user_source: u64,    // Offset 25-32
+///     pub pool_coin: u64,      // Offset 33-40
+///     pub pool_pc: u64,        // Offset 41-48
+///     pub out_amount: u64,     // Offset 49-56 ← 实际输出！
+/// }
+/// ```
+///
+/// SwapBaseOutLog 结构 (exact_out):
+/// ```rust
+/// pub struct SwapBaseOutLog {
+///     pub log_type: u8,       // Offset 0: 4
+///     // 1 byte padding
+///     pub max_in: u64,         // Offset 1-8
+///     pub amount_out: u64,     // Offset 9-16
+///     pub direction: u64,      // Offset 17-24
+///     pub user_source: u64,    // Offset 25-32
+///     pub pool_coin: u64,      // Offset 33-40
+///     pub pool_pc: u64,        // Offset 41-48
+///     pub deduct_in: u64,      // Offset 49-56 ← 实际输入！
+/// }
+/// ```
+///
 /// # 参数
 /// * `ray_log_base64` - base64 编码的 ray_log 数据
 ///
@@ -439,84 +472,43 @@ fn parse_raydium_amm_v4_log_data(ray_log_base64: &str) -> Option<(u64, u64)> {
     // 解码 base64
     let data = base64::engine::general_purpose::STANDARD.decode(ray_log_base64).ok()?;
 
-    // 检查数据长度（至少需要 24 字节：3 个 u64）
-    if data.len() < 24 {
+    // 检查数据长度（至少需要 57 字节：SwapBaseInLog 的完整结构）
+    if data.len() < 57 {
         return None;
     }
 
-    // 解析方向标志 (offset 16)
-    let direction = u64::from_le_bytes(data[16..24].try_into().ok()?);
+    // 解析 log_type 来判断是 exact_in 还是 exact_out
+    let log_type = data[0];
 
-    // 解析 swap_in_amount（前 8 字节，little endian）
-    let raw_in = u64::from_le_bytes(data[0..8].try_into().ok()?);
+    match log_type {
+        3 => {
+            // SwapBaseIn (exact_in)
+            // Offset 1-8: amount_in
+            let amount_in = u64::from_le_bytes(data[1..9].try_into().ok()?);
+            // Offset 9-16: minimum_out (忽略，使用 out_amount)
+            // Offset 17-24: direction (用于验证)
+            let _direction = u64::from_le_bytes(data[17..25].try_into().ok()?);
+            // Offset 49-56: out_amount ← 实际输出！
+            let amount_out = u64::from_le_bytes(data[49..57].try_into().ok()?);
 
-    // 解析 swap_out_amount（后 8 字节，little endian）
-    let raw_out = u64::from_le_bytes(data[8..16].try_into().ok()?);
+            Some((amount_in, amount_out))
+        },
+        4 => {
+            // SwapBaseOut (exact_out)
+            // Offset 1-8: max_in
+            // Offset 9-16: amount_out (期望输出)
+            // Offset 17-24: direction
+            // Offset 49-56: deduct_in ← 实际输入！
+            let amount_in = u64::from_le_bytes(data[49..57].try_into().ok()?);
+            let amount_out = u64::from_le_bytes(data[9..17].try_into().ok()?);
 
-    // 判断是 exact_in 还是 exact_out
-    // 方法：检查 raw_in 的大小（offset 0），并根据 direction 使用不同的阈值
-    // direction=512 (buy):
-    //   - exact_in: raw_in ~ 256,000,000 (direction * amount)
-    //   - exact_out: raw_in < 200,000,000
-    // direction=256 (sell):
-    //   - exact_in: raw_in ~ 256,000 (direction * amount / 1000)
-    //   - exact_out: raw_in > 200,000,000
-    let is_exact_out = if direction == 512 {
-        // buy: raw_in 较小的是 exact_out
-        raw_in < 200_000_000
-    } else {
-        // sell: raw_in 较大的是 exact_out
-        raw_in > 200_000_000
-    };
-
-    // 根据方向标志和 swap 类型调整解析公式
-    let (amount_in, amount_out) = if is_exact_out {
-        // exact_out 的公式根据方向有所不同
-        match direction {
-            512 => {
-                // 买入 exact_out: WSOL -> USDC
-                // 根据 raydium-amm processor.rs 的 SwapBaseOutLog 结构:
-                // - offset 0: max_in (最大输入)
-                // - offset 8: amount_out (实际输出，已包含单位转换)
-                // - offset 16: direction
-                // 公式应该与 exact_in 类似，但不需要额外乘除
-                (raw_in / 256, raw_out / 256)
-            },
-            256 => {
-                // 卖出 exact_out: USDC -> WSOL
-                // offset 0: 输入 USDC / 256
-                // offset 8: 输出 WSOL / 256（不需要除以 100）
-                (raw_in / 256, raw_out / 256)
-            },
-            _ => {
-                // 未知方向，使用默认公式
-                (raw_in / 256, raw_out / 256)
-            },
-        }
-    } else {
-        // exact_in: 使用修正后的公式
-        match direction {
-            512 => {
-                // 买入方向: WSOL -> USDC
-                // offset 0: swap_in / 256
-                // offset 8: swap_out / 256
-                // 注意：不需要额外的乘除，ray_log 中的值已经是正确格式
-                (raw_in / 256, raw_out / 256)
-            },
-            256 => {
-                // 卖出方向: USDC -> WSOL
-                // offset 0: swap_in / 256
-                // offset 8: swap_out / 256
-                (raw_in / 256, raw_out / 256)
-            },
-            _ => {
-                // 未知方向，使用默认公式
-                (raw_in / 256, raw_out / 256)
-            },
-        }
-    };
-
-    Some((amount_in, amount_out))
+            Some((amount_in, amount_out))
+        },
+        _ => {
+            // 未知 log_type
+            None
+        },
+    }
 }
 
 /// 从 Raydium CPMM 的 Program data 中解析 swap 结果
