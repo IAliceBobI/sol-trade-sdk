@@ -11,6 +11,7 @@ use sol_trade_test_utils::{
         cleanup_pool_cache,
         run_dex_three_stage_verification,
         run_dex_three_stage_verification_sell,
+        verify_three_stage_accuracy,
         BuyParamsBuilder,
         DexVerifyConfig,
         OperationType,
@@ -129,53 +130,10 @@ async fn test_ammv4_exact_in_buy_three_stage_verification_with_framework() {
         },
     };
 
-    // ===== 验证 Quote 准确性（只比较本地计算和实际执行）=====
-    let local_output = result.quote_result.amount_out;
-    let actual_output = result.execution_result.amount_out;
-
-    println!("\n========================================");
-    println!("裁判：Quote 准确性验证");
-    println!("========================================\n");
-
-    println!("┌─────────────────────────────────────────────────────────────┐");
-    println!("│ 阶段                │ 输出 (原始单位) │ 说明                  │");
-    println!("├─────────────────────────────────────────────────────────────┤");
-    println!(
-        "│ 1. 本地计算         │ {:>12} │ sell_quote             │",
-        local_output
-    );
-    println!(
-        "│ 2. 实际执行         │ {:>12} │ send_transaction       │",
-        actual_output
-    );
-    println!("└─────────────────────────────────────────────────────────────┘");
-    println!();
-
-    let diff = local_output.abs_diff(actual_output);
-    let error_rate = if actual_output > 0 {
-        (diff as f64 / actual_output as f64) * 100.0
-    } else {
-        0.0
-    };
-
-    println!("┌─────────────────────────────────────────────────────────────┐");
-    println!("│ 差异分析                                                │");
-    println!("├─────────────────────────────────────────────────────────────┤");
-    println!("│ 本地 vs 实际:                                            │");
-    println!("│   绝对差异: {} (原始单位)                            │", diff);
-    println!("│   误差率:   {:.4}%                                         │", error_rate);
-    println!("└─────────────────────────────────────────────────────────────┘");
-    println!();
-
-    if error_rate <= 1.0 {
-        println!("✅ 裁判结果：Quote 计算准确");
-        println!("   本地 vs 实际: {:.4}% ≤ 1.0% ✓\n", error_rate);
-    } else {
+    // ===== 验证三阶段准确性（Quote + Simulation + Execution）=====
+    if let Err(e) = verify_three_stage_accuracy(&result, 1.0) {
         cleanup_pool_cache();
-        panic!(
-            "❌ 测试失败：Quote 计算误差过大\n   本地 vs 实际: {:.4}% > 1.0%",
-            error_rate
-        );
+        panic!("{}", e);
     }
 
     // 清理缓存
@@ -293,53 +251,10 @@ async fn test_ammv4_exact_in_sell_three_stage_verification_with_framework() {
         },
     };
 
-    // ===== 验证 Quote 准确性（只比较本地计算和实际执行）=====
-    let local_output = result.quote_result.amount_out;
-    let actual_output = result.execution_result.amount_out;
-
-    println!("\n========================================");
-    println!("裁判：Quote 准确性验证");
-    println!("========================================\n");
-
-    println!("┌─────────────────────────────────────────────────────────────┐");
-    println!("│ 阶段                │ 输出 (原始单位) │ 说明                  │");
-    println!("├─────────────────────────────────────────────────────────────┤");
-    println!(
-        "│ 1. 本地计算         │ {:>12} │ sell_quote             │",
-        local_output
-    );
-    println!(
-        "│ 2. 实际执行         │ {:>12} │ send_transaction       │",
-        actual_output
-    );
-    println!("└─────────────────────────────────────────────────────────────┘");
-    println!();
-
-    let diff = local_output.abs_diff(actual_output);
-    let error_rate = if actual_output > 0 {
-        (diff as f64 / actual_output as f64) * 100.0
-    } else {
-        0.0
-    };
-
-    println!("┌─────────────────────────────────────────────────────────────┐");
-    println!("│ 差异分析                                                │");
-    println!("├─────────────────────────────────────────────────────────────┤");
-    println!("│ 本地 vs 实际:                                            │");
-    println!("│   绝对差异: {} (原始单位)                            │", diff);
-    println!("│   误差率:   {:.4}%                                         │", error_rate);
-    println!("└─────────────────────────────────────────────────────────────┘");
-    println!();
-
-    if error_rate <= 1.0 {
-        println!("✅ 裁判结果：Quote 计算准确");
-        println!("   本地 vs 实际: {:.4}% ≤ 1.0% ✓\n", error_rate);
-    } else {
+    // ===== 验证三阶段准确性（Quote + Simulation + Execution）=====
+    if let Err(e) = verify_three_stage_accuracy(&result, 1.0) {
         cleanup_pool_cache();
-        panic!(
-            "❌ 测试失败：Quote 计算误差过大\n   本地 vs 实际: {:.4}% > 1.0%",
-            error_rate
-        );
+        panic!("{}", e);
     }
 
     // 清理缓存
