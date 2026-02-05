@@ -53,8 +53,8 @@ pub fn get_swap_tick_arrays(
         ..Default::default()
     };
 
-    let mut tick_array_start_index =
-        crate::instruction::utils::raydium_clmm::get_first_initialized_tick_array_start_index(
+    let (_is_current_initialized, mut tick_array_start_index) =
+        crate::instruction::utils::raydium_clmm::get_first_initialized_tick_array(
             &pool_state_struct,
             zero_for_one,
         );

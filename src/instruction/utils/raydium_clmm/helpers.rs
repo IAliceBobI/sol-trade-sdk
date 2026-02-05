@@ -115,22 +115,38 @@ pub(crate) fn get_tick_array_start_index(tick_current: i32, tick_spacing: u16) -
 /// # 实现状态
 ///
 /// ✅ 已完成 - 移植自官方实现
-pub(crate) fn get_first_initialized_tick_array_start_index(
+///
+/// 返回 `(bool, i32)` 元组：
+/// - 第一个值表示"当前 tick array 是否已初始化"
+/// - 第二个值是"应该使用的第一个 tick array 起始索引"
+pub(crate) fn get_first_initialized_tick_array(
     pool_state: &crate::instruction::utils::raydium_clmm_types::PoolState,
     zero_for_one: bool,
-) -> i32 {
+) -> (bool, i32) {
     use crate::instruction::utils::raydium_clmm::tick_array_bitmap::{
-        next_initialized_tick_array_start_index, pool_bitmap_to_u1024,
+        check_current_tick_array_is_initialized, next_initialized_tick_array_start_index,
+        pool_bitmap_to_u1024,
     };
 
     // 将 PoolState 的 bitmap 转换为 U1024
     let bitmap = pool_bitmap_to_u1024(pool_state);
 
-    // 获取当前 tick 所在的 array 起始索引
+    // 首先检查当前 tick array 是否已初始化
+    if let Some((is_initialized, start_index)) = check_current_tick_array_is_initialized(
+        bitmap,
+        pool_state.tick_current,
+        pool_state.tick_spacing,
+    ) {
+        if is_initialized {
+            // 当前 array 已初始化，直接使用
+            return (true, start_index);
+        }
+    }
+
+    // 当前 array 未初始化，查找下一个已初始化的 array
     let current_array_start =
         get_tick_array_start_index(pool_state.tick_current, pool_state.tick_spacing);
 
-    // 从当前 array 开始搜索下一个已初始化的 array
     let (found, next_array_start) = next_initialized_tick_array_start_index(
         bitmap,
         current_array_start,
@@ -138,6 +154,10 @@ pub(crate) fn get_first_initialized_tick_array_start_index(
         zero_for_one,
     );
 
-    // 如果找到，返回下一个 array；否则返回当前 array
-    if found { next_array_start } else { current_array_start }
+    if found {
+        (false, next_array_start)
+    } else {
+        // 未找到任何已初始化的 array，返回当前 array（虽然它未初始化）
+        (false, current_array_start)
+    }
 }
