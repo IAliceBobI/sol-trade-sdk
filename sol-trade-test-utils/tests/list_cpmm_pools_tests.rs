@@ -6,7 +6,7 @@
 //! - Pool 字段验证
 //!
 //! 运行测试:
-//!     cargo nextest run --package sol-trade-test-utils list_pools_tests -- --nocapture
+//!     cargo nextest run --package sol-trade-test-utils list_cpmm_pools_tests -- --nocapture
 
 use sol_trade_sdk::{
     common::auto_mock_rpc::AutoMockRpcClient,
