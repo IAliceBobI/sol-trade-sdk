@@ -71,6 +71,7 @@ async fn test_pumpswap_wsol_pump_exact_in_buy_with_framework() {
         operation: OperationType::BuyExactIn,
         direction: TradeDirection::Token1ToToken0, // WSOL -> PUMP
         input_amount,
+        skip_local_quote: false, // 本地 Quote 准确，不需要跳过
     };
 
     // ===== 初始化 Client 和余额（框架外的准备）=====
@@ -99,7 +100,7 @@ async fn test_pumpswap_wsol_pump_exact_in_buy_with_framework() {
     };
 
     // ===== 验证结果（框架自动对比）=====
-    if let Err(e) = verify_three_stage_accuracy(&result, 1.0) {
+    if let Err(e) = verify_three_stage_accuracy(&result, 1.0, false) {
         cleanup_pool_cache();
         panic!("{}", e);
     }
@@ -151,6 +152,7 @@ async fn test_pumpswap_wsol_pump_sell_exact_in() {
         operation: OperationType::SellExactIn,
         direction: TradeDirection::Token0ToToken1, // PUMP -> WSOL
         input_amount,
+        skip_local_quote: false, // 本地 Quote 准确，不需要跳过
     };
 
     let client = create_test_client().await;
@@ -178,7 +180,7 @@ async fn test_pumpswap_wsol_pump_sell_exact_in() {
     };
 
     // 使用更宽松的误差容忍度（1%），因为 Token-2022 混合 Pool 可能有精度问题
-    if let Err(e) = verify_three_stage_accuracy(&result, 1.0) {
+    if let Err(e) = verify_three_stage_accuracy(&result, 1.0, false) {
         cleanup_pool_cache();
         panic!("{}", e);
     }

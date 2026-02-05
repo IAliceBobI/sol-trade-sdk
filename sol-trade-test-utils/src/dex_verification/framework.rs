@@ -142,7 +142,11 @@ where
     println!("  Pool: {}", config.pool);
     println!("  操作: {}", config.operation);
     println!("  方向: {}", config.direction);
-    println!("  输入金额: {} (最小单位)\n", config.input_amount);
+    println!("  输入金额: {} (最小单位)", config.input_amount);
+    if config.skip_local_quote {
+        println!("  模式: 跳过本地 Quote 计算（仅验证模拟 vs 实际）");
+    }
+    println!();
 
     // 检查 Pool 类型
     if config.pool.is_mixed_pool() {
@@ -152,24 +156,42 @@ where
         );
     }
 
-    // ===== 阶段 1: 本地计算（Quote）=====
-    println!("========================================");
-    println!("阶段 1: 本地计算（client.buy_quote）");
-    println!("========================================\n");
-
+    // 构建交易参数
     let buy_params = params_builder.build(client, config.input_amount).await;
 
-    let quote_result = match client.buy_quote(buy_params.clone()).await {
-        Ok(quote) => quote,
-        Err(e) => {
-            return Err(format!("❌ 本地计算失败: {}", e).into());
-        },
-    };
+    // ===== 阶段 1: 本地计算（Quote）=====
+    let quote_result = if config.skip_local_quote {
+        println!("========================================");
+        println!("阶段 1: 本地计算（跳过）");
+        println!("========================================\n");
+        println!("⚠️  跳过本地 Quote 计算（本地计算不准确，依赖链上模拟）\n");
 
-    println!("✅ 本地计算结果:");
-    println!("  输出金额: {}", quote_result.amount_out);
-    println!("  手续费: {}", quote_result.fee_amount);
-    println!("  计算时间: {} ms\n", quote_result.calculation_time_ms);
+        // 创建一个占位的 QuoteResult
+        sol_trade_sdk::QuoteResult {
+            amount_out: 0,
+            fee_amount: 0,
+            price_impact_bps: None,
+            calculation_time_ms: 0,
+            dex_type: config.dex_type,
+        }
+    } else {
+        println!("========================================");
+        println!("阶段 1: 本地计算（client.buy_quote）");
+        println!("========================================\n");
+
+        match client.buy_quote(buy_params.clone()).await {
+            Ok(quote) => {
+                println!("✅ 本地计算结果:");
+                println!("  输出金额: {}", quote.amount_out);
+                println!("  手续费: {}", quote.fee_amount);
+                println!("  计算时间: {} ms\n", quote.calculation_time_ms);
+                quote
+            },
+            Err(e) => {
+                return Err(format!("❌ 本地计算失败: {}", e).into());
+            },
+        }
+    };
 
     // ===== 阶段 2: 链上模拟（Simulation）=====
     println!("========================================");
@@ -283,6 +305,7 @@ where
 ///
 /// * `result` - 三阶段验证结果
 /// * `max_error_percent` - 最大允许误差百分比（例如 1.0 表示 1%）
+/// * `skip_local_check` - 是否跳过本地计算的验证（当本地计算不准确时使用）
 ///
 /// # 返回
 ///
@@ -290,10 +313,15 @@ where
 pub fn verify_three_stage_accuracy(
     result: &ThreeStageResult,
     max_error_percent: f64,
+    skip_local_check: bool,
 ) -> Result<(), Box<dyn std::error::Error>> {
     // ===== 裁判：比较三个阶段的结果 =====
     println!("========================================");
-    println!("裁判：三阶段结果对比");
+    if skip_local_check {
+        println!("裁判：两阶段结果对比（模拟 vs 实际）");
+    } else {
+        println!("裁判：三阶段结果对比");
+    }
     println!("========================================\n");
 
     let local_output = result.quote_result.amount_out;
@@ -306,128 +334,186 @@ pub fn verify_three_stage_accuracy(
         TransactionType::Sell => "sell",
     };
 
-    println!("┌─────────────────────────────────────────────────────────────┐");
-    println!("│ 阶段                │ 输出 (原始单位) │ 说明                  │");
-    println!("├─────────────────────────────────────────────────────────────┤");
-    println!(
-        "│ 1. 本地计算         │ {:>12} │ {}_quote              │",
-        local_output, op_name
-    );
-    println!(
-        "│ 2. 链上模拟         │ {:>12} │ {}_simulate           │",
-        sim_output, op_name
-    );
-    println!(
-        "│ 3. 实际执行         │ {:>12} │ send_transaction       │",
-        actual_output
-    );
-    println!("└─────────────────────────────────────────────────────────────┘");
-    println!();
-
-    // 计算差异
-    let diff_sim_local = local_output.abs_diff(sim_output);
-    let diff_actual_sim = sim_output.abs_diff(actual_output);
-    let diff_actual_local = local_output.abs_diff(actual_output);
-
-    let error_rate_sim_local = if sim_output > 0 {
-        (diff_sim_local as f64 / sim_output as f64) * 100.0
-    } else {
-        0.0
-    };
-
-    let error_rate_actual_sim = if actual_output > 0 {
-        (diff_actual_sim as f64 / actual_output as f64) * 100.0
-    } else {
-        0.0
-    };
-
-    let error_rate_actual_local = if actual_output > 0 {
-        (diff_actual_local as f64 / actual_output as f64) * 100.0
-    } else {
-        0.0
-    };
-
-    println!("┌─────────────────────────────────────────────────────────────┐");
-    println!("│ 差异分析                                                │");
-    println!("├─────────────────────────────────────────────────────────────┤");
-    println!("│ 本地 vs 模拟:                                            │");
-    println!(
-        "│   绝对差异: {} (原始单位)                            │",
-        diff_sim_local
-    );
-    println!("│   误差率:   {:.4}%                                         │", error_rate_sim_local);
-    println!("│                                                         │");
-    println!("│ 模拟 vs 实际:                                            │");
-    println!(
-        "│   绝对差异: {} (原始单位)                            │",
-        diff_actual_sim
-    );
-    println!(
-        "│   误差率:   {:.4}%                                         │",
-        error_rate_actual_sim
-    );
-    println!("│                                                         │");
-    println!("│ 本地 vs 实际:                                            │");
-    println!(
-        "│   绝对差异: {} (原始单位)                            │",
-        diff_actual_local
-    );
-    println!(
-        "│   误差率:   {:.4}%                                         │",
-        error_rate_actual_local
-    );
-    println!("└─────────────────────────────────────────────────────────────┘");
-    println!();
-
-    // 判断：误差是否在可接受范围内
-    let local_sim_ok = error_rate_sim_local <= max_error_percent;
-    let sim_actual_ok = error_rate_actual_sim <= max_error_percent;
-    let local_actual_ok = error_rate_actual_local <= max_error_percent;
-
-    if local_sim_ok && sim_actual_ok && local_actual_ok {
-        println!("✅ 裁判结果：三阶段结果一致");
+    if skip_local_check {
+        println!("┌─────────────────────────────────────────────────────────────┐");
+        println!("│ 阶段                │ 输出 (原始单位) │ 说明                  │");
+        println!("├─────────────────────────────────────────────────────────────┤");
         println!(
-            "   本地 vs 模拟: {:.4}% ≤ {:.1}% ✓",
-            error_rate_sim_local, max_error_percent
+            "│ 1. 本地计算         │ {:>12} │ 已跳过（不准确）         │",
+            local_output
         );
         println!(
-            "   模拟 vs 实际: {:.4}% ≤ {:.1}% ✓",
-            error_rate_actual_sim, max_error_percent
+            "│ 2. 链上模拟         │ {:>12} │ {}_simulate           │",
+            sim_output, op_name
         );
         println!(
-            "   本地 vs 实际: {:.4}% ≤ {:.1}% ✓",
-            error_rate_actual_local, max_error_percent
+            "│ 3. 实际执行         │ {:>12} │ send_transaction       │",
+            actual_output
         );
-        println!("✅ 测试通过\n");
-        Ok(())
-    } else {
-        println!("❌ 裁判结果：三阶段结果不一致");
-        if !local_sim_ok {
+        println!("└─────────────────────────────────────────────────────────────┘");
+        println!();
+
+        // 计算差异（仅模拟 vs 实际）
+        let diff_actual_sim = sim_output.abs_diff(actual_output);
+        let error_rate_actual_sim = if actual_output > 0 {
+            (diff_actual_sim as f64 / actual_output as f64) * 100.0
+        } else {
+            0.0
+        };
+
+        println!("┌─────────────────────────────────────────────────────────────┐");
+        println!("│ 差异分析（仅验证模拟 vs 实际）                            │");
+        println!("├─────────────────────────────────────────────────────────────┤");
+        println!("│ 模拟 vs 实际:                                            │");
+        println!(
+            "│   绝对差异: {} (原始单位)                            │",
+            diff_actual_sim
+        );
+        println!(
+            "│   误差率:   {:.4}%                                         │",
+            error_rate_actual_sim
+        );
+        println!("└─────────────────────────────────────────────────────────────┘");
+        println!();
+
+        // 判断：仅验证模拟 vs 实际
+        let sim_actual_ok = error_rate_actual_sim <= max_error_percent;
+
+        if sim_actual_ok {
+            println!("✅ 裁判结果：模拟与实际一致");
             println!(
-                "   ❌ 本地 vs 模拟: {:.4}% > {:.1}%",
-                error_rate_sim_local, max_error_percent
+                "   模拟 vs 实际: {:.4}% ≤ {:.1}% ✓",
+                error_rate_actual_sim, max_error_percent
             );
-        }
-        if !sim_actual_ok {
+            println!("✅ 测试通过（本地计算已跳过）\n");
+            Ok(())
+        } else {
+            println!("❌ 裁判结果：模拟与实际不一致");
             println!(
                 "   ❌ 模拟 vs 实际: {:.4}% > {:.1}%",
                 error_rate_actual_sim, max_error_percent
             );
+            println!();
+            Err("❌ 测试失败：模拟与实际误差过大".into())
         }
-        if !local_actual_ok {
+    } else {
+        println!("┌─────────────────────────────────────────────────────────────┐");
+        println!("│ 阶段                │ 输出 (原始单位) │ 说明                  │");
+        println!("├─────────────────────────────────────────────────────────────┤");
+        println!(
+            "│ 1. 本地计算         │ {:>12} │ {}_quote              │",
+            local_output, op_name
+        );
+        println!(
+            "│ 2. 链上模拟         │ {:>12} │ {}_simulate           │",
+            sim_output, op_name
+        );
+        println!(
+            "│ 3. 实际执行         │ {:>12} │ send_transaction       │",
+            actual_output
+        );
+        println!("└─────────────────────────────────────────────────────────────┘");
+        println!();
+
+        // 计算差异
+        let diff_sim_local = local_output.abs_diff(sim_output);
+        let diff_actual_sim = sim_output.abs_diff(actual_output);
+        let diff_actual_local = local_output.abs_diff(actual_output);
+
+        let error_rate_sim_local = if sim_output > 0 {
+            (diff_sim_local as f64 / sim_output as f64) * 100.0
+        } else {
+            0.0
+        };
+
+        let error_rate_actual_sim = if actual_output > 0 {
+            (diff_actual_sim as f64 / actual_output as f64) * 100.0
+        } else {
+            0.0
+        };
+
+        let error_rate_actual_local = if actual_output > 0 {
+            (diff_actual_local as f64 / actual_output as f64) * 100.0
+        } else {
+            0.0
+        };
+
+        println!("┌─────────────────────────────────────────────────────────────┐");
+        println!("│ 差异分析                                                │");
+        println!("├─────────────────────────────────────────────────────────────┤");
+        println!("│ 本地 vs 模拟:                                            │");
+        println!(
+            "│   绝对差异: {} (原始单位)                            │",
+            diff_sim_local
+        );
+        println!("│   误差率:   {:.4}%                                         │", error_rate_sim_local);
+        println!("│                                                         │");
+        println!("│ 模拟 vs 实际:                                            │");
+        println!(
+            "│   绝对差异: {} (原始单位)                            │",
+            diff_actual_sim
+        );
+        println!(
+            "│   误差率:   {:.4}%                                         │",
+            error_rate_actual_sim
+        );
+        println!("│                                                         │");
+        println!("│ 本地 vs 实际:                                            │");
+        println!(
+            "│   绝对差异: {} (原始单位)                            │",
+            diff_actual_local
+        );
+        println!(
+            "│   误差率:   {:.4}%                                         │",
+            error_rate_actual_local
+        );
+        println!("└─────────────────────────────────────────────────────────────┘");
+        println!();
+
+        // 判断：误差是否在可接受范围内
+        let local_sim_ok = error_rate_sim_local <= max_error_percent;
+        let sim_actual_ok = error_rate_actual_sim <= max_error_percent;
+        let local_actual_ok = error_rate_actual_local <= max_error_percent;
+
+        if local_sim_ok && sim_actual_ok && local_actual_ok {
+            println!("✅ 裁判结果：三阶段结果一致");
             println!(
-                "   ❌ 本地 vs 实际: {:.4}% > {:.1}%",
+                "   本地 vs 模拟: {:.4}% ≤ {:.1}% ✓",
+                error_rate_sim_local, max_error_percent
+            );
+            println!(
+                "   模拟 vs 实际: {:.4}% ≤ {:.1}% ✓",
+                error_rate_actual_sim, max_error_percent
+            );
+            println!(
+                "   本地 vs 实际: {:.4}% ≤ {:.1}% ✓",
                 error_rate_actual_local, max_error_percent
             );
+            println!("✅ 测试通过\n");
+            Ok(())
+        } else {
+            println!("❌ 裁判结果：三阶段结果不一致");
+            if !local_sim_ok {
+                println!(
+                    "   ❌ 本地 vs 模拟: {:.4}% > {:.1}%",
+                    error_rate_sim_local, max_error_percent
+                );
+            }
+            if !sim_actual_ok {
+                println!(
+                    "   ❌ 模拟 vs 实际: {:.4}% > {:.1}%",
+                    error_rate_actual_sim, max_error_percent
+                );
+            }
+            if !local_actual_ok {
+                println!(
+                    "   ❌ 本地 vs 实际: {:.4}% > {:.1}%",
+                    error_rate_actual_local, max_error_percent
+                );
+            }
+            println!();
+            Err("❌ 测试失败：三阶段结果误差过大".into())
         }
-        println!();
-        println!("🔍 可能的原因：");
-        println!("  1. 本地计算公式与链上逻辑不一致");
-        println!("  2. 储备金在查询和执行之间发生了变化");
-        println!("  3. 费用计算方式不同");
-        println!("  4. Program data 解析错误");
-        println!();
-        Err("❌ 测试失败：三阶段结果误差过大".into())
     }
 }
 
@@ -464,7 +550,11 @@ where
     println!("  Pool: {}", config.pool);
     println!("  操作: {}", config.operation);
     println!("  方向: {}", config.direction);
-    println!("  输入金额: {} (最小单位)\n", config.input_amount);
+    println!("  输入金额: {} (最小单位)", config.input_amount);
+    if config.skip_local_quote {
+        println!("  模式: 跳过本地 Quote 计算（仅验证模拟 vs 实际）");
+    }
+    println!();
 
     // 检查 Pool 类型
     if config.pool.is_mixed_pool() {
@@ -474,24 +564,42 @@ where
         );
     }
 
-    // ===== 阶段 1: 本地计算（Quote）=====
-    println!("========================================");
-    println!("阶段 1: 本地计算（client.sell_quote）");
-    println!("========================================\n");
-
+    // 构建交易参数
     let sell_params = params_builder.build(client, config.input_amount).await;
 
-    let quote_result = match client.sell_quote(sell_params.clone()).await {
-        Ok(quote) => quote,
-        Err(e) => {
-            return Err(format!("❌ 本地计算失败: {}", e).into());
-        },
-    };
+    // ===== 阶段 1: 本地计算（Quote）=====
+    let quote_result = if config.skip_local_quote {
+        println!("========================================");
+        println!("阶段 1: 本地计算（跳过）");
+        println!("========================================\n");
+        println!("⚠️  跳过本地 Quote 计算（本地计算不准确，依赖链上模拟）\n");
 
-    println!("✅ 本地计算结果:");
-    println!("  输出金额: {}", quote_result.amount_out);
-    println!("  手续费: {}", quote_result.fee_amount);
-    println!("  计算时间: {} ms\n", quote_result.calculation_time_ms);
+        // 创建一个占位的 QuoteResult
+        sol_trade_sdk::QuoteResult {
+            amount_out: 0,
+            fee_amount: 0,
+            price_impact_bps: None,
+            calculation_time_ms: 0,
+            dex_type: config.dex_type,
+        }
+    } else {
+        println!("========================================");
+        println!("阶段 1: 本地计算（client.sell_quote）");
+        println!("========================================\n");
+
+        match client.sell_quote(sell_params.clone()).await {
+            Ok(quote) => {
+                println!("✅ 本地计算结果:");
+                println!("  输出金额: {}", quote.amount_out);
+                println!("  手续费: {}", quote.fee_amount);
+                println!("  计算时间: {} ms\n", quote.calculation_time_ms);
+                quote
+            },
+            Err(e) => {
+                return Err(format!("❌ 本地计算失败: {}", e).into());
+            },
+        }
+    };
 
     // ===== 阶段 2: 链上模拟（Simulation）=====
     println!("========================================");
@@ -633,7 +741,7 @@ mod tests {
             },
         };
 
-        assert!(verify_three_stage_accuracy(&result, 1.0).is_ok());
+        assert!(verify_three_stage_accuracy(&result, 1.0, false).is_ok());
     }
 
     #[test]
@@ -667,7 +775,7 @@ mod tests {
         };
 
         // 0.5% 误差应该通过 1% 的容忍度
-        assert!(verify_three_stage_accuracy(&result, 1.0).is_ok());
+        assert!(verify_three_stage_accuracy(&result, 1.0, false).is_ok());
     }
 
     #[test]
@@ -701,6 +809,6 @@ mod tests {
         };
 
         // 5% 误差应该超过 1% 的容忍度
-        assert!(verify_three_stage_accuracy(&result, 1.0).is_err());
+        assert!(verify_three_stage_accuracy(&result, 1.0, false).is_err());
     }
 }

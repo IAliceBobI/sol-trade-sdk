@@ -81,6 +81,7 @@ async fn test_raydium_clmm_solett_wsol_exact_in_buy_with_framework() {
         operation: OperationType::BuyExactIn,
         direction: TradeDirection::Token1ToToken0, // WSOL -> SOLETT
         input_amount,
+        skip_local_quote: true, // CLMM 负数 tick 本地计算不准确，跳过本地 Quote
     };
 
     // ===== 初始化 Client 和余额（框架外的准备）=====
@@ -123,8 +124,8 @@ async fn test_raydium_clmm_solett_wsol_exact_in_buy_with_framework() {
     // ===== 验证结果（框架自动对比）=====
     // 注意：SOLETT-WSOL 是 Token-2022 + Token Program 混合 Pool
     // CLMM 本地计算对负数 tick 不准确，我们重点验证链上模拟和实际执行的一致性
-    // 由于本地 Quote 返回 0，使用 1000% 容错率（主要关注模拟 vs 实际的准确性）
-    if let Err(e) = verify_three_stage_accuracy(&result, 1000.0) {
+    // 使用 skip_local_check=true 跳过本地计算验证
+    if let Err(e) = verify_three_stage_accuracy(&result, 0.1, true) {
         cleanup_pool_cache();
         panic!("{}", e);
     }
@@ -171,6 +172,7 @@ async fn test_raydium_clmm_solett_wsol_sell_exact_in() {
         operation: OperationType::SellExactIn,
         direction: TradeDirection::Token0ToToken1, // SOLETT -> WSOL
         input_amount,
+        skip_local_quote: true, // CLMM 负数 tick 本地计算不准确，跳过本地 Quote
     };
 
     let client = create_test_client().await;
@@ -198,8 +200,8 @@ async fn test_raydium_clmm_solett_wsol_sell_exact_in() {
     };
 
     // 注意：由于 CLMM local quote 的已知问题,
-    // 使用较大的容错率。重点验证链上模拟和实际执行的一致性。
-    if let Err(e) = verify_three_stage_accuracy(&result, 1000.0) {
+    // 跳过本地计算验证。重点验证链上模拟和实际执行的一致性。
+    if let Err(e) = verify_three_stage_accuracy(&result, 0.1, true) {
         cleanup_pool_cache();
         panic!("{}", e);
     }

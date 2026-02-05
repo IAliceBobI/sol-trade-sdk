@@ -90,6 +90,7 @@ async fn test_ammv4_exact_in_buy_three_stage_verification_with_framework() {
         operation: OperationType::BuyExactIn,
         direction: TradeDirection::Token0ToToken1, // WSOL -> USDC
         input_amount,
+        skip_local_quote: false, // AMM V4 本地 Quote 准确，不需要跳过
     };
 
     // ===== 初始化 Client 和余额（框架外的准备）=====
@@ -131,7 +132,8 @@ async fn test_ammv4_exact_in_buy_three_stage_verification_with_framework() {
     };
 
     // ===== 验证三阶段准确性（Quote + Simulation + Execution）=====
-    if let Err(e) = verify_three_stage_accuracy(&result, 1.0) {
+    // AMM V4 是纯 Token Pool，期望 0% 误差，不跳过本地计算验证
+    if let Err(e) = verify_three_stage_accuracy(&result, 1.0, false) {
         cleanup_pool_cache();
         panic!("{}", e);
     }
@@ -211,6 +213,7 @@ async fn test_ammv4_exact_in_sell_three_stage_verification_with_framework() {
         operation: OperationType::SellExactIn,
         direction: TradeDirection::Token1ToToken0, // USDC -> WSOL
         input_amount,
+        skip_local_quote: false, // AMM V4 本地 Quote 准确，不需要跳过
     };
 
     // ===== 初始化 Client 和余额（框架外的准备）=====
@@ -252,7 +255,8 @@ async fn test_ammv4_exact_in_sell_three_stage_verification_with_framework() {
     };
 
     // ===== 验证三阶段准确性（Quote + Simulation + Execution）=====
-    if let Err(e) = verify_three_stage_accuracy(&result, 1.0) {
+    // AMM V4 是纯 Token Pool，期望 0% 误差，不跳过本地计算验证
+    if let Err(e) = verify_three_stage_accuracy(&result, 1.0, false) {
         cleanup_pool_cache();
         panic!("{}", e);
     }

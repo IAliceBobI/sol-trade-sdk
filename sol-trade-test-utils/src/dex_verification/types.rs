@@ -174,6 +174,8 @@ pub struct DexVerifyConfig {
     pub direction: TradeDirection,
     /// 输入金额
     pub input_amount: u64,
+    /// 是否跳过本地 Quote 计算（适用于本地计算不准确的场景，如 CLMM 负数 tick）
+    pub skip_local_quote: bool,
 }
 
 impl fmt::Display for DexVerifyConfig {

@@ -72,6 +72,7 @@ async fn test_cpmm_usdc_prts_exact_in_buy_with_framework() {
         operation: OperationType::BuyExactIn,
         direction: TradeDirection::Token0ToToken1, // USDC -> PRTS
         input_amount,
+        skip_local_quote: false, // CPMM 本地 Quote 准确，不需要跳过
     };
 
     // ===== 初始化 Client 和余额（框架外的准备）=====
@@ -100,7 +101,8 @@ async fn test_cpmm_usdc_prts_exact_in_buy_with_framework() {
     };
 
     // ===== 验证结果（框架自动对比）=====
-    if let Err(e) = verify_three_stage_accuracy(&result, 1.0) {
+    // 混合 Pool（Token-2022 + Token），本地计算可能有 0.04% 误差，使用 1% 容错
+    if let Err(e) = verify_three_stage_accuracy(&result, 1.0, false) {
         cleanup_pool_cache();
         panic!("{}", e);
     }
@@ -160,6 +162,7 @@ async fn test_cpmm_usdc_prts_sell_exact_in() {
         operation: OperationType::SellExactIn,
         direction: TradeDirection::Token1ToToken0, // PRTS -> USDC
         input_amount,
+        skip_local_quote: false, // CPMM 本地 Quote 准确，不需要跳过
     };
 
     let client = create_test_client().await;
@@ -187,7 +190,8 @@ async fn test_cpmm_usdc_prts_sell_exact_in() {
     };
 
     // 使用更宽松的误差容忍度（1%），因为 Token-2022 混合 Pool 有已知精度问题
-    if let Err(e) = verify_three_stage_accuracy(&result, 1.0) {
+    // 不跳过本地计算验证
+    if let Err(e) = verify_three_stage_accuracy(&result, 1.0, false) {
         cleanup_pool_cache();
         panic!("{}", e);
     }

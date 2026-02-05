@@ -56,6 +56,7 @@ async fn test_cpmm_exact_in_buy_three_stage_verification_with_framework() {
         operation: OperationType::BuyExactIn,
         direction: TradeDirection::Token1ToToken0, // WSOL -> PIPE
         input_amount,
+        skip_local_quote: false, // 本地 Quote 准确，不需要跳过
     };
 
     // ===== 初始化 Client 和余额（框架外的准备）=====
@@ -110,7 +111,7 @@ async fn test_cpmm_exact_in_buy_three_stage_verification_with_framework() {
     };
 
     // ===== 验证结果（框架自动对比）=====
-    if let Err(e) = verify_three_stage_accuracy(&result, 1.0) {
+    if let Err(e) = verify_three_stage_accuracy(&result, 1.0, false) {
         cleanup_pool_cache();
         panic!("{}", e);
     }
@@ -157,6 +158,7 @@ async fn test_cpmm_exact_in_sell_three_stage_verification_with_framework() {
         operation: OperationType::SellExactIn,
         direction: TradeDirection::Token0ToToken1, // PIPE -> WSOL
         input_amount,
+        skip_local_quote: false, // 本地 Quote 准确，不需要跳过
     };
 
     // ===== 初始化 Client 和余额（框架外的准备）=====
@@ -211,7 +213,7 @@ async fn test_cpmm_exact_in_sell_three_stage_verification_with_framework() {
     };
 
     // ===== 验证结果（框架自动对比）=====
-    if let Err(e) = verify_three_stage_accuracy(&result, 1.0) {
+    if let Err(e) = verify_three_stage_accuracy(&result, 1.0, false) {
         cleanup_pool_cache();
         panic!("{}", e);
     }
