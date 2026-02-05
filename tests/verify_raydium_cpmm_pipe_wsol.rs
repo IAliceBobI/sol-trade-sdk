@@ -40,7 +40,7 @@ impl BuyParamsBuilder for PipeWsolParamsBuilder {
 }
 
 #[tokio::test]
-#[serial_test::serial(cpmm_exact_in_buy_complete_framework)]
+#[serial_test::serial(cpmm_pipe_wsol_pool)] // 使用同一把锁，避免并行测试修改同一个 pool
 async fn test_cpmm_exact_in_buy_three_stage_verification_with_framework() {
     // ===== 测试配置（仅此部分需要修改）=====
     let input_amount = 100u64; // 0.0001 SOL（买入少量 PIPE）
@@ -141,7 +141,7 @@ impl SellParamsBuilder for PipeWsolSellExactInParamsBuilder {
 }
 
 #[tokio::test]
-#[serial_test::serial(cpmm_exact_in_sell_complete_framework)]
+#[serial_test::serial(cpmm_pipe_wsol_pool)] // 使用同一把锁，避免并行测试修改同一个 pool
 async fn test_cpmm_exact_in_sell_three_stage_verification_with_framework() {
     // ===== 测试配置（仅此部分需要修改）=====
     let input_amount = 1_000_000_000_u64; // 卖出 10 PIPE（增加卖出金额以匹配 DEX 不平衡）

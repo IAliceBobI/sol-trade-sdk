@@ -73,7 +73,7 @@ impl BuyParamsBuilder for WsolUsdcParamsBuilder {
 }
 
 #[tokio::test]
-#[serial_test::serial(ammv4_exact_in_buy_complete_framework)]
+#[serial_test::serial(ammv4_wsol_usdc_pool)] // 使用同一把锁，避免并行测试修改同一个 pool
 async fn test_ammv4_exact_in_buy_three_stage_verification_with_framework() {
     // ===== 测试配置（仅此部分需要修改）=====
     let input_amount = 20_000_000u64; // 0.02 SOL（买入少量 USDC）
@@ -237,7 +237,7 @@ impl SellParamsBuilder for WsolUsdcSellExactInParamsBuilder {
 }
 
 #[tokio::test]
-#[serial_test::serial(ammv4_exact_in_sell_complete_framework)]
+#[serial_test::serial(ammv4_wsol_usdc_pool)] // 使用同一把锁，避免并行测试修改同一个 pool
 async fn test_ammv4_exact_in_sell_three_stage_verification_with_framework() {
     // ===== 测试配置（仅此部分需要修改）=====
     let input_amount = 1_000_000u64; // 卖出 1 USDC

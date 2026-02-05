@@ -54,7 +54,7 @@ impl BuyParamsBuilder for UsdcPrtsParamsBuilder {
 }
 
 #[tokio::test]
-#[serial_test::serial(cpmm_usdc_prts_framework)]
+#[serial_test::serial(cpmm_usdc_prts_pool)] // 使用同一把锁，避免并行测试修改同一个 pool
 async fn test_cpmm_usdc_prts_exact_in_buy_with_framework() {
     // ===== 测试配置（仅此部分需要修改）=====
     // ⚠️ 注意：USDC decimals = 6，所以：
@@ -145,7 +145,7 @@ impl SellParamsBuilder for UsdcPrtsSellExactInParamsBuilder {
 }
 
 #[tokio::test]
-#[serial_test::serial(cpmm_usdc_prts_sell_exact_in)]
+#[serial_test::serial(cpmm_usdc_prts_pool)] // 使用同一把锁，避免并行测试修改同一个 pool
 async fn test_cpmm_usdc_prts_sell_exact_in() {
     // ⚠️ 注意：PRTS decimals = 9，所以：
     // - 1 PRTS = 1,000,000,000 units
