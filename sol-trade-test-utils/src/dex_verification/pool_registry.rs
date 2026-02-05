@@ -83,7 +83,22 @@ impl RaydiumCpmmPoolRegistry {
 pub struct RaydiumClmmPoolRegistry;
 
 impl RaydiumClmmPoolRegistry {
-    // TODO: 添加 CLMM Pool 配置
+    /// USDT-WSOL (Token/Token)
+    ///
+    /// - Pool: ExcBWu8fGPdJiaF1b1z3iEef38sjQJks8xvj6M85pPY6
+    /// - USDT: Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB (Token Program)
+    /// - WSOL: So11111111111111111111111111111111111111112 (Token Program)
+    pub fn usdt_wsol() -> PoolConfig {
+        PoolConfig::new(
+            Pubkey::from_str("ExcBWu8fGPdJiaF1b1z3iEef38sjQJks8xvj6M85pPY6").unwrap(),
+            "USDT-WSOL",
+            Pubkey::from_str("Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB").unwrap(),
+            super::TokenProgramType::Token,
+            Pubkey::from_str("So11111111111111111111111111111111111111112").unwrap(),
+            super::TokenProgramType::Token,
+            10,
+        )
+    }
 }
 
 /// Raydium AMM V4 Pool 注册表
