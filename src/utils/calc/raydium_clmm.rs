@@ -274,7 +274,29 @@ pub fn calculate_swap_amount_with_tick_arrays(
 
             loop_count += 1;
         } else {
-            // 没有更多 tick array，跳出循环
+            // 没有找到下一个初始化的 tick
+            // 在当前价格区间完成交易（使用当前价格作为目标，价格不变）
+            let swap_step = compute_swap_step(
+                state.sqrt_price_x64,
+                state.sqrt_price_x64,
+                state.liquidity,
+                state.amount_specified_remaining,
+                fee_rate,
+                true,
+                zero_for_one,
+            )?;
+
+            // 更新剩余量和计算量
+            state.amount_specified_remaining = state
+                .amount_specified_remaining
+                .checked_sub(swap_step.amount_in + swap_step.fee_amount)
+                .ok_or("amount underflow")?;
+            state.amount_calculated =
+                state.amount_calculated.checked_add(swap_step.amount_out).ok_or("amount overflow")?;
+            state.fee_amount =
+                state.fee_amount.checked_add(swap_step.fee_amount).ok_or("fee amount overflow")?;
+
+            // 跳出循环
             break;
         }
 
@@ -306,20 +328,37 @@ fn find_next_initialized_tick(
     _tick_spacing: u16,
     zero_for_one: bool,
 ) -> Option<(i32, bool, i128)> {
+    // 首先尝试找最接近的初始化 tick
+    let mut best_tick: Option<(i32, bool, i128)> = None;
+
     for (_start_index, ticks) in tick_arrays {
         for &(tick, liquidity_net, liquidity_gross) in ticks {
             let is_initialized = liquidity_gross > 0;
+            if !is_initialized {
+                continue;
+            }
 
             if zero_for_one {
-                if tick <= current_tick && is_initialized {
-                    return Some((tick, is_initialized, liquidity_net));
+                // token0 -> token1, 价格下降
+                // 找小于等于当前 tick 的最大 tick
+                if tick <= current_tick {
+                    if best_tick.is_none() || tick > best_tick.unwrap().0 {
+                        best_tick = Some((tick, is_initialized, liquidity_net));
+                    }
                 }
-            } else if tick > current_tick && is_initialized {
-                return Some((tick, is_initialized, liquidity_net));
+            } else {
+                // token1 -> token0, 价格上涨
+                // 找大于当前 tick 的最小 tick
+                if tick > current_tick {
+                    if best_tick.is_none() || tick < best_tick.unwrap().0 {
+                        best_tick = Some((tick, is_initialized, liquidity_net));
+                    }
+                }
             }
         }
     }
-    None
+
+    best_tick
 }
 
 /// 判断是否需要移动到下一个 tick array
