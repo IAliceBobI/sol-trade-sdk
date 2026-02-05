@@ -124,7 +124,173 @@ pub async fn ensure_token_balance(
     crate::token::set_token_balance(rpc_client, rpc_url, payer, mint, &decimal_formatted).await
 }
 
-/// 确保 PIPE Pool 有足够的 WSOL 流动性
+/// 通过大额 Swap 确保 PIPE-WSOL Pool 流动性（推荐方法）
+///
+/// ## 设计理念
+///
+/// 相比于直接添加流动性（需要同时提供 WSOL 和 PIPE），**通过大额 Swap 更优**：
+///
+/// 1. **只需要 WSOL** - 不需要预先持有 PIPE
+/// 2. **同时增加两个 vault 的余额** - Swap 后 WSOL 和 PIPE 都会增加
+/// 3. **提高 PIPE 价格** - 大额买入会推高 PIPE 价格，使 Pool 更健康
+/// 4. **更接近真实场景** - 模拟真实的大额交易
+/// 5. **后续测试可以卖出** - 持有的 PIPE 可以用于卖出测试
+///
+/// ## 工作原理
+///
+/// 通过执行一笔大额 WSOL → PIPE 的 Swap：
+/// - **WSOL 进入 Pool**: WSOL vault 增加
+/// - **PIPE 从 Pool 提出**: PIPE vault 减少（但仍有剩余）
+/// - **获得 PIPE 代币**: 测试账户获得 PIPE，可用于卖出测试
+///
+/// ⚠️ 仅适用于测试环境
+///
+/// # 参数
+/// * `rpc_client` - RPC 客户端
+/// * `rpc_url` - RPC URL
+/// * `payer` - 账户 Keypair（需要持有足够的 WSOL）
+/// * `swap_amount_sol` - Swap 金额（SOL 单位，如 10 表示 10 SOL）
+///
+/// # 示例
+/// ```ignore
+/// // 通过大额 Swap 确保 PIPE Pool 流动性
+/// ensure_pipe_pool_liquidity_via_swap(
+///     &rpc,
+///     "http://127.0.0.1:8899",
+///     &payer,
+///     10, // Swap 10 SOL 买入 PIPE
+/// ).await?;
+/// ```
+pub async fn ensure_pipe_pool_liquidity_via_swap(
+    rpc_client: &Arc<RpcClient>,
+    rpc_url: &str,
+    payer: &Keypair,
+    swap_amount_sol: u64,
+) -> Result<(), String> {
+    use solana_commitment_config::CommitmentConfig;
+    use sol_trade_sdk::{SolanaTrade, TradeConfig};
+    use sol_trade_sdk::swqos::SwqosConfig;
+    use std::sync::Arc;
+
+    let swap_amount_lamports = swap_amount_sol * 1_000_000_000;
+
+    println!("💰 通过大额 Swap 确保 PIPE Pool 流动性...");
+    println!("   Swap 金额: {} SOL ({} lamports)", swap_amount_sol, swap_amount_lamports);
+    println!("   方向: WSOL → PIPE");
+
+    // 1. 确保 payer 有足够的 WSOL 余额
+    println!("\n📋 步骤 1: 确保 WSOL 余额...");
+    let wsol_mint = crate::test_params::wsol_mint();
+    ensure_token_balance(
+        rpc_client,
+        rpc_url,
+        payer,
+        &wsol_mint,
+        &format!("{}", swap_amount_sol * 2),
+    )
+    .await
+    .map_err(|e| format!("确保 WSOL 余额失败: {}", e))?;
+    println!("✅ WSOL 余额充足");
+
+    // 2. 创建 TradingClient（使用正确的 API）
+    println!("\n📋 步骤 2: 创建 TradingClient...");
+    let payer_arc = Arc::new(payer.insecure_clone());
+
+    // 创建 TradeConfig
+    let commitment = CommitmentConfig::confirmed();
+    let swqos_configs: Vec<SwqosConfig> = vec![SwqosConfig::Default(rpc_url.to_string())];
+    let trade_config = TradeConfig::new(rpc_url.to_string(), swqos_configs, commitment)
+        .with_wsol_ata_config(true, false);
+
+    // 创建 TradingClient
+    let client = SolanaTrade::new(payer_arc.clone(), trade_config).await;
+    println!("✅ TradingClient 创建成功");
+
+    // 3. 构建 Swap 参数（WSOL → PIPE）
+    println!("\n📋 步骤 3: 构建 Swap 参数...");
+    let buy_params = crate::test_params::PipeWsolBuyParamsBuilder::new(Some(swap_amount_lamports))
+        .slippage(2000); // 20% 滑点（Pool 流动性不足时需要更大的滑点容忍度）
+
+    let buy_params = buy_params.build(&client).await;
+    println!("✅ Swap 参数构建成功");
+    println!("   输入: {} WSOL", swap_amount_sol);
+    println!("   滑点: 20%");
+
+    // 4. 执行 Swap
+    println!("\n📋 步骤 4: 执行 Swap...");
+    println!("   ⏳ 正在通过大额买入增加 PIPE Pool 流动性...");
+
+    let (success, sigs, error) = client
+        .buy(buy_params)
+        .await
+        .map_err(|e| format!("Swap 调用失败: {}", e).to_string())?;
+
+    if !success {
+        if let Some(err) = error {
+            return Err(format!("Swap 失败: {}", err));
+        } else {
+            return Err("Swap 失败: 未知错误".to_string());
+        }
+    }
+
+    println!("✅ Swap 成功！");
+    if let Some(sig) = sigs.first() {
+        println!("   签名: {}", sig);
+    }
+
+    // 5. 等待交易确认
+    println!("\n📋 步骤 5: 等待交易确认...");
+    if let Some(sig) = sigs.first() {
+        tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
+        match rpc_client.get_signature_status(sig).await {
+            Ok(Some(status)) => {
+                if let Ok(()) = status {
+                    println!("✅ 交易已确认");
+                } else {
+                    println!("⚠️  交易确认失败: {:?}", status);
+                }
+            }
+            _ => {
+                println!("⚠️  无法获取交易状态");
+            }
+        }
+    }
+
+    // 6. 验证流动性
+    println!("\n📋 步骤 6: 验证 Pool 流动性...");
+    let pool_address = crate::test_params::pipe_wsol_pool();
+    let pool_state = get_pool_by_address(rpc_client, &pool_address)
+        .await
+        .map_err(|e| format!("获取 Pool 状态失败: {}", e))?;
+
+    let wsol_vault_balance = rpc_client
+        .get_token_account_balance(&pool_state.token1_vault)
+        .await
+        .map(|b| b.amount.parse::<u64>().unwrap_or(0))
+        .unwrap_or(0);
+    let pipe_vault_balance = rpc_client
+        .get_token_account_balance(&pool_state.token0_vault)
+        .await
+        .map(|b| b.amount.parse::<u64>().unwrap_or(0))
+        .unwrap_or(0);
+
+    let wsol_vault_sol = wsol_vault_balance as f64 / 1_000_000_000.0;
+    let pipe_vault_human = pipe_vault_balance as f64 / 1_000_000.0;
+
+    println!("✅ Pool 流动性验证成功");
+    println!("   WSOL Vault: {:.6} SOL", wsol_vault_sol);
+    println!("   PIPE Vault: {:.2} PIPE", pipe_vault_human);
+    println!("\n✨ PIPE Pool 流动性添加完成！");
+
+    Ok(())
+}
+
+/// 确保 PIPE Pool 有足够的 WSOL 流动性（旧方法，不推荐）
+///
+/// ⚠️ **已弃用**: 此方法需要同时提供 WSOL 和 PIPE，不如使用 `ensure_pipe_pool_liquidity_via_swap`
+///
+/// 此方法通过直接添加流动性（deposit）来增加 Pool 的 WSOL 余额。
+/// 相比之下，`ensure_pipe_pool_liquidity_via_swap` 方法更简单、更有效。
 ///
 /// 便捷函数，专门用于确保 PIPE-WSOL pool 有指定数量的 WSOL 流动性。
 /// 如果当前 WSOL vault 余额不足，会自动添加流动性以达到目标值。
@@ -147,6 +313,7 @@ pub async fn ensure_token_balance(
 ///     1000,
 /// ).await?;
 /// ```
+#[deprecated(note = "使用 ensure_pipe_pool_liquidity_via_swap 代替")]
 pub async fn ensure_pipe_pool_wsol_liquidity(
     rpc_client: &Arc<RpcClient>,
     rpc_url: &str,

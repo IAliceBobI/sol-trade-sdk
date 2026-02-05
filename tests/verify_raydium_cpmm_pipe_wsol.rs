@@ -13,7 +13,7 @@ use sol_trade_test_utils::{
         SellParamsBuilder, TradeDirection, cleanup_pool_cache, run_dex_three_stage_verification,
         run_dex_three_stage_verification_sell, verify_three_stage_accuracy,
     },
-    ensure_pipe_pool_wsol_liquidity, ensure_token_balance, pipe_mint, wsol_mint,
+    ensure_pipe_pool_liquidity_via_swap, ensure_token_balance, pipe_mint, wsol_mint,
 };
 
 // 参数构建器结构体
@@ -39,7 +39,7 @@ impl BuyParamsBuilder for PipeWsolParamsBuilder {
 #[serial_test::serial(cpmm_pipe_wsol_pool)] // 使用同一把锁，避免并行测试修改同一个 pool
 async fn test_cpmm_exact_in_buy_three_stage_verification_with_framework() {
     // ===== 测试配置（仅此部分需要修改）=====
-    let input_amount = 100u64; // 0.0001 SOL（买入少量 PIPE）
+    let input_amount = 1_000_000u64; // 0.001 SOL（增加测试金额，避免最小交易限制）
     let rpc_url = "http://127.0.0.1:8899";
 
     // 使用 Pool 注册表获取配置
@@ -58,12 +58,13 @@ async fn test_cpmm_exact_in_buy_three_stage_verification_with_framework() {
     // ===== 初始化 Client 和余额（框架外的准备）=====
     let client = create_test_client().await;
 
-    // 确保 PIPE Pool 流动性
+    // 通过大额 Swap 确保 PIPE Pool 流动性（推荐方法）
+    // 使用 1 SOL 进行大额买入，既增加流动性又提高 PIPE 价格
+    // 注意：如果 1 SOL 仍然太大，可以尝试更小的金额（如 0.1 SOL）
     if let Err(e) =
-        ensure_pipe_pool_wsol_liquidity(&client.rpc, rpc_url, client.payer.as_ref(), 1).await
+        ensure_pipe_pool_liquidity_via_swap(&client.rpc, rpc_url, client.payer.as_ref(), 1).await
     {
-        println!("⚠️  警告: 确保 PIPE Pool 流动性失败: {}", e);
-        println!("继续测试，但可能因为流动性不足而失败...");
+        panic!("❌ 确保 PIPE Pool 流动性失败: {}", e);
     }
 
     // 确保 WSOL 余额
@@ -125,7 +126,7 @@ impl SellParamsBuilder for PipeWsolSellExactInParamsBuilder {
 #[serial_test::serial(cpmm_pipe_wsol_pool)] // 使用同一把锁，避免并行测试修改同一个 pool
 async fn test_cpmm_exact_in_sell_three_stage_verification_with_framework() {
     // ===== 测试配置（仅此部分需要修改）=====
-    let input_amount = 1_000_000_000_u64; // 卖出 10 PIPE（增加卖出金额以匹配 DEX 不平衡）
+    let input_amount = 1_000_000_000u64; // 卖出 1000 PIPE（增加卖出金额以匹配 DEX 不平衡）
     let rpc_url = "http://127.0.0.1:8899";
 
     // 使用 Pool 注册表获取配置
@@ -144,15 +145,17 @@ async fn test_cpmm_exact_in_sell_three_stage_verification_with_framework() {
     // ===== 初始化 Client 和余额（框架外的准备）=====
     let client = create_test_client().await;
 
-    // 确保 PIPE Pool 流动性
+    // 通过大额 Swap 确保 PIPE Pool 流动性（推荐方法）
+    // 使用 1 SOL 进行大额买入，既增加流动性又获得 PIPE 用于卖出测试
+    // 注意：如果 1 SOL 仍然太大，可以尝试更小的金额（如 0.1 SOL）
     if let Err(e) =
-        ensure_pipe_pool_wsol_liquidity(&client.rpc, rpc_url, client.payer.as_ref(), 1).await
+        ensure_pipe_pool_liquidity_via_swap(&client.rpc, rpc_url, client.payer.as_ref(), 1).await
     {
-        println!("⚠️  警告: 确保 PIPE Pool 流动性失败: {}", e);
-        println!("继续测试，但可能因为流动性不足而失败...");
+        panic!("❌ 确保 PIPE Pool 流动性失败: {}", e);
     }
 
     // 确保 PIPE 余额（卖出需要持有 PIPE）
+    // 注意：由于上面的 swap 已经获得了 PIPE，这里只需要确保 ATA 存在即可
     if let Err(e) = ensure_token_balance(
         &client.rpc,
         rpc_url,

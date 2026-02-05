@@ -37,8 +37,9 @@ pub mod token;
 // 重新导出常用类型
 pub use airdrop::airdrop_and_wait;
 pub use ensure::{
-    ensure_cpmm_liquidity, ensure_pipe_pool_wsol_liquidity, ensure_sol_balance,
-    ensure_token_balance, ensure_usdc_prts_pool_usdc_liquidity,
+    ensure_cpmm_liquidity, ensure_pipe_pool_liquidity_via_swap,
+    ensure_pipe_pool_wsol_liquidity, ensure_sol_balance, ensure_token_balance,
+    ensure_usdc_prts_pool_usdc_liquidity,
 };
 pub use token::{get_mint_info, mint_token_to, set_token_balance, transfer_token_to, MintInfo};
 
