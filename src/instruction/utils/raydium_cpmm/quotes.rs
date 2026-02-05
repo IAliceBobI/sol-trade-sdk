@@ -54,14 +54,18 @@ async fn get_creator_fees_from_pool_data(
 ///
 /// **混合 Pool**（Token-2022 + Token Program）：
 /// - 本地计算 vs 链上执行误差：**约 0.04%**
-/// - 原因：Token-2022 的 Transfer Fee 扩展和内部状态计算方式与标准 Token 不同
-/// - 即使当前 Transfer Fee 为 0%，链上程序在处理混合 Pool 时仍有细微计算差异
 /// - 示例：USDC-PRTS Pool（PRTS 使用 Token-2022，USDC 使用标准 Token）
 ///
 /// **技术细节**：
 /// - Token-2022 支持扩展功能（Transfer Fee、Interest Bearing、Confidential Transfer 等）
-/// - 链上程序在处理 Token-2022 转账时会检查并应用这些扩展
-/// - 本地 Quote 计算使用简化的数学模型，无法完全模拟链上的 Token-2022 扩展逻辑
+/// - **Transfer Fee 处理**：
+///   - 即使 Token 启用了 Transfer Fee 扩展，实际费率可能为 0%（如 PRTS）
+///   - SDK 的 Quote 计算假设 Transfer Fee 为 0，适用于大多数场景
+///   - 如果 Token 有非零 Transfer Fee，链上会自动扣除，导致输出略低于预期
+/// - **0.04% 误差来源**：
+///   - Token-2022 扩展数据的内部状态计算方式与标准 Token 有细微差异
+///   - 链上程序处理混合 Pool 时的额外计算（扩展验证、状态更新等）
+///   - 累积手续费（protocol_fees + fund_fees）扣除精度
 /// - 0.04% 误差在可接受范围内（通常滑点容忍度为 0.1%-1%）
 ///
 /// # Arguments
