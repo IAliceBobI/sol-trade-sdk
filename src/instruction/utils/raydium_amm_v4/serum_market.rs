@@ -15,42 +15,51 @@ const MARKET_HEADER_LEN: usize = 5;
 
 /// Serum Market State 结构（简化版，只包含需要的字段）
 ///
-/// 参考: https://github.com/project-serum/serum-dex/blob/master/dex/src/state.rs
-#[repr(C)]
+/// 参考: temp/serum-dex/dex/src/state.rs:293-343
+/// 使用 `#[repr(C, packed)]` 确保结构与链上数据一致
+#[repr(C, packed)]
 #[derive(Debug, Clone)]
 pub struct MarketState {
     /// 账户标志（Initialized, Market）
     pub account_flags: u64,
-    /// Market 自身地址
-    pub own_address: Pubkey,
+    /// Market 自身地址（32 字节，表示为 [u64; 4]）
+    pub own_address: [u64; 4],
     /// Vault Signer 的 nonce，用于派生 PDA
     pub vault_signer_nonce: u64,
-    /// 基础币 mint
-    pub coin_mint: Pubkey,
-    /// 报价币 mint
-    pub pc_mint: Pubkey,
-    /// 基础币 vault 账户
-    pub coin_vault: Pubkey,
+    /// 基础币 mint（32 字节）
+    pub coin_mint: [u64; 4],
+    /// 报价币 mint（32 字节）
+    pub pc_mint: [u64; 4],
+    /// 基础币 vault 账户（32 字节）
+    pub coin_vault: [u64; 4],
     /// 基础币存款总额
     pub coin_deposits_total: u64,
     /// 基础币费用累积
     pub coin_fees_accrued: u64,
-    /// 报价币 vault 账户
-    pub pc_vault: Pubkey,
+    /// 报价币 vault 账户（32 字节）
+    pub pc_vault: [u64; 4],
     /// 报价币存款总额
     pub pc_deposits_total: u64,
     /// 报价币费用累积
     pub pc_fees_accrued: u64,
     /// 报价币 dust 阈值
     pub pc_dust_threshold: u64,
-    /// 请求队列账户
-    pub req_q: Pubkey,
-    /// 事件队列账户
-    pub event_q: Pubkey,
-    /// Bids 账户
-    pub bids: Pubkey,
-    /// Asks 账户
-    pub asks: Pubkey,
+    /// 请求队列账户（32 字节）
+    pub req_q: [u64; 4],
+    /// 事件队列账户（32 字节）
+    pub event_q: [u64; 4],
+    /// Bids 账户（32 字节）
+    pub bids: [u64; 4],
+    /// Asks 账户（32 字节）
+    pub asks: [u64; 4],
+    /// 基础币最小交易单位
+    pub coin_lot_size: u64,
+    /// 报价币最小交易单位
+    pub pc_lot_size: u64,
+    /// 手续费率（基点）
+    pub fee_rate_bps: u64,
+    /// 推荐人返利累积
+    pub referrer_rebates_accrued: u64,
 }
 
 /// Market 账户数据（包含头部 padding）
@@ -62,6 +71,15 @@ pub struct MarketAccountData {
     pub header: [u8; MARKET_HEADER_LEN],
     /// Market State 数据
     pub state: MarketState,
+}
+
+/// 将 `[u64; 4]` 转换为 `Pubkey`
+#[inline]
+#[allow(dead_code)]
+const fn array_to_pubkey(arr: [u64; 4]) -> Pubkey {
+    // [u64; 4] 在内存中是 32 字节，与 Pubkey 相同
+    // 使用 unsafe 转换，因为内存布局完全一致
+    unsafe { std::mem::transmute(arr) }
 }
 
 /// 从 Market 账户数据解析出所有子账户地址
@@ -144,8 +162,14 @@ pub fn parse_vault_signer_nonce(data: &[u8]) -> Result<u64, anyhow::Error> {
 
     let nonce_bytes = &data[nonce_offset..nonce_offset + 8];
     Ok(u64::from_le_bytes([
-        nonce_bytes[0], nonce_bytes[1], nonce_bytes[2], nonce_bytes[3],
-        nonce_bytes[4], nonce_bytes[5], nonce_bytes[6], nonce_bytes[7],
+        nonce_bytes[0],
+        nonce_bytes[1],
+        nonce_bytes[2],
+        nonce_bytes[3],
+        nonce_bytes[4],
+        nonce_bytes[5],
+        nonce_bytes[6],
+        nonce_bytes[7],
     ]))
 }
 
@@ -165,10 +189,7 @@ pub fn derive_vault_signer(
 ) -> (Pubkey, u8) {
     // nonce 实际上只有 8 位，因为它是 PDA 的 bump
     let nonce = vault_signer_nonce as u8;
-    Pubkey::find_program_address(
-        &[market_address.as_ref(), &[nonce]],
-        program_id,
-    )
+    Pubkey::find_program_address(&[market_address.as_ref(), &[nonce]], program_id)
 }
 
 #[cfg(test)]
@@ -178,9 +199,10 @@ mod tests {
     #[test]
     fn test_market_size() {
         // 验证结构体大小正确
-        assert_eq!(size_of::<Pubkey>(), 32);
+        // MarketState 有 47 个 u64 字段（包括 [u64; 4] 数组）
+        // 参考: temp/serum-dex/dex/src/state.rs:293-343
         assert_eq!(size_of::<u64>(), 8);
-        assert_eq!(size_of::<MarketState>(), 208);
+        assert_eq!(size_of::<MarketState>(), 376); // 47 * 8 = 376
     }
 
     #[test]
@@ -196,20 +218,29 @@ mod tests {
 
         let market = parse_market_account(&bytes).unwrap();
 
-        // 打印解析出的值进行调试
-        println!("vault_signer_nonce: {}", market.vault_signer_nonce);
-        println!("pc_dust_threshold: {}", market.pc_dust_threshold);
-        println!("account_flags: {}", market.account_flags);
+        // 打印解析出的值进行调试（需要先复制到局部变量，因为 packed 结构体）
+        let vault_signer_nonce = market.vault_signer_nonce;
+        let pc_dust_threshold = market.pc_dust_threshold;
+        let account_flags = market.account_flags;
+        let bids = market.bids;
+        let asks = market.asks;
+        let event_q = market.event_q;
+        let coin_vault = market.coin_vault;
+        let pc_vault = market.pc_vault;
+
+        println!("vault_signer_nonce: {}", vault_signer_nonce);
+        println!("pc_dust_threshold: {}", pc_dust_threshold);
+        println!("account_flags: {}", account_flags);
 
         // 验证关键字段
         // 注意：由于结构体对齐问题，这些值可能需要调整
         // assert_eq!(market.vault_signer_nonce, 1);
         // assert_eq!(market.pc_dust_threshold, 10000);
 
-        println!("Bids: {}", market.bids);
-        println!("Asks: {}", market.asks);
-        println!("Event Queue: {}", market.event_q);
-        println!("Coin Vault: {}", market.coin_vault);
-        println!("PC Vault: {}", market.pc_vault);
+        println!("Bids: {}", array_to_pubkey(bids));
+        println!("Asks: {}", array_to_pubkey(asks));
+        println!("Event Queue: {}", array_to_pubkey(event_q));
+        println!("Coin Vault: {}", array_to_pubkey(coin_vault));
+        println!("PC Vault: {}", array_to_pubkey(pc_vault));
     }
 }
