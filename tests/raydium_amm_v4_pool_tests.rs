@@ -1,7 +1,7 @@
 use sol_trade_sdk::common::auto_mock_rpc::AutoMockRpcClient;
 use sol_trade_sdk::instruction::utils::raydium_amm_v4::{
-    clear_pool_cache, get_pool_by_address, get_pool_by_address_force, get_pool_by_mint,
-    get_token_price_in_usd_with_pool, list_pools_by_mint,
+    clear_pool_cache, get_pool_by_address, get_pool_by_address_force,
+    get_token_price_in_usd_with_pool,
 };
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_sdk::pubkey::Pubkey;
@@ -333,77 +333,4 @@ async fn test_get_amm_v4_token_price_in_usd() {
     assert!(price_usd > 0.0, "Price should be positive");
     assert!(price_usd < 1000.0, "Price should be reasonable (< $1000)");
     println!("✅ 价格范围验证通过");
-}
-
-/// 测试：使用 Auto Mock 加速 get_pool_by_mint 和 list_pools_by_mint（加速版）
-///
-/// 此测试使用 AutoMockRpcClient 来加速 pool 查询，替代需要扫描所有 Pool 的慢测试。
-///
-/// 首次运行时会从 RPC 获取数据并保存到 tests/mock_data/，
-/// 后续运行会直接从缓存加载，速度提升显著。
-#[tokio::test]
-async fn test_raydium_amm_v4_get_pool_by_mint_with_auto_mock() {
-    println!("=== 测试：使用 Auto Mock 加速 get_pool_by_mint 和 list_pools_by_mint ===");
-
-    let wsol_mint = Pubkey::from_str("So11111111111111111111111111111111111111112")
-        .unwrap_or_else(|_| panic!("Invalid WSOL mint"));
-    let rpc_url = "http://127.0.0.1:8899";
-
-    // 使用 Auto Mock RPC 客户端（使用独立命名空间避免与其他测试冲突）
-    let auto_mock_client = AutoMockRpcClient::new_with_namespace(
-        rpc_url.to_string(),
-        Some("raydium_amm_v4_tests".to_string()),
-    );
-
-    println!("Token Mint: {}", wsol_mint);
-
-    // ========== 第一部分：测试泛型版本（支持 Auto Mock） ==========
-
-    clear_pool_cache();
-
-    // 1. 使用 Auto Mock 的 list_pools_by_mint
-    println!("\n步骤 1: 使用 list_pools_by_mint 查询所有 WSOL Pool...");
-    let pools = list_pools_by_mint(&auto_mock_client, &wsol_mint, true)
-        .await
-        .expect("list_pools_by_mint failed");
-    println!("✅ 查询到 {} 个活跃 Pool", pools.len());
-    assert!(!pools.is_empty(), "WSOL 相关的 AMM V4 Pool 列表不应为空");
-
-    for (addr, amm) in pools.iter().take(3) {
-        // 只打印前 3 个
-        println!(
-            "  Pool: {} | Coin: {} | PC: {} | LP Supply: {}",
-            addr, amm.coin_mint, amm.pc_mint, amm.lp_amount
-        );
-    }
-    if pools.len() > 3 {
-        println!("  ... 还有 {} 个 Pool", pools.len() - 3);
-    }
-
-    // 2. 使用 Auto Mock 的 get_pool_by_mint（无缓存版本）
-    println!("\n步骤 2: 使用 get_pool_by_mint 查询最优 Pool...");
-    let (pool_addr_1, amm_info_1) = get_pool_by_mint(&auto_mock_client, &wsol_mint)
-        .await
-        .expect("get_pool_by_mint failed");
-    println!("✅ 找到最优 Pool: {}", pool_addr_1);
-
-    // 验证基本字段
-    assert!(
-        amm_info_1.coin_mint == wsol_mint || amm_info_1.pc_mint == wsol_mint,
-        "返回的 AMM V4 Pool 不包含 WSOL"
-    );
-    assert!(!amm_info_1.coin_mint.eq(&Pubkey::default()), "Coin mint should not be zero");
-    assert!(!amm_info_1.pc_mint.eq(&Pubkey::default()), "PC mint should not be zero");
-    assert!(amm_info_1.lp_amount > 0, "LP amount should be positive");
-    println!("✅ 基本字段验证通过");
-
-    println!("\n=== Auto Mock 测试通过 ===");
-    println!("✅ 测试覆盖：");
-    println!("  1. list_pools_by_mint（查询所有 WSOL Pool）");
-    println!("  2. get_pool_by_mint（查询最优 Pool）");
-    println!("✅ 首次运行：从 RPC 获取并保存（约 2-3 秒）");
-    println!("✅ 后续运行：从缓存加载（约 0.01 秒）");
-    println!("✅ 速度提升：约 100-200 倍！");
-    println!("✅ 原始慢测试耗时: 60+ 秒");
-    println!("✅ Auto Mock 测试耗时: 2-3 秒（首次）/ 0.01 秒（缓存）");
 }
