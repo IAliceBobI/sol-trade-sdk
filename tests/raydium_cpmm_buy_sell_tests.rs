@@ -27,7 +27,7 @@ use solana_sdk::signer::Signer;
 mod test_helpers;
 use test_helpers::{create_test_client, print_balances, print_token_balance};
 use sol_trade_test_utils::{
-    ensure_pipe_pool_wsol_liquidity, ensure_token_balance, ensure_usdc_prts_pool_usdc_liquidity,
+    ensure_token_balance, ensure_usdc_prts_pool_usdc_liquidity,
 };
 
 // 使用参数构造工具模块
