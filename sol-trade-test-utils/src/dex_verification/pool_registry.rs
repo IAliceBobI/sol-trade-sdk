@@ -86,6 +86,28 @@ impl RaydiumClmmPoolRegistry {
     // TODO: 添加 CLMM Pool 配置
 }
 
+/// Raydium AMM V4 Pool 注册表
+pub struct RaydiumAmmV4PoolRegistry;
+
+impl RaydiumAmmV4PoolRegistry {
+    /// WSOL-USDC (Token/Token)
+    ///
+    /// - Pool: 58oQChx4yWmvKdwLLZzBi4ChoCc2fqCUWBkwMihLYQo2
+    /// - WSOL: So11111111111111111111111111111111111111112 (Token Program)
+    /// - USDC: EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v (Token Program)
+    pub fn wsol_usdc() -> PoolConfig {
+        PoolConfig::new(
+            Pubkey::from_str("58oQChx4yWmvKdwLLZzBi4ChoCc2fqCUWBkwMihLYQo2").unwrap(),
+            "WSOL-USDC",
+            Pubkey::from_str("So11111111111111111111111111111111111111112").unwrap(),
+            super::TokenProgramType::Token,
+            Pubkey::from_str("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v").unwrap(),
+            super::TokenProgramType::Token,
+            10,
+        )
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

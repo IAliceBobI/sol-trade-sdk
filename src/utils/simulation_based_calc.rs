@@ -494,23 +494,24 @@ fn parse_raydium_amm_v4_log_data(ray_log_base64: &str) -> Option<(u64, u64)> {
             },
         }
     } else {
-        // exact_in: 使用原来的公式
+        // exact_in: 使用修正后的公式
         match direction {
             512 => {
                 // 买入方向: WSOL -> USDC
                 // offset 0: swap_in / 256
-                // offset 8: swap_out / 256 * 100
-                (raw_in / 256, (raw_out / 256) * 100)
+                // offset 8: swap_out / 256
+                // 注意：不需要额外的乘除，ray_log 中的值已经是正确格式
+                (raw_in / 256, raw_out / 256)
             },
             256 => {
                 // 卖出方向: USDC -> WSOL
-                // offset 0: swap_in / 256 * 1000 (因为单位是 smallest unit)
-                // offset 8: swap_out / 256 * 100
-                ((raw_in / 256) * 1000, (raw_out / 256) * 100)
+                // offset 0: swap_in / 256
+                // offset 8: swap_out / 256
+                (raw_in / 256, raw_out / 256)
             },
             _ => {
                 // 未知方向，使用默认公式
-                (raw_in / 256, (raw_out / 256) * 100)
+                (raw_in / 256, raw_out / 256)
             },
         }
     };
