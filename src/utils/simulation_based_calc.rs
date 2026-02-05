@@ -17,6 +17,7 @@
 //! - 测试新 DEX 协议的 swap 逻辑
 
 use crate::common::SolanaRpcClient;
+use crate::parser::pumpswap::events::{parse_pumpswap_event, EventData, PumpswapEventType};
 use anyhow::{Result, anyhow};
 use solana_client::rpc_config::RpcSimulateTransactionConfig;
 use solana_commitment_config::{CommitmentConfig, CommitmentLevel};
@@ -140,16 +141,20 @@ pub async fn simulate_swap_transaction(
 
     // 从模拟结果中解析 Token Transfer 金额
     //
-    // 方法 1: 优先解析 Raydium AMM V4 ray_log（适用于 AMM V4）
-    // 方法 2: 解析 Raydium CPMM Program data（适用于 CPMM）
-    // 方法 3: 解析 Program data（最准确，适用于 CLMM）
-    // 方法 4: 从 inner instructions 解析 Transfer/TransferChecked
-    // 方法 5: 解析日志中的 Token Transfer（备用方案）
+    // 方法 1: 优先解析 PumpSwap 事件（适用于 PumpSwap）
+    // 方法 2: 解析 Raydium AMM V4 ray_log（适用于 AMM V4）
+    // 方法 3: 解析 Raydium CPMM Program data（适用于 CPMM）
+    // 方法 4: 解析 Program data（最准确，适用于 CLMM）
+    // 方法 5: 从 inner instructions 解析 Transfer/TransferChecked
+    // 方法 6: 解析日志中的 Token Transfer（备用方案）
 
     let (actual_input_amount, actual_output_amount) =
         if let Some(logs) = &simulate_result.value.logs {
-            // 优先尝试解析 Raydium AMM V4 ray_log
-            if let Some(result) = parse_raydium_amm_v4_ray_log(logs) {
+            // 优先尝试解析 PumpSwap Program data（适用于 PumpSwap）
+            if let Some(result) = parse_pumpswap_program_data(logs) {
+                result
+            // 尝试解析 Raydium AMM V4 ray_log
+            } else if let Some(result) = parse_raydium_amm_v4_ray_log(logs) {
                 result
             // 尝试解析 Raydium CPMM Program data
             } else if let Some(result) = parse_raydium_cpmm_program_data(logs) {
@@ -533,6 +538,21 @@ fn parse_raydium_cpmm_program_data(logs: &[String]) -> Option<(u64, u64)> {
         return None;
     }
 
+    // 检查是否是 PumpSwap 交易（Program ID: pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA）
+    // PumpSwap 也会输出 "Program data:" 但格式不同，不应该用 CPMM 解析器
+    // 注意：Program ID 和 "Program data:" 可能在不同的日志行中
+    let has_pumpswap_program = logs.iter().any(|log| {
+        log.contains("pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA")
+    });
+    let has_program_data = logs.iter().any(|log| {
+        log.contains("Program data:")
+    });
+
+    // 如果日志中同时包含 PumpSwap Program ID 和 Program data，则跳过 CPMM 解析
+    if has_pumpswap_program && has_program_data {
+        return None;
+    }
+
     // 查找包含 "Program data:" 的日志行
     for log in logs {
         if let Some(start) = log.find("Program data: ") {
@@ -585,6 +605,242 @@ fn parse_raydium_cpmm_data(program_data_base64: &str) -> Option<(u64, u64)> {
     Some((amount_in, amount_out))
 }
 
+/// 从 PumpSwap 的 inner instructions 中解析 swap 结果
+///
+/// PumpSwap swap 指令会在 inner instructions 中发出事件，包含：
+/// - base_amount_out: 用户收到的代币数量
+/// - quote_amount_in: 用户支付的代币数量
+///
+/// # 参数
+/// * `inner_instructions` - RPC 返回的 inner instructions
+///
+/// # 返回
+/// * `Some((amount_in, amount_out))` - 解析成功
+/// * `None` - 解析失败
+fn parse_pumpswap_event_from_inner_instructions(
+    inner_instructions: &Option<Vec<UiInnerInstructions>>,
+) -> Option<(u64, u64)> {
+    use base64::Engine;
+
+    let inner_ixs = inner_instructions.as_ref()?;
+
+    for outer_ix in inner_ixs {
+        for ui_instruction in &outer_ix.instructions {
+            // 尝试从 Parsed 格式中提取数据
+            if let UiInstruction::Parsed(ui_parsed_instruction) = ui_instruction {
+                // 将 UiParsedInstruction 转换为 serde_json::Value
+                if let Ok(value) = serde_json::to_value(ui_parsed_instruction) {
+                    // 检查是否是 PumpSwap 程序
+                    if let Some(program) = value.get("program") {
+                        if program.as_str() == Some("pump_amm") {
+                            // 尝试从 data 字段中提取事件数据
+                            if let Some(data_str) = value.get("data").and_then(|d| d.as_str()) {
+                                // 解码 base64 数据
+                                if let Ok(event_data) = base64::engine::general_purpose::STANDARD
+                                    .decode(data_str)
+                                {
+                                    // 使用 PumpSwap 事件解析器
+                                    if let Some((event_type, event_data)) =
+                                        parse_pumpswap_event(&event_data)
+                                    {
+                                        match event_type {
+                                            PumpswapEventType::Buy => {
+                                                if let EventData::Buy(buy_event) = event_data {
+                                                    // 返回 (输入金额, 输出金额)
+                                                    return Some((
+                                                        buy_event.quote_amount_in_with_lp_fee,
+                                                        buy_event.base_amount_out,
+                                                    ));
+                                                }
+                                            },
+                                            PumpswapEventType::Sell => {
+                                                if let EventData::Sell(sell_event) = event_data {
+                                                    // 返回 (输入金额, 输出金额)
+                                                    return Some((
+                                                        sell_event.base_amount_in,
+                                                        sell_event.quote_amount_out,
+                                                    ));
+                                                }
+                                            },
+                                            _ => {},
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // 尝试从 Compiled 格式中提取数据
+            if let UiInstruction::Compiled(compiled) = ui_instruction {
+                // 解码 base64 编码的指令数据
+                if let Ok(decoded) = base64::Engine::decode(
+                    &base64::engine::general_purpose::STANDARD,
+                    &compiled.data,
+                ) {
+                    // 尝试解析 PumpSwap 事件
+                    if let Some((event_type, event_data)) = parse_pumpswap_event(&decoded) {
+                        match event_type {
+                            PumpswapEventType::Buy => {
+                                if let EventData::Buy(buy_event) = event_data {
+                                    return Some((
+                                        buy_event.quote_amount_in_with_lp_fee,
+                                        buy_event.base_amount_out,
+                                    ));
+                                }
+                            },
+                            PumpswapEventType::Sell => {
+                                if let EventData::Sell(sell_event) = event_data {
+                                    return Some((
+                                        sell_event.base_amount_in,
+                                        sell_event.quote_amount_out,
+                                    ));
+                                }
+                            },
+                            _ => {},
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    None
+}
+
+/// 从 PumpSwap 的 Program data 中解析 swap 结果
+///
+/// PumpSwap 的 Program data 格式（从链上实际交易验证）：
+/// - Offset 16-23: base_amount_out（用户收到的 base token 数量，u64, little endian）
+/// - Offset 24-31: quote_amount_in（用户支付的 quote token 数量，u64, little endian）
+///
+/// # 参数
+/// * `logs` - 程序日志数组
+///
+/// # 返回
+/// * `Some((amount_in, amount_out))` - 解析成功
+/// * `None` - 解析失败
+fn parse_pumpswap_program_data(logs: &[String]) -> Option<(u64, u64)> {
+    use base64::Engine;
+
+    // 检查是否是 PumpSwap 交易
+    let has_pumpswap = logs.iter().any(|log| {
+        log.contains("pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA")
+    });
+
+    if !has_pumpswap {
+        return None;
+    }
+
+    // 查找包含 "Program data:" 的日志行
+    for log in logs {
+        if let Some(start) = log.find("Program data: ") {
+            let base64_str = &log[start + 13..];
+            let base64_str = base64_str.trim();
+
+            if base64_str.is_empty() {
+                continue;
+            }
+
+            // 解码 base64
+            let data = base64::engine::general_purpose::STANDARD.decode(base64_str).ok()?;
+
+            // 检查数据长度（至少需要 32 字节到 offset 24）
+            if data.len() < 32 {
+                continue;
+            }
+
+            // 解析输出金额（offset 16）：用户收到的 base token
+            let amount_out = u64::from_le_bytes(data[16..24].try_into().ok()?);
+
+            // 解析输入金额（offset 24）：用户支付的 quote token
+            let amount_in = u64::from_le_bytes(data[24..32].try_into().ok()?);
+
+            return Some((amount_in, amount_out));
+        }
+    }
+
+    None
+}
+
+/// 从 PumpSwap 交易的 inner instructions 中解析 swap 结果
+///
+/// PumpSwap 的 swap 交易包含多个 Transfer 指令：
+/// 1. 用户 → Pool：输入代币（WSOL）
+/// 2. Pool → 用户：输出代币（PUMP）
+/// 3. Pool → 协议：手续费
+///
+/// 此函数从 inner instructions 中提取用户实际收到的代币金额
+fn parse_pumpswap_from_inner_instructions(
+    inner_instructions: &Option<Vec<UiInnerInstructions>>,
+    user_output_token_account: &Pubkey,
+) -> Option<(u64, u64)> {
+    use base64::Engine;
+
+    let inner_ixs = inner_instructions.as_ref()?;
+
+    let mut user_input_amount = None;
+    let mut user_output_amount = None;
+
+    for outer_ix in inner_ixs {
+        for ui_instruction in &outer_ix.instructions {
+            match ui_instruction {
+                UiInstruction::Parsed(ui_parsed_instruction) => {
+                    // 从 Parsed 格式中提取 Transfer/TransferChecked 指令
+                    if let Ok(value) = serde_json::to_value(ui_parsed_instruction) {
+                        // 检查是否是 Transfer/TransferChecked 指令
+                        let instruction_type = value.get("type")?.as_str()?;
+
+                        if instruction_type == "transfer" || instruction_type == "transferChecked" {
+                            // 获取目标账户（接收方）
+                            if let Some(info) = value.get("info") {
+                                let destination = info.get("destination").and_then(|d| d.as_str())?;
+                                let amount_str = info.get("tokenAmount")
+                                    .and_then(|t| t.get("amount"))
+                                    .and_then(|a| a.as_str())?;
+                                let amount = amount_str.parse::<u64>().ok()?;
+
+                                // 如果接收方是用户的输出代币账户，记录为输出金额
+                                if destination == user_output_token_account.to_string() {
+                                    user_output_amount = Some(amount);
+                                }
+                            }
+                        }
+                    }
+                },
+                UiInstruction::Compiled(compiled) => {
+                    // 从 Compiled 格式中提取 Transfer/TransferChecked 指令
+                    if let Ok(decoded) = base64::Engine::decode(
+                        &base64::engine::general_purpose::STANDARD,
+                        &compiled.data,
+                    ) {
+                        // Transfer (0x03) 或 TransferChecked (0x0C)
+                        if !decoded.is_empty() && (decoded[0] == 0x03 || decoded[0] == 0x0C) {
+                            if decoded.len() >= 9 {
+                                let amount = u64::from_le_bytes(decoded[1..9].try_into().ok()?);
+
+                                // 注意：Compiled 格式中没有账户信息，无法确定是哪个 Transfer
+                                // 暂时记录，但优先使用 Parsed 格式
+                                if user_output_amount.is_none() {
+                                    user_output_amount = Some(amount);
+                                }
+                            }
+                        }
+                    }
+                },
+            }
+        }
+    }
+
+    // 返回解析结果
+    match (user_input_amount, user_output_amount) {
+        (Some(input), Some(output)) => Some((input, output)),
+        (_, Some(output)) => Some((0, output)), // 只有输出金额
+        _ => None,
+    }
+}
+
 /// 从程序日志中解析 Token Transfer 金额
 ///
 /// Solana Token Transfer 指令通常会在日志中输出转账金额
@@ -606,6 +862,15 @@ fn parse_transfer_amounts_from_logs(
 
     // CLMM 交易不应该使用这个方法解析，应该使用 inner instructions
     if is_clmm {
+        return None;
+    }
+
+    // 检查是否是 PumpSwap 交易（应该使用 inner instructions）
+    let is_pumpswap = logs.iter().any(|log| {
+        log.contains("pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA")
+    });
+
+    if is_pumpswap {
         return None;
     }
 
