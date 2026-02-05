@@ -8,19 +8,11 @@ use test_helpers::create_test_client;
 use sol_trade_sdk::{DexType, TradingClient};
 use sol_trade_test_utils::{
     dex_verification::{
-        cleanup_pool_cache,
-        run_dex_three_stage_verification,
-        run_dex_three_stage_verification_sell,
-        verify_three_stage_accuracy,
-        BuyParamsBuilder,
-        DexVerifyConfig,
-        OperationType,
-        RaydiumAmmV4PoolRegistry,
-        SellParamsBuilder,
-        TradeDirection,
+        BuyParamsBuilder, DexVerifyConfig, OperationType, RaydiumAmmV4PoolRegistry,
+        SellParamsBuilder, TradeDirection, cleanup_pool_cache, run_dex_three_stage_verification,
+        run_dex_three_stage_verification_sell, verify_three_stage_accuracy,
     },
-    ensure_token_balance,
-    usdc_mint, wsol_mint,
+    ensure_token_balance, usdc_mint, wsol_mint,
 };
 
 // ==================== Buy Exact In ====================
@@ -30,23 +22,25 @@ struct WsolUsdcParamsBuilder;
 
 impl BuyParamsBuilder for WsolUsdcParamsBuilder {
     #[allow(clippy::manual_async_fn)]
-    fn build(&self, client: &TradingClient, amount: u64) -> impl std::future::Future<Output = sol_trade_sdk::TradeBuyParams> + Send {
+    fn build(
+        &self,
+        client: &TradingClient,
+        amount: u64,
+    ) -> impl std::future::Future<Output = sol_trade_sdk::TradeBuyParams> + Send {
         async move {
             // 构建 AMM V4 买入参数
             let pool_config = RaydiumAmmV4PoolRegistry::wsol_usdc();
 
-            let amm_v4_params = sol_trade_sdk::trading::core::params::RaydiumAmmV4Params::from_amm_address_by_rpc(
-                &client.rpc,
-                pool_config.pool_address,
-            )
-            .await
-            .expect("Failed to build RaydiumAmmV4Params for WSOL-USDC");
-
-            let recent_blockhash = client
-                .rpc
-                .get_latest_blockhash()
+            let amm_v4_params =
+                sol_trade_sdk::trading::core::params::RaydiumAmmV4Params::from_amm_address_by_rpc(
+                    &client.rpc,
+                    pool_config.pool_address,
+                )
                 .await
-                .expect("Failed to get latest blockhash");
+                .expect("Failed to build RaydiumAmmV4Params for WSOL-USDC");
+
+            let recent_blockhash =
+                client.rpc.get_latest_blockhash().await.expect("Failed to get latest blockhash");
 
             sol_trade_sdk::TradeBuyParams {
                 dex_type: sol_trade_sdk::DexType::RaydiumAmmV4,
@@ -55,7 +49,9 @@ impl BuyParamsBuilder for WsolUsdcParamsBuilder {
                 input_token_amount: amount,
                 slippage_basis_points: Some(0), // 0% 滑点，验证 Quote 准确性
                 recent_blockhash: Some(recent_blockhash),
-                extension_params: sol_trade_sdk::trading::core::params::DexParamEnum::RaydiumAmmV4(amm_v4_params),
+                extension_params: sol_trade_sdk::trading::core::params::DexParamEnum::RaydiumAmmV4(
+                    amm_v4_params,
+                ),
                 address_lookup_table_account: None,
                 wait_transaction_confirmed: true,
                 create_input_token_ata: true,
@@ -97,39 +93,29 @@ async fn test_ammv4_exact_in_buy_three_stage_verification_with_framework() {
     let client = create_test_client().await;
 
     // 确保 WSOL 余额
-    if let Err(e) = ensure_token_balance(
-        &client.rpc,
-        rpc_url,
-        client.payer.as_ref(),
-        &wsol_mint(),
-        "10",
-    )
-    .await
+    if let Err(e) =
+        ensure_token_balance(&client.rpc, rpc_url, client.payer.as_ref(), &wsol_mint(), "10").await
     {
         panic!("❌ 确保 WSOL 余额失败: {}", e);
     }
 
     // 确保 USDC 余额（确保 ATA 存在）
-    if let Err(e) = ensure_token_balance(
-        &client.rpc,
-        rpc_url,
-        client.payer.as_ref(),
-        &usdc_mint(),
-        "1000",
-    )
-    .await
+    if let Err(e) =
+        ensure_token_balance(&client.rpc, rpc_url, client.payer.as_ref(), &usdc_mint(), "1000")
+            .await
     {
         panic!("❌ 确保 USDC 余额失败: {}", e);
     }
 
     // ===== 运行三阶段验证（框架自动处理）=====
-    let result = match run_dex_three_stage_verification(&client, config, WsolUsdcParamsBuilder).await {
-        Ok(r) => r,
-        Err(e) => {
-            cleanup_pool_cache();
-            panic!("❌ 三阶段验证失败: {}", e);
-        },
-    };
+    let result =
+        match run_dex_three_stage_verification(&client, config, WsolUsdcParamsBuilder).await {
+            Ok(r) => r,
+            Err(e) => {
+                cleanup_pool_cache();
+                panic!("❌ 三阶段验证失败: {}", e);
+            },
+        };
 
     // ===== 验证三阶段准确性（Quote + Simulation + Execution）=====
     // AMM V4 是纯 Token Pool，期望 0% 误差，不跳过本地计算验证
@@ -157,18 +143,16 @@ impl SellParamsBuilder for WsolUsdcSellExactInParamsBuilder {
             // 构建 AMM V4 卖出参数
             let pool_config = RaydiumAmmV4PoolRegistry::wsol_usdc();
 
-            let amm_v4_params = sol_trade_sdk::trading::core::params::RaydiumAmmV4Params::from_amm_address_by_rpc(
-                &client.rpc,
-                pool_config.pool_address,
-            )
-            .await
-            .expect("Failed to build RaydiumAmmV4Params for WSOL-USDC");
-
-            let recent_blockhash = client
-                .rpc
-                .get_latest_blockhash()
+            let amm_v4_params =
+                sol_trade_sdk::trading::core::params::RaydiumAmmV4Params::from_amm_address_by_rpc(
+                    &client.rpc,
+                    pool_config.pool_address,
+                )
                 .await
-                .expect("Failed to get latest blockhash");
+                .expect("Failed to build RaydiumAmmV4Params for WSOL-USDC");
+
+            let recent_blockhash =
+                client.rpc.get_latest_blockhash().await.expect("Failed to get latest blockhash");
 
             sol_trade_sdk::TradeSellParams {
                 dex_type: sol_trade_sdk::DexType::RaydiumAmmV4,
@@ -178,7 +162,9 @@ impl SellParamsBuilder for WsolUsdcSellExactInParamsBuilder {
                 slippage_basis_points: Some(0), // 0% 滑点，验证 Quote 准确性
                 recent_blockhash: Some(recent_blockhash),
                 with_tip: false,
-                extension_params: sol_trade_sdk::trading::core::params::DexParamEnum::RaydiumAmmV4(amm_v4_params),
+                extension_params: sol_trade_sdk::trading::core::params::DexParamEnum::RaydiumAmmV4(
+                    amm_v4_params,
+                ),
                 address_lookup_table_account: None,
                 wait_transaction_confirmed: true,
                 create_output_token_ata: true,
@@ -233,20 +219,20 @@ async fn test_ammv4_exact_in_sell_three_stage_verification_with_framework() {
     }
 
     // 确保 WSOL 余额（确保 WSOL ATA 存在，用于接收卖出的 WSOL）
-    if let Err(e) = ensure_token_balance(
-        &client.rpc,
-        rpc_url,
-        client.payer.as_ref(),
-        &wsol_mint(),
-        "1",
-    )
-    .await
+    if let Err(e) =
+        ensure_token_balance(&client.rpc, rpc_url, client.payer.as_ref(), &wsol_mint(), "1").await
     {
         panic!("❌ 确保 WSOL 余额失败: {}", e);
     }
 
     // ===== 运行三阶段验证（框架自动处理）=====
-    let result = match run_dex_three_stage_verification_sell(&client, config, WsolUsdcSellExactInParamsBuilder).await {
+    let result = match run_dex_three_stage_verification_sell(
+        &client,
+        config,
+        WsolUsdcSellExactInParamsBuilder,
+    )
+    .await
+    {
         Ok(r) => r,
         Err(e) => {
             cleanup_pool_cache();

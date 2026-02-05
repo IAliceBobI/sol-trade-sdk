@@ -19,23 +19,13 @@ use test_helpers::create_test_client;
 
 use sol_trade_sdk::{DexType, TradingClient};
 use sol_trade_test_utils::{
+    UsdcPrtsBuyParamsBuilder, UsdcPrtsSellParamsBuilder,
     dex_verification::{
-        cleanup_pool_cache,
-        run_dex_three_stage_verification,
-        run_dex_three_stage_verification_sell,
-        verify_three_stage_accuracy,
-        BuyParamsBuilder,
-        DexVerifyConfig,
-        OperationType,
-        RaydiumCpmmPoolRegistry,
-        SellParamsBuilder,
-        TradeDirection,
+        BuyParamsBuilder, DexVerifyConfig, OperationType, RaydiumCpmmPoolRegistry,
+        SellParamsBuilder, TradeDirection, cleanup_pool_cache, run_dex_three_stage_verification,
+        run_dex_three_stage_verification_sell, verify_three_stage_accuracy,
     },
-    ensure_token_balance,
-    prts_mint,
-    usdc_mint,
-    UsdcPrtsBuyParamsBuilder,
-    UsdcPrtsSellParamsBuilder,
+    ensure_token_balance, prts_mint, usdc_mint,
 };
 
 // 参数构建器结构体
@@ -43,7 +33,11 @@ struct UsdcPrtsParamsBuilder;
 
 impl BuyParamsBuilder for UsdcPrtsParamsBuilder {
     #[allow(clippy::manual_async_fn)]
-    fn build(&self, client: &TradingClient, amount: u64) -> impl std::future::Future<Output = sol_trade_sdk::TradeBuyParams> + Send {
+    fn build(
+        &self,
+        client: &TradingClient,
+        amount: u64,
+    ) -> impl std::future::Future<Output = sol_trade_sdk::TradeBuyParams> + Send {
         async move {
             UsdcPrtsBuyParamsBuilder::new(Some(amount))
                 .slippage(1000) // 10% 滑点
@@ -79,26 +73,21 @@ async fn test_cpmm_usdc_prts_exact_in_buy_with_framework() {
     let client = create_test_client().await;
 
     // 确保 USDC 余额（Token Program）
-    if let Err(e) = ensure_token_balance(
-        &client.rpc,
-        rpc_url,
-        client.payer.as_ref(),
-        &usdc_mint(),
-        "10",
-    )
-    .await
+    if let Err(e) =
+        ensure_token_balance(&client.rpc, rpc_url, client.payer.as_ref(), &usdc_mint(), "10").await
     {
         panic!("❌ 确保 USDC 余额失败: {}", e);
     }
 
     // ===== 运行三阶段验证（框架自动处理）=====
-    let result = match run_dex_three_stage_verification(&client, config, UsdcPrtsParamsBuilder).await {
-        Ok(r) => r,
-        Err(e) => {
-            cleanup_pool_cache();
-            panic!("❌ 三阶段验证失败: {}", e);
-        },
-    };
+    let result =
+        match run_dex_three_stage_verification(&client, config, UsdcPrtsParamsBuilder).await {
+            Ok(r) => r,
+            Err(e) => {
+                cleanup_pool_cache();
+                panic!("❌ 三阶段验证失败: {}", e);
+            },
+        };
 
     // ===== 验证结果（框架自动对比）=====
     // 混合 Pool（Token-2022 + Token），本地计算可能有 0.04% 误差，使用 1% 容错
@@ -173,7 +162,7 @@ async fn test_cpmm_usdc_prts_sell_exact_in() {
         rpc_url,
         client.payer.as_ref(),
         &prts_mint(),
-        "200000",  // 200,000 PRTS（足够卖出 100,000 PRTS）
+        "200000", // 200,000 PRTS（足够卖出 100,000 PRTS）
     )
     .await
     {
@@ -181,7 +170,13 @@ async fn test_cpmm_usdc_prts_sell_exact_in() {
     }
 
     // 注意：USDC-PRTS 是混合 Pool（Token-2022），本地 vs 链行误差约 0.04%
-    let result = match run_dex_three_stage_verification_sell(&client, config, UsdcPrtsSellExactInParamsBuilder).await {
+    let result = match run_dex_three_stage_verification_sell(
+        &client,
+        config,
+        UsdcPrtsSellExactInParamsBuilder,
+    )
+    .await
+    {
         Ok(r) => r,
         Err(e) => {
             cleanup_pool_cache();

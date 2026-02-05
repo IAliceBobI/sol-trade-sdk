@@ -31,7 +31,9 @@ use solana_system_interface::instruction::transfer;
 use std::str::FromStr;
 
 // 导入公共代理库
-use sol_trade_test_utils::proxy_http::{get_latest_blockhash_with_proxy, get_solana_balance_with_proxy};
+use sol_trade_test_utils::proxy_http::{
+    get_latest_blockhash_with_proxy, get_solana_balance_with_proxy,
+};
 
 /// 模拟 Bundle 执行（在发送前验证）
 #[tokio::test]

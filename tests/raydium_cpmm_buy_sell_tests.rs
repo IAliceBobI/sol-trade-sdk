@@ -18,17 +18,14 @@
 //! - Token 价格获取测试已移至 sol-trade-test-utils/tests/token_price_tests.rs
 
 use sol_trade_sdk::{
-    instruction::utils::raydium_cpmm::get_pool_by_address,
-    parser::DexParser,
+    instruction::utils::raydium_cpmm::get_pool_by_address, parser::DexParser,
     trading::core::params::RaydiumCpmmParams,
 };
 use solana_sdk::signer::Signer;
 
 mod test_helpers;
+use sol_trade_test_utils::{ensure_token_balance, ensure_usdc_prts_pool_usdc_liquidity};
 use test_helpers::{create_test_client, print_balances, print_token_balance};
-use sol_trade_test_utils::{
-    ensure_token_balance, ensure_usdc_prts_pool_usdc_liquidity,
-};
 
 // 使用参数构造工具模块
 use sol_trade_test_utils::test_params::*;
@@ -143,8 +140,10 @@ async fn test_raydium_cpmm_buy_sell_complete() {
     let (success_buy, buy_sigs, error_buy) =
         client.buy(buy_params).await.expect("Raydium CPMM 买入交易执行失败");
     if !success_buy {
-        panic!("❌ 买入交易失败: {:?}\n  Pool: {}\n  Target Mint: {}\n  输入金额: {} lamports",
-               error_buy, pool_address, target_mint, 20_000_000);
+        panic!(
+            "❌ 买入交易失败: {:?}\n  Pool: {}\n  Target Mint: {}\n  输入金额: {} lamports",
+            error_buy, pool_address, target_mint, 20_000_000
+        );
     }
     println!("✅ 买入成功，签名: {:?}", buy_sigs.first());
 
@@ -197,8 +196,10 @@ async fn test_raydium_cpmm_buy_sell_complete() {
     let (success_sell, sell_sigs, error_sell) =
         client.sell(sell_params).await.expect("Raydium CPMM 卖出交易执行失败");
     if !success_sell {
-        panic!("❌ 卖出交易失败: {:?}\n  Pool: {}\n  Target Mint: {}\n  卖出数量: {}",
-               error_sell, pool_address, target_mint, token_after_buy);
+        panic!(
+            "❌ 卖出交易失败: {:?}\n  Pool: {}\n  Target Mint: {}\n  卖出数量: {}",
+            error_sell, pool_address, target_mint, token_after_buy
+        );
     }
     println!("✅ 卖出成功，签名: {:?}", sell_sigs.first());
 
@@ -256,7 +257,6 @@ async fn test_raydium_cpmm_buy_sell_complete() {
 
     println!("\n=== Raydium CPMM 买入-卖出完整流程测试通过 ===");
 }
-
 
 /// 测试：Raydium CPMM USDC-PRTS 完整买入-卖出流程
 ///

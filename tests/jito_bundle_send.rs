@@ -42,7 +42,9 @@ use solana_system_interface::instruction::transfer;
 use std::str::FromStr;
 
 // 导入公共代理库
-use sol_trade_test_utils::proxy_http::{get_latest_blockhash_with_proxy, get_solana_balance_with_proxy};
+use sol_trade_test_utils::proxy_http::{
+    get_latest_blockhash_with_proxy, get_solana_balance_with_proxy,
+};
 
 /// 完整的 Jito Bundle 发送示例（Testnet 实际测试）
 ///

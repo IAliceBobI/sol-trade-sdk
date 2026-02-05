@@ -41,34 +41,28 @@
 mod test_helpers;
 use test_helpers::create_test_client;
 
+use sol_trade_sdk::instruction::utils::raydium_clmm::get_pool_by_address;
 use sol_trade_sdk::{DexType, TradingClient};
 use sol_trade_test_utils::{
+    UsdtWsolClmmBuyParamsBuilder, UsdtWsolClmmSellParamsBuilder,
     dex_verification::{
-        cleanup_pool_cache,
-        run_dex_three_stage_verification,
-        run_dex_three_stage_verification_sell,
-        verify_three_stage_accuracy,
-        BuyParamsBuilder,
-        DexVerifyConfig,
-        OperationType,
-        RaydiumClmmPoolRegistry,
-        SellParamsBuilder,
-        TradeDirection,
+        BuyParamsBuilder, DexVerifyConfig, OperationType, RaydiumClmmPoolRegistry,
+        SellParamsBuilder, TradeDirection, cleanup_pool_cache, run_dex_three_stage_verification,
+        run_dex_three_stage_verification_sell, verify_three_stage_accuracy,
     },
-    ensure_token_balance,
-    usdt_mint,
-    wsol_mint,
-    UsdtWsolClmmBuyParamsBuilder,
-    UsdtWsolClmmSellParamsBuilder,
+    ensure_token_balance, usdt_mint, wsol_mint,
 };
-use sol_trade_sdk::instruction::utils::raydium_clmm::get_pool_by_address;
 
 // 参数构建器结构体
 struct UsdtWsolParamsBuilder;
 
 impl BuyParamsBuilder for UsdtWsolParamsBuilder {
     #[allow(clippy::manual_async_fn)]
-    fn build(&self, client: &TradingClient, amount: u64) -> impl std::future::Future<Output = sol_trade_sdk::TradeBuyParams> + Send {
+    fn build(
+        &self,
+        client: &TradingClient,
+        amount: u64,
+    ) -> impl std::future::Future<Output = sol_trade_sdk::TradeBuyParams> + Send {
         async move {
             UsdtWsolClmmBuyParamsBuilder::new(Some(amount))
                 .slippage(1000) // 10% 滑点
@@ -105,7 +99,8 @@ async fn test_raydium_clmm_usdt_wsol_exact_in_buy_with_framework() {
     let client = create_test_client().await;
 
     // 调试：查看 Pool 状态
-    let pool_address = std::str::FromStr::from_str("ExcBWu8fGPdJiaF1b1z3iEef38sjQJks8xvj6M85pPY6").unwrap();
+    let pool_address =
+        std::str::FromStr::from_str("ExcBWu8fGPdJiaF1b1z3iEef38sjQJks8xvj6M85pPY6").unwrap();
     if let Ok(pool_state) = get_pool_by_address(&client.rpc, &pool_address).await {
         println!("🔍 Pool 状态:");
         println!("  token0_mint: {}", pool_state.token_mint0);
@@ -117,26 +112,21 @@ async fn test_raydium_clmm_usdt_wsol_exact_in_buy_with_framework() {
     }
 
     // 确保 WSOL 余额（Token Program）
-    if let Err(e) = ensure_token_balance(
-        &client.rpc,
-        rpc_url,
-        client.payer.as_ref(),
-        &wsol_mint(),
-        "10",
-    )
-    .await
+    if let Err(e) =
+        ensure_token_balance(&client.rpc, rpc_url, client.payer.as_ref(), &wsol_mint(), "10").await
     {
         panic!("❌ 确保 WSOL 余额失败: {}", e);
     }
 
     // ===== 运行三阶段验证（框架自动处理）=====
-    let result = match run_dex_three_stage_verification(&client, config, UsdtWsolParamsBuilder).await {
-        Ok(r) => r,
-        Err(e) => {
-            cleanup_pool_cache();
-            panic!("❌ 三阶段验证失败: {}", e);
-        },
-    };
+    let result =
+        match run_dex_three_stage_verification(&client, config, UsdtWsolParamsBuilder).await {
+            Ok(r) => r,
+            Err(e) => {
+                cleanup_pool_cache();
+                panic!("❌ 三阶段验证失败: {}", e);
+            },
+        };
 
     // ===== 验证结果（框架自动对比）=====
     // 注意：由于 CLMM local quote 对负数 tick 的已知问题,
@@ -204,7 +194,7 @@ async fn test_raydium_clmm_usdt_wsol_sell_exact_in() {
         rpc_url,
         client.payer.as_ref(),
         &usdt_mint(),
-        "1000",  // 1,000 USDT（足够卖出 10 USDT）
+        "1000", // 1,000 USDT（足够卖出 10 USDT）
     )
     .await
     {
@@ -212,7 +202,13 @@ async fn test_raydium_clmm_usdt_wsol_sell_exact_in() {
     }
 
     // 纯 Token Pool，期望 0% 误差
-    let result = match run_dex_three_stage_verification_sell(&client, config, UsdtWsolSellExactInParamsBuilder).await {
+    let result = match run_dex_three_stage_verification_sell(
+        &client,
+        config,
+        UsdtWsolSellExactInParamsBuilder,
+    )
+    .await
+    {
         Ok(r) => r,
         Err(e) => {
             cleanup_pool_cache();

@@ -24,34 +24,28 @@
 mod test_helpers;
 use test_helpers::create_test_client;
 
+use sol_trade_sdk::instruction::utils::raydium_clmm::get_pool_by_address;
 use sol_trade_sdk::{DexType, TradingClient};
 use sol_trade_test_utils::{
+    SolettWsolClmmBuyParamsBuilder, SolettWsolClmmSellParamsBuilder,
     dex_verification::{
-        cleanup_pool_cache,
-        run_dex_three_stage_verification,
-        run_dex_three_stage_verification_sell,
-        verify_three_stage_accuracy,
-        BuyParamsBuilder,
-        DexVerifyConfig,
-        OperationType,
-        RaydiumClmmPoolRegistry,
-        SellParamsBuilder,
-        TradeDirection,
+        BuyParamsBuilder, DexVerifyConfig, OperationType, RaydiumClmmPoolRegistry,
+        SellParamsBuilder, TradeDirection, cleanup_pool_cache, run_dex_three_stage_verification,
+        run_dex_three_stage_verification_sell, verify_three_stage_accuracy,
     },
-    ensure_token_balance,
-    solett_mint,
-    wsol_mint,
-    SolettWsolClmmBuyParamsBuilder,
-    SolettWsolClmmSellParamsBuilder,
+    ensure_token_balance, solett_mint, wsol_mint,
 };
-use sol_trade_sdk::instruction::utils::raydium_clmm::get_pool_by_address;
 
 // 参数构建器结构体
 struct SolettWsolParamsBuilder;
 
 impl BuyParamsBuilder for SolettWsolParamsBuilder {
     #[allow(clippy::manual_async_fn)]
-    fn build(&self, client: &TradingClient, amount: u64) -> impl std::future::Future<Output = sol_trade_sdk::TradeBuyParams> + Send {
+    fn build(
+        &self,
+        client: &TradingClient,
+        amount: u64,
+    ) -> impl std::future::Future<Output = sol_trade_sdk::TradeBuyParams> + Send {
         async move {
             SolettWsolClmmBuyParamsBuilder::new(Some(amount))
                 .slippage(10000) // 100% 滑点（CLMM 负数 tick 的本地 Quote 不准确）
@@ -88,7 +82,8 @@ async fn test_raydium_clmm_solett_wsol_exact_in_buy_with_framework() {
     let client = create_test_client().await;
 
     // 调试：查看 Pool 状态
-    let pool_address = std::str::FromStr::from_str("CYJQ19fbryujjHFDiik6GZmVpPuqi4Ew31orj43cAupT").unwrap();
+    let pool_address =
+        std::str::FromStr::from_str("CYJQ19fbryujjHFDiik6GZmVpPuqi4Ew31orj43cAupT").unwrap();
     if let Ok(pool_state) = get_pool_by_address(&client.rpc, &pool_address).await {
         println!("🔍 Pool 状态:");
         println!("  token0_mint: {}", pool_state.token_mint0);
@@ -100,26 +95,21 @@ async fn test_raydium_clmm_solett_wsol_exact_in_buy_with_framework() {
     }
 
     // 确保 WSOL 余额（Token Program）
-    if let Err(e) = ensure_token_balance(
-        &client.rpc,
-        rpc_url,
-        client.payer.as_ref(),
-        &wsol_mint(),
-        "10",
-    )
-    .await
+    if let Err(e) =
+        ensure_token_balance(&client.rpc, rpc_url, client.payer.as_ref(), &wsol_mint(), "10").await
     {
         panic!("❌ 确保 WSOL 余额失败: {}", e);
     }
 
     // ===== 运行三阶段验证（框架自动处理）=====
-    let result = match run_dex_three_stage_verification(&client, config, SolettWsolParamsBuilder).await {
-        Ok(r) => r,
-        Err(e) => {
-            cleanup_pool_cache();
-            panic!("❌ 三阶段验证失败: {}", e);
-        },
-    };
+    let result =
+        match run_dex_three_stage_verification(&client, config, SolettWsolParamsBuilder).await {
+            Ok(r) => r,
+            Err(e) => {
+                cleanup_pool_cache();
+                panic!("❌ 三阶段验证失败: {}", e);
+            },
+        };
 
     // ===== 验证结果（框架自动对比）=====
     // 注意：SOLETT-WSOL 是 Token-2022 + Token Program 混合 Pool
@@ -183,7 +173,7 @@ async fn test_raydium_clmm_solett_wsol_sell_exact_in() {
         rpc_url,
         client.payer.as_ref(),
         &solett_mint(),
-        "10000",  // 10,000 SOLETT（足够卖出）
+        "10000", // 10,000 SOLETT（足够卖出）
     )
     .await
     {
@@ -191,7 +181,13 @@ async fn test_raydium_clmm_solett_wsol_sell_exact_in() {
     }
 
     // Token-2022 + Token 混合 Pool，使用较大的容错率
-    let result = match run_dex_three_stage_verification_sell(&client, config, SolettWsolSellExactInParamsBuilder).await {
+    let result = match run_dex_three_stage_verification_sell(
+        &client,
+        config,
+        SolettWsolSellExactInParamsBuilder,
+    )
+    .await
+    {
         Ok(r) => r,
         Err(e) => {
             cleanup_pool_cache();

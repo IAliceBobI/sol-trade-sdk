@@ -7,21 +7,13 @@ use test_helpers::create_test_client;
 
 use sol_trade_sdk::{DexType, TradingClient};
 use sol_trade_test_utils::{
-    dex_verification::{
-        cleanup_pool_cache,
-        run_dex_three_stage_verification,
-        run_dex_three_stage_verification_sell,
-        verify_three_stage_accuracy,
-        BuyParamsBuilder,
-        DexVerifyConfig,
-        OperationType,
-        RaydiumCpmmPoolRegistry,
-        SellParamsBuilder,
-        TradeDirection,
-    },
-    ensure_pipe_pool_wsol_liquidity, ensure_token_balance,
-    pipe_mint, wsol_mint,
     PipeWsolBuyParamsBuilder, PipeWsolSellParamsBuilder,
+    dex_verification::{
+        BuyParamsBuilder, DexVerifyConfig, OperationType, RaydiumCpmmPoolRegistry,
+        SellParamsBuilder, TradeDirection, cleanup_pool_cache, run_dex_three_stage_verification,
+        run_dex_three_stage_verification_sell, verify_three_stage_accuracy,
+    },
+    ensure_pipe_pool_wsol_liquidity, ensure_token_balance, pipe_mint, wsol_mint,
 };
 
 // 参数构建器结构体
@@ -29,7 +21,11 @@ struct PipeWsolParamsBuilder;
 
 impl BuyParamsBuilder for PipeWsolParamsBuilder {
     #[allow(clippy::manual_async_fn)]
-    fn build(&self, client: &TradingClient, amount: u64) -> impl std::future::Future<Output = sol_trade_sdk::TradeBuyParams> + Send {
+    fn build(
+        &self,
+        client: &TradingClient,
+        amount: u64,
+    ) -> impl std::future::Future<Output = sol_trade_sdk::TradeBuyParams> + Send {
         async move {
             PipeWsolBuyParamsBuilder::new(Some(amount))
                 .slippage(1000) // 10% 滑点
@@ -63,52 +59,36 @@ async fn test_cpmm_exact_in_buy_three_stage_verification_with_framework() {
     let client = create_test_client().await;
 
     // 确保 PIPE Pool 流动性
-    if let Err(e) = ensure_pipe_pool_wsol_liquidity(
-        &client.rpc,
-        rpc_url,
-        client.payer.as_ref(),
-        1,
-    )
-    .await
+    if let Err(e) =
+        ensure_pipe_pool_wsol_liquidity(&client.rpc, rpc_url, client.payer.as_ref(), 1).await
     {
         println!("⚠️  警告: 确保 PIPE Pool 流动性失败: {}", e);
         println!("继续测试，但可能因为流动性不足而失败...");
     }
 
     // 确保 WSOL 余额
-    if let Err(e) = ensure_token_balance(
-        &client.rpc,
-        rpc_url,
-        client.payer.as_ref(),
-        &wsol_mint(),
-        "10",
-    )
-    .await
+    if let Err(e) =
+        ensure_token_balance(&client.rpc, rpc_url, client.payer.as_ref(), &wsol_mint(), "10").await
     {
         panic!("❌ 确保 WSOL 余额失败: {}", e);
     }
 
     // 确保 PIPE 余额（确保 ATA 存在）
-    if let Err(e) = ensure_token_balance(
-        &client.rpc,
-        rpc_url,
-        client.payer.as_ref(),
-        &pipe_mint(),
-        "1",
-    )
-    .await
+    if let Err(e) =
+        ensure_token_balance(&client.rpc, rpc_url, client.payer.as_ref(), &pipe_mint(), "1").await
     {
         panic!("❌ 确保 PIPE 余额失败: {}", e);
     }
 
     // ===== 运行三阶段验证（框架自动处理）=====
-    let result = match run_dex_three_stage_verification(&client, config, PipeWsolParamsBuilder).await {
-        Ok(r) => r,
-        Err(e) => {
-            cleanup_pool_cache();
-            panic!("❌ 三阶段验证失败: {}", e);
-        },
-    };
+    let result =
+        match run_dex_three_stage_verification(&client, config, PipeWsolParamsBuilder).await {
+            Ok(r) => r,
+            Err(e) => {
+                cleanup_pool_cache();
+                panic!("❌ 三阶段验证失败: {}", e);
+            },
+        };
 
     // ===== 验证结果（框架自动对比）=====
     if let Err(e) = verify_three_stage_accuracy(&result, 1.0, false) {
@@ -165,13 +145,8 @@ async fn test_cpmm_exact_in_sell_three_stage_verification_with_framework() {
     let client = create_test_client().await;
 
     // 确保 PIPE Pool 流动性
-    if let Err(e) = ensure_pipe_pool_wsol_liquidity(
-        &client.rpc,
-        rpc_url,
-        client.payer.as_ref(),
-        1,
-    )
-    .await
+    if let Err(e) =
+        ensure_pipe_pool_wsol_liquidity(&client.rpc, rpc_url, client.payer.as_ref(), 1).await
     {
         println!("⚠️  警告: 确保 PIPE Pool 流动性失败: {}", e);
         println!("继续测试，但可能因为流动性不足而失败...");
@@ -191,20 +166,20 @@ async fn test_cpmm_exact_in_sell_three_stage_verification_with_framework() {
     }
 
     // 确保 WSOL 余额（确保 WSOL ATA 存在，用于接收卖出的 WSOL）
-    if let Err(e) = ensure_token_balance(
-        &client.rpc,
-        rpc_url,
-        client.payer.as_ref(),
-        &wsol_mint(),
-        "1",
-    )
-    .await
+    if let Err(e) =
+        ensure_token_balance(&client.rpc, rpc_url, client.payer.as_ref(), &wsol_mint(), "1").await
     {
         panic!("❌ 确保 WSOL 余额失败: {}", e);
     }
 
     // ===== 运行三阶段验证（框架自动处理）=====
-    let result = match run_dex_three_stage_verification_sell(&client, config, PipeWsolSellExactInParamsBuilder).await {
+    let result = match run_dex_three_stage_verification_sell(
+        &client,
+        config,
+        PipeWsolSellExactInParamsBuilder,
+    )
+    .await
+    {
         Ok(r) => r,
         Err(e) => {
             cleanup_pool_cache();

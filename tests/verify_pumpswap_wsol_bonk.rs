@@ -17,23 +17,13 @@ use test_helpers::create_test_client;
 
 use sol_trade_sdk::{DexType, TradingClient};
 use sol_trade_test_utils::{
+    BonkWsolBuyParamsBuilder, BonkWsolSellParamsBuilder, bonk_mint,
     dex_verification::{
-        cleanup_pool_cache,
-        run_dex_three_stage_verification,
-        run_dex_three_stage_verification_sell,
-        verify_three_stage_accuracy,
-        BuyParamsBuilder,
-        DexVerifyConfig,
-        OperationType,
-        PumpSwapPoolRegistry,
-        SellParamsBuilder,
-        TradeDirection,
+        BuyParamsBuilder, DexVerifyConfig, OperationType, PumpSwapPoolRegistry, SellParamsBuilder,
+        TradeDirection, cleanup_pool_cache, run_dex_three_stage_verification,
+        run_dex_three_stage_verification_sell, verify_three_stage_accuracy,
     },
-    ensure_token_balance,
-    bonk_mint,
-    wsol_mint,
-    BonkWsolBuyParamsBuilder,
-    BonkWsolSellParamsBuilder,
+    ensure_token_balance, wsol_mint,
 };
 
 // 参数构建器结构体
@@ -41,7 +31,11 @@ struct BonkWsolParamsBuilder;
 
 impl BuyParamsBuilder for BonkWsolParamsBuilder {
     #[allow(clippy::manual_async_fn)]
-    fn build(&self, client: &TradingClient, amount: u64) -> impl std::future::Future<Output = sol_trade_sdk::TradeBuyParams> + Send {
+    fn build(
+        &self,
+        client: &TradingClient,
+        amount: u64,
+    ) -> impl std::future::Future<Output = sol_trade_sdk::TradeBuyParams> + Send {
         async move {
             BonkWsolBuyParamsBuilder::new(Some(amount))
                 .slippage(1000) // 10% 滑点
@@ -78,26 +72,21 @@ async fn test_pumpswap_wsol_bonk_exact_in_buy_with_framework() {
     let client = create_test_client().await;
 
     // 确保 WSOL 余额（Token Program）
-    if let Err(e) = ensure_token_balance(
-        &client.rpc,
-        rpc_url,
-        client.payer.as_ref(),
-        &wsol_mint(),
-        "10",
-    )
-    .await
+    if let Err(e) =
+        ensure_token_balance(&client.rpc, rpc_url, client.payer.as_ref(), &wsol_mint(), "10").await
     {
         panic!("❌ 确保 WSOL 余额失败: {}", e);
     }
 
     // ===== 运行三阶段验证（框架自动处理）=====
-    let result = match run_dex_three_stage_verification(&client, config, BonkWsolParamsBuilder).await {
-        Ok(r) => r,
-        Err(e) => {
-            cleanup_pool_cache();
-            panic!("❌ 三阶段验证失败: {}", e);
-        },
-    };
+    let result =
+        match run_dex_three_stage_verification(&client, config, BonkWsolParamsBuilder).await {
+            Ok(r) => r,
+            Err(e) => {
+                cleanup_pool_cache();
+                panic!("❌ 三阶段验证失败: {}", e);
+            },
+        };
 
     // ===== 验证结果（框架自动对比）=====
     // 纯 Token Pool，期望 0% 误差
@@ -164,7 +153,7 @@ async fn test_pumpswap_wsol_bonk_sell_exact_in() {
         rpc_url,
         client.payer.as_ref(),
         &bonk_mint(),
-        "10000000",  // 10,000,000 BONK（足够卖出 1,000,000 BONK）
+        "10000000", // 10,000,000 BONK（足够卖出 1,000,000 BONK）
     )
     .await
     {
@@ -172,7 +161,13 @@ async fn test_pumpswap_wsol_bonk_sell_exact_in() {
     }
 
     // 纯 Token Pool，期望 0% 误差
-    let result = match run_dex_three_stage_verification_sell(&client, config, BonkWsolSellExactInParamsBuilder).await {
+    let result = match run_dex_three_stage_verification_sell(
+        &client,
+        config,
+        BonkWsolSellExactInParamsBuilder,
+    )
+    .await
+    {
         Ok(r) => r,
         Err(e) => {
             cleanup_pool_cache();
