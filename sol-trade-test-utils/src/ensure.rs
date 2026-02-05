@@ -167,9 +167,9 @@ pub async fn ensure_pipe_pool_liquidity_via_swap(
     payer: &Keypair,
     swap_amount_sol: u64,
 ) -> Result<(), String> {
-    use solana_commitment_config::CommitmentConfig;
-    use sol_trade_sdk::{SolanaTrade, TradeConfig};
     use sol_trade_sdk::swqos::SwqosConfig;
+    use sol_trade_sdk::{SolanaTrade, TradeConfig};
+    use solana_commitment_config::CommitmentConfig;
     use std::sync::Arc;
 
     let swap_amount_lamports = swap_amount_sol * 1_000_000_000;
@@ -249,10 +249,10 @@ pub async fn ensure_pipe_pool_liquidity_via_swap(
                 } else {
                     println!("⚠️  交易确认失败: {:?}", status);
                 }
-            }
+            },
             _ => {
                 println!("⚠️  无法获取交易状态");
-            }
+            },
         }
     }
 
