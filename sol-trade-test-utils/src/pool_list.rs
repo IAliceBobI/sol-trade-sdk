@@ -682,13 +682,11 @@ pub async fn list_and_classify_clmm_pools(
     let mut token2022_pools = Vec::new();
     let mut token_pools = Vec::new();
 
-    for result in results {
-        if let Some((addr, pool_info, other_mint, token_program)) = result {
-            if token_program == TOKEN_2022_PROGRAM {
-                token2022_pools.push((addr, pool_info, other_mint));
-            } else if token_program == spl_token::ID {
-                token_pools.push((addr, pool_info, other_mint));
-            }
+    for (addr, pool_info, other_mint, token_program) in results.into_iter().flatten() {
+        if token_program == TOKEN_2022_PROGRAM {
+            token2022_pools.push((addr, pool_info, other_mint));
+        } else if token_program == spl_token::ID {
+            token_pools.push((addr, pool_info, other_mint));
         }
     }
 
