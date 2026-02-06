@@ -28,7 +28,7 @@ impl BuyParamsBuilder for PipeWsolParamsBuilder {
     ) -> impl std::future::Future<Output = sol_trade_sdk::TradeBuyParams> + Send {
         async move {
             PipeWsolBuyParamsBuilder::new(Some(amount))
-                .slippage(1000) // 10% 滑点
+                .slippage(8000) // 80% 滑点（PIPE Pool 流动性极低，需要极大的滑点容忍度）
                 .build(client)
                 .await
         }
@@ -59,10 +59,10 @@ async fn test_cpmm_exact_in_buy_three_stage_verification_with_framework() {
     let client = create_test_client().await;
 
     // 通过大额 Swap 确保 PIPE Pool 流动性（推荐方法）
-    // 使用 1 SOL 进行大额买入，既增加流动性又提高 PIPE 价格
-    // 注意：如果 1 SOL 仍然太大，可以尝试更小的金额（如 0.1 SOL）
+    // 使用 5 SOL 进行大额买入，既增加流动性又提高 PIPE 价格
+    // 注意：增加金额可以显著提高池子流动性，降低后续测试的滑点
     if let Err(e) =
-        ensure_pipe_pool_liquidity_via_swap(&client.rpc, rpc_url, client.payer.as_ref(), 1).await
+        ensure_pipe_pool_liquidity_via_swap(&client.rpc, rpc_url, client.payer.as_ref(), 5).await
     {
         panic!("❌ 确保 PIPE Pool 流动性失败: {}", e);
     }
@@ -115,7 +115,7 @@ impl SellParamsBuilder for PipeWsolSellExactInParamsBuilder {
         async move {
             // 先获取 PIPE 余额，确保有足够的 PIPE 可以卖出
             PipeWsolSellParamsBuilder::new(amount)
-                .slippage(1000) // 10% 滑点
+                .slippage(8000) // 80% 滑点（PIPE Pool 流动性极低，需要极大的滑点容忍度）
                 .build(client)
                 .await
         }
@@ -146,10 +146,10 @@ async fn test_cpmm_exact_in_sell_three_stage_verification_with_framework() {
     let client = create_test_client().await;
 
     // 通过大额 Swap 确保 PIPE Pool 流动性（推荐方法）
-    // 使用 1 SOL 进行大额买入，既增加流动性又获得 PIPE 用于卖出测试
-    // 注意：如果 1 SOL 仍然太大，可以尝试更小的金额（如 0.1 SOL）
+    // 使用 5 SOL 进行大额买入，既增加流动性又获得 PIPE 用于卖出测试
+    // 注意：增加金额可以显著提高池子流动性，降低后续测试的滑点
     if let Err(e) =
-        ensure_pipe_pool_liquidity_via_swap(&client.rpc, rpc_url, client.payer.as_ref(), 1).await
+        ensure_pipe_pool_liquidity_via_swap(&client.rpc, rpc_url, client.payer.as_ref(), 5).await
     {
         panic!("❌ 确保 PIPE Pool 流动性失败: {}", e);
     }

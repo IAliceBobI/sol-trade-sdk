@@ -74,7 +74,8 @@ pub struct CpmmDepositParams {
 ///
 /// 返回构建好的 Instruction
 pub fn build_deposit_instruction(params: CpmmDepositParams, owner: Pubkey) -> Instruction {
-    let program_id = Pubkey::from_str(RAYDIUM_CPMM_PROGRAM_ID).unwrap();
+    let program_id = Pubkey::from_str(RAYDIUM_CPMM_PROGRAM_ID)
+        .expect("RAYDIUM_CPMM_PROGRAM_ID is a valid valid pubkey");
 
     // 派生 authority PDA
     let (authority, _bump) = Pubkey::find_program_address(&[AUTH_SEED.as_bytes()], &program_id);

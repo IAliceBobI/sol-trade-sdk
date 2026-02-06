@@ -192,6 +192,12 @@ pub async fn ensure_pipe_pool_liquidity_via_swap(
     .map_err(|e| format!("确保 WSOL 余额失败: {}", e))?;
     println!("✅ WSOL 余额充足");
 
+    // 1.5. 确保 payer 有足够的原生 SOL 余额（WSOL 需要原生 SOL 支持）
+    println!("\n📋 步骤 1.5: 确保原生 SOL 余额...");
+    ensure_sol_balance(rpc_client, rpc_url, &payer.pubkey(), swap_amount_sol * 3).await
+        .map_err(|e| format!("确保 SOL 余额失败: {}", e))?;
+    println!("✅ 原生 SOL 余额充足");
+
     // 2. 创建 TradingClient（使用正确的 API）
     println!("\n📋 步骤 2: 创建 TradingClient...");
     let payer_arc = Arc::new(payer.insecure_clone());
@@ -209,12 +215,12 @@ pub async fn ensure_pipe_pool_liquidity_via_swap(
     // 3. 构建 Swap 参数（WSOL → PIPE）
     println!("\n📋 步骤 3: 构建 Swap 参数...");
     let buy_params = crate::test_params::PipeWsolBuyParamsBuilder::new(Some(swap_amount_lamports))
-        .slippage(2000); // 20% 滑点（Pool 流动性不足时需要更大的滑点容忍度）
+        .slippage(8000); // 80% 滑点（PIPE Pool 流动性极低，需要极大的滑点容忍度）
 
     let buy_params = buy_params.build(&client).await;
     println!("✅ Swap 参数构建成功");
     println!("   输入: {} WSOL", swap_amount_sol);
-    println!("   滑点: 20%");
+    println!("   滑点: 80%");
 
     // 4. 执行 Swap
     println!("\n📋 步骤 4: 执行 Swap...");

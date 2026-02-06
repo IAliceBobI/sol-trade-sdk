@@ -53,12 +53,14 @@ pub fn swap_token_amount_base_in(
             // => amount_out = pc - coin * pc / (coin + amount_in)
             // => amount_out = ((pc * coin + pc * amount_in) - coin * pc) / (coin + amount_in)
             // => amount_out =  pc * amount_in / (coin + amount_in)
-            let denominator = total_coin_without_take_pnl.checked_add(amount_in).unwrap();
+            let denominator = total_coin_without_take_pnl
+                .checked_add(amount_in)
+                .expect("Arithmetic overflow in Coin2PC swap calculation");
             total_pc_without_take_pnl
                 .checked_mul(amount_in)
-                .unwrap()
+                .expect("Arithmetic overflow in Coin2PC swap calculation")
                 .checked_div(denominator)
-                .unwrap()
+                .expect("Division by zero in Coin2PC swap calculation")
         },
         SwapDirection::PC2Coin => {
             // (x + delta_x) * (y + delta_y) = x * y
@@ -66,12 +68,14 @@ pub fn swap_token_amount_base_in(
             // => amount_out = coin - coin * pc / (pc + amount_in)
             // => amount_out = (coin * pc + coin * amount_in - coin * pc) / (pc + amount_in)
             // => amount_out = coin * amount_in / (pc + amount_in)
-            let denominator = total_pc_without_take_pnl.checked_add(amount_in).unwrap();
+            let denominator = total_pc_without_take_pnl
+                .checked_add(amount_in)
+                .expect("Arithmetic overflow in PC2Coin swap calculation");
             total_coin_without_take_pnl
                 .checked_mul(amount_in)
-                .unwrap()
+                .expect("Arithmetic overflow in PC2Coin swap calculation")
                 .checked_div(denominator)
-                .unwrap()
+                .expect("Division by zero in PC2Coin swap calculation")
         },
     }
 }
@@ -102,14 +106,16 @@ pub fn calculate_swap_with_fee(
     // 源码: processor.rs:2393-2397
     let swap_fee = (amount_in as u128)
         .checked_mul(swap_fee_numerator as u128)
-        .unwrap()
+        .expect("Arithmetic overflow in swap fee calculation")
         .checked_ceil_div(swap_fee_denominator as u128)
-        .unwrap() as u64;
+        .expect("Division by zero in swap fee calculation") as u64;
 
     // 2. 从输入扣除费用
     // 源码: processor.rs:2398
-    let swap_in_after_deduct_fee =
-        (amount_in as u128).checked_sub(swap_fee as u128).unwrap() as u64;
+    let swap_in_after_deduct_fee = (amount_in as u128)
+        .checked_sub(swap_fee as u128)
+        .expect("Arithmetic underflow in swap fee deduction")
+        as u64;
 
     // 3. 计算输出金额
     // 源码: processor.rs:2399-2405
