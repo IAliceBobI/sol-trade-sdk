@@ -194,7 +194,8 @@ pub async fn ensure_pipe_pool_liquidity_via_swap(
 
     // 1.5. 确保 payer 有足够的原生 SOL 余额（WSOL 需要原生 SOL 支持）
     println!("\n📋 步骤 1.5: 确保原生 SOL 余额...");
-    ensure_sol_balance(rpc_client, rpc_url, &payer.pubkey(), swap_amount_sol * 3).await
+    ensure_sol_balance(rpc_client, rpc_url, &payer.pubkey(), swap_amount_sol * 3)
+        .await
         .map_err(|e| format!("确保 SOL 余额失败: {}", e))?;
     println!("✅ 原生 SOL 余额充足");
 
