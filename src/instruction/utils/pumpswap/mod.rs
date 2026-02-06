@@ -5,6 +5,7 @@ mod pool_queries;
 mod quotes;
 
 pub use constants::*;
+pub use helpers::identify_quote_mint;
 pub(crate) use helpers::*;
 pub use pool_queries::*;
 // 只导出公开的价格查询函数，quote_exact_in 和 quote_exact_out 是内部实现
