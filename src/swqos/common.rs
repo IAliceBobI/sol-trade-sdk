@@ -63,17 +63,23 @@ pub async fn poll_transaction_confirmation(
         return Ok(txt_sig);
     }
 
-    let timeout: Duration = Duration::from_secs(15); // 🔧 增加到15秒，避免网络拥堵时超时
-    let interval: Duration = Duration::from_millis(1000);
+    let timeout: Duration = Duration::from_secs(30); // 🔧 增加到30秒，确保有足够时间等待确认
+    let interval: Duration = Duration::from_millis(500); // 🔧 减少到500ms，更频繁地轮询
     let start: Instant = Instant::now();
     let mut poll_count = 0u32;
 
     loop {
         if start.elapsed() >= timeout {
-            return Err(anyhow::anyhow!("Transaction {}'s confirmation timed out", txt_sig));
+            eprintln!(" [poll_transaction_confirmation] Timeout after {} polls, {} elapsed", poll_count, start.elapsed());
+            return Err(anyhow::anyhow!("Transaction {}'s confirmation timed out after {}s", txt_sig, timeout.as_secs()));
         }
 
         poll_count += 1;
+
+        // 🔧 添加调试日志
+        if poll_count % 10 == 0 {
+            eprintln!(" [poll_transaction_confirmation] Polling #{} for tx {:?}...", poll_count, txt_sig);
+        }
 
         let status = rpc.get_signature_statuses(&[txt_sig]).await?;
         match status.value[0].clone() {
