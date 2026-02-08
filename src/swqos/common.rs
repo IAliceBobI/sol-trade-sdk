@@ -70,7 +70,7 @@ pub async fn poll_transaction_confirmation(
 
     loop {
         if start.elapsed() >= timeout {
-            eprintln!(" [poll_transaction_confirmation] Timeout after {} polls, {} elapsed", poll_count, start.elapsed());
+            eprintln!(" [poll_transaction_confirmation] Timeout after {} polls, {:?} elapsed", poll_count, start.elapsed());
             return Err(anyhow::anyhow!("Transaction {}'s confirmation timed out after {}s", txt_sig, timeout.as_secs()));
         }
 

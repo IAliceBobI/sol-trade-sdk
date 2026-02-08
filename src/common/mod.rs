@@ -2,6 +2,7 @@ pub mod address_lookup;
 pub mod amm_config_cache;
 pub mod auto_mock_rpc;
 pub mod bonding_curve;
+pub mod dex_detector;
 pub mod dex_pool_cache;
 pub mod fast_fn;
 pub mod fast_timing;
@@ -17,5 +18,6 @@ pub mod subscription_handle;
 pub mod types;
 
 pub use auto_mock_rpc::{AutoMockRpcClient, PoolRpcClient};
+pub use dex_detector::*;
 pub use gas_fee_strategy::*;
 pub use types::*;
