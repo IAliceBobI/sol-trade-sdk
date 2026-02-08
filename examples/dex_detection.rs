@@ -2,8 +2,10 @@
 //!
 //! 展示如何使用 Pool 地址识别 DEX 协议
 
-use sol_trade_sdk::common::dex_detector::{detect_dex_from_pool, detect_dex_from_pools_batch, DexInfo};
 use sol_trade_sdk::common::SolanaRpcClient;
+use sol_trade_sdk::common::dex_detector::{
+    DexInfo, detect_dex_from_pool, detect_dex_from_pools_batch,
+};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -35,7 +37,7 @@ async fn main() -> anyhow::Result<()> {
             },
             Err(e) => {
                 println!("   ❌ 识别失败: {}", e);
-            }
+            },
         }
         println!();
     }

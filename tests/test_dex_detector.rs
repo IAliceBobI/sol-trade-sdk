@@ -1,8 +1,10 @@
 //! DEX 检测功能集成测试
 
-use sol_trade_sdk::common::dex_detector::{detect_dex_from_pool, detect_dex_from_pools_batch, DexInfo};
-use sol_trade_sdk::constants::DexProtocol;
 use sol_trade_sdk::common::SolanaRpcClient;
+use sol_trade_sdk::common::dex_detector::{
+    DexInfo, detect_dex_from_pool, detect_dex_from_pools_batch,
+};
+use sol_trade_sdk::constants::DexProtocol;
 
 #[tokio::test]
 async fn test_detect_dex_from_pumpswap_pool() {
@@ -22,10 +24,7 @@ async fn test_detect_dex_from_pumpswap_pool() {
     assert_eq!(dex_info.protocol, DexProtocol::PumpSwap);
     assert_eq!(dex_info.dex_name(), "pumpswap");
     assert_eq!(dex_info.display_name(), "PumpSwap");
-    assert_eq!(
-        dex_info.program_id,
-        "pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA"
-    );
+    assert_eq!(dex_info.program_id, "pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA");
 }
 
 #[tokio::test]
@@ -171,9 +170,6 @@ async fn test_dex_info_methods() {
     assert_eq!(info.dex_name(), "raydium_amm_v4");
     assert_eq!(info.display_name(), "Raydium AMM V4");
     assert_eq!(info.pool_address, "58L7CzkRV5qD1owUPurbAC7gUNV1kSzwj2TMkvgEpbjZ");
-    assert_eq!(
-        info.program_id,
-        "675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8"
-    );
+    assert_eq!(info.program_id, "675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8");
     assert_eq!(info.protocol, DexProtocol::RaydiumAmmV4);
 }

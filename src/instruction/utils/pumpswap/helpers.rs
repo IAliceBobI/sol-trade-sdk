@@ -26,7 +26,9 @@ pub(crate) fn is_hot_mint(mint: &Pubkey) -> bool {
 /// * `Some(quote_mint)` - 识别出的 quote mint
 /// * `None` - 无法识别（两个都不是主流 quote asset）
 pub fn identify_quote_mint(mint_a: &Pubkey, mint_b: &Pubkey) -> Option<Pubkey> {
-    use crate::constants::{SOL_MINT, USDC_MINT, USDT_MINT, USD1_TOKEN_ACCOUNT, WSOL_TOKEN_ACCOUNT};
+    use crate::constants::{
+        SOL_MINT, USD1_TOKEN_ACCOUNT, USDC_MINT, USDT_MINT, WSOL_TOKEN_ACCOUNT,
+    };
 
     // 定义优先级枚举
     #[derive(PartialEq, PartialOrd, Copy, Clone)]
@@ -56,7 +58,7 @@ pub fn identify_quote_mint(mint_a: &Pubkey, mint_b: &Pubkey) -> Option<Pubkey> {
         (QuotePriority::Usd, QuotePriority::Usd) => Some(*mint_a), // 两者都是 USD，返回第一个
         (QuotePriority::Sol, QuotePriority::Sol) => Some(*mint_a), // 两者都是 SOL，返回第一个
         _ if priority_a >= priority_b => Some(*mint_a),            // mint_a 优先级更高或相等
-        _ => Some(*mint_b),                                         // mint_b 优先级更高
+        _ => Some(*mint_b),                                        // mint_b 优先级更高
     }
 }
 
@@ -169,7 +171,9 @@ pub(crate) fn calculate_canonical_pool_pda(mint: &Pubkey) -> Option<(Pubkey, Pub
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::constants::{SOL_MINT, USDC_MINT, USDT_MINT, USD1_TOKEN_ACCOUNT, WSOL_TOKEN_ACCOUNT};
+    use crate::constants::{
+        SOL_MINT, USD1_TOKEN_ACCOUNT, USDC_MINT, USDT_MINT, WSOL_TOKEN_ACCOUNT,
+    };
 
     #[test]
     fn test_identify_quote_mint_usdc_vs_wsol() {

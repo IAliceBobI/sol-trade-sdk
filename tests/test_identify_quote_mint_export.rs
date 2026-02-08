@@ -1,6 +1,6 @@
+use sol_trade_sdk::constants::{USDC_MINT, WSOL_TOKEN_ACCOUNT};
 /// 测试 identify_quote_mint 函数是否可以被下游使用
 use sol_trade_sdk::instruction::utils::pumpswap::identify_quote_mint;
-use sol_trade_sdk::constants::{USDC_MINT, WSOL_TOKEN_ACCOUNT};
 
 #[test]
 fn test_identify_quote_mint_is_exported() {

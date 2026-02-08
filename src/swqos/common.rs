@@ -70,15 +70,26 @@ pub async fn poll_transaction_confirmation(
 
     loop {
         if start.elapsed() >= timeout {
-            eprintln!(" [poll_transaction_confirmation] Timeout after {} polls, {:?} elapsed", poll_count, start.elapsed());
-            return Err(anyhow::anyhow!("Transaction {}'s confirmation timed out after {}s", txt_sig, timeout.as_secs()));
+            eprintln!(
+                " [poll_transaction_confirmation] Timeout after {} polls, {:?} elapsed",
+                poll_count,
+                start.elapsed()
+            );
+            return Err(anyhow::anyhow!(
+                "Transaction {}'s confirmation timed out after {}s",
+                txt_sig,
+                timeout.as_secs()
+            ));
         }
 
         poll_count += 1;
 
         // 🔧 添加调试日志
-        if poll_count % 10 == 0 {
-            eprintln!(" [poll_transaction_confirmation] Polling #{} for tx {:?}...", poll_count, txt_sig);
+        if poll_count.is_multiple_of(10) {
+            eprintln!(
+                " [poll_transaction_confirmation] Polling #{} for tx {:?}...",
+                poll_count, txt_sig
+            );
         }
 
         let status = rpc.get_signature_statuses(&[txt_sig]).await?;

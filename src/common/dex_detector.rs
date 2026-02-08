@@ -2,8 +2,8 @@
 //!
 //! 提供通过 Pool 地址识别 DEX 协议的便捷工具函数
 
-use crate::constants::DexProtocol;
 use crate::common::types::SolanaRpcClient;
+use crate::constants::DexProtocol;
 use solana_sdk::pubkey::Pubkey;
 use std::str::FromStr;
 
@@ -24,11 +24,7 @@ impl DexInfo {
         let pubkey = Pubkey::from_str(&program_id).ok()?;
         let protocol = DexProtocol::from_program_id(&pubkey)?;
 
-        Some(Self {
-            protocol,
-            pool_address,
-            program_id,
-        })
+        Some(Self { protocol, pool_address, program_id })
     }
 
     /// 获取 DEX 代码名称（用于代码/数据库）
@@ -55,8 +51,8 @@ pub async fn detect_dex_from_pool(
     pool_address: &str,
 ) -> anyhow::Result<DexInfo> {
     // 解析 Pool 地址
-    let pool_pubkey = Pubkey::from_str(pool_address)
-        .map_err(|e| anyhow::anyhow!("无效的 Pool 地址: {}", e))?;
+    let pool_pubkey =
+        Pubkey::from_str(pool_address).map_err(|e| anyhow::anyhow!("无效的 Pool 地址: {}", e))?;
 
     // 获取账户信息
     let account = rpc
@@ -71,11 +67,7 @@ pub async fn detect_dex_from_pool(
     let protocol = DexProtocol::from_program_id(&account.owner)
         .ok_or_else(|| anyhow::anyhow!("未知的 DEX 协议，Program ID: {}", program_id))?;
 
-    Ok(DexInfo {
-        protocol,
-        pool_address: pool_address.to_string(),
-        program_id,
-    })
+    Ok(DexInfo { protocol, pool_address: pool_address.to_string(), program_id })
 }
 
 /// 批量检测多个 Pool 地址的 DEX
@@ -90,19 +82,14 @@ pub async fn detect_dex_from_pools_batch(
     rpc: &SolanaRpcClient,
     pool_addresses: &[&str],
 ) -> Vec<DexInfo> {
-    let futures: Vec<_> = pool_addresses
-        .iter()
-        .map(|&addr| detect_dex_from_pool(rpc, addr))
-        .collect();
+    let futures: Vec<_> =
+        pool_addresses.iter().map(|&addr| detect_dex_from_pool(rpc, addr)).collect();
 
     // 并发执行所有请求
     let results = futures::future::join_all(futures).await;
 
     // 过滤掉失败的结果
-    results
-        .into_iter()
-        .filter_map(|result| result.ok())
-        .collect()
+    results.into_iter().filter_map(|result| result.ok()).collect()
 }
 
 #[cfg(test)]
