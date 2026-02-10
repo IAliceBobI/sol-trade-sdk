@@ -3,7 +3,7 @@
 #![allow(dead_code)]
 
 use crate::{
-    common::SolanaRpcClient,
+    common::{SolanaRpcClient, auto_mock_rpc::PoolRpcClient},
     constants::{SOL_MINT, USDC_MINT, USDT_MINT, WSOL_TOKEN_ACCOUNT},
     instruction::utils::raydium_cpmm::{
         constants::DEFAULT_WSOL_USDT_CLMM_POOL, fee_queries, pool_queries,
@@ -320,8 +320,11 @@ pub async fn quote_exact_out_legacy(
 ///
 /// 价格计算路径：Token X -> WSOL -> USD
 /// - 要求：存在一个 X-WSOL 的 CPMM 池，以及一个 Raydium CLMM 上的 WSOL-USDT/USDC 锚定池
-pub async fn get_token_price_in_usd(
-    rpc: &SolanaRpcClient,
+///
+/// 这是一个泛型版本，可以接受任何实现了 PoolRpcClient 的客户端。
+/// 支持标准的 RpcClient 和 AutoMockRpcClient。
+pub async fn get_token_price_in_usd<T: PoolRpcClient + ?Sized>(
+    rpc: &T,
     token_mint: &Pubkey,
     wsol_usd_clmm_pool_address: Option<&Pubkey>,
 ) -> Result<f64, anyhow::Error> {
