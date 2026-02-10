@@ -80,9 +80,36 @@ impl PoolRpcClient for NonblockingRpcClient {
         &self,
         pubkeys: &[Pubkey],
     ) -> Result<Vec<Option<Account>>, String> {
-        self.get_multiple_accounts(pubkeys)
-            .await
-            .map_err(|e| format!("RPC 批量查询失败: {}", e))
+        use std::time::Instant;
+        let start = Instant::now();
+        let count = pubkeys.len();
+
+        let result = self.get_multiple_accounts(pubkeys).await;
+
+        let elapsed = start.elapsed();
+        let exist_count = result.as_ref().map(|accounts| accounts.iter().filter(|a| a.is_some()).count()).unwrap_or(0);
+
+        // 记录详细的性能日志
+        if elapsed.as_millis() > 100 {
+            tracing::warn!(
+                "[RPC-PERF] get_multiple_accounts 慢: 总数={}, 存在={}, 不存在={}, 耗时={:.2}ms, 平均={:.2}ms/个",
+                count,
+                exist_count,
+                count - exist_count,
+                elapsed.as_millis(),
+                elapsed.as_millis() as f64 / count as f64
+            );
+        } else {
+            tracing::info!(
+                "[RPC-PERF] get_multiple_accounts: 总数={}, 存在={}, 不存在={}, 耗时={:.2}ms",
+                count,
+                exist_count,
+                count - exist_count,
+                elapsed.as_millis()
+            );
+        }
+
+        result.map_err(|e| format!("RPC 批量查询失败: {}", e))
     }
 
     async fn get_program_ui_accounts_with_config(
@@ -103,9 +130,32 @@ impl PoolRpcClient for NonblockingRpcClient {
     }
 
     async fn get_token_account_balance(&self, pubkey: &Pubkey) -> Result<UiTokenAmount, String> {
-        self.get_token_account_balance(pubkey)
-            .await
-            .map_err(|e| format!("RPC 调用失败: {}", e))
+        use std::time::Instant;
+        let start = Instant::now();
+
+        let result = self.get_token_account_balance(pubkey).await;
+
+        let elapsed = start.elapsed();
+        let exists = result.is_ok();
+
+        // 记录性能日志
+        if elapsed.as_millis() > 50 {
+            tracing::warn!(
+                "[RPC-PERF] get_token_account_balance 慢: pubkey={}, 存在={}, 耗时={:.2}ms",
+                pubkey,
+                exists,
+                elapsed.as_millis()
+            );
+        } else {
+            tracing::info!(
+                "[RPC-PERF] get_token_account_balance: pubkey={}, 存在={}, 耗时={:.2}ms",
+                pubkey,
+                exists,
+                elapsed.as_millis()
+            );
+        }
+
+        result.map_err(|e| format!("RPC 调用失败: {}", e))
     }
 
     async fn get_balance(&self, pubkey: &Pubkey) -> Result<u64, String> {
@@ -164,10 +214,36 @@ impl PoolRpcClient for Arc<NonblockingRpcClient> {
         &self,
         pubkeys: &[Pubkey],
     ) -> Result<Vec<Option<Account>>, String> {
-        self.as_ref()
-            .get_multiple_accounts(pubkeys)
-            .await
-            .map_err(|e| format!("RPC 批量查询失败: {}", e))
+        use std::time::Instant;
+        let start = Instant::now();
+        let count = pubkeys.len();
+
+        let result = self.as_ref().get_multiple_accounts(pubkeys).await;
+
+        let elapsed = start.elapsed();
+        let exist_count = result.as_ref().map(|accounts| accounts.iter().filter(|a| a.is_some()).count()).unwrap_or(0);
+
+        // 记录详细的性能日志
+        if elapsed.as_millis() > 100 {
+            tracing::warn!(
+                "[RPC-PERF] get_multiple_accounts (Arc) 慢: 总数={}, 存在={}, 不存在={}, 耗时={:.2}ms, 平均={:.2}ms/个",
+                count,
+                exist_count,
+                count - exist_count,
+                elapsed.as_millis(),
+                elapsed.as_millis() as f64 / count as f64
+            );
+        } else {
+            tracing::info!(
+                "[RPC-PERF] get_multiple_accounts (Arc): 总数={}, 存在={}, 不存在={}, 耗时={:.2}ms",
+                count,
+                exist_count,
+                count - exist_count,
+                elapsed.as_millis()
+            );
+        }
+
+        result.map_err(|e| format!("RPC 批量查询失败: {}", e))
     }
 
     async fn get_program_ui_accounts_with_config(
@@ -189,10 +265,32 @@ impl PoolRpcClient for Arc<NonblockingRpcClient> {
     }
 
     async fn get_token_account_balance(&self, pubkey: &Pubkey) -> Result<UiTokenAmount, String> {
-        self.as_ref()
-            .get_token_account_balance(pubkey)
-            .await
-            .map_err(|e| format!("RPC 调用失败: {}", e))
+        use std::time::Instant;
+        let start = Instant::now();
+
+        let result = self.as_ref().get_token_account_balance(pubkey).await;
+
+        let elapsed = start.elapsed();
+        let exists = result.is_ok();
+
+        // 记录性能日志
+        if elapsed.as_millis() > 50 {
+            tracing::warn!(
+                "[RPC-PERF] get_token_account_balance (Arc) 慢: pubkey={}, 存在={}, 耗时={:.2}ms",
+                pubkey,
+                exists,
+                elapsed.as_millis()
+            );
+        } else {
+            tracing::info!(
+                "[RPC-PERF] get_token_account_balance (Arc): pubkey={}, 存在={}, 耗时={:.2}ms",
+                pubkey,
+                exists,
+                elapsed.as_millis()
+            );
+        }
+
+        result.map_err(|e| format!("RPC 调用失败: {}", e))
     }
 
     async fn get_balance(&self, pubkey: &Pubkey) -> Result<u64, String> {
