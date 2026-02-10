@@ -104,11 +104,11 @@ pub async fn get_pool_by_address<T: PoolRpcClient + ?Sized>(
     Ok(amm_info)
 }
 
-/// 强制刷新：强制重新查询指定 Pool
+/// 强制刷新：强制重新查询指定 Pool（使用 PoolRpcClient trait，支持 Auto Mock）
 ///
 /// 先从缓存中删除该 Pool，然后重新查询并写入缓存。
-pub async fn get_pool_by_address_force(
-    rpc: &SolanaRpcClient,
+pub async fn get_pool_by_address_force<T: PoolRpcClient + ?Sized>(
+    rpc: &T,
     pool_address: &Pubkey,
 ) -> Result<AmmInfo, anyhow::Error> {
     POOL_DATA_CACHE.remove(pool_address);
@@ -475,8 +475,12 @@ pub async fn list_pools_by_mint<T: PoolRpcClient + ?Sized>(
 ///
 /// 价格计算路径：Token X -> WSOL -> USD
 /// - 要求：存在一个 X-WSOL 的 AMM V4 池，以及一个 Raydium CLMM 上的 WSOL-USDT/USDC 锚定池
-pub async fn get_token_price_in_usd(
-    rpc: &SolanaRpcClient,
+/// 获取任意 Token 在 Raydium AMM V4 上的 USD 价格（使用 PoolRpcClient trait，支持 Auto Mock）
+///
+/// 这是一个泛型版本，可以接受任何实现了 PoolRpcClient 的客户端。
+/// 支持标准的 RpcClient 和 AutoMockRpcClient。
+pub async fn get_token_price_in_usd<T: PoolRpcClient + ?Sized>(
+    rpc: &T,
     token_mint: &Pubkey,
     wsol_usd_clmm_pool_address: Option<&Pubkey>,
 ) -> Result<f64, anyhow::Error> {
@@ -526,18 +530,20 @@ pub async fn get_token_price_in_usd(
     // 3. 其他：暂不支持（需要多跳路由）
     if other_mint == USDC_MINT || other_mint == USDT_MINT {
         // X-稳定币池：直接计算 X 相对稳定币的价格
-        let coin_decimals = crate::utils::token::get_token_decimals(rpc, &amm.coin_mint).await?;
-        let pc_decimals = crate::utils::token::get_token_decimals(rpc, &amm.pc_mint).await?;
+        let coin_decimals = crate::utils::token::get_token_decimals_with_client(rpc, &amm.coin_mint).await?;
+        let pc_decimals = crate::utils::token::get_token_decimals_with_client(rpc, &amm.pc_mint).await?;
 
         // 获取实时余额
         let coin_balance =
             rpc.get_token_account_balance(&amm.token_coin)
-                .await?
+                .await
+                .map_err(|e| anyhow!("Failed to get coin balance: {}", e))?
                 .ui_amount
                 .ok_or_else(|| anyhow!("Failed to get coin balance"))? as u64;
         let pc_balance = rpc
             .get_token_account_balance(&amm.token_pc)
-            .await?
+            .await
+            .map_err(|e| anyhow!("Failed to get pc balance: {}", e))?
             .ui_amount
             .ok_or_else(|| anyhow!("Failed to get pc balance"))? as u64;
 
@@ -569,18 +575,20 @@ pub async fn get_token_price_in_usd(
     }
 
     // X-WSOL 池：计算 X 相对 WSOL 的价格
-    let coin_decimals = crate::utils::token::get_token_decimals(rpc, &amm.coin_mint).await?;
-    let pc_decimals = crate::utils::token::get_token_decimals(rpc, &amm.pc_mint).await?;
+    let coin_decimals = crate::utils::token::get_token_decimals_with_client(rpc, &amm.coin_mint).await?;
+    let pc_decimals = crate::utils::token::get_token_decimals_with_client(rpc, &amm.pc_mint).await?;
 
     // 获取实时余额
     let coin_balance = rpc
         .get_token_account_balance(&amm.token_coin)
-        .await?
+        .await
+        .map_err(|e| anyhow!("Failed to get coin balance: {}", e))?
         .ui_amount
         .ok_or_else(|| anyhow!("Failed to get coin balance"))? as u64;
     let pc_balance = rpc
         .get_token_account_balance(&amm.token_pc)
-        .await?
+        .await
+        .map_err(|e| anyhow!("Failed to get pc balance: {}", e))?
         .ui_amount
         .ok_or_else(|| anyhow!("Failed to get pc balance"))? as u64;
 
@@ -614,12 +622,12 @@ pub async fn get_token_price_in_usd(
 /// - 适用于高频调用、已缓存池地址的场景
 ///
 /// # Arguments
-/// * `rpc` - Solana RPC 客户端
+/// * `rpc` - 实现 PoolRpcClient 的 RPC 客户端（支持标准 RpcClient 和 AutoMockRpcClient）
 /// * `token_mint` - Token X 的 mint 地址
 /// * `x_wsol_pool_address` - Token X 与 WSOL 配对的 AMM V4 池地址
 /// * `wsol_usd_clmm_pool_address` - Raydium CLMM 上的 WSOL-USDT/USDC 锚定池地址
-pub async fn get_token_price_in_usd_with_pool(
-    rpc: &SolanaRpcClient,
+pub async fn get_token_price_in_usd_with_pool<T: PoolRpcClient + ?Sized>(
+    rpc: &T,
     token_mint: &Pubkey,
     x_wsol_pool_address: &Pubkey,
     wsol_usd_clmm_pool_address: Option<&Pubkey>,
@@ -667,18 +675,20 @@ pub async fn get_token_price_in_usd_with_pool(
     // 3. 其他：暂不支持（需要多跳路由）
     if other_mint == USDC_MINT || other_mint == USDT_MINT {
         // X-稳定币池：直接计算 X 相对稳定币的价格
-        let coin_decimals = crate::utils::token::get_token_decimals(rpc, &amm.coin_mint).await?;
-        let pc_decimals = crate::utils::token::get_token_decimals(rpc, &amm.pc_mint).await?;
+        let coin_decimals = crate::utils::token::get_token_decimals_with_client(rpc, &amm.coin_mint).await?;
+        let pc_decimals = crate::utils::token::get_token_decimals_with_client(rpc, &amm.pc_mint).await?;
 
         // 获取实时余额
         let coin_balance =
             rpc.get_token_account_balance(&amm.token_coin)
-                .await?
+                .await
+                .map_err(|e| anyhow!("Failed to get coin balance: {}", e))?
                 .ui_amount
                 .ok_or_else(|| anyhow!("Failed to get coin balance"))? as u64;
         let pc_balance = rpc
             .get_token_account_balance(&amm.token_pc)
-            .await?
+            .await
+            .map_err(|e| anyhow!("Failed to get pc balance: {}", e))?
             .ui_amount
             .ok_or_else(|| anyhow!("Failed to get pc balance"))? as u64;
 
@@ -710,18 +720,20 @@ pub async fn get_token_price_in_usd_with_pool(
     }
 
     // 3. X-WSOL 池：计算 X 相对 WSOL 的价格
-    let coin_decimals = crate::utils::token::get_token_decimals(rpc, &amm.coin_mint).await?;
-    let pc_decimals = crate::utils::token::get_token_decimals(rpc, &amm.pc_mint).await?;
+    let coin_decimals = crate::utils::token::get_token_decimals_with_client(rpc, &amm.coin_mint).await?;
+    let pc_decimals = crate::utils::token::get_token_decimals_with_client(rpc, &amm.pc_mint).await?;
 
     // 获取实时余额
     let coin_balance = rpc
         .get_token_account_balance(&amm.token_coin)
-        .await?
+        .await
+        .map_err(|e| anyhow!("Failed to get coin balance: {}", e))?
         .ui_amount
         .ok_or_else(|| anyhow!("Failed to get coin balance"))? as u64;
     let pc_balance = rpc
         .get_token_account_balance(&amm.token_pc)
-        .await?
+        .await
+        .map_err(|e| anyhow!("Failed to get pc balance: {}", e))?
         .ui_amount
         .ok_or_else(|| anyhow!("Failed to get pc balance"))? as u64;
 
