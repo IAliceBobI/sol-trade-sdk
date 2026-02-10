@@ -267,8 +267,11 @@ pub async fn quote_exact_out_legacy(
 ///
 /// 价格计算路径：Token X -> WSOL -> USD
 /// - 要求：存在一个 X-WSOL 的 PumpSwap 池，以及一个 Raydium CLMM 上的 WSOL-USDT/USDC 锚定池
-pub async fn get_token_price_in_usd(
-    rpc: &SolanaRpcClient,
+///
+/// 这是一个泛型版本，可以接受任何实现了 PoolRpcClient 的客户端。
+/// 支持标准的 RpcClient 和 AutoMockRpcClient。
+pub async fn get_token_price_in_usd<T: PoolRpcClient + ?Sized>(
+    rpc: &T,
     token_mint: &Pubkey,
     wsol_usd_clmm_pool_address: Option<&Pubkey>,
 ) -> Result<f64, anyhow::Error> {
@@ -309,8 +312,8 @@ pub async fn get_token_price_in_usd(
     let (base_reserve, quote_reserve) = get_token_balances(&pool, rpc).await?;
 
     // 5. 获取两侧代币精度
-    let base_decimals = crate::utils::token::get_token_decimals(rpc, &pool.base_mint).await?;
-    let quote_decimals = crate::utils::token::get_token_decimals(rpc, &pool.quote_mint).await?;
+    let base_decimals = crate::utils::token::get_token_decimals_with_client(rpc, &pool.base_mint).await?;
+    let quote_decimals = crate::utils::token::get_token_decimals_with_client(rpc, &pool.quote_mint).await?;
 
     // 6. 计算 X 相对 WSOL 的价格
     let price_x_in_wsol = if is_base_x {
