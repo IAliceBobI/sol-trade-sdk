@@ -68,9 +68,9 @@ solana-compute-budget-interface = "3.0.0"
 solana-commitment-config = { version = "3", features = ["serde"] }
 solana-transaction-status-client-types = "3"
 
-spl-token = "9.0.0"
-spl-token-2022 = "10.0.0"
-spl-associated-token-account = "8.0.0"
+spl-token = { version = "9.0.0", features = ["no-entrypoint"] }
+spl-token-2022 = { version = "10.0.0", features = ["no-entrypoint"] }
+spl-associated-token-account = { version = "8.0.0", features = ["no-entrypoint"] }
 spl-token-metadata-interface = "0.8"
 spl-token-2022-interface = "2"
 
@@ -157,7 +157,7 @@ incremental = true         # 增量编译 - 大幅加速重新编译
 overflow-checks = true     # 开发时启用溢出检查
 opt-level = 0
 debug = 1
-codegen-units = 256 # 保持高并行度
+codegen-units = 16        # 减少并行度以降低内存占用（原值 256 会导致 OOM）
 
 # 🚀 性能关键依赖的特殊优化
 [profile.release.package.solana-sdk]
