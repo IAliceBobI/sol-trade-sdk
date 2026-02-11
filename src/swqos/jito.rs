@@ -228,6 +228,36 @@ impl JitoClient {
         Ok(())
     }
 
+    /// 发送 Bundle（多笔交易原子执行）
+    ///
+    /// # Jito Bundle 最佳实践
+    ///
+    /// 根据 Jito 官方文档，一个 Bundle 只需要 **一个 tip 指令**，且应放在 **最后一个交易** 中。
+    /// 详见：`docs/Jito_Tip使用指南.md`
+    ///
+    /// ## TODO: 当前实现的问题
+    ///
+    /// 当前此方法接收外部已构建好的交易数组，无法控制 tip 指令的位置。
+    /// 如果传入的每个交易都包含 tip，会造成不必要的费用浪费。
+    ///
+    /// ## 正确的 Bundle 结构
+    ///
+    /// ```text
+    /// Bundle = [tx1, tx2, ..., txN]
+    /// tx1: [business_inst1, business_inst2, ...]           // 无 tip
+    /// tx2: [business_inst1, business_inst2, ...]           // 无 tip
+    /// txN: [business_inst1, ..., tip_transfer]             // tip 作为最后一条指令
+    /// ```
+    ///
+    /// ## 如果要支持 Bundle 功能，需要：
+    ///
+    /// 1. 添加 `build_bundle_transactions()` 函数，只有最后一个交易包含 tip
+    /// 2. 或者在此方法中解析并重新构建交易，移除中间交易的 tip 指令
+    /// 3. 更新调用方，使用专门的 Bundle 构建函数
+    ///
+    /// ## 当前状态
+    ///
+    /// ⚠️ 此方法目前未被业务代码使用。如果使用，请确保只有最后一个交易包含 tip。
     pub async fn send_transactions_impl(
         &self,
         trade_type: TradeType,

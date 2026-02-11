@@ -21,6 +21,25 @@ use crate::{
 };
 
 /// Build standard RPC transaction
+///
+/// # 交易结构
+///
+/// ```text
+/// [nonce_instruction?, jitodontfront_marker?, tip_transfer?, compute_budget, business_instructions...]
+/// ```
+///
+/// # Jito Tip 说明
+///
+/// - **sendTransaction（单笔交易）**：交易包含 tip 指令，Jito 建议使用 70% priority fee + 30% tip
+/// - **sendBundle（多笔交易打包）**：整个 Bundle 只需一个 tip 指令，放在最后一个交易中
+///
+/// 详见：`docs/Jito_Tip使用指南.md`
+///
+/// # 参数
+///
+/// - `with_tip`: 是否添加 tip 指令（对于 Bundle，只有最后一个交易应为 true）
+/// - `tip_amount`: tip 金额（SOL），最低 0.000001 SOL（1000 lamports）
+/// - `enable_jito_sandwich_protection`: 是否启用 Jito 三明治攻击防护
 pub async fn build_transaction(
     payer: Arc<Keypair>,
     _rpc: Option<Arc<SolanaRpcClient>>,
@@ -60,14 +79,12 @@ pub async fn build_transaction(
     // 注意：虽然文档说"添加到指令中"，但实际上是通过在交易中包含这个账户来实现的。
     // 最简单的方式是创建一个无操作指令来携带这个账户。
     //
-    // ## 不启用防护时
+    // ## 交易结构
     //
-    // 交易结构：
+    // 不启用防护时：
     // [nonce_instruction, tip_transfer, compute_budget, business_instructions...]
     //
-    // ## 启用防护时
-    //
-    // 交易结构：
+    // 启用防护时：
     // [nonce_instruction, jitodontfront_marker, tip_transfer, compute_budget, business_instructions...]
     //
     // ## 性能影响
