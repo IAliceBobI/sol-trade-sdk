@@ -62,7 +62,7 @@ impl TradingClient {
         } else {
             crate::USD1_TOKEN_ACCOUNT
         };
-        let executor = TradeFactory::create_executor(params.dex_type.clone());
+        let executor = TradeFactory::create_executor(params.dex_type);
         let protocol_params = params.extension_params;
         let buy_params = SwapParams {
             rpc: Some(self.rpc.clone()),
@@ -181,7 +181,7 @@ impl TradingClient {
                 " Current version only support USD1 trading on Bonk protocols"
             ));
         }
-        let executor = TradeFactory::create_executor(params.dex_type.clone());
+        let executor = TradeFactory::create_executor(params.dex_type);
         let protocol_params = params.extension_params;
         let output_token_mint = if params.output_token_type == crate::TradeTokenType::SOL {
             crate::SOL_TOKEN_ACCOUNT
