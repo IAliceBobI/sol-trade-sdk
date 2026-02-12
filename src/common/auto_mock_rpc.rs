@@ -87,7 +87,10 @@ impl PoolRpcClient for NonblockingRpcClient {
         let result = self.get_multiple_accounts(pubkeys).await;
 
         let elapsed = start.elapsed();
-        let exist_count = result.as_ref().map(|accounts| accounts.iter().filter(|a| a.is_some()).count()).unwrap_or(0);
+        let exist_count = result
+            .as_ref()
+            .map(|accounts| accounts.iter().filter(|a| a.is_some()).count())
+            .unwrap_or(0);
 
         // 记录详细的性能日志
         if elapsed.as_millis() > 100 {
@@ -221,7 +224,10 @@ impl PoolRpcClient for Arc<NonblockingRpcClient> {
         let result = self.as_ref().get_multiple_accounts(pubkeys).await;
 
         let elapsed = start.elapsed();
-        let exist_count = result.as_ref().map(|accounts| accounts.iter().filter(|a| a.is_some()).count()).unwrap_or(0);
+        let exist_count = result
+            .as_ref()
+            .map(|accounts| accounts.iter().filter(|a| a.is_some()).count())
+            .unwrap_or(0);
 
         // 记录详细的性能日志
         if elapsed.as_millis() > 100 {

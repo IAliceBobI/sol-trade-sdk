@@ -312,8 +312,10 @@ pub async fn get_token_price_in_usd<T: PoolRpcClient + ?Sized>(
     let (base_reserve, quote_reserve) = get_token_balances(&pool, rpc).await?;
 
     // 5. 获取两侧代币精度
-    let base_decimals = crate::utils::token::get_token_decimals_with_client(rpc, &pool.base_mint).await?;
-    let quote_decimals = crate::utils::token::get_token_decimals_with_client(rpc, &pool.quote_mint).await?;
+    let base_decimals =
+        crate::utils::token::get_token_decimals_with_client(rpc, &pool.base_mint).await?;
+    let quote_decimals =
+        crate::utils::token::get_token_decimals_with_client(rpc, &pool.quote_mint).await?;
 
     // 6. 计算 X 相对 WSOL 的价格
     let price_x_in_wsol = if is_base_x {
