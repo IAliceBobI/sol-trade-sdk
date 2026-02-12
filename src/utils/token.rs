@@ -11,6 +11,12 @@ use solana_sdk::pubkey::Pubkey;
 use spl_token::solana_program::program_pack::Pack;
 use spl_token::state::Mint;
 
+/// Metaplex Token Metadata 程序 ID
+const METADATA_PROGRAM_ID: Pubkey = Pubkey::new_from_array([
+    77, 101, 116, 97, 112, 108, 101, 120, 32, 84, 111, 107, 101, 110, 32, 77, 101, 116, 97, 100,
+    97, 116, 97, 32, 83, 116, 97, 110, 100, 97, 114, 100,
+]);
+
 // Increased cache sizes for better performance
 const MAX_TOKEN_METADATA_CACHE_SIZE: usize = 100_000;
 
@@ -125,9 +131,15 @@ pub async fn get_mint_info(
 
     // 尝试解析为传统 Token 程序的 Mint
     if !is_token2022 && let Ok(mint_account) = Mint::unpack(&account.data) {
+        // 对于传统 Token 程序，尝试从 Metaplex Metadata 获取 symbol
+        let symbol = match get_symbol_from_metaplex_with_client(rpc, mint).await {
+            Ok(s) if !s.is_empty() => s,
+            _ => get_known_token_symbol(mint), // Metaplex 获取失败，使用已知列表兜底
+        };
+
         let info = MintInfo {
             decimals: mint_account.decimals,
-            symbol: get_known_token_symbol(mint),
+            symbol,
             is_token2022: false,
             token_program,
         };
@@ -182,9 +194,15 @@ pub async fn get_mint_info_with_client<T: PoolRpcClient + ?Sized>(
 
     // 尝试解析为传统 Token 程序的 Mint
     if !is_token2022 && let Ok(mint_account) = Mint::unpack(&account.data) {
+        // 对于传统 Token 程序，尝试从 Metaplex Metadata 获取 symbol
+        let symbol = match get_symbol_from_metaplex_with_client(rpc, mint).await {
+            Ok(s) if !s.is_empty() => s,
+            _ => get_known_token_symbol(mint), // Metaplex 获取失败，使用已知列表兜底
+        };
+
         let info = MintInfo {
             decimals: mint_account.decimals,
-            symbol: get_known_token_symbol(mint),
+            symbol,
             is_token2022: false,
             token_program,
         };
@@ -397,6 +415,91 @@ pub fn get_known_token_symbol(mint: &Pubkey) -> String {
         "RAY".to_string()
     } else {
         "".to_string()
+    }
+}
+
+/// 计算 Metaplex Metadata PDA
+///
+/// Metaplex Metadata 账户地址是通过 PDA 计算的：
+/// seeds: [b"metadata", METADATA_PROGRAM_ID, mint]
+fn get_metadata_pda(mint: &Pubkey) -> Pubkey {
+    use solana_sdk::pubkey::Pubkey;
+    Pubkey::find_program_address(
+        &[b"metadata", METADATA_PROGRAM_ID.as_ref(), mint.as_ref()],
+        &METADATA_PROGRAM_ID,
+    )
+    .0
+}
+
+/// 从 Metaplex Metadata 账户解析 symbol
+///
+/// Metaplex Metadata 数据结构：
+/// - 1 byte: key (account discriminator)
+/// - 32 bytes: update_authority
+/// - 32 bytes: mint
+/// - 4 bytes + len: name (borsh string)
+/// - 4 bytes + len: symbol (borsh string)
+/// - 4 bytes + len: uri (borsh string)
+fn parse_symbol_from_metadata(data: &[u8]) -> Option<String> {
+    // 最小数据长度：1 + 32 + 32 + 4 (至少空的 name) + 4 (至少空的 symbol)
+    if data.len() < 73 {
+        return None;
+    }
+
+    let mut offset = 1 + 32 + 32; // skip key, update_authority, mint
+
+    // 读取 name (borsh string: 4 bytes length + data)
+    let name_len = u32::from_le_bytes([data[offset], data[offset + 1], data[offset + 2], data[offset + 3]]) as usize;
+    offset += 4 + name_len;
+
+    // 检查是否有足够的数据读取 symbol length
+    if offset + 4 > data.len() {
+        return None;
+    }
+
+    // 读取 symbol (borsh string: 4 bytes length + data)
+    let symbol_len = u32::from_le_bytes([data[offset], data[offset + 1], data[offset + 2], data[offset + 3]]) as usize;
+    offset += 4;
+
+    // 检查是否有足够的数据读取 symbol
+    if offset + symbol_len > data.len() {
+        return None;
+    }
+
+    let symbol = String::from_utf8_lossy(&data[offset..offset + symbol_len])
+        .trim_end_matches('\0')
+        .to_string();
+
+    if symbol.is_empty() {
+        None
+    } else {
+        Some(symbol)
+    }
+}
+
+/// 从 Metaplex Metadata 获取 token symbol（泛型版本）
+///
+/// 对于普通 SPL Token（非 Token2022），symbol 存储在 Metaplex Metadata 账户中
+async fn get_symbol_from_metaplex_with_client<T: PoolRpcClient + ?Sized>(
+    rpc: &T,
+    mint: &Pubkey,
+) -> Result<String> {
+    let metadata_pda = get_metadata_pda(mint);
+
+    // 尝试获取 Metaplex Metadata 账户
+    match rpc.get_account(&metadata_pda).await {
+        Ok(account) => {
+            // 尝试解析 symbol
+            if let Some(symbol) = parse_symbol_from_metadata(&account.data) {
+                return Ok(symbol);
+            }
+            // 解析失败，返回空字符串
+            Ok(String::new())
+        }
+        Err(_) => {
+            // 账户不存在，返回空字符串
+            Ok(String::new())
+        }
     }
 }
 
