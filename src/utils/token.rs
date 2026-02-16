@@ -10,6 +10,7 @@ use once_cell::sync::Lazy;
 use solana_sdk::pubkey::Pubkey;
 use spl_token::solana_program::program_pack::Pack;
 use spl_token::state::Mint;
+use std::str::FromStr;
 
 /// Metaplex Token Metadata 程序 ID
 const METADATA_PROGRAM_ID: Pubkey = Pubkey::new_from_array([
@@ -413,6 +414,10 @@ pub fn get_known_token_symbol(mint: &Pubkey) -> String {
         "USDT".to_string()
     } else if *mint == RAY_MINT {
         "RAY".to_string()
+    } else if *mint == Pubkey::from_str("8ycz3kctoRb4LFrtoYG2r8tRyUYUeGf5Q16M2TEMp7A").unwrap() {
+        "PIPE".to_string()
+    } else if *mint == Pubkey::from_str("JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN").unwrap() {
+        "JUP".to_string()
     } else {
         "".to_string()
     }
@@ -502,8 +507,6 @@ async fn get_symbol_from_metaplex_with_client<T: PoolRpcClient + ?Sized>(
         },
     }
 }
-
-use std::str::FromStr;
 
 #[allow(dead_code)]
 trait PubkeyExt {
