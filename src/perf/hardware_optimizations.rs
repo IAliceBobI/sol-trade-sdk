@@ -528,22 +528,26 @@ impl BranchOptimizer {
     /// 预取指令 - 提前加载数据到缓存
     #[inline(always)]
     pub unsafe fn prefetch_read_data<T>(_ptr: *const T) {
-        #[cfg(target_arch = "x86_64")]
-        {
-            use std::arch::x86_64::_MM_HINT_T0;
-            use std::arch::x86_64::_mm_prefetch;
-            _mm_prefetch(_ptr as *const i8, _MM_HINT_T0);
+        unsafe {
+            #[cfg(target_arch = "x86_64")]
+            {
+                use std::arch::x86_64::_MM_HINT_T0;
+                use std::arch::x86_64::_mm_prefetch;
+                _mm_prefetch(_ptr as *const i8, _MM_HINT_T0);
+            }
         }
     }
 
     /// 预取指令 - 提前加载数据到缓存（写优化）
     #[inline(always)]
     pub unsafe fn prefetch_write_data<T>(_ptr: *const T) {
-        #[cfg(target_arch = "x86_64")]
-        {
-            use std::arch::x86_64::_MM_HINT_T1;
-            use std::arch::x86_64::_mm_prefetch;
-            _mm_prefetch(_ptr as *const i8, _MM_HINT_T1);
+        unsafe {
+            #[cfg(target_arch = "x86_64")]
+            {
+                use std::arch::x86_64::_MM_HINT_T1;
+                use std::arch::x86_64::_mm_prefetch;
+                _mm_prefetch(_ptr as *const i8, _MM_HINT_T1);
+            }
         }
     }
 }

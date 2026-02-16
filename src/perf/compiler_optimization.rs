@@ -494,30 +494,32 @@ impl SIMDCompileTimeOptimizer {
     #[cfg(target_arch = "x86_64")]
     #[target_feature(enable = "avx2")]
     pub unsafe fn vectorized_sum_compile_time(data: &[u64]) -> u64 {
-        use std::arch::x86_64::*;
+        unsafe {
+            use std::arch::x86_64::*;
 
-        if data.len() < 4 {
-            return data.iter().sum();
+            if data.len() < 4 {
+                return data.iter().sum();
+            }
+
+            let chunks = data.len() / 4;
+            let mut sum_vec = _mm256_setzero_si256();
+
+            for i in 0..chunks {
+                let ptr = data.as_ptr().add(i * 4) as *const __m256i;
+                let vec = _mm256_loadu_si256(ptr);
+                sum_vec = _mm256_add_epi64(sum_vec, vec);
+            }
+
+            // 水平求和
+            let mut result = [0u64; 4];
+            _mm256_storeu_si256(result.as_mut_ptr() as *mut __m256i, sum_vec);
+            let partial_sum: u64 = result.iter().sum();
+
+            // 处理剩余元素
+            let remaining: u64 = data[chunks * 4..].iter().sum();
+
+            partial_sum + remaining
         }
-
-        let chunks = data.len() / 4;
-        let mut sum_vec = _mm256_setzero_si256();
-
-        for i in 0..chunks {
-            let ptr = data.as_ptr().add(i * 4) as *const __m256i;
-            let vec = _mm256_loadu_si256(ptr);
-            sum_vec = _mm256_add_epi64(sum_vec, vec);
-        }
-
-        // 水平求和
-        let mut result = [0u64; 4];
-        _mm256_storeu_si256(result.as_mut_ptr() as *mut __m256i, sum_vec);
-        let partial_sum: u64 = result.iter().sum();
-
-        // 处理剩余元素
-        let remaining: u64 = data[chunks * 4..].iter().sum();
-
-        partial_sum + remaining
     }
 
     /// 编译时SIMD向量化 - 通用回退版本（非x86_64架构）

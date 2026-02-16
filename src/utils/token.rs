@@ -449,7 +449,9 @@ fn parse_symbol_from_metadata(data: &[u8]) -> Option<String> {
     let mut offset = 1 + 32 + 32; // skip key, update_authority, mint
 
     // 读取 name (borsh string: 4 bytes length + data)
-    let name_len = u32::from_le_bytes([data[offset], data[offset + 1], data[offset + 2], data[offset + 3]]) as usize;
+    let name_len =
+        u32::from_le_bytes([data[offset], data[offset + 1], data[offset + 2], data[offset + 3]])
+            as usize;
     offset += 4 + name_len;
 
     // 检查是否有足够的数据读取 symbol length
@@ -458,7 +460,9 @@ fn parse_symbol_from_metadata(data: &[u8]) -> Option<String> {
     }
 
     // 读取 symbol (borsh string: 4 bytes length + data)
-    let symbol_len = u32::from_le_bytes([data[offset], data[offset + 1], data[offset + 2], data[offset + 3]]) as usize;
+    let symbol_len =
+        u32::from_le_bytes([data[offset], data[offset + 1], data[offset + 2], data[offset + 3]])
+            as usize;
     offset += 4;
 
     // 检查是否有足够的数据读取 symbol
@@ -470,11 +474,7 @@ fn parse_symbol_from_metadata(data: &[u8]) -> Option<String> {
         .trim_end_matches('\0')
         .to_string();
 
-    if symbol.is_empty() {
-        None
-    } else {
-        Some(symbol)
-    }
+    if symbol.is_empty() { None } else { Some(symbol) }
 }
 
 /// 从 Metaplex Metadata 获取 token symbol（泛型版本）
@@ -495,11 +495,11 @@ async fn get_symbol_from_metaplex_with_client<T: PoolRpcClient + ?Sized>(
             }
             // 解析失败，返回空字符串
             Ok(String::new())
-        }
+        },
         Err(_) => {
             // 账户不存在，返回空字符串
             Ok(String::new())
-        }
+        },
     }
 }
 

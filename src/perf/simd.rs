@@ -17,19 +17,21 @@ impl SIMDMemory {
     #[cfg(target_arch = "x86_64")]
     #[inline(always)]
     pub unsafe fn copy_avx2(dst: *mut u8, src: *const u8, len: usize) {
-        let mut offset = 0;
+        unsafe {
+            let mut offset = 0;
 
-        // 32字节对齐的批量拷贝（AVX2）
-        while offset + 32 <= len {
-            let data = _mm256_loadu_si256(src.add(offset) as *const __m256i);
-            _mm256_storeu_si256(dst.add(offset) as *mut __m256i, data);
-            offset += 32;
-        }
+            // 32字节对齐的批量拷贝（AVX2）
+            while offset + 32 <= len {
+                let data = _mm256_loadu_si256(src.add(offset) as *const __m256i);
+                _mm256_storeu_si256(dst.add(offset) as *mut __m256i, data);
+                offset += 32;
+            }
 
-        // 处理剩余字节
-        while offset < len {
-            *dst.add(offset) = *src.add(offset);
-            offset += 1;
+            // 处理剩余字节
+            while offset < len {
+                *dst.add(offset) = *src.add(offset);
+                offset += 1;
+            }
         }
     }
 
@@ -46,30 +48,32 @@ impl SIMDMemory {
     #[cfg(target_arch = "x86_64")]
     #[inline(always)]
     pub unsafe fn compare_avx2(a: *const u8, b: *const u8, len: usize) -> bool {
-        let mut offset = 0;
+        unsafe {
+            let mut offset = 0;
 
-        // 32字节对齐的批量比较
-        while offset + 32 <= len {
-            let va = _mm256_loadu_si256(a.add(offset) as *const __m256i);
-            let vb = _mm256_loadu_si256(b.add(offset) as *const __m256i);
-            let cmp = _mm256_cmpeq_epi8(va, vb);
-            let mask = _mm256_movemask_epi8(cmp);
+            // 32字节对齐的批量比较
+            while offset + 32 <= len {
+                let va = _mm256_loadu_si256(a.add(offset) as *const __m256i);
+                let vb = _mm256_loadu_si256(b.add(offset) as *const __m256i);
+                let cmp = _mm256_cmpeq_epi8(va, vb);
+                let mask = _mm256_movemask_epi8(cmp);
 
-            if mask != -1 {
-                return false;
+                if mask != -1 {
+                    return false;
+                }
+                offset += 32;
             }
-            offset += 32;
-        }
 
-        // 处理剩余字节
-        while offset < len {
-            if *a.add(offset) != *b.add(offset) {
-                return false;
+            // 处理剩余字节
+            while offset < len {
+                if *a.add(offset) != *b.add(offset) {
+                    return false;
+                }
+                offset += 1;
             }
-            offset += 1;
-        }
 
-        true
+            true
+        }
     }
 
     /// 使用通用方法比较内存（非x86_64架构）
@@ -83,19 +87,21 @@ impl SIMDMemory {
     #[cfg(target_arch = "x86_64")]
     #[inline(always)]
     pub unsafe fn zero_avx2(ptr: *mut u8, len: usize) {
-        let zero = _mm256_setzero_si256();
-        let mut offset = 0;
+        unsafe {
+            let zero = _mm256_setzero_si256();
+            let mut offset = 0;
 
-        // 32字节对齐的批量清零
-        while offset + 32 <= len {
-            _mm256_storeu_si256(ptr.add(offset) as *mut __m256i, zero);
-            offset += 32;
-        }
+            // 32字节对齐的批量清零
+            while offset + 32 <= len {
+                _mm256_storeu_si256(ptr.add(offset) as *mut __m256i, zero);
+                offset += 32;
+            }
 
-        // 处理剩余字节
-        while offset < len {
-            *ptr.add(offset) = 0;
-            offset += 1;
+            // 处理剩余字节
+            while offset < len {
+                *ptr.add(offset) = 0;
+                offset += 1;
+            }
         }
     }
 
@@ -117,25 +123,27 @@ impl SIMDMath {
     #[cfg(target_arch = "x86_64")]
     #[inline(always)]
     pub unsafe fn add_u64_batch(a: &[u64], b: &[u64], result: &mut [u64]) {
-        assert_eq!(a.len(), b.len());
-        assert_eq!(a.len(), result.len());
+        unsafe {
+            assert_eq!(a.len(), b.len());
+            assert_eq!(a.len(), result.len());
 
-        let len = a.len();
-        let mut i = 0;
+            let len = a.len();
+            let mut i = 0;
 
-        // 4个 u64 一组处理（256位）
-        while i + 4 <= len {
-            let va = _mm256_loadu_si256(a.as_ptr().add(i) as *const __m256i);
-            let vb = _mm256_loadu_si256(b.as_ptr().add(i) as *const __m256i);
-            let vsum = _mm256_add_epi64(va, vb);
-            _mm256_storeu_si256(result.as_mut_ptr().add(i) as *mut __m256i, vsum);
-            i += 4;
-        }
+            // 4个 u64 一组处理（256位）
+            while i + 4 <= len {
+                let va = _mm256_loadu_si256(a.as_ptr().add(i) as *const __m256i);
+                let vb = _mm256_loadu_si256(b.as_ptr().add(i) as *const __m256i);
+                let vsum = _mm256_add_epi64(va, vb);
+                _mm256_storeu_si256(result.as_mut_ptr().add(i) as *mut __m256i, vsum);
+                i += 4;
+            }
 
-        // 处理剩余元素
-        while i < len {
-            result[i] = a[i].wrapping_add(b[i]);
-            i += 1;
+            // 处理剩余元素
+            while i < len {
+                result[i] = a[i].wrapping_add(b[i]);
+                i += 1;
+            }
         }
     }
 
