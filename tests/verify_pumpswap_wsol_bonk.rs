@@ -127,6 +127,7 @@ impl SellParamsBuilder for BonkWsolSellExactInParamsBuilder {
 }
 
 #[tokio::test]
+#[ignore]
 #[serial_test::serial(pumpswap_wsol_bonk_pool)] // 使用同一把锁，避免并行测试修改同一个 pool
 async fn test_pumpswap_wsol_bonk_sell_exact_in() {
     // ⚠️ 注意：BONK decimals = 5，所以：

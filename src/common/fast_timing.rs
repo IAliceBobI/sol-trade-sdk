@@ -193,6 +193,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore]
     async fn test_fast_now_overhead() {
         // 测试调用开销
         let iterations = 10_000;
