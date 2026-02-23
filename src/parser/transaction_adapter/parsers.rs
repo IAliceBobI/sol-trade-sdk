@@ -579,3 +579,41 @@ pub fn extract_instructions(
 
     Ok((instructions, inner_instructions, inner_instructions_json))
 }
+
+/// 提取 SOL 余额变化
+///
+/// 从交易元数据中提取每个账户的 SOL 余额变化
+pub fn extract_sol_balances(
+    tx: &EncodedTransactionWithStatusMeta,
+    account_keys: &[Pubkey],
+) -> Result<HashMap<Pubkey, (u64, u64)>, AdapterError> {
+    let mut sol_balance_changes = HashMap::new();
+
+    let tx_value = serde_json::to_value(tx).map_err(|e| AdapterError::JsonError(e.to_string()))?;
+
+    let meta = &tx_value["meta"];
+
+    // 提取 pre balances
+    if let Some(pre_balances) = meta["preBalances"].as_array() {
+        for (i, balance) in pre_balances.iter().enumerate() {
+            if i < account_keys.len() {
+                let account = account_keys[i];
+                let pre_amount = balance.as_u64().unwrap_or(0);
+                sol_balance_changes.entry(account).or_insert_with(|| (0, 0)).0 = pre_amount;
+            }
+        }
+    }
+
+    // 提取 post balances
+    if let Some(post_balances) = meta["postBalances"].as_array() {
+        for (i, balance) in post_balances.iter().enumerate() {
+            if i < account_keys.len() {
+                let account = account_keys[i];
+                let post_amount = balance.as_u64().unwrap_or(0);
+                sol_balance_changes.entry(account).or_insert_with(|| (0, 0)).1 = post_amount;
+            }
+        }
+    }
+
+    Ok(sol_balance_changes)
+}

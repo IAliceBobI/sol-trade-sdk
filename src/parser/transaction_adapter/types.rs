@@ -85,3 +85,18 @@ pub fn token_program() -> Pubkey {
 pub fn token_program_2022() -> Pubkey {
     Pubkey::from_str_const("TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb")
 }
+
+/// SOL 转账数据
+#[derive(Debug, Clone)]
+pub struct SolTransferData {
+    /// 发送方地址
+    pub from: Pubkey,
+    /// 接收方地址
+    pub to: Pubkey,
+    /// 转账金额（lamports）
+    pub amount: u64,
+    /// 发送方余额变化（lamports，负数表示减少）
+    pub from_balance_change: i64,
+    /// 接收方余额变化（lamports，正数表示增加）
+    pub to_balance_change: i64,
+}

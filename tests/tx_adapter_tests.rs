@@ -302,3 +302,63 @@ async fn test_transaction_adapter_get_transfer_actions() {
     println!("💡 后续运行：从缓存加载（约 0.01 秒）");
     println!("💡 速度提升：约 100-200 倍！");
 }
+
+/// 测试：解析 SOL 转账信息 (Auto Mock 加速)
+#[tokio::test]
+async fn test_transaction_adapter_parse_sol_transfers() {
+    println!("=== 测试：TransactionAdapter 解析 SOL 转账 (Auto Mock 加速) ===");
+
+    let rpc_url = "http://127.0.0.1:8899";
+    // 使用一个包含 SOL 转账的交易签名
+    let signature_str =
+        "5GCZ3TR31aDRP9LZxznKPBux86jWDyCxt1noCAAhX43d6Cmtqi8HvK6oHErq7DBr9j5KRcqeYumW2wHt5qJG1tQK";
+
+    // 使用 Auto Mock RPC 客户端（使用独立命名空间）
+    let auto_mock_client = AutoMockRpcClient::new_with_namespace(
+        rpc_url.to_string(),
+        Some("tx_adapter_tests".to_string()),
+    );
+
+    let signature =
+        Signature::from_str(signature_str).expect("Failed to parse signature from string");
+
+    let config = RpcTransactionConfig {
+        encoding: Some(UiTransactionEncoding::JsonParsed),
+        commitment: Some(CommitmentConfig::confirmed()),
+        max_supported_transaction_version: Some(0),
+    };
+
+    let tx = auto_mock_client
+        .get_transaction(&signature, config)
+        .await
+        .expect("Failed to get transaction from RPC");
+
+    let adapter =
+        TransactionAdapter::from_encoded_transaction(&tx, tx.slot, tx.block_time).unwrap();
+
+    // 测试：获取所有 SOL 转账信息
+    let sol_transfers = adapter.get_sol_transfers();
+    println!("✓ SOL 转账数量: {}", sol_transfers.len());
+
+    // 打印每个 SOL 转账的详情
+    for (i, transfer) in sol_transfers.iter().enumerate() {
+        println!("\n[{}] SOL 转账详情:", i);
+        println!("  发送方: {}", transfer.from);
+        println!("  接收方: {}", transfer.to);
+        println!(
+            "  金额: {} lamports ({:.9} SOL)",
+            transfer.amount,
+            transfer.amount as f64 / 1_000_000_000.0
+        );
+        println!("  发送方余额变化: {} lamports", transfer.from_balance_change);
+        println!("  接收方余额变化: {} lamports", transfer.to_balance_change);
+    }
+
+    // 测试：获取特定账户的 SOL 余额变化
+    if let Some(first_account) = adapter.account_keys.first() {
+        let balance_change = adapter.get_sol_balance_change(first_account);
+        println!("\n✓ 账户 {} 的 SOL 余额变化: {:?}", first_account, balance_change);
+    }
+
+    println!("✅ 测试通过");
+}

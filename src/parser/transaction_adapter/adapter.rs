@@ -5,11 +5,12 @@
 
 use super::errors::AdapterError;
 use super::parsers::{
-    extract_account_keys, extract_instructions, extract_signature, extract_token_balances,
-    parse_transfer_instruction_parsed, parse_transfer_instruction_raw,
+    extract_account_keys, extract_instructions, extract_signature, extract_sol_balances,
+    extract_token_balances, parse_transfer_instruction_parsed, parse_transfer_instruction_raw,
 };
 use super::types::{
-    InnerInstructionInfo, InstructionInfo, TransferData, token_program, token_program_2022,
+    InnerInstructionInfo, InstructionInfo, SolTransferData, TransferData, token_program,
+    token_program_2022,
 };
 use solana_account_decoder::parse_token::UiTokenAmount;
 use solana_sdk::pubkey::Pubkey;
@@ -41,6 +42,8 @@ pub struct TransactionAdapter {
     pub inner_instructions: Vec<InnerInstructionInfo>,
     /// 内部指令的 JSON 表示（用于方便解析）
     pub inner_instructions_json: Vec<serde_json::Value>,
+    /// SOL 余额变化映射 (account -> (pre_balance, post_balance))
+    pub sol_balance_changes: HashMap<Pubkey, (u64, u64)>,
 }
 
 impl TransactionAdapter {
@@ -68,6 +71,9 @@ impl TransactionAdapter {
         let (instructions, inner_instructions, inner_instructions_json) =
             extract_instructions(tx_with_meta, &account_keys)?;
 
+        // 提取 SOL 余额变化
+        let sol_balance_changes = extract_sol_balances(tx_with_meta, &account_keys)?;
+
         Ok(Self {
             signature,
             slot,
@@ -79,6 +85,7 @@ impl TransactionAdapter {
             instructions,
             inner_instructions,
             inner_instructions_json,
+            sol_balance_changes,
         })
     }
 
@@ -258,6 +265,93 @@ impl TransactionAdapter {
             .into_iter()
             .filter(|t| t.outer_index == outer_index)
             .collect()
+    }
+
+    /// 获取指定账户的 SOL 余额变化
+    ///
+    /// # 参数
+    /// - `account`: 账户公钥
+    ///
+    /// # 返回
+    /// 选项，包含 (pre_balance, post_balance) 元组
+    pub fn get_sol_balance_change(&self, account: &Pubkey) -> Option<(u64, u64)> {
+        self.sol_balance_changes.get(account).copied()
+    }
+
+    /// 获取所有 SOL 转账信息
+    ///
+    /// 通过分析 SOL 余额变化来识别转账
+    /// 规则：
+    /// - 发送方：余额减少最多的账户（排除 fee payer，因为 fee 也会减少余额）
+    /// - 接收方：余额增加的账户
+    /// - 金额：接收方余额增加量（更准确，不受 gas fee 影响）
+    ///
+    /// # 返回
+    /// SOL 转账数据列表
+    pub fn get_sol_transfers(&self) -> Vec<SolTransferData> {
+        let mut transfers = Vec::new();
+
+        // 找出所有有余额变化的账户
+        let mut changes: Vec<(Pubkey, i64)> = self
+            .sol_balance_changes
+            .iter()
+            .map(|(account, (pre, post))| (*account, *post as i64 - *pre as i64))
+            .filter(|(_, change)| *change != 0)
+            .collect();
+
+        if changes.len() < 2 {
+            return transfers;
+        }
+
+        // 按变化量排序：减少的在前面（发送方），增加的在后面（接收方）
+        changes.sort_by_key(|(_, change)| *change);
+
+        // 找到减少最多的账户（发送方），排除 fee payer (索引 0)
+        let fee_payer_idx = 0usize;
+        let mut sender: Option<(Pubkey, i64)> = None;
+        let mut sender_change: i64 = 0;
+
+        for (idx, (account, change)) in changes.iter().enumerate() {
+            if *change < 0 && (sender_change == 0 || *change < sender_change) {
+                // 跳过 fee payer（如果 fee payer 不是唯一的发送方）
+                if idx != fee_payer_idx || changes.iter().filter(|(_, c)| *c < 0).count() > 1 {
+                    sender = Some((*account, *change));
+                    sender_change = *change;
+                }
+            }
+        }
+
+        // 如果 fee payer 是唯一的发送方，使用 fee payer
+        if sender.is_none() {
+            if let Some((account, change)) = changes.first() {
+                if *change < 0 {
+                    sender = Some((*account, *change));
+                }
+            }
+        }
+
+        // 找到增加最多的账户（接收方）
+        let receiver = changes
+            .iter()
+            .filter(|(_, change)| *change > 0)
+            .max_by_key(|(_, change)| *change);
+
+        // 如果有发送方和接收方，且不是同一个账户，创建转账记录
+        if let Some((sender_account, sender_ch)) = sender {
+            if let Some((receiver_account, receiver_ch)) = receiver {
+                if sender_account != *receiver_account {
+                    transfers.push(SolTransferData {
+                        from: sender_account,
+                        to: *receiver_account,
+                        amount: *receiver_ch as u64,
+                        from_balance_change: sender_ch,
+                        to_balance_change: *receiver_ch,
+                    });
+                }
+            }
+        }
+
+        transfers
     }
 }
 

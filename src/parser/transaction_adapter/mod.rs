@@ -9,4 +9,6 @@ mod types;
 
 pub use adapter::TransactionAdapter;
 pub use errors::AdapterError;
-pub use types::{InnerInstructionInfo, InstructionInfo, TokenAmount, TransferData};
+pub use types::{
+    InnerInstructionInfo, InstructionInfo, SolTransferData, TokenAmount, TransferData,
+};
