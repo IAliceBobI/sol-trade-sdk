@@ -48,3 +48,6 @@ json
 mock_data/
 
 
+
+# Surfpool 运行时目录
+.surfpool/

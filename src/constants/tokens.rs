@@ -17,3 +17,9 @@ pub const USDT_MINT: Pubkey = pubkey!("Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8Benw
 
 /// RAY (Raydium) Mint
 pub const RAY_MINT: Pubkey = pubkey!("4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R");
+
+/// PIPE Mint
+pub const PIPE_MINT: Pubkey = pubkey!("8ycz3kctoRb4LFrtoYG2r8tRyUYUeGf5Q16M2TEMp7A");
+
+/// JUP (Jupiter) Mint
+pub const JUP_MINT: Pubkey = pubkey!("JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN");

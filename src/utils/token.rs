@@ -3,7 +3,7 @@
 //! 提供跨项目使用的 Token 相关工具函数
 
 use crate::common::auto_mock_rpc::PoolRpcClient;
-use crate::constants::{RAY_MINT, SOL_MINT, USDC_MINT, USDT_MINT};
+use crate::constants::{JUP_MINT, PIPE_MINT, RAY_MINT, SOL_MINT, USDC_MINT, USDT_MINT};
 use anyhow::Result;
 use dashmap::DashMap;
 use once_cell::sync::Lazy;
@@ -414,9 +414,9 @@ pub fn get_known_token_symbol(mint: &Pubkey) -> String {
         "USDT".to_string()
     } else if *mint == RAY_MINT {
         "RAY".to_string()
-    } else if *mint == Pubkey::from_str("8ycz3kctoRb4LFrtoYG2r8tRyUYUeGf5Q16M2TEMp7A").unwrap() {
+    } else if *mint == PIPE_MINT {
         "PIPE".to_string()
-    } else if *mint == Pubkey::from_str("JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN").unwrap() {
+    } else if *mint == JUP_MINT {
         "JUP".to_string()
     } else {
         "".to_string()
