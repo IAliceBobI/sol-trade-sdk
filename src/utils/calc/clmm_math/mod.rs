@@ -16,6 +16,7 @@ pub mod full_math;
 pub mod liquidity_math;
 pub mod sqrt_price_math;
 pub mod swap_math;
+pub mod tick_array_iterator;
 pub mod tick_math;
 pub mod unsafe_math;
 
@@ -23,4 +24,8 @@ pub mod unsafe_math;
 pub use big_num::{U128, U256, U512};
 pub use full_math::MulDiv;
 pub use swap_math::{FEE_RATE_DENOMINATOR_VALUE, SwapStep, compute_swap_step};
+pub use tick_array_iterator::{
+    TickArrayIterator, check_tick_array_initialized, get_first_tick_array,
+    TICK_ARRAY_BITMAP_SIZE,
+};
 pub use unsafe_math::UnsafeMathTrait;
