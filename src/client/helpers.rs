@@ -11,6 +11,7 @@ pub fn get_input_mint(input_token_type: &TradeTokenType) -> solana_sdk::pubkey::
         TradeTokenType::SOL => crate::WSOL_TOKEN_ACCOUNT,
         TradeTokenType::WSOL => crate::WSOL_TOKEN_ACCOUNT,
         TradeTokenType::USDC => crate::USDC_TOKEN_ACCOUNT,
+        TradeTokenType::USDT => crate::USDT_TOKEN_ACCOUNT,
         TradeTokenType::USD1 => crate::USD1_TOKEN_ACCOUNT,
     }
 }
@@ -24,6 +25,7 @@ pub fn get_output_mint(output_type: &TradeTokenType) -> solana_sdk::pubkey::Pubk
         TradeTokenType::SOL => crate::WSOL_TOKEN_ACCOUNT,
         TradeTokenType::WSOL => crate::WSOL_TOKEN_ACCOUNT,
         TradeTokenType::USDC => crate::USDC_TOKEN_ACCOUNT,
+        TradeTokenType::USDT => crate::USDT_TOKEN_ACCOUNT,
         TradeTokenType::USD1 => crate::USD1_TOKEN_ACCOUNT,
     }
 }

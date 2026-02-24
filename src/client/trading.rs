@@ -59,6 +59,8 @@ impl TradingClient {
             crate::WSOL_TOKEN_ACCOUNT
         } else if params.input_token_type == crate::TradeTokenType::USDC {
             crate::USDC_TOKEN_ACCOUNT
+        } else if params.input_token_type == crate::TradeTokenType::USDT {
+            crate::USDT_TOKEN_ACCOUNT
         } else {
             crate::USD1_TOKEN_ACCOUNT
         };
@@ -189,6 +191,8 @@ impl TradingClient {
             crate::WSOL_TOKEN_ACCOUNT
         } else if params.output_token_type == crate::TradeTokenType::USDC {
             crate::USDC_TOKEN_ACCOUNT
+        } else if params.output_token_type == crate::TradeTokenType::USDT {
+            crate::USDT_TOKEN_ACCOUNT
         } else {
             crate::USD1_TOKEN_ACCOUNT
         };

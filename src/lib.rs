@@ -32,4 +32,5 @@ pub enum TradeTokenType {
     WSOL,
     USD1,
     USDC,
+    USDT,
 }
