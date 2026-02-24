@@ -64,29 +64,30 @@ pub(crate) fn get_tick_array_bitmap_extension_pda(pool_id: &Pubkey) -> (Pubkey, 
 /// Starting tick index for the tick array containing the current tick
 ///
 /// Each tick array contains 60 ticks (TICKS_PER_ARRAY = 60)
-/// Implementation matches Raydium SDK V2: TickUtils.getTickArrayStartIndexByTick
+/// Implementation matches official Raydium CLMM:
+/// `temp/raydium-clmm/programs/amm/src/states/tick_array.rs:227-234`
 ///
-/// Formula: getTickArrayBitIndex(tickIndex, tickSpacing) * tickCount(tickSpacing)
-/// where tickCount = TICK_ARRAY_SIZE * tickSpacing
+/// # Formula
+/// ```text
+/// ticks_in_array = TICK_ARRAY_SIZE * tick_spacing
+/// array_index = tick_current / ticks_in_array (向下取整到负无穷)
+/// start_index = array_index * ticks_in_array
+/// ```
 pub(crate) fn get_tick_array_start_index(tick_current: i32, tick_spacing: u16) -> i32 {
-    let tick_spacing_i32 = tick_spacing as i32;
+    let ticks_in_array = TICKS_PER_ARRAY * tick_spacing as i32;
 
-    // Calculate ticks per array (tickCount)
-    let ticks_in_array = TICKS_PER_ARRAY * tick_spacing_i32;
-
-    // Calculate tick array bit index (getTickArrayBitIndex)
-    // This is the array index, not the tick index
-    let mut start_index: i32 = tick_current / ticks_in_array;
-
-    // Handle negative ticks: round down towards negative infinity
-    if tick_current < 0 && tick_current % ticks_in_array != 0 {
-        start_index = ((start_index as f64).ceil() as i32) - 1;
+    // 纯整数实现：向下取整（向负无穷方向）
+    // 参考：temp/raydium-clmm/programs/amm/src/states/tick_array.rs
+    let array_index = if tick_current >= 0 {
+        tick_current / ticks_in_array
     } else {
-        start_index = (start_index as f64).floor() as i32;
-    }
+        // 负数：Rust 的整数除法是向零取整，需要手动向下取整
+        // 例：-1 / 60 = 0（Rust），但应该向下取整到 -1
+        // 例：-61 / 60 = -1（Rust），但应该向下取整到 -2
+        (tick_current - ticks_in_array + 1) / ticks_in_array
+    };
 
-    // Convert bit index to tick index
-    start_index * ticks_in_array
+    array_index * ticks_in_array
 }
 
 /// Find first initialized tick array from bitmap
@@ -159,5 +160,67 @@ pub(crate) fn get_first_initialized_tick_array(
     } else {
         // 未找到任何已初始化的 array，返回当前 array（虽然它未初始化）
         (false, current_array_start)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// 测试 get_tick_array_start_index 函数
+    /// 测试用例参考官方实现：
+    /// temp/raydium-clmm/programs/amm/src/states/tick_array.rs:598-625
+    #[test]
+    fn test_get_tick_array_start_index_positive() {
+        // 正数 tick 测试
+        assert_eq!(get_tick_array_start_index(120, 3), 0);
+        assert_eq!(get_tick_array_start_index(1002, 30), 0);
+        assert_eq!(get_tick_array_start_index(20, 10), 0);
+        assert_eq!(get_tick_array_start_index(30720, 1), 30720);
+        assert_eq!(get_tick_array_start_index(30719, 1), 30660);
+    }
+
+    #[test]
+    fn test_get_tick_array_start_index_negative() {
+        // 负数 tick 测试（关键边界测试）
+        assert_eq!(get_tick_array_start_index(-120, 3), -180);
+        assert_eq!(get_tick_array_start_index(-1002, 30), -1800);
+        assert_eq!(get_tick_array_start_index(-20, 10), -600);
+        assert_eq!(get_tick_array_start_index(-600, 10), -600);
+        assert_eq!(get_tick_array_start_index(-601, 10), -1200);
+        assert_eq!(get_tick_array_start_index(-30720, 1), -30720);
+        assert_eq!(get_tick_array_start_index(-30721, 1), -30780);
+    }
+
+    #[test]
+    fn test_get_tick_array_start_index_boundary() {
+        // MAX_TICK 和 MIN_TICK 边界测试
+        // MIN_TICK = -443636, MAX_TICK = 443636
+        assert_eq!(get_tick_array_start_index(-443636, 1), -443640);
+        assert_eq!(get_tick_array_start_index(443636, 1), 443580);
+        assert_eq!(get_tick_array_start_index(-443636, 60), -446400);
+        assert_eq!(get_tick_array_start_index(443636, 60), 442800);
+    }
+
+    #[test]
+    fn test_get_tick_array_start_index_various_spacing() {
+        // 不同 tick_spacing 测试
+        // tick_spacing = 1
+        assert_eq!(get_tick_array_start_index(0, 1), 0);
+        assert_eq!(get_tick_array_start_index(-1, 1), -60);
+        assert_eq!(get_tick_array_start_index(59, 1), 0);
+        assert_eq!(get_tick_array_start_index(60, 1), 60);
+
+        // tick_spacing = 8
+        assert_eq!(get_tick_array_start_index(0, 8), 0);
+        assert_eq!(get_tick_array_start_index(-1, 8), -480);
+        assert_eq!(get_tick_array_start_index(479, 8), 0);
+        assert_eq!(get_tick_array_start_index(480, 8), 480);
+
+        // tick_spacing = 64
+        assert_eq!(get_tick_array_start_index(0, 64), 0);
+        assert_eq!(get_tick_array_start_index(-1, 64), -3840);
+        assert_eq!(get_tick_array_start_index(3839, 64), 0);
+        assert_eq!(get_tick_array_start_index(3840, 64), 3840);
     }
 }
