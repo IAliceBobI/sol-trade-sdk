@@ -24,7 +24,7 @@ pub(crate) fn find_next_initialized_tick(
                 // token0 -> token1, 价格下降
                 // 找小于等于当前 tick 的最大 tick
                 if tick <= current_tick {
-                    if best_tick.is_none() || tick > best_tick.as_ref().unwrap().0 {
+                    if best_tick.as_ref().is_none_or(|b| tick > b.0) {
                         best_tick = Some((tick, is_initialized, liquidity_net));
                     }
                 }
@@ -32,7 +32,7 @@ pub(crate) fn find_next_initialized_tick(
                 // token1 -> token0, 价格上涨
                 // 找大于当前 tick 的最小 tick
                 if tick > current_tick {
-                    if best_tick.is_none() || tick < best_tick.as_ref().unwrap().0 {
+                    if best_tick.as_ref().is_none_or(|b| tick < b.0) {
                         best_tick = Some((tick, is_initialized, liquidity_net));
                     }
                 }

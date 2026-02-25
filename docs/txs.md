@@ -51,6 +51,7 @@ clmm pool: EZVkeboWeXygtq8LMyENHyXdF5wpYrtExRNH9UwB1qYw, ju-wsol(solett JUPyiwrY
 clmm pool: CYJQ19fbryujjHFDiik6GZmVpPuqi4Ew31orj43cAupT, solett-wsol(solett token2022 RRiB8JNqJvSQ3YJqFASQ3h5BBHPK1KHFrHgCFhxHjoM)
 
 ammv4 pool: 58oQChx4yWmvKdwLLZzBi4ChoCc2fqCUWBkwMihLYQo2, usdc-wsol
+ammv4 pool: 8WwcNqdZjCY5Pt7AkhupAFknV2txca9sq6YBkGzLbvdt, Pippin-wsol, Dfh5DzRgSvvCFDoYc2ciTkMrbDfRKybA4SoFbPmApump
 
 pumpswap pool: Dwczp92NX3ngbE2HeTUH4p5dcQxrpDF2AJMbW581gq1E, bonk-wsol, bonk token: DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263
 pumpswap pool: 539m4mVWt6iduB6W8rDGPMarzNCMesuqY5eUTiiYHAgR, pump-wsol, pump token2022: pumpCmXqMfrsAkQ5r49WcJnRayYRqmXz6ae8H7H9Dfn
