@@ -6,11 +6,14 @@
 //! 固定输入金额，计算输出金额。
 
 use super::helpers::{find_next_initialized_tick, needs_next_tick_array};
-use super::types::{SwapCalculationResult, SwapState, StepComputations};
+use super::types::{StepComputations, SwapCalculationResult, SwapState};
 use crate::utils::calc::clmm_math::{
     liquidity_math::add_delta,
     swap_math::compute_swap_step as official_compute_swap_step,
-    tick_math::{get_sqrt_price_at_tick, get_tick_at_sqrt_price, MAX_SQRT_PRICE_X64, MAX_TICK, MIN_SQRT_PRICE_X64, MIN_TICK},
+    tick_math::{
+        MAX_SQRT_PRICE_X64, MAX_TICK, MIN_SQRT_PRICE_X64, MIN_TICK, get_sqrt_price_at_tick,
+        get_tick_at_sqrt_price,
+    },
 };
 
 /// 计算单步 swap 结果（使用官方实现）

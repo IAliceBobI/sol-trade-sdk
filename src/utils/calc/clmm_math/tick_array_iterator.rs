@@ -73,10 +73,8 @@ impl TickArrayIterator {
         let tick_boundary = Self::max_tick_in_bitmap(pool_state.tick_spacing);
 
         // 计算当前 tick 所在的 tick array 起始索引
-        let current_start = Self::get_array_start_index(
-            pool_state.tick_current,
-            pool_state.tick_spacing,
-        );
+        let current_start =
+            Self::get_array_start_index(pool_state.tick_current, pool_state.tick_spacing);
 
         Self {
             bitmap,
@@ -94,11 +92,7 @@ impl TickArrayIterator {
     /// * `pool_state` - Pool 状态
     /// * `start_index` - 起始 tick array 索引
     /// * `zero_for_one` - 遍历方向
-    pub fn from_start_index(
-        pool_state: &PoolState,
-        start_index: i32,
-        zero_for_one: bool,
-    ) -> Self {
+    pub fn from_start_index(pool_state: &PoolState, start_index: i32, zero_for_one: bool) -> Self {
         let bitmap = U1024(pool_state.tick_array_bitmap);
         let tick_boundary = Self::max_tick_in_bitmap(pool_state.tick_spacing);
 
@@ -133,11 +127,11 @@ impl TickArrayIterator {
             (true, next_start) => {
                 self.current_start = next_start;
                 Some(next_start)
-            }
+            },
             (false, _) => {
                 self.exhausted = true;
                 None
-            }
+            },
         }
     }
 
@@ -343,48 +337,18 @@ mod tests {
     #[test]
     fn test_get_array_start_index() {
         // tick_spacing = 1
-        assert_eq!(
-            TickArrayIterator::get_array_start_index(0, 1),
-            0
-        );
-        assert_eq!(
-            TickArrayIterator::get_array_start_index(59, 1),
-            0
-        );
-        assert_eq!(
-            TickArrayIterator::get_array_start_index(60, 1),
-            60
-        );
-        assert_eq!(
-            TickArrayIterator::get_array_start_index(-1, 1),
-            -60
-        );
-        assert_eq!(
-            TickArrayIterator::get_array_start_index(-60, 1),
-            -60
-        );
-        assert_eq!(
-            TickArrayIterator::get_array_start_index(-61, 1),
-            -120
-        );
+        assert_eq!(TickArrayIterator::get_array_start_index(0, 1), 0);
+        assert_eq!(TickArrayIterator::get_array_start_index(59, 1), 0);
+        assert_eq!(TickArrayIterator::get_array_start_index(60, 1), 60);
+        assert_eq!(TickArrayIterator::get_array_start_index(-1, 1), -60);
+        assert_eq!(TickArrayIterator::get_array_start_index(-60, 1), -60);
+        assert_eq!(TickArrayIterator::get_array_start_index(-61, 1), -120);
 
         // tick_spacing = 10
-        assert_eq!(
-            TickArrayIterator::get_array_start_index(0, 10),
-            0
-        );
-        assert_eq!(
-            TickArrayIterator::get_array_start_index(599, 10),
-            0
-        );
-        assert_eq!(
-            TickArrayIterator::get_array_start_index(600, 10),
-            600
-        );
-        assert_eq!(
-            TickArrayIterator::get_array_start_index(-1, 10),
-            -600
-        );
+        assert_eq!(TickArrayIterator::get_array_start_index(0, 10), 0);
+        assert_eq!(TickArrayIterator::get_array_start_index(599, 10), 0);
+        assert_eq!(TickArrayIterator::get_array_start_index(600, 10), 600);
+        assert_eq!(TickArrayIterator::get_array_start_index(-1, 10), -600);
     }
 
     #[test]

@@ -45,12 +45,14 @@ pub use super::clmm_math::swap_math::{
 };
 
 // Export types
-pub use types::{QuoteExactOutResult, SwapCalculationResult, SwapState, SwapStep, StepComputations, TickState};
+pub use types::{
+    QuoteExactOutResult, StepComputations, SwapCalculationResult, SwapState, SwapStep, TickState,
+};
 
 // Export swap functions
+pub use quote::{quote_exact_out, quote_exact_out_simplified};
 pub use swap_exact_in::{calculate_swap_amount_with_tick_arrays, compute_swap_step};
 pub use swap_exact_out::calculate_swap_exact_out_with_tick_arrays;
-pub use quote::{quote_exact_out, quote_exact_out_simplified};
 
 #[cfg(test)]
 mod tests {

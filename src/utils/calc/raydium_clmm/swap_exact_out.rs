@@ -10,7 +10,10 @@ use super::swap_exact_in::compute_swap_step;
 use super::types::QuoteExactOutResult;
 use crate::utils::calc::clmm_math::{
     liquidity_math::add_delta,
-    tick_math::{get_sqrt_price_at_tick, get_tick_at_sqrt_price, MAX_SQRT_PRICE_X64, MAX_TICK, MIN_SQRT_PRICE_X64, MIN_TICK},
+    tick_math::{
+        MAX_SQRT_PRICE_X64, MAX_TICK, MIN_SQRT_PRICE_X64, MIN_TICK, get_sqrt_price_at_tick,
+        get_tick_at_sqrt_price,
+    },
 };
 
 /// 完整的 exact_out swap 计算（需要外部传入 tick array 数据）

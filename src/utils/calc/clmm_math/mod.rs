@@ -25,7 +25,6 @@ pub use big_num::{U128, U256, U512};
 pub use full_math::MulDiv;
 pub use swap_math::{FEE_RATE_DENOMINATOR_VALUE, SwapStep, compute_swap_step};
 pub use tick_array_iterator::{
-    TickArrayIterator, check_tick_array_initialized, get_first_tick_array,
-    TICK_ARRAY_BITMAP_SIZE,
+    TICK_ARRAY_BITMAP_SIZE, TickArrayIterator, check_tick_array_initialized, get_first_tick_array,
 };
 pub use unsafe_math::UnsafeMathTrait;
