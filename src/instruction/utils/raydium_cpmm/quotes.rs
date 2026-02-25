@@ -1,6 +1,4 @@
 // Raydium CPMM Quote 计算函数
-// 允许未使用的 legacy 函数（保留用于向后兼容）
-#![allow(dead_code)]
 
 use crate::{
     common::{SolanaRpcClient, auto_mock_rpc::PoolRpcClient},
@@ -157,41 +155,6 @@ pub(crate) async fn quote_exact_in(
     })
 }
 
-/// Quote an exact-in swap against a Raydium CPMM pool (旧版接口，已废弃).
-///
-/// # Deprecated
-///
-/// 请使用新版本的 `quote_exact_in`，它使用 `QuoteExactInParams` 结构体参数。
-///
-/// - If `is_token0_in=true`: token0 -> token1
-/// - If `is_token0_in=false`: token1 -> token0
-#[deprecated(since = "4.1.0", note = "请使用 quote_exact_in(&rpc, QuoteExactInParams)")]
-#[allow(dead_code)]
-pub async fn quote_exact_in_legacy(
-    rpc: &SolanaRpcClient,
-    pool_address: &Pubkey,
-    amount_in: u64,
-    is_token0_in: bool,
-) -> Result<QuoteExactInResult, anyhow::Error> {
-    let pool_state = pool_queries::get_pool_by_address(rpc, pool_address).await?;
-
-    // 构建新版本的参数
-    let (input_mint, output_mint) = if is_token0_in {
-        (pool_state.token0_mint, pool_state.token1_mint)
-    } else {
-        (pool_state.token1_mint, pool_state.token0_mint)
-    };
-
-    let params = QuoteExactInParams {
-        pool_address: *pool_address,
-        input_mint,
-        output_mint,
-        amount_in,
-    };
-
-    quote_exact_in(rpc, params).await
-}
-
 /// Quote an exact-out swap against a Raydium CPMM pool.
 ///
 /// 计算需要多少输入金额才能获得指定的输出金额。
@@ -282,38 +245,6 @@ pub(crate) async fn quote_exact_out(
         price_impact_bps: result.price_impact_bps,
         extra_accounts_read: 2,
     })
-}
-
-/// Quote an exact-out swap against a Raydium CPMM pool (旧版接口，已废弃).
-///
-/// # Deprecated
-///
-/// 请使用新版本的 `quote_exact_out`，它使用 `QuoteExactOutParams` 结构体参数。
-#[deprecated(since = "4.1.0", note = "请使用 quote_exact_out(&rpc, QuoteExactOutParams)")]
-#[allow(dead_code)]
-pub async fn quote_exact_out_legacy(
-    rpc: &SolanaRpcClient,
-    pool_address: &Pubkey,
-    amount_out: u64,
-    is_token0_in: bool,
-) -> Result<QuoteExactOutResult, anyhow::Error> {
-    let pool_state = pool_queries::get_pool_by_address(rpc, pool_address).await?;
-
-    // 构建新版本的参数
-    let (input_mint, output_mint) = if is_token0_in {
-        (pool_state.token0_mint, pool_state.token1_mint)
-    } else {
-        (pool_state.token1_mint, pool_state.token0_mint)
-    };
-
-    let params = QuoteExactOutParams {
-        pool_address: *pool_address,
-        input_mint,
-        output_mint,
-        amount_out,
-    };
-
-    quote_exact_out(rpc, params).await
 }
 
 /// 获取任意 Token 在 Raydium CPMM 上的 USD 价格（通过 X-WSOL 池 + Raydium CLMM WSOL-USD 锚定池）

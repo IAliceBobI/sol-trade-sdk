@@ -13,11 +13,7 @@
 //   - 在 SwapState 中累计手续费
 //   - 修改 compute_swap_amount_with_tick_arrays 返回完整结果
 
-// 允许未使用的 legacy 函数（保留用于向后兼容）
-#![allow(dead_code)]
-
 use anyhow::anyhow;
-use solana_sdk::pubkey::Pubkey;
 
 use crate::{
     common::SolanaRpcClient,
@@ -147,37 +143,6 @@ pub(crate) async fn quote_exact_in(
     })
 }
 
-/// Quote an exact-in swap against a Raydium CLMM pool (旧版接口，已废弃).
-///
-/// # Deprecated
-///
-/// 请使用新版本的 `quote_exact_in`，它使用 `QuoteExactInParams` 结构体参数。
-#[deprecated(since = "4.1.0", note = "请使用 quote_exact_in(&rpc, QuoteExactInParams)")]
-pub async fn quote_exact_in_legacy(
-    rpc: &SolanaRpcClient,
-    pool_address: &Pubkey,
-    amount_in: u64,
-    zero_for_one: bool,
-) -> Result<crate::utils::quote::QuoteExactInResult, anyhow::Error> {
-    let pool_state = get_pool_by_address(rpc, pool_address).await?;
-
-    // 构建新版本的参数
-    let (input_mint, output_mint) = if zero_for_one {
-        (pool_state.token_mint0, pool_state.token_mint1)
-    } else {
-        (pool_state.token_mint1, pool_state.token_mint0)
-    };
-
-    let params = QuoteExactInParams {
-        pool_address: *pool_address,
-        input_mint,
-        output_mint,
-        amount_in,
-    };
-
-    quote_exact_in(rpc, params).await
-}
-
 /// Quote an exact-out swap against a Raydium CLMM pool (完整版本)
 ///
 /// 使用完整的 tick array 遍历算法，支持大额交易和跨 tick 边界。
@@ -294,35 +259,4 @@ pub(crate) async fn quote_exact_out(
     .map_err(|e| anyhow!("CLMM exact_out calculation failed: {}", e))?;
 
     Ok(result)
-}
-
-/// Quote an exact-out swap against a Raydium CLMM pool (旧版接口，已废弃).
-///
-/// # Deprecated
-///
-/// 请使用新版本的 `quote_exact_out`，它使用 `QuoteExactOutParams` 结构体参数。
-#[deprecated(since = "4.1.0", note = "请使用 quote_exact_out(&rpc, QuoteExactOutParams)")]
-pub async fn quote_exact_out_legacy(
-    rpc: &SolanaRpcClient,
-    pool_address: &Pubkey,
-    amount_out: u64,
-    zero_for_one: bool,
-) -> Result<crate::utils::calc::raydium_clmm::QuoteExactOutResult, anyhow::Error> {
-    let pool_state = get_pool_by_address(rpc, pool_address).await?;
-
-    // 构建新版本的参数
-    let (input_mint, output_mint) = if zero_for_one {
-        (pool_state.token_mint0, pool_state.token_mint1)
-    } else {
-        (pool_state.token_mint1, pool_state.token_mint0)
-    };
-
-    let params = QuoteExactOutParams {
-        pool_address: *pool_address,
-        input_mint,
-        output_mint,
-        amount_out,
-    };
-
-    quote_exact_out(rpc, params).await
 }
