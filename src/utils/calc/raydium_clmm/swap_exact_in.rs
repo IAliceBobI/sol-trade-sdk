@@ -9,7 +9,7 @@ use super::helpers::{find_next_initialized_tick, needs_next_tick_array};
 use super::types::{StepComputations, SwapCalculationResult, SwapState};
 use crate::utils::calc::clmm_math::{
     liquidity_math::add_delta,
-    swap_math::compute_swap_step as official_compute_swap_step,
+    swap_math::{SwapStep, compute_swap_step},
     tick_math::{
         MAX_SQRT_PRICE_X64, MAX_TICK, MIN_SQRT_PRICE_X64, MIN_TICK, get_sqrt_price_at_tick,
         get_tick_at_sqrt_price,
@@ -20,7 +20,7 @@ use crate::utils::calc::clmm_math::{
 ///
 /// 这是 CLMM 最核心的函数，直接调用官方 swap_math::compute_swap_step
 /// 注意：block_timestamp 参数用于未来扩展，当前传入 0 即可
-pub fn compute_swap_step(
+pub fn compute_swap_step_wrapper(
     sqrt_price_current_x64: u128,
     sqrt_price_target_x64: u128,
     liquidity: u128,
@@ -28,9 +28,9 @@ pub fn compute_swap_step(
     fee_rate: u32,
     is_base_input: bool,
     zero_for_one: bool,
-) -> Result<crate::utils::calc::clmm_math::swap_math::SwapStep, &'static str> {
+) -> Result<SwapStep, &'static str> {
     // 直接调用官方实现，block_timestamp 传 0
-    official_compute_swap_step(
+    compute_swap_step(
         sqrt_price_current_x64,
         sqrt_price_target_x64,
         liquidity,
@@ -133,7 +133,7 @@ pub fn calculate_swap_amount_with_tick_arrays(
             };
 
             // 调用官方 swap 计算
-            let swap_step = compute_swap_step(
+            let swap_step = compute_swap_step_wrapper(
                 state.sqrt_price_x64,
                 target_price,
                 state.liquidity,
@@ -177,7 +177,7 @@ pub fn calculate_swap_amount_with_tick_arrays(
         } else {
             // 没有找到下一个初始化的 tick
             // 在当前价格区间完成交易（使用当前价格作为目标，价格不变）
-            let swap_step = compute_swap_step(
+            let swap_step = compute_swap_step_wrapper(
                 state.sqrt_price_x64,
                 state.sqrt_price_x64,
                 state.liquidity,

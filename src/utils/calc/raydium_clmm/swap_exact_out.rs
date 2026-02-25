@@ -6,7 +6,7 @@
 //! 固定输出金额，计算输入金额。
 
 use super::helpers::{find_next_initialized_tick, needs_next_tick_array};
-use super::swap_exact_in::compute_swap_step;
+use super::swap_exact_in::compute_swap_step_wrapper;
 use super::types::QuoteExactOutResult;
 use crate::utils::calc::clmm_math::{
     liquidity_math::add_delta,
@@ -113,7 +113,7 @@ pub fn calculate_swap_exact_out_with_tick_arrays(
             let sqrt_price_start_x64 = current_sqrt_price;
 
             // 调用官方 swap 计算，关键：is_base_input = false（exact_out 模式）
-            let swap_step = compute_swap_step(
+            let swap_step = compute_swap_step_wrapper(
                 current_sqrt_price,
                 target_price,
                 current_liquidity,

@@ -39,19 +39,16 @@ pub use super::clmm_math::tick_math::{
 };
 
 // Re-export official swap_math components
-pub use super::clmm_math::swap_math::{
-    FEE_RATE_DENOMINATOR_VALUE, SwapStep as OfficialSwapStep,
-    compute_swap_step as official_compute_swap_step,
-};
+pub use super::clmm_math::swap_math::{FEE_RATE_DENOMINATOR_VALUE, SwapStep, compute_swap_step};
 
 // Export types
 pub use types::{
-    QuoteExactOutResult, StepComputations, SwapCalculationResult, SwapState, SwapStep, TickState,
+    QuoteExactOutResult, StepComputations, SwapCalculationResult, SwapState, TickState,
 };
 
 // Export swap functions
 pub use quote::{quote_exact_out, quote_exact_out_simplified};
-pub use swap_exact_in::{calculate_swap_amount_with_tick_arrays, compute_swap_step};
+pub use swap_exact_in::calculate_swap_amount_with_tick_arrays;
 pub use swap_exact_out::calculate_swap_exact_out_with_tick_arrays;
 
 #[cfg(test)]
@@ -99,6 +96,7 @@ mod tests {
             fee_rate,
             true,  // is_base_input
             false, // zero_for_one = false （价格上涨）
+            0,     // block_timestamp: 客户端计算不需要，传 0
         );
 
         assert!(result.is_ok(), "compute_swap_step should succeed: {:?}", result.err());

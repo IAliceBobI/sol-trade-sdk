@@ -31,20 +31,6 @@ pub struct SwapCalculationResult {
     pub fee_amount: u64,
 }
 
-/// 单步计算结果（为了向后兼容保留，实际使用官方 OfficialSwapStep）
-#[deprecated(note = "Use OfficialSwapStep from swap_math instead")]
-#[derive(Debug, Clone, Default)]
-pub struct SwapStep {
-    /// 下一个价格
-    pub sqrt_price_next_x64: u128,
-    /// 输入量
-    pub amount_in: u64,
-    /// 输出量
-    pub amount_out: u64,
-    /// 手续费
-    pub fee_amount: u64,
-}
-
 /// Step 计算状态
 #[derive(Debug, Clone, Default)]
 pub struct StepComputations {
