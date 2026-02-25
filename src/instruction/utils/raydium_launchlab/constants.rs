@@ -1,3 +1,5 @@
+use crate::constants::{RAYDIUM_CPMM_PUBKEY, RAYDIUM_LAUNCHLAB_PUBKEY};
+
 /// Constants used as seeds for deriving PDAs (Program Derived Addresses)
 pub mod seeds {
     /// Seed for bonding curve PDAs (pool_state)
@@ -20,11 +22,11 @@ pub mod seeds {
 pub mod accounts {
     use solana_sdk::{pubkey, pubkey::Pubkey};
 
-    /// Raydium LaunchLab program ID (mainnet)
-    pub const LAUNCHLAB_PROGRAM: Pubkey = pubkey!("LanMV9sAd7wArD4vJFi2qDdfnVhFxYSUg6eADduJ3uj");
+    /// Raydium LaunchLab program ID (from crate constants)
+    pub const LAUNCHLAB_PROGRAM: Pubkey = super::RAYDIUM_LAUNCHLAB_PUBKEY;
 
-    /// Raydium CPMM program ID (mainnet) - used for external pool after migration
-    pub const CPMM_PROGRAM: Pubkey = pubkey!("CPMMoo8L3F4NbTegBCKVNunggL7H1ZpdTHKxQB5qKP1C");
+    /// Raydium CPMM program ID (from crate constants)
+    pub const CPMM_PROGRAM: Pubkey = super::RAYDIUM_CPMM_PUBKEY;
 
     /// Raydium CPMM program ID (devnet)
     pub const CPMM_PROGRAM_DEVNET: Pubkey = pubkey!("DRaycpLY18LhpbydsBWbVJtxpNv9oXPgjRSfpF2bWpYb");

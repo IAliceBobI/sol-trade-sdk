@@ -1,5 +1,9 @@
 //! 交易解析器的核心数据类型定义
 
+use crate::constants::{
+    PUMPSWAP_PROGRAM_ID, RAYDIUM_AMM_V4_PROGRAM_ID, RAYDIUM_CLMM_PROGRAM_ID,
+    RAYDIUM_CPMM_PROGRAM_ID,
+};
 use serde::{Deserialize, Serialize};
 use solana_sdk::pubkey::Pubkey;
 
@@ -119,7 +123,7 @@ impl Default for ParserConfig {
     }
 }
 
-/// DEX 协议枚举
+/// DEX 协议枚举（解析器支持的子集）
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum DexProtocol {
     PumpSwap,
@@ -132,10 +136,10 @@ impl DexProtocol {
     /// 获取协议的程序ID
     pub fn program_id(&self) -> &'static str {
         match self {
-            DexProtocol::PumpSwap => "pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA",
-            DexProtocol::RaydiumV4 => "675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8",
-            DexProtocol::RaydiumClmm => "CAMMCzo5YL8w4VFF8KVHrK22GGUsp5VTaW7grrKgrWqK",
-            DexProtocol::RaydiumCpmm => "CPMMoo8L3F4NbTegBCKVNunggL7H1ZpdTHKxQB5qKP1C",
+            DexProtocol::PumpSwap => PUMPSWAP_PROGRAM_ID,
+            DexProtocol::RaydiumV4 => RAYDIUM_AMM_V4_PROGRAM_ID,
+            DexProtocol::RaydiumClmm => RAYDIUM_CLMM_PROGRAM_ID,
+            DexProtocol::RaydiumCpmm => RAYDIUM_CPMM_PROGRAM_ID,
         }
     }
 
@@ -152,10 +156,10 @@ impl DexProtocol {
     /// 从程序ID解析协议
     pub fn from_program_id(program_id: &str) -> Option<Self> {
         match program_id {
-            "pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA" => Some(DexProtocol::PumpSwap),
-            "675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8" => Some(DexProtocol::RaydiumV4),
-            "CAMMCzo5YL8w4VFF8KVHrK22GGUsp5VTaW7grrKgrWqK" => Some(DexProtocol::RaydiumClmm),
-            "CPMMoo8L3F4NbTegBCKVNunggL7H1ZpdTHKxQB5qKP1C" => Some(DexProtocol::RaydiumCpmm),
+            PUMPSWAP_PROGRAM_ID => Some(DexProtocol::PumpSwap),
+            RAYDIUM_AMM_V4_PROGRAM_ID => Some(DexProtocol::RaydiumV4),
+            RAYDIUM_CLMM_PROGRAM_ID => Some(DexProtocol::RaydiumClmm),
+            RAYDIUM_CPMM_PROGRAM_ID => Some(DexProtocol::RaydiumCpmm),
             _ => None,
         }
     }

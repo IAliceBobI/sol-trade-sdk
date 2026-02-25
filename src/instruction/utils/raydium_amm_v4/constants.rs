@@ -1,5 +1,6 @@
 // Raydium AMM V4 常量定义
 
+use crate::constants::RAYDIUM_AMM_V4_PUBKEY;
 use solana_sdk::{pubkey, pubkey::Pubkey};
 
 /// Raydium CLMM WSOL-USDT 锚定池（用于 USD 价格计算）
@@ -17,7 +18,8 @@ pub mod accounts {
     use solana_sdk::{pubkey, pubkey::Pubkey};
 
     pub const AUTHORITY: Pubkey = pubkey!("5Q544fKrFoe6tsEbD7S8EmxGTJYAKtTVhAW5Q5pge4j1");
-    pub const RAYDIUM_AMM_V4: Pubkey = pubkey!("675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8");
+    /// Raydium AMM V4 Program ID (from crate constants)
+    pub const RAYDIUM_AMM_V4: Pubkey = super::RAYDIUM_AMM_V4_PUBKEY;
 
     pub const TRADE_FEE_NUMERATOR: u64 = 25;
     pub const TRADE_FEE_DENOMINATOR: u64 = 10000;

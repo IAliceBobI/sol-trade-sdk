@@ -2,14 +2,14 @@
 
 use solana_sdk::pubkey::Pubkey;
 
-use crate::constants::{SOL_MINT, USDC_MINT, USDT_MINT};
+use crate::constants::{RAYDIUM_CLMM_PUBKEY, SOL_MINT, USDC_MINT, USDT_MINT};
 
 use super::constants::{TICKS_PER_ARRAY, seeds};
 
 /// Constants related to program accounts and authorities
 pub mod accounts {
-    use solana_sdk::{pubkey, pubkey::Pubkey};
-    pub const RAYDIUM_CLMM: Pubkey = pubkey!("CAMMCzo5YL8w4VFF8KVHrK22GGUsp5VTaW7grrKgrWqK");
+    /// Raydium CLMM Program ID (from crate constants)
+    pub const RAYDIUM_CLMM: solana_sdk::pubkey::Pubkey = super::RAYDIUM_CLMM_PUBKEY;
 }
 
 /// 判断是否为 Hot Mint（主流桥接资产）

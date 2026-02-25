@@ -1,5 +1,6 @@
 // Raydium CPMM 常量定义
 
+use crate::constants::RAYDIUM_CPMM_PUBKEY;
 use solana_sdk::{pubkey, pubkey::Pubkey};
 
 /// Raydium CLMM WSOL-USDT 锚定池（用于 USD 价格计算）
@@ -18,7 +19,8 @@ pub mod seeds {
 pub mod accounts {
     use solana_sdk::{pubkey, pubkey::Pubkey};
     pub const AUTHORITY: Pubkey = pubkey!("GpMZbSM2GgvTKHJirzeGfMFoaZ8UR2X7F4v8vHTvxFbL");
-    pub const RAYDIUM_CPMM: Pubkey = pubkey!("CPMMoo8L3F4NbTegBCKVNunggL7H1ZpdTHKxQB5qKP1C");
+    /// Raydium CPMM Program ID (from crate constants)
+    pub const RAYDIUM_CPMM: Pubkey = super::RAYDIUM_CPMM_PUBKEY;
     pub const FEE_RATE_DENOMINATOR_VALUE: u128 = 1_000_000;
     pub const TRADE_FEE_RATE: u64 = 2500;
     pub const CREATOR_FEE_RATE: u64 = 0;

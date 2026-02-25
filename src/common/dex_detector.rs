@@ -95,18 +95,19 @@ pub async fn detect_dex_from_pools_batch(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::constants::RAYDIUM_AMM_V4_PROGRAM_ID;
 
     #[test]
     fn test_dex_info_creation() {
         let info = DexInfo::new(
             "58L7CzkRV5qD1owUPurbAC7gUNV1kSzwj2TMkvgEpbjZ".to_string(),
-            "675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8".to_string(),
+            RAYDIUM_AMM_V4_PROGRAM_ID.to_string(),
         )
         .expect("应该成功创建 DexInfo");
 
         assert_eq!(info.dex_name(), "raydium_amm_v4");
         assert_eq!(info.display_name(), "Raydium AMM V4");
-        assert_eq!(info.program_id, "675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8");
+        assert_eq!(info.program_id, RAYDIUM_AMM_V4_PROGRAM_ID);
     }
 
     #[test]

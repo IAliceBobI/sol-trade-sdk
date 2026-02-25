@@ -45,7 +45,8 @@ pub mod accounts {
     pub const PROTOCOL_FEE_RECIPIENT: Pubkey =
         pubkey!("62qc2CNXwrYqQScmEdiZFFAnJR262PxWEuNQtxfafNgV");
 
-    pub const AMM_PROGRAM: Pubkey = pubkey!("pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA");
+    /// PumpSwap Program ID (from crate constants)
+    pub const AMM_PROGRAM: Pubkey = crate::constants::PUMPSWAP_PUBKEY;
 
     pub const LP_FEE_BASIS_POINTS: u64 = 25;
     pub const PROTOCOL_FEE_BASIS_POINTS: u64 = 5;
@@ -54,9 +55,9 @@ pub mod accounts {
     pub const FEE_PROGRAM: Pubkey = pubkey!("pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ");
 
     pub const GLOBAL_VOLUME_ACCUMULATOR: Pubkey =
-        pubkey!("C2aFPdENg4A2HQsmrd5rTw5TaYBX5Ku887cWjbFKtZpw"); // get_global_volume_accumulator_pda().unwrap();
+        pubkey!("C2aFPdENg4A2HQsmrd5rTw5TaYBX5Ku887cWjbFKtZpw");
 
-    pub const FEE_CONFIG: Pubkey = pubkey!("5PHirr8joyTMp9JMm6nW7hNDVyEYdkzDqazxPD7RaTjx"); // get_fee_config_pda().unwrap();
+    pub const FEE_CONFIG: Pubkey = pubkey!("5PHirr8joyTMp9JMm6nW7hNDVyEYdkzDqazxPD7RaTjx");
 
     pub const DEFAULT_COIN_CREATOR_VAULT_AUTHORITY: Pubkey =
         pubkey!("8N3GDaZ2iwN65oxVatKTLPNooAVUJTbfiVJ1ahyqwjSk");

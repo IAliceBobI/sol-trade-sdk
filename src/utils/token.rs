@@ -3,7 +3,9 @@
 //! 提供跨项目使用的 Token 相关工具函数
 
 use crate::common::auto_mock_rpc::PoolRpcClient;
-use crate::constants::{JUP_MINT, PIPE_MINT, PIPPIN_MINT, RAY_MINT, SOL_MINT, USDC_MINT, USDT_MINT};
+use crate::constants::{
+    JUP_MINT, PIPE_MINT, PIPPIN_MINT, RAY_MINT, SOL_MINT, USDC_MINT, USDT_MINT,
+};
 use anyhow::Result;
 use dashmap::DashMap;
 use once_cell::sync::Lazy;

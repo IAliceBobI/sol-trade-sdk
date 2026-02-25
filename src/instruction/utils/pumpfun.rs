@@ -1,4 +1,5 @@
 use crate::common::{SolanaRpcClient, bonding_curve::BondingCurveAccount};
+use crate::constants::{PUMPFUN_PUBKEY, RAYDIUM_AMM_V4_PUBKEY};
 use anyhow::anyhow;
 use solana_sdk::pubkey::Pubkey;
 use std::sync::Arc;
@@ -101,8 +102,8 @@ pub mod global_constants {
 pub mod accounts {
     use solana_sdk::{pubkey, pubkey::Pubkey};
 
-    /// Public key for the Pump.fun program
-    pub const PUMPFUN: Pubkey = pubkey!("6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P");
+    /// PumpFun Program ID (from crate constants)
+    pub const PUMPFUN: Pubkey = super::PUMPFUN_PUBKEY;
 
     /// Public key for the MPL Token Metadata program
     pub const MPL_TOKEN_METADATA: Pubkey = pubkey!("metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s");
@@ -114,7 +115,8 @@ pub mod accounts {
     pub const ASSOCIATED_TOKEN_PROGRAM: Pubkey =
         pubkey!("ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL");
 
-    pub const AMM_PROGRAM: Pubkey = pubkey!("675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8");
+    /// Raydium AMM V4 Program ID (from crate constants)
+    pub const AMM_PROGRAM: Pubkey = super::RAYDIUM_AMM_V4_PUBKEY;
 
     pub const FEE_PROGRAM: Pubkey = pubkey!("pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ");
 

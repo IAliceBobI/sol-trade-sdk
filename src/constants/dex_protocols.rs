@@ -2,9 +2,9 @@
 //!
 //! 提供统一的 DEX 协议枚举和识别功能
 
-use solana_sdk::pubkey::Pubkey;
+use solana_sdk::{pubkey, pubkey::Pubkey};
 
-// ===== DEX 协议常量 =====
+// ===== DEX 协议常量 (&str 格式) =====
 
 /// PumpFun 协议常量
 pub const PUMPFUN_PROGRAM_ID: &str = "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P";
@@ -45,6 +45,32 @@ pub const RAYDIUM_LAUNCHLAB_DISPLAY_NAME: &str = "Raydium LaunchLab";
 pub const METEORA_DAMM_V2_PROGRAM_ID: &str = "cpamdpZCGKUy5JxQXB4dcpGPiikHawvSWAd6mEn1sGG";
 pub const METEORA_DAMM_V2_NAME: &str = "meteora_damm_v2";
 pub const METEORA_DAMM_V2_DISPLAY_NAME: &str = "Meteora DAMM V2";
+
+// ===== DEX 协议常量 (Pubkey 格式，用于编译时类型安全) =====
+
+/// PumpFun Program ID (Pubkey 格式)
+pub const PUMPFUN_PUBKEY: Pubkey = pubkey!("6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P");
+
+/// PumpSwap Program ID (Pubkey 格式)
+pub const PUMPSWAP_PUBKEY: Pubkey = pubkey!("pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA");
+
+/// Bonk Program ID (Pubkey 格式)
+pub const BONK_PUBKEY: Pubkey = pubkey!("BSwp6bEBihVLdqJRKGgzjcGLHkcTuzmSo1TQkHepzH8p");
+
+/// Raydium AMM V4 Program ID (Pubkey 格式)
+pub const RAYDIUM_AMM_V4_PUBKEY: Pubkey = pubkey!("675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8");
+
+/// Raydium CLMM Program ID (Pubkey 格式)
+pub const RAYDIUM_CLMM_PUBKEY: Pubkey = pubkey!("CAMMCzo5YL8w4VFF8KVHrK22GGUsp5VTaW7grrKgrWqK");
+
+/// Raydium CPMM Program ID (Pubkey 格式)
+pub const RAYDIUM_CPMM_PUBKEY: Pubkey = pubkey!("CPMMoo8L3F4NbTegBCKVNunggL7H1ZpdTHKxQB5qKP1C");
+
+/// Raydium LaunchLab Program ID (Pubkey 格式)
+pub const RAYDIUM_LAUNCHLAB_PUBKEY: Pubkey = pubkey!("LanMV9sAd7wArD4vJFi2qDdfnVhFxYSUg6eADduJ3uj");
+
+/// Meteora DAMM V2 Program ID (Pubkey 格式)
+pub const METEORA_DAMM_V2_PUBKEY: Pubkey = pubkey!("cpamdpZCGKUy5JxQXB4dcpGPiikHawvSWAd6mEn1sGG");
 
 /// 支持的 DEX 协议
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -227,5 +253,61 @@ mod tests {
         let names: Vec<_> = protocols.iter().map(|p| p.name()).collect();
         let unique_names: std::collections::HashSet<_> = names.iter().collect();
         assert_eq!(names.len(), unique_names.len(), "Names should be unique");
+    }
+
+    /// 测试 &str 和 Pubkey 格式常量的一致性
+    #[test]
+    fn test_str_and_pubkey_constants_consistency() {
+        // PumpFun
+        assert_eq!(
+            PUMPFUN_PROGRAM_ID,
+            PUMPFUN_PUBKEY.to_string(),
+            "PumpFun: &str and Pubkey mismatch"
+        );
+
+        // PumpSwap
+        assert_eq!(
+            PUMPSWAP_PROGRAM_ID,
+            PUMPSWAP_PUBKEY.to_string(),
+            "PumpSwap: &str and Pubkey mismatch"
+        );
+
+        // Bonk
+        assert_eq!(BONK_PROGRAM_ID, BONK_PUBKEY.to_string(), "Bonk: &str and Pubkey mismatch");
+
+        // Raydium AMM V4
+        assert_eq!(
+            RAYDIUM_AMM_V4_PROGRAM_ID,
+            RAYDIUM_AMM_V4_PUBKEY.to_string(),
+            "Raydium AMM V4: &str and Pubkey mismatch"
+        );
+
+        // Raydium CLMM
+        assert_eq!(
+            RAYDIUM_CLMM_PROGRAM_ID,
+            RAYDIUM_CLMM_PUBKEY.to_string(),
+            "Raydium CLMM: &str and Pubkey mismatch"
+        );
+
+        // Raydium CPMM
+        assert_eq!(
+            RAYDIUM_CPMM_PROGRAM_ID,
+            RAYDIUM_CPMM_PUBKEY.to_string(),
+            "Raydium CPMM: &str and Pubkey mismatch"
+        );
+
+        // Raydium LaunchLab
+        assert_eq!(
+            RAYDIUM_LAUNCHLAB_PROGRAM_ID,
+            RAYDIUM_LAUNCHLAB_PUBKEY.to_string(),
+            "Raydium LaunchLab: &str and Pubkey mismatch"
+        );
+
+        // Meteora DAMM V2
+        assert_eq!(
+            METEORA_DAMM_V2_PROGRAM_ID,
+            METEORA_DAMM_V2_PUBKEY.to_string(),
+            "Meteora DAMM V2: &str and Pubkey mismatch"
+        );
     }
 }

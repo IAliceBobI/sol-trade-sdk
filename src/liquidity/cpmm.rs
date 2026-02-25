@@ -2,13 +2,10 @@
 //!
 //! 提供向 Raydium CPMM 池子添加流动性的功能
 
+use crate::constants::RAYDIUM_CPMM_PUBKEY;
 use crate::instruction::utils::raydium_cpmm_types::PoolState;
 use solana_sdk::instruction::{AccountMeta, Instruction};
 use solana_sdk::pubkey::Pubkey;
-use std::str::FromStr;
-
-/// Raydium CPMM 程序 ID
-pub const RAYDIUM_CPMM_PROGRAM_ID: &str = "CPMMoo8L3F4NbTegBCKVNunggL7H1ZpdTHKxQB5qKP1C";
 
 /// Authority seed
 pub const AUTH_SEED: &str = "vault_and_lp_mint_auth_seed";
@@ -74,11 +71,9 @@ pub struct CpmmDepositParams {
 ///
 /// 返回构建好的 Instruction
 pub fn build_deposit_instruction(params: CpmmDepositParams, owner: Pubkey) -> Instruction {
-    let program_id = Pubkey::from_str(RAYDIUM_CPMM_PROGRAM_ID)
-        .expect("RAYDIUM_CPMM_PROGRAM_ID is a valid valid pubkey");
-
     // 派生 authority PDA
-    let (authority, _bump) = Pubkey::find_program_address(&[AUTH_SEED.as_bytes()], &program_id);
+    let (authority, _bump) =
+        Pubkey::find_program_address(&[AUTH_SEED.as_bytes()], &RAYDIUM_CPMM_PUBKEY);
 
     // 构建指令数据（使用 Anchor discriminator）
     let mut data = Vec::with_capacity(8 + 24); // discriminator (8) + 3 * u64 (24)
@@ -117,7 +112,7 @@ pub fn build_deposit_instruction(params: CpmmDepositParams, owner: Pubkey) -> In
         AccountMeta::new(params.lp_mint, false),
     ];
 
-    Instruction { program_id, accounts, data }
+    Instruction { program_id: RAYDIUM_CPMM_PUBKEY, accounts, data }
 }
 
 /// 计算添加流动性所需的代币数量
@@ -232,7 +227,7 @@ mod tests {
         let owner = Pubkey::new_unique();
         let instruction = build_deposit_instruction(params, owner);
 
-        assert_eq!(instruction.program_id, Pubkey::from_str(RAYDIUM_CPMM_PROGRAM_ID).unwrap());
+        assert_eq!(instruction.program_id, RAYDIUM_CPMM_PUBKEY);
         // 验证 discriminator 正确
         assert_eq!(&instruction.data[0..8], &DEPOSIT_DISCRIMINATOR);
         assert_eq!(instruction.accounts.len(), 13);
