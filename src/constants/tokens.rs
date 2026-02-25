@@ -23,3 +23,6 @@ pub const PIPE_MINT: Pubkey = pubkey!("8ycz3kctoRb4LFrtoYG2r8tRyUYUeGf5Q16M2TEMp
 
 /// JUP (Jupiter) Mint
 pub const JUP_MINT: Pubkey = pubkey!("JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN");
+
+/// PIPPIN Mint
+pub const PIPPIN_MINT: Pubkey = pubkey!("Dfh5DzRgSvvCFDoYc2ciTkMrbDfRKybA4SoFbPmApump");
