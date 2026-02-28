@@ -4,7 +4,7 @@
 //!
 //! # 测试目标
 //!
-//! 验证 `quote_exact_out` 的本地计算与链上模拟执行结果的一致性
+//! 验证 `buy_exact_out_internal` 和 `sell_exact_out_internal` 的本地计算与链上模拟执行结果的一致性
 //!
 //! # 运行测试
 //!
@@ -23,7 +23,7 @@ use sol_trade_sdk::{
     trading::core::params::{DexParamEnum, RaydiumAmmV4Params, SwapParams},
     trading::core::traits::InstructionBuilder,
     utils::{
-        calc::raydium_amm_v4::quote_exact_out,
+        calc::raydium_amm_v4::buy_exact_out_internal,
         simulation_based_calc::{SimulatedSwapResult, simulate_swap_transaction},
     },
 };
@@ -57,7 +57,7 @@ fn get_test_pool_address() -> Pubkey {
 ///
 /// # 流程
 /// 1. 通过 `RaydiumAmmV4Params::from_amm_address_by_rpc` 获取所有参数
-/// 2. 调用 `quote_exact_out` 进行本地计算
+/// 2. 调用 `buy_exact_out_internal` 进行本地计算
 /// 3. 构建 SwapParams（设置 `fixed_output_amount`）
 /// 4. 调用 `RaydiumAmmV4InstructionBuilder.build_buy_instructions` 构建指令
 /// 5. 调用 `simulate_swap_transaction` 进行链上模拟
@@ -97,18 +97,12 @@ pub async fn verify_exact_out_buy_full(
     println!("  Coin Reserves: {}", protocol_params.coin_reserve);
     println!("  PC Reserves: {}", protocol_params.pc_reserve);
 
-    // 确定交易方向：SOL (coin) -> USDC (pc)
-    // is_coin_in = true 表示 coin (SOL) 是输入，pc (USDC) 是输出
-    // 但我们想要 Buy USDC，所以输入是 SOL (coin)，输出是 USDC (pc)
-    let is_coin_in = true; // SOL -> USDC
-
-    // 2. 调用 quote_exact_out 进行本地计算
+    // 2. 调用 buy_exact_out_internal 进行本地计算（用 SOL 买 USDC）
     println!("\n[步骤 2] 本地计算所需 SOL 数量...");
-    let local_result = quote_exact_out(
+    let local_result = buy_exact_out_internal(
         protocol_params.coin_reserve,
         protocol_params.pc_reserve,
         amount_out,
-        is_coin_in,
     )
     .map_err(|e| anyhow::anyhow!("本地计算失败: {}", e))?;
 

@@ -179,6 +179,52 @@ pub fn compute_swap_amount(
     }
 }
 
+/// Exact In Buy 方向的内部计算（用 coin 买 pc）
+///
+/// 已知 coin (base) 输入数量，计算能获得多少 pc (quote) 输出。
+///
+/// # 参数
+///
+/// * `coin_reserve` - Pool 中 coin 的储备量
+/// * `pc_reserve` - Pool 中 pc 的储备量
+/// * `coin_in` - 输入的 coin 数量（精确输入）
+/// * `slippage_basis_points` - 滑点容忍度（基点，100 = 1%）
+///
+/// # 返回
+///
+/// `ComputeSwapParams` 包含输出金额、最小输出金额和费用
+pub fn buy_exact_in_internal(
+    coin_reserve: u64,
+    pc_reserve: u64,
+    coin_in: u64,
+    slippage_basis_points: u64,
+) -> ComputeSwapParams {
+    compute_swap_amount(coin_reserve, pc_reserve, true, coin_in, slippage_basis_points)
+}
+
+/// Exact In Sell 方向的内部计算（用 pc 买 coin）
+///
+/// 已知 pc (quote) 输入数量，计算能获得多少 coin (base) 输出。
+///
+/// # 参数
+///
+/// * `coin_reserve` - Pool 中 coin 的储备量
+/// * `pc_reserve` - Pool 中 pc 的储备量
+/// * `pc_in` - 输入的 pc 数量（精确输入）
+/// * `slippage_basis_points` - 滑点容忍度（基点，100 = 1%）
+///
+/// # 返回
+///
+/// `ComputeSwapParams` 包含输出金额、最小输出金额和费用
+pub fn sell_exact_in_internal(
+    coin_reserve: u64,
+    pc_reserve: u64,
+    pc_in: u64,
+    slippage_basis_points: u64,
+) -> ComputeSwapParams {
+    compute_swap_amount(coin_reserve, pc_reserve, false, pc_in, slippage_basis_points)
+}
+
 /// Result of an exact-out swap calculation
 #[derive(Debug, Clone)]
 pub struct QuoteExactOutResult {
@@ -290,4 +336,46 @@ pub fn quote_exact_out(
         fee_amount: swap_fee,
         price_impact_bps,
     })
+}
+
+/// Exact Out Buy 方向的内部计算（用 coin 买 pc）
+///
+/// 已知想要获得的 pc (quote) 数量，计算需要多少 coin (base) 作为输入。
+///
+/// # 参数
+///
+/// * `coin_reserve` - Pool 中 coin 的储备量
+/// * `pc_reserve` - Pool 中 pc 的储备量
+/// * `pc_out` - 想要获得的 pc 数量（精确输出）
+///
+/// # 返回
+///
+/// `QuoteExactOutResult` 包含所需输入金额和费用
+pub fn buy_exact_out_internal(
+    coin_reserve: u64,
+    pc_reserve: u64,
+    pc_out: u64,
+) -> Result<QuoteExactOutResult, String> {
+    quote_exact_out(coin_reserve, pc_reserve, pc_out, true)
+}
+
+/// Exact Out Sell 方向的内部计算（用 pc 买 coin）
+///
+/// 已知想要获得的 coin (base) 数量，计算需要多少 pc (quote) 作为输入。
+///
+/// # 参数
+///
+/// * `coin_reserve` - Pool 中 coin 的储备量
+/// * `pc_reserve` - Pool 中 pc 的储备量
+/// * `coin_out` - 想要获得的 coin 数量（精确输出）
+///
+/// # 返回
+///
+/// `QuoteExactOutResult` 包含所需输入金额和费用
+pub fn sell_exact_out_internal(
+    coin_reserve: u64,
+    pc_reserve: u64,
+    coin_out: u64,
+) -> Result<QuoteExactOutResult, String> {
+    quote_exact_out(coin_reserve, pc_reserve, coin_out, false)
 }
