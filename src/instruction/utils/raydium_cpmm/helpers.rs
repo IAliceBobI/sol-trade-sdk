@@ -1,18 +1,14 @@
 // Raydium CPMM 辅助函数
 
 use crate::{
-    constants::{USDC_MINT, USDT_MINT, WSOL_TOKEN_ACCOUNT},
     instruction::utils::raydium_cpmm_types::PoolState,
 };
 use solana_sdk::pubkey::Pubkey;
 
 use super::constants::{accounts, seeds};
 
-/// 判断是否为 Hot Mint（主流桥接资产）
-/// 当前包含：WSOL、USDC、USDT
-pub(crate) fn is_hot_mint(mint: &Pubkey) -> bool {
-    *mint == WSOL_TOKEN_ACCOUNT || *mint == USDC_MINT || *mint == USDT_MINT
-}
+// 使用统一的 is_hot_mint 函数
+pub(crate) use crate::constants::is_hot_mint;
 
 /// 获取 Pool PDA
 pub(crate) fn get_pool_pda(amm_config: &Pubkey, mint1: &Pubkey, mint2: &Pubkey) -> Option<Pubkey> {

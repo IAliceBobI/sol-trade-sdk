@@ -3,12 +3,6 @@
 use crate::constants::{SOL_MINT, USDC_MINT, USDT_MINT};
 use crate::instruction::utils::raydium_amm_v4_types::AmmInfo;
 
-/// 判断是否为 Hot Mint（主流桥接资产）
-/// 当前包含：WSOL、USDC、USDT
-pub fn is_hot_mint(mint: &solana_sdk::pubkey::Pubkey) -> bool {
-    *mint == SOL_MINT || *mint == USDC_MINT || *mint == USDT_MINT
-}
-
 /// 计算池子的有效交易量（基于 swap 数据）
 /// - 如果包含 WSOL/USDC/USDT，只计算这些资产侧的交易量
 /// - 否则计算两侧的总交易量

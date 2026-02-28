@@ -15,6 +15,9 @@ pub const USDC_MINT: Pubkey = pubkey!("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTD
 /// USDT Mint (mainnet)
 pub const USDT_MINT: Pubkey = pubkey!("Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB");
 
+/// USD1 Mint (mainnet)
+pub const USD1_MINT: Pubkey = pubkey!("USD1ttGY1N17NEEHLmELoaybftRBUSErhqYiQzvEmuB");
+
 /// RAY (Raydium) Mint
 pub const RAY_MINT: Pubkey = pubkey!("4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R");
 
@@ -26,3 +29,11 @@ pub const JUP_MINT: Pubkey = pubkey!("JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvC
 
 /// PIPPIN Mint
 pub const PIPPIN_MINT: Pubkey = pubkey!("Dfh5DzRgSvvCFDoYc2ciTkMrbDfRKybA4SoFbPmApump");
+
+/// 判断是否为 Hot Mint（主流桥接资产）
+///
+/// Hot Mint 包含：WSOL、USDC、USDT、USD1
+/// 这些代币通常作为交易对中的 quote 货币使用
+pub fn is_hot_mint(mint: &Pubkey) -> bool {
+    *mint == SOL_MINT || *mint == USDC_MINT || *mint == USDT_MINT || *mint == USD1_MINT
+}

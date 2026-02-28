@@ -2,7 +2,7 @@
 
 use solana_sdk::pubkey::Pubkey;
 
-use crate::constants::{RAYDIUM_CLMM_PUBKEY, SOL_MINT, USDC_MINT, USDT_MINT};
+use crate::constants::RAYDIUM_CLMM_PUBKEY;
 
 use super::constants::{TICKS_PER_ARRAY, seeds};
 
@@ -12,11 +12,8 @@ pub mod accounts {
     pub const RAYDIUM_CLMM: solana_sdk::pubkey::Pubkey = super::RAYDIUM_CLMM_PUBKEY;
 }
 
-/// 判断是否为 Hot Mint（主流桥接资产）
-/// 当前包含：WSOL、USDC、USDT
-pub(crate) fn is_hot_mint(mint: &Pubkey) -> bool {
-    *mint == SOL_MINT || *mint == USDC_MINT || *mint == USDT_MINT
-}
+// 使用统一的 is_hot_mint 函数
+pub(crate) use crate::constants::is_hot_mint;
 
 /// Calculate tick array PDA
 ///

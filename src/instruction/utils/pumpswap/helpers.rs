@@ -1,15 +1,12 @@
 use crate::{
     common::spl_associated_token_account::get_associated_token_address_with_program_id,
-    constants::{TOKEN_PROGRAM, USDC_MINT, USDT_MINT, WSOL_TOKEN_ACCOUNT},
+    constants::TOKEN_PROGRAM,
     instruction::utils::pumpswap::constants::{accounts, seeds},
 };
 use solana_sdk::pubkey::Pubkey;
 
-/// 判断是否为 Hot Mint（主流桥接资产）
-/// 当前包含：WSOL、USDC、USDT
-pub(crate) fn is_hot_mint(mint: &Pubkey) -> bool {
-    *mint == WSOL_TOKEN_ACCOUNT || *mint == USDC_MINT || *mint == USDT_MINT
-}
+// 使用统一的 is_hot_mint 函数
+pub(crate) use crate::constants::is_hot_mint;
 
 /// 从两个 mint 中识别出 quote mint（计价货币）
 ///

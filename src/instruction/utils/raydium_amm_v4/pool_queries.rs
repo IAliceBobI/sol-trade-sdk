@@ -3,7 +3,8 @@
 use super::constants::{
     COIN_MINT_OFFSET, MAX_CACHE_SIZE, PC_MINT_OFFSET, accounts::RAYDIUM_AMM_V4,
 };
-use super::helpers::{calculate_effective_volume, is_hot_mint, select_best_pool_by_volume};
+use super::helpers::{calculate_effective_volume, select_best_pool_by_volume};
+use crate::constants::is_hot_mint;
 use crate::common::{SolanaRpcClient, auto_mock_rpc::PoolRpcClient};
 use crate::constants::{SOL_MINT, USDC_MINT, USDT_MINT};
 use crate::instruction::utils::raydium_amm_v4_types::{AMM_INFO_SIZE, AmmInfo, amm_info_decode};

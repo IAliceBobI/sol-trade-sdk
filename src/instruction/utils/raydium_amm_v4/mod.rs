@@ -28,6 +28,9 @@ pub use pool_queries::{
 pub(crate) use quotes::{quote_exact_in, quote_exact_out};
 
 // helpers 函数 - 用户可能需要检查 pool 状态
-pub use helpers::{is_hot_mint, is_pool_active, is_pool_tradeable};
+pub use helpers::{is_pool_active, is_pool_tradeable};
+
+// 使用统一的 is_hot_mint 函数
+pub use crate::constants::is_hot_mint;
 
 pub use serum_market::{MarketState, derive_vault_signer, parse_market_account};
