@@ -54,7 +54,7 @@ impl TradingClient {
             ));
         }
         let input_token_mint = if params.input_token_type == crate::TradeTokenType::SOL {
-            crate::SOL_TOKEN_ACCOUNT
+            crate::NATIVE_SOL_MARKER
         } else if params.input_token_type == crate::TradeTokenType::WSOL {
             crate::WSOL_TOKEN_ACCOUNT
         } else if params.input_token_type == crate::TradeTokenType::USDC {
@@ -186,7 +186,7 @@ impl TradingClient {
         let executor = TradeFactory::create_executor(params.dex_type);
         let protocol_params = params.extension_params;
         let output_token_mint = if params.output_token_type == crate::TradeTokenType::SOL {
-            crate::SOL_TOKEN_ACCOUNT
+            crate::NATIVE_SOL_MARKER
         } else if params.output_token_type == crate::TradeTokenType::WSOL {
             crate::WSOL_TOKEN_ACCOUNT
         } else if params.output_token_type == crate::TradeTokenType::USDC {

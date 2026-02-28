@@ -27,8 +27,19 @@ pub const TOKEN_PROGRAM_2022_META: solana_sdk::instruction::AccountMeta =
 /// Alias for TOKEN_PROGRAM_2022 to match usage in code
 pub const TOKEN_2022_PROGRAM: Pubkey = TOKEN_PROGRAM_2022;
 
-pub const SOL_TOKEN_ACCOUNT: Pubkey = pubkey!("So11111111111111111111111111111111111111111");
+/// 原生 SOL 的 API 占位符标记（以 11 结尾）
+///
+/// ⚠️ 注意：这不是一个真实的 Token Mint 地址！
+/// 它仅作为 TradingClient API 的标记，表示"用户希望使用原生 SOL 进行交易"
+/// 在实际链上操作中，会自动转换为 WSOL_TOKEN_ACCOUNT（以 12 结尾）
+///
+/// 真实 WSOL Token Mint 地址请使用 `WSOL_TOKEN_ACCOUNT`（以 12 结尾）
+pub const NATIVE_SOL_MARKER: Pubkey = pubkey!("So11111111111111111111111111111111111111111");
 
+/// Wrapped SOL (WSOL) Token Mint 地址（以 12 结尾）
+///
+/// 这是 Solana 上真实的 WSOL Token Mint 地址，Pool 中使用的就是这个地址
+/// 注意：NATIVE_SOL_MARKER（以 11 结尾）只是 API 占位符，不是真实 Token Mint
 pub const WSOL_TOKEN_ACCOUNT: Pubkey = pubkey!("So11111111111111111111111111111111111111112");
 pub const WSOL_TOKEN_ACCOUNT_META: solana_sdk::instruction::AccountMeta =
     solana_sdk::instruction::AccountMeta {

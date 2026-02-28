@@ -42,10 +42,10 @@ pub(crate) fn get_vault_account(
     token_mint: &Pubkey,
     protocol_params: &crate::trading::core::params::RaydiumCpmmParams,
 ) -> Pubkey {
-    // 处理 SOL_TOKEN_ACCOUNT 和 WSOL_TOKEN_ACCOUNT 的别名关系
-    // SOL_TOKEN_ACCOUNT (以 11 结尾) 和 WSOL_TOKEN_ACCOUNT (以 12 结尾) 在链上指向同一个代币
-    // TradingClient 使用 SOL_TOKEN_ACCOUNT，但 Pool 使用 WSOL_TOKEN_ACCOUNT
-    let normalized_mint = if *token_mint == crate::constants::SOL_TOKEN_ACCOUNT {
+    // 处理 NATIVE_SOL_MARKER 和 WSOL_TOKEN_ACCOUNT 的别名关系
+    // NATIVE_SOL_MARKER (以 11 结尾) 是 API 占位符，WSOL_TOKEN_ACCOUNT (以 12 结尾) 是真实的 Token Mint
+    // TradingClient 使用 NATIVE_SOL_MARKER 表示原生 SOL，但 Pool 实际使用的是 WSOL_TOKEN_ACCOUNT
+    let normalized_mint = if *token_mint == crate::constants::NATIVE_SOL_MARKER {
         &crate::constants::WSOL_TOKEN_ACCOUNT
     } else {
         token_mint

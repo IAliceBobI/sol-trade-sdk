@@ -1,5 +1,5 @@
 // Constants 模块的重导出
-pub use crate::constants::SOL_TOKEN_ACCOUNT;
+pub use crate::constants::NATIVE_SOL_MARKER;
 pub use crate::constants::USD1_TOKEN_ACCOUNT;
 pub use crate::constants::USDC_TOKEN_ACCOUNT;
 pub use crate::constants::USDT_TOKEN_ACCOUNT;

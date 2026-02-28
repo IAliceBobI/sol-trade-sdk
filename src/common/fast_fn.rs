@@ -119,7 +119,7 @@ fn _create_associated_token_account_idempotent_fast(
     // 🔧 修复：Token-2022 也支持 seed 方式（白名单方式更安全）
     let arc_instructions = if use_seed
         && !mint.eq(&crate::constants::WSOL_TOKEN_ACCOUNT)
-        && !mint.eq(&crate::constants::SOL_TOKEN_ACCOUNT)
+        && !mint.eq(&crate::constants::NATIVE_SOL_MARKER)
         && (token_program.eq(&crate::constants::TOKEN_PROGRAM)
             || token_program.eq(&crate::constants::TOKEN_PROGRAM_2022))
     {
@@ -290,7 +290,7 @@ fn _get_associated_token_address_with_program_id_fast(
     // 🔧 修复：Token-2022 也支持 seed 方式（白名单方式更安全）
     let ata = if use_seed
         && !token_mint_address.eq(&crate::constants::WSOL_TOKEN_ACCOUNT)
-        && !token_mint_address.eq(&crate::constants::SOL_TOKEN_ACCOUNT)
+        && !token_mint_address.eq(&crate::constants::NATIVE_SOL_MARKER)
         && (token_program_id.eq(&crate::constants::TOKEN_PROGRAM)
             || token_program_id.eq(&crate::constants::TOKEN_PROGRAM_2022))
     {

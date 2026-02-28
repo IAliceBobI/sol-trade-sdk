@@ -93,15 +93,15 @@ impl InstructionBuilder for RaydiumCpmmInstructionBuilder {
         // ========================================
         // Token Program 和 ATA 计算（简化版）
         // ========================================
-        // 处理 SOL_TOKEN_ACCOUNT 和 WSOL_TOKEN_ACCOUNT 的标准化
+        // 处理 NATIVE_SOL_MARKER 和 WSOL_TOKEN_ACCOUNT 的标准化
         // 必须在获取 Token Program 之前进行标准化，因为 Pool 中使用 WSOL_TOKEN_ACCOUNT
-        let normalized_input_mint = if params.input_mint == crate::constants::SOL_TOKEN_ACCOUNT {
+        let normalized_input_mint = if params.input_mint == crate::constants::NATIVE_SOL_MARKER {
             crate::constants::WSOL_TOKEN_ACCOUNT
         } else {
             params.input_mint
         };
 
-        let normalized_output_mint = if params.output_mint == crate::constants::SOL_TOKEN_ACCOUNT {
+        let normalized_output_mint = if params.output_mint == crate::constants::NATIVE_SOL_MARKER {
             crate::constants::WSOL_TOKEN_ACCOUNT
         } else {
             params.output_mint
@@ -260,15 +260,15 @@ impl InstructionBuilder for RaydiumCpmmInstructionBuilder {
         // ========================================
         // Token Program 和 ATA 计算（简化版）
         // ========================================
-        // 处理 SOL_TOKEN_ACCOUNT 和 WSOL_TOKEN_ACCOUNT 的标准化
+        // 处理 NATIVE_SOL_MARKER 和 WSOL_TOKEN_ACCOUNT 的标准化
         // 必须在获取 Token Program 之前进行标准化，因为 Pool 中使用 WSOL_TOKEN_ACCOUNT
-        let normalized_input_mint = if params.input_mint == crate::constants::SOL_TOKEN_ACCOUNT {
+        let normalized_input_mint = if params.input_mint == crate::constants::NATIVE_SOL_MARKER {
             crate::constants::WSOL_TOKEN_ACCOUNT
         } else {
             params.input_mint
         };
 
-        let normalized_output_mint = if params.output_mint == crate::constants::SOL_TOKEN_ACCOUNT {
+        let normalized_output_mint = if params.output_mint == crate::constants::NATIVE_SOL_MARKER {
             crate::constants::WSOL_TOKEN_ACCOUNT
         } else {
             params.output_mint

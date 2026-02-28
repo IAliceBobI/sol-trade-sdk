@@ -80,7 +80,7 @@ impl InstructionBuilder for RaydiumClmmInstructionBuilder {
         }
 
         // 验证输入 mint
-        let is_supported_input = user_input_mint == crate::constants::SOL_TOKEN_ACCOUNT
+        let is_supported_input = user_input_mint == crate::constants::NATIVE_SOL_MARKER
             || user_input_mint == crate::constants::WSOL_TOKEN_ACCOUNT
             || user_input_mint == crate::constants::USDC_TOKEN_ACCOUNT;
         if !is_supported_input {
@@ -103,7 +103,7 @@ impl InstructionBuilder for RaydiumClmmInstructionBuilder {
         };
 
         // 映射 SOL 输入到 Pool 使用的实际稳定币 mint
-        let input_mint = if user_input_mint == crate::constants::SOL_TOKEN_ACCOUNT {
+        let input_mint = if user_input_mint == crate::constants::NATIVE_SOL_MARKER {
             stable_mint_in_pool
         } else {
             user_input_mint
@@ -407,7 +407,7 @@ impl InstructionBuilder for RaydiumClmmInstructionBuilder {
         }
 
         // 验证输出 mint
-        let is_supported_output = user_output_mint == crate::constants::SOL_TOKEN_ACCOUNT
+        let is_supported_output = user_output_mint == crate::constants::NATIVE_SOL_MARKER
             || user_output_mint == crate::constants::WSOL_TOKEN_ACCOUNT
             || user_output_mint == crate::constants::USDC_TOKEN_ACCOUNT;
         if !is_supported_output {
@@ -430,7 +430,7 @@ impl InstructionBuilder for RaydiumClmmInstructionBuilder {
         };
 
         // 映射 SOL 输出到 Pool 使用的实际稳定币 mint
-        let output_mint = if user_output_mint == crate::constants::SOL_TOKEN_ACCOUNT {
+        let output_mint = if user_output_mint == crate::constants::NATIVE_SOL_MARKER {
             stable_mint_in_pool
         } else {
             user_output_mint
