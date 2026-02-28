@@ -18,7 +18,7 @@ use crate::{
         },
     },
     utils::calc::pumpswap::{
-        buy_exact_out_base_internal, buy_exact_in_quote_internal, sell_exact_in_base_internal,
+        buy_exact_in_quote_internal, buy_exact_out_base_internal, sell_exact_in_base_internal,
     },
 };
 use anyhow::{Result, anyhow};

@@ -7,11 +7,11 @@
 //! - PROTOCOL_FEE = 0.05% (5 bps)
 //! - CREATOR_FEE = 0.05% (5 bps)
 
-use solana_sdk::pubkey::Pubkey;
 use sol_trade_sdk::utils::calc::pumpswap::{
-    buy_exact_out_base_internal, buy_exact_in_quote_internal, sell_exact_in_base_internal,
+    buy_exact_in_quote_internal, buy_exact_out_base_internal, sell_exact_in_base_internal,
     sell_exact_out_quote_internal,
 };
+use solana_sdk::pubkey::Pubkey;
 
 /// 创建非零的测试用 Pubkey
 fn non_zero_pubkey() -> Pubkey {
@@ -31,14 +31,9 @@ fn test_buy_exact_out_base_internal_no_creator() {
     let quote_reserve = 10_000_000_000; // 10B quote reserve
     let coin_creator = Pubkey::default(); // 无 creator
 
-    let result = buy_exact_out_base_internal(
-        base,
-        slippage_bps,
-        base_reserve,
-        quote_reserve,
-        &coin_creator,
-    )
-    .expect("buy_exact_out_base_internal should succeed");
+    let result =
+        buy_exact_out_base_internal(base, slippage_bps, base_reserve, quote_reserve, &coin_creator)
+            .expect("buy_exact_out_base_internal should succeed");
 
     // 验证内部计算：quote_amount_in = ceil(quote_reserve * base / (base_reserve - base))
     let expected_quote_in = ((quote_reserve as u128 * base as u128) as f64
@@ -72,14 +67,9 @@ fn test_buy_exact_out_base_internal_with_creator() {
     let quote_reserve = 10_000_000_000;
     let coin_creator = non_zero_pubkey(); // 有 creator
 
-    let result = buy_exact_out_base_internal(
-        base,
-        slippage_bps,
-        base_reserve,
-        quote_reserve,
-        &coin_creator,
-    )
-    .expect("buy_exact_out_base_internal should succeed");
+    let result =
+        buy_exact_out_base_internal(base, slippage_bps, base_reserve, quote_reserve, &coin_creator)
+            .expect("buy_exact_out_base_internal should succeed");
 
     // 验证内部计算
     let expected_quote_in = ((quote_reserve as u128 * base as u128) as f64
@@ -106,14 +96,9 @@ fn test_buy_exact_out_base_internal_edge_cases() {
     // 边界情况测试
 
     // 1. 非常小的购买量
-    let result = buy_exact_out_base_internal(
-        100,
-        100,
-        100_000_000_000,
-        10_000_000_000,
-        &Pubkey::default(),
-    )
-    .expect("small buy should succeed");
+    let result =
+        buy_exact_out_base_internal(100, 100, 100_000_000_000, 10_000_000_000, &Pubkey::default())
+            .expect("small buy should succeed");
     assert!(result.internal_quote_amount > 0);
 
     // 2. 较大的滑点
@@ -258,12 +243,10 @@ fn test_sell_exact_out_quote_internal_edge_cases() {
     assert!(result.is_err());
 
     // 3. 错误情况：零储备
-    let result =
-        sell_exact_out_quote_internal(100, 100, 0, 10_000_000_000, &Pubkey::default());
+    let result = sell_exact_out_quote_internal(100, 100, 0, 10_000_000_000, &Pubkey::default());
     assert!(result.is_err());
 
-    let result =
-        sell_exact_out_quote_internal(100, 100, 100_000_000_000, 0, &Pubkey::default());
+    let result = sell_exact_out_quote_internal(100, 100, 100_000_000_000, 0, &Pubkey::default());
     assert!(result.is_err());
 }
 

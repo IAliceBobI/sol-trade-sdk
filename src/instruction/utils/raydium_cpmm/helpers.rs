@@ -1,8 +1,6 @@
 // Raydium CPMM 辅助函数
 
-use crate::{
-    instruction::utils::raydium_cpmm_types::PoolState,
-};
+use crate::instruction::utils::raydium_cpmm_types::PoolState;
 use solana_sdk::pubkey::Pubkey;
 
 use super::constants::{accounts, seeds};
