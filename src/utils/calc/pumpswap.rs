@@ -50,10 +50,10 @@ pub struct SellQuoteInputResult {
     pub min_quote: u64,
 }
 
-/// Calculate quote amount needed to buy a specific amount of base tokens
+/// Calculate quote amount needed to buy a specific amount of base tokens (Exact Out)
 ///
 /// # Arguments
-/// * `base` - Amount of base tokens to buy
+/// * `base` - Amount of base tokens to buy (Exact Out)
 /// * `slippage_basis_points` - Slippage tolerance in basis points (100 = 1%)
 /// * `base_reserve` - Base token reserves in the pool
 /// * `quote_reserve` - Quote token reserves in the pool
@@ -61,7 +61,7 @@ pub struct SellQuoteInputResult {
 ///
 /// # Returns
 /// * `BuyBaseInputResult` containing quote amounts and slippage calculations
-pub fn buy_base_input_internal(
+pub fn buy_exact_out_base_internal(
     base: u64,
     slippage_basis_points: u64,
     base_reserve: u64,
@@ -106,10 +106,10 @@ pub fn buy_base_input_internal(
     })
 }
 
-/// Calculate base tokens received for a specific quote amount
+/// Calculate base tokens received for a specific quote amount (Exact In)
 ///
 /// # Arguments
-/// * `quote` - Amount of quote tokens to spend
+/// * `quote` - Amount of quote tokens to spend (Exact In)
 /// * `slippage_basis_points` - Slippage tolerance in basis points (100 = 1%)
 /// * `base_reserve` - Base token reserves in the pool
 /// * `quote_reserve` - Quote token reserves in the pool
@@ -117,7 +117,7 @@ pub fn buy_base_input_internal(
 ///
 /// # Returns
 /// * `BuyQuoteInputResult` containing base amount and slippage calculations
-pub fn buy_quote_input_internal(
+pub fn buy_exact_in_quote_internal(
     quote: u64,
     slippage_basis_points: u64,
     base_reserve: u64,
@@ -157,10 +157,10 @@ pub fn buy_quote_input_internal(
     })
 }
 
-/// Calculate quote tokens received for selling a specific amount of base tokens
+/// Calculate quote tokens received for selling a specific amount of base tokens (Exact In)
 ///
 /// # Arguments
-/// * `base` - Amount of base tokens to sell
+/// * `base` - Amount of base tokens to sell (Exact In)
 /// * `slippage_basis_points` - Slippage tolerance in basis points (100 = 1%)
 /// * `base_reserve` - Base token reserves in the pool
 /// * `quote_reserve` - Quote token reserves in the pool
@@ -168,7 +168,7 @@ pub fn buy_quote_input_internal(
 ///
 /// # Returns
 /// * `SellBaseInputResult` containing quote amounts and slippage calculations
-pub fn sell_base_input_internal(
+pub fn sell_exact_in_base_internal(
     base: u64,
     slippage_basis_points: u64,
     base_reserve: u64,
@@ -225,10 +225,10 @@ fn calculate_quote_amount_out(
         as u64
 }
 
-/// Calculate base tokens needed to receive a specific amount of quote tokens
+/// Calculate base tokens needed to receive a specific amount of quote tokens (Exact Out)
 ///
 /// # Arguments
-/// * `quote` - Desired amount of quote tokens to receive
+/// * `quote` - Desired amount of quote tokens to receive (Exact Out)
 /// * `slippage_basis_points` - Slippage tolerance in basis points (100 = 1%)
 /// * `base_reserve` - Base token reserves in the pool
 /// * `quote_reserve` - Quote token reserves in the pool
@@ -236,7 +236,7 @@ fn calculate_quote_amount_out(
 ///
 /// # Returns
 /// * `SellQuoteInputResult` containing base amount and slippage calculations
-pub fn sell_quote_input_internal(
+pub fn sell_exact_out_quote_internal(
     quote: u64,
     slippage_basis_points: u64,
     base_reserve: u64,

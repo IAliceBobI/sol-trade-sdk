@@ -4,7 +4,7 @@
 //!
 //! # 测试目标
 //!
-//! 验证 `buy_base_input_internal` 和 `sell_quote_input_internal` 的本地计算
+//! 验证 `buy_exact_out_base_internal` 和 `sell_exact_out_quote_internal` 的本地计算
 //! 与链上模拟执行结果的一致性
 //!
 //! # 运行测试
@@ -24,7 +24,7 @@ use sol_trade_sdk::{
     trading::core::params::{DexParamEnum, PumpSwapParams, SwapParams},
     trading::core::traits::InstructionBuilder,
     utils::{
-        calc::pumpswap::buy_base_input_internal,
+        calc::pumpswap::buy_exact_out_base_internal,
         simulation_based_calc::{simulate_swap_transaction, SimulatedSwapResult},
     },
 };
@@ -59,7 +59,7 @@ fn get_test_pool_address() -> Pubkey {
 ///
 /// # 流程
 /// 1. 通过 `PumpSwapParams::from_pool_address_by_rpc` 获取所有参数
-/// 2. 调用 `buy_base_input_internal` 进行本地计算
+/// 2. 调用 `buy_exact_out_base_internal` 进行本地计算
 /// 3. 构建 SwapParams（设置 `fixed_output_amount`）
 /// 4. 调用 `PumpSwapInstructionBuilder.build_buy_instructions` 构建指令
 /// 5. 调用 `simulate_swap_transaction` 进行链上模拟
@@ -101,10 +101,10 @@ pub async fn verify_exact_out_buy_full(
     println!("  Base Token Program: {}", protocol_params.base_token_program);
     println!("  Quote Token Program: {}", protocol_params.quote_token_program);
 
-    // 2. 调用 buy_base_input_internal 进行本地计算
+    // 2. 调用 buy_exact_out_base_internal 进行本地计算
     println!("\n[步骤 2] 本地计算所需 quote 数量...");
     let coin_creator = protocol_params.coin_creator_vault_authority;
-    let local_result = buy_base_input_internal(
+    let local_result = buy_exact_out_base_internal(
         amount_out,
         0, // 0% 滑点，精确计算
         protocol_params.pool_base_token_reserves,

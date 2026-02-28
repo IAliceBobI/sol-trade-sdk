@@ -61,7 +61,7 @@ pub(crate) async fn quote_exact_in(
 
     if is_base_in {
         // base -> quote
-        let r = crate::utils::calc::pumpswap::sell_base_input_internal(
+        let r = crate::utils::calc::pumpswap::sell_exact_in_base_internal(
             params.amount_in,
             0,
             base_reserve,
@@ -79,7 +79,7 @@ pub(crate) async fn quote_exact_in(
         })
     } else {
         // quote -> base
-        let r = crate::utils::calc::pumpswap::buy_quote_input_internal(
+        let r = crate::utils::calc::pumpswap::buy_exact_in_quote_internal(
             params.amount_in,
             0,
             base_reserve,
@@ -151,8 +151,8 @@ pub(crate) async fn quote_exact_out(
 
     if is_base_in {
         // base -> quote (卖出 base，获得指定数量的 quote)
-        // 使用 sell_quote_input_internal 进行逆向计算
-        let r = crate::utils::calc::pumpswap::sell_quote_input_internal(
+        // 使用 sell_exact_out_quote_internal 进行逆向计算
+        let r = crate::utils::calc::pumpswap::sell_exact_out_quote_internal(
             params.amount_out,
             0, // slippage 在 quote 中不计算
             base_reserve,
@@ -175,8 +175,8 @@ pub(crate) async fn quote_exact_out(
         })
     } else {
         // quote -> base (买入 base，获得指定数量的 base)
-        // 使用 buy_base_input_internal 进行逆向计算
-        let r = crate::utils::calc::pumpswap::buy_base_input_internal(
+        // 使用 buy_exact_out_base_internal 进行逆向计算
+        let r = crate::utils::calc::pumpswap::buy_exact_out_base_internal(
             params.amount_out,
             0, // slippage 在 quote 中不计算
             base_reserve,

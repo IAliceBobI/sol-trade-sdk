@@ -18,7 +18,7 @@ use crate::{
         },
     },
     utils::calc::pumpswap::{
-        buy_base_input_internal, buy_quote_input_internal, sell_base_input_internal,
+        buy_exact_out_base_internal, buy_exact_in_quote_internal, sell_exact_in_base_internal,
     },
 };
 use anyhow::{Result, anyhow};
@@ -90,7 +90,7 @@ impl InstructionBuilder for PumpSwapInstructionBuilder {
         // 如果设置了 fixed_output_amount，使用逆向计算
         let (token_amount, sol_amount) = if let Some(fixed_output) = params.fixed_output_amount {
             // 逆向计算：给定目标 base 数量，计算需要的 quote 数量
-            let result = buy_base_input_internal(
+            let result = buy_exact_out_base_internal(
                 fixed_output,
                 params.slippage_basis_points.unwrap_or(DEFAULT_SLIPPAGE),
                 pool_base_token_reserves,
@@ -101,7 +101,7 @@ impl InstructionBuilder for PumpSwapInstructionBuilder {
             // base_amount_out (fixed), max_quote_amount_in
             (fixed_output, result.max_quote)
         } else if quote_is_wsol_or_usdc {
-            let result = buy_quote_input_internal(
+            let result = buy_exact_in_quote_internal(
                 params.input_amount.unwrap_or(0),
                 params.slippage_basis_points.unwrap_or(DEFAULT_SLIPPAGE),
                 pool_base_token_reserves,
@@ -112,7 +112,7 @@ impl InstructionBuilder for PumpSwapInstructionBuilder {
             // base_amount_out, max_quote_amount_in
             (result.base, result.max_quote)
         } else {
-            let result = sell_base_input_internal(
+            let result = sell_exact_in_base_internal(
                 params.input_amount.unwrap_or(0),
                 params.slippage_basis_points.unwrap_or(DEFAULT_SLIPPAGE),
                 pool_base_token_reserves,
@@ -286,7 +286,7 @@ impl InstructionBuilder for PumpSwapInstructionBuilder {
         }
 
         let (token_amount, mut sol_amount) = if quote_is_wsol_or_usdc {
-            let result = sell_base_input_internal(
+            let result = sell_exact_in_base_internal(
                 params.input_amount.unwrap(),
                 params.slippage_basis_points.unwrap_or(DEFAULT_SLIPPAGE),
                 pool_base_token_reserves,
@@ -297,7 +297,7 @@ impl InstructionBuilder for PumpSwapInstructionBuilder {
             // base_amount_in, min_quote_amount_out
             (params.input_amount.unwrap(), result.min_quote)
         } else {
-            let result = buy_quote_input_internal(
+            let result = buy_exact_in_quote_internal(
                 params.input_amount.unwrap(),
                 params.slippage_basis_points.unwrap_or(DEFAULT_SLIPPAGE),
                 pool_base_token_reserves,

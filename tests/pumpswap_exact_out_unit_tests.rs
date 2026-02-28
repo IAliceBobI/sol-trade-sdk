@@ -1,6 +1,6 @@
 //! PumpSwap Exact Out 单元测试
 //!
-//! 测试 `buy_base_input_internal` 和 `sell_quote_input_internal` 的数学正确性
+//! 测试 `buy_exact_out_base_internal` 和 `sell_exact_out_quote_internal` 的数学正确性
 //!
 //! 费用结构：
 //! - LP_FEE = 0.25% (25 bps)
@@ -9,8 +9,8 @@
 
 use solana_sdk::pubkey::Pubkey;
 use sol_trade_sdk::utils::calc::pumpswap::{
-    buy_base_input_internal, buy_quote_input_internal, sell_base_input_internal,
-    sell_quote_input_internal,
+    buy_exact_out_base_internal, buy_exact_in_quote_internal, sell_exact_in_base_internal,
+    sell_exact_out_quote_internal,
 };
 
 /// 创建非零的测试用 Pubkey
@@ -19,11 +19,11 @@ fn non_zero_pubkey() -> Pubkey {
 }
 
 // ============================================================================
-// buy_base_input_internal 测试
+// buy_exact_out_base_internal 测试
 // ============================================================================
 
 #[test]
-fn test_buy_base_input_internal_no_creator() {
+fn test_buy_exact_out_base_internal_no_creator() {
     // 场景：无 creator 的情况（只有 LP 费用 + 协议费用）
     let base = 1_000_000; // 想要购买 1M base tokens
     let slippage_bps = 100; // 1% 滑点
@@ -31,14 +31,14 @@ fn test_buy_base_input_internal_no_creator() {
     let quote_reserve = 10_000_000_000; // 10B quote reserve
     let coin_creator = Pubkey::default(); // 无 creator
 
-    let result = buy_base_input_internal(
+    let result = buy_exact_out_base_internal(
         base,
         slippage_bps,
         base_reserve,
         quote_reserve,
         &coin_creator,
     )
-    .expect("buy_base_input_internal should succeed");
+    .expect("buy_exact_out_base_internal should succeed");
 
     // 验证内部计算：quote_amount_in = ceil(quote_reserve * base / (base_reserve - base))
     let expected_quote_in = ((quote_reserve as u128 * base as u128) as f64
@@ -64,7 +64,7 @@ fn test_buy_base_input_internal_no_creator() {
 }
 
 #[test]
-fn test_buy_base_input_internal_with_creator() {
+fn test_buy_exact_out_base_internal_with_creator() {
     // 场景：有 creator 的情况（LP 费用 + 协议费用 + Creator 费用）
     let base = 1_000_000;
     let slippage_bps = 100;
@@ -72,14 +72,14 @@ fn test_buy_base_input_internal_with_creator() {
     let quote_reserve = 10_000_000_000;
     let coin_creator = non_zero_pubkey(); // 有 creator
 
-    let result = buy_base_input_internal(
+    let result = buy_exact_out_base_internal(
         base,
         slippage_bps,
         base_reserve,
         quote_reserve,
         &coin_creator,
     )
-    .expect("buy_base_input_internal should succeed");
+    .expect("buy_exact_out_base_internal should succeed");
 
     // 验证内部计算
     let expected_quote_in = ((quote_reserve as u128 * base as u128) as f64
@@ -102,11 +102,11 @@ fn test_buy_base_input_internal_with_creator() {
 }
 
 #[test]
-fn test_buy_base_input_internal_edge_cases() {
+fn test_buy_exact_out_base_internal_edge_cases() {
     // 边界情况测试
 
     // 1. 非常小的购买量
-    let result = buy_base_input_internal(
+    let result = buy_exact_out_base_internal(
         100,
         100,
         100_000_000_000,
@@ -117,7 +117,7 @@ fn test_buy_base_input_internal_edge_cases() {
     assert!(result.internal_quote_amount > 0);
 
     // 2. 较大的滑点
-    let result = buy_base_input_internal(
+    let result = buy_exact_out_base_internal(
         1_000_000,
         1000, // 10% 滑点
         100_000_000_000,
@@ -129,7 +129,7 @@ fn test_buy_base_input_internal_edge_cases() {
     assert_eq!(result.max_quote, expected_max);
 
     // 3. 错误情况：购买量超过储备
-    let result = buy_base_input_internal(
+    let result = buy_exact_out_base_internal(
         200_000_000_000, // 超过 base_reserve
         100,
         100_000_000_000,
@@ -139,19 +139,19 @@ fn test_buy_base_input_internal_edge_cases() {
     assert!(result.is_err());
 
     // 4. 错误情况：零储备
-    let result = buy_base_input_internal(100, 100, 0, 10_000_000_000, &Pubkey::default());
+    let result = buy_exact_out_base_internal(100, 100, 0, 10_000_000_000, &Pubkey::default());
     assert!(result.is_err());
 
-    let result = buy_base_input_internal(100, 100, 100_000_000_000, 0, &Pubkey::default());
+    let result = buy_exact_out_base_internal(100, 100, 100_000_000_000, 0, &Pubkey::default());
     assert!(result.is_err());
 }
 
 // ============================================================================
-// sell_quote_input_internal 测试
+// sell_exact_out_quote_internal 测试
 // ============================================================================
 
 #[test]
-fn test_sell_quote_input_internal_no_creator() {
+fn test_sell_exact_out_quote_internal_no_creator() {
     // 场景：无 creator 的情况
     let quote = 100_000_000; // 想要获得 100M quote tokens
     let slippage_bps = 100; // 1% 滑点
@@ -159,14 +159,14 @@ fn test_sell_quote_input_internal_no_creator() {
     let quote_reserve = 10_000_000_000;
     let coin_creator = Pubkey::default();
 
-    let result = sell_quote_input_internal(
+    let result = sell_exact_out_quote_internal(
         quote,
         slippage_bps,
         base_reserve,
         quote_reserve,
         &coin_creator,
     )
-    .expect("sell_quote_input_internal should succeed");
+    .expect("sell_exact_out_quote_internal should succeed");
 
     // 验证内部 raw_quote 计算
     // raw_quote = ceil(quote * 10000 / (10000 - total_fee_bps))
@@ -192,7 +192,7 @@ fn test_sell_quote_input_internal_no_creator() {
 }
 
 #[test]
-fn test_sell_quote_input_internal_with_creator() {
+fn test_sell_exact_out_quote_internal_with_creator() {
     // 场景：有 creator 的情况
     let quote = 100_000_000;
     let slippage_bps = 100;
@@ -200,14 +200,14 @@ fn test_sell_quote_input_internal_with_creator() {
     let quote_reserve = 10_000_000_000;
     let coin_creator = non_zero_pubkey();
 
-    let result = sell_quote_input_internal(
+    let result = sell_exact_out_quote_internal(
         quote,
         slippage_bps,
         base_reserve,
         quote_reserve,
         &coin_creator,
     )
-    .expect("sell_quote_input_internal should succeed");
+    .expect("sell_exact_out_quote_internal should succeed");
 
     // 验证内部 raw_quote 计算
     // 有 creator: total_fee_bps = 25 + 5 + 5 = 35
@@ -215,7 +215,7 @@ fn test_sell_quote_input_internal_with_creator() {
     assert_eq!(result.internal_raw_quote, expected_raw_quote);
 
     // 有 creator 时需要更多的 base
-    let result_no_creator = sell_quote_input_internal(
+    let result_no_creator = sell_exact_out_quote_internal(
         quote,
         slippage_bps,
         base_reserve,
@@ -233,11 +233,11 @@ fn test_sell_quote_input_internal_with_creator() {
 }
 
 #[test]
-fn test_sell_quote_input_internal_edge_cases() {
+fn test_sell_exact_out_quote_internal_edge_cases() {
     // 边界情况测试
 
     // 1. 非常小的 quote 输出
-    let result = sell_quote_input_internal(
+    let result = sell_exact_out_quote_internal(
         1000,
         100,
         100_000_000_000,
@@ -248,7 +248,7 @@ fn test_sell_quote_input_internal_edge_cases() {
     assert!(result.base > 0);
 
     // 2. 错误情况：quote 超过储备
-    let result = sell_quote_input_internal(
+    let result = sell_exact_out_quote_internal(
         20_000_000_000, // 超过 quote_reserve
         100,
         100_000_000_000,
@@ -259,11 +259,11 @@ fn test_sell_quote_input_internal_edge_cases() {
 
     // 3. 错误情况：零储备
     let result =
-        sell_quote_input_internal(100, 100, 0, 10_000_000_000, &Pubkey::default());
+        sell_exact_out_quote_internal(100, 100, 0, 10_000_000_000, &Pubkey::default());
     assert!(result.is_err());
 
     let result =
-        sell_quote_input_internal(100, 100, 100_000_000_000, 0, &Pubkey::default());
+        sell_exact_out_quote_internal(100, 100, 100_000_000_000, 0, &Pubkey::default());
     assert!(result.is_err());
 }
 
@@ -281,15 +281,15 @@ fn test_exact_out_buy_reverse_verification() {
     let quote_reserve = 10_000_000_000;
     let coin_creator = Pubkey::default();
 
-    // Step 1: 使用 buy_base_input_internal 计算需要多少 quote
-    let exact_out_result = buy_base_input_internal(
+    // Step 1: 使用 buy_exact_out_base_internal 计算需要多少 quote
+    let exact_out_result = buy_exact_out_base_internal(
         desired_base,
         slippage_bps,
         base_reserve,
         quote_reserve,
         &coin_creator,
     )
-    .expect("buy_base_input_internal should succeed");
+    .expect("buy_exact_out_base_internal should succeed");
 
     let quote_to_spend = exact_out_result.ui_quote;
 
@@ -297,15 +297,15 @@ fn test_exact_out_buy_reverse_verification() {
     println!("期望获得的 base: {}", desired_base);
     println!("需要花费的 quote: {}", quote_to_spend);
 
-    // Step 2: 使用 buy_quote_input_internal 验证用这些 quote 能获得多少 base
-    let exact_in_result = buy_quote_input_internal(
+    // Step 2: 使用 buy_exact_in_quote_internal 验证用这些 quote 能获得多少 base
+    let exact_in_result = buy_exact_in_quote_internal(
         quote_to_spend,
         slippage_bps,
         base_reserve,
         quote_reserve,
         &coin_creator,
     )
-    .expect("buy_quote_input_internal should succeed");
+    .expect("buy_exact_in_quote_internal should succeed");
 
     println!("实际获得的 base: {}", exact_in_result.base);
 
@@ -341,15 +341,15 @@ fn test_exact_out_sell_reverse_verification() {
     let quote_reserve = 10_000_000_000;
     let coin_creator = Pubkey::default();
 
-    // Step 1: 使用 sell_quote_input_internal 计算需要卖多少 base
-    let exact_out_result = sell_quote_input_internal(
+    // Step 1: 使用 sell_exact_out_quote_internal 计算需要卖多少 base
+    let exact_out_result = sell_exact_out_quote_internal(
         desired_quote,
         slippage_bps,
         base_reserve,
         quote_reserve,
         &coin_creator,
     )
-    .expect("sell_quote_input_internal should succeed");
+    .expect("sell_exact_out_quote_internal should succeed");
 
     let base_to_sell = exact_out_result.base;
 
@@ -357,15 +357,15 @@ fn test_exact_out_sell_reverse_verification() {
     println!("期望获得的 quote: {}", desired_quote);
     println!("需要卖出的 base: {}", base_to_sell);
 
-    // Step 2: 使用 sell_base_input_internal 验证卖这些 base 能获得多少 quote
-    let exact_in_result = sell_base_input_internal(
+    // Step 2: 使用 sell_exact_in_base_internal 验证卖这些 base 能获得多少 quote
+    let exact_in_result = sell_exact_in_base_internal(
         base_to_sell,
         slippage_bps,
         base_reserve,
         quote_reserve,
         &coin_creator,
     )
-    .expect("sell_base_input_internal should succeed");
+    .expect("sell_exact_in_base_internal should succeed");
 
     println!("实际获得的 quote: {}", exact_in_result.ui_quote);
 
@@ -394,8 +394,8 @@ fn test_exact_out_sell_reverse_verification() {
 ///
 /// 注意：由于 PumpSwap 的多层费用结构和 ceil_div 操作，反向验证会产生累积误差。
 /// 这些误差来源于：
-/// 1. buy_base_input_internal: 在内部计算上叠加三层费用（每层都有 ceil）
-/// 2. buy_quote_input_internal: 从输入中扣除费用（也有 ceil）
+/// 1. buy_exact_out_base_internal: 在内部计算上叠加三层费用（每层都有 ceil）
+/// 2. buy_exact_in_quote_internal: 从输入中扣除费用（也有 ceil）
 /// 3. 恒定乘积公式中的除法（ceil）
 ///
 /// 因此我们使用相对误差（比例）来验证，而不是绝对误差。
@@ -413,23 +413,23 @@ fn test_exact_out_buy_multiple_cases() {
     let coin_creator = Pubkey::default();
 
     for (desired_base, base_reserve, quote_reserve) in test_cases {
-        let exact_out = buy_base_input_internal(
+        let exact_out = buy_exact_out_base_internal(
             desired_base,
             slippage_bps,
             base_reserve,
             quote_reserve,
             &coin_creator,
         )
-        .expect("buy_base_input_internal should succeed");
+        .expect("buy_exact_out_base_internal should succeed");
 
-        let exact_in = buy_quote_input_internal(
+        let exact_in = buy_exact_in_quote_internal(
             exact_out.ui_quote,
             slippage_bps,
             base_reserve,
             quote_reserve,
             &coin_creator,
         )
-        .expect("buy_quote_input_internal should succeed");
+        .expect("buy_exact_in_quote_internal should succeed");
 
         let diff = (desired_base as i64 - exact_in.base as i64).abs();
         let diff_ratio = diff as f64 / desired_base as f64 * 100.0;
@@ -468,23 +468,23 @@ fn test_exact_out_sell_multiple_cases() {
     let coin_creator = Pubkey::default();
 
     for (desired_quote, base_reserve, quote_reserve) in test_cases {
-        let exact_out = sell_quote_input_internal(
+        let exact_out = sell_exact_out_quote_internal(
             desired_quote,
             slippage_bps,
             base_reserve,
             quote_reserve,
             &coin_creator,
         )
-        .expect("sell_quote_input_internal should succeed");
+        .expect("sell_exact_out_quote_internal should succeed");
 
-        let exact_in = sell_base_input_internal(
+        let exact_in = sell_exact_in_base_internal(
             exact_out.base,
             slippage_bps,
             base_reserve,
             quote_reserve,
             &coin_creator,
         )
-        .expect("sell_base_input_internal should succeed");
+        .expect("sell_exact_in_base_internal should succeed");
 
         let diff = (desired_quote as i64 - exact_in.ui_quote as i64).abs();
         let diff_ratio = diff as f64 / desired_quote as f64 * 100.0;
@@ -520,7 +520,7 @@ fn test_exact_out_reverse_with_creator() {
     // Buy with creator
     {
         let desired_base = 1_000_000;
-        let exact_out = buy_base_input_internal(
+        let exact_out = buy_exact_out_base_internal(
             desired_base,
             slippage_bps,
             base_reserve,
@@ -529,7 +529,7 @@ fn test_exact_out_reverse_with_creator() {
         )
         .expect("should succeed");
 
-        let exact_in = buy_quote_input_internal(
+        let exact_in = buy_exact_in_quote_internal(
             exact_out.ui_quote,
             slippage_bps,
             base_reserve,
@@ -553,7 +553,7 @@ fn test_exact_out_reverse_with_creator() {
     // Sell with creator
     {
         let desired_quote = 50_000_000;
-        let exact_out = sell_quote_input_internal(
+        let exact_out = sell_exact_out_quote_internal(
             desired_quote,
             slippage_bps,
             base_reserve,
@@ -562,7 +562,7 @@ fn test_exact_out_reverse_with_creator() {
         )
         .expect("should succeed");
 
-        let exact_in = sell_base_input_internal(
+        let exact_in = sell_exact_in_base_internal(
             exact_out.base,
             slippage_bps,
             base_reserve,
