@@ -23,7 +23,7 @@ use sol_trade_sdk::{
     trading::core::params::{DexParamEnum, RaydiumCpmmParams, SwapParams},
     trading::core::traits::InstructionBuilder,
     utils::{
-        calc::raydium_cpmm::quote_exact_out,
+        calc::raydium_cpmm::buy_exact_out_internal,
         simulation_based_calc::{SimulatedSwapResult, simulate_swap_transaction},
     },
 };
@@ -97,10 +97,6 @@ pub async fn verify_exact_out_buy_full(
     println!("  Base Reserves: {}", protocol_params.base_reserve);
     println!("  Quote Reserves: {}", protocol_params.quote_reserve);
 
-    // 确定交易方向：检查哪个是输入，哪个是输出
-    // 假设 base 是输入，quote 是输出（Buy base token with quote token）
-    let is_base_in = false; // quote -> base (Buy base)
-
     // 获取费用率
     let fees = sol_trade_sdk::instruction::utils::raydium_cpmm::get_amm_config_fees(
         rpc,
@@ -109,13 +105,12 @@ pub async fn verify_exact_out_buy_full(
     .await
     .map_err(|e| anyhow::anyhow!("获取费用率失败: {}", e))?;
 
-    // 2. 调用 quote_exact_out 进行本地计算
+    // 2. 调用 buy_exact_out_internal 进行本地计算
     println!("\n[步骤 2] 本地计算所需输入数量...");
-    let local_result = quote_exact_out(
+    let local_result = buy_exact_out_internal(
         protocol_params.base_reserve,
         protocol_params.quote_reserve,
         amount_out,
-        is_base_in,
         fees.trade_fee_rate,
         fees.protocol_fee_rate,
         fees.fund_fee_rate,

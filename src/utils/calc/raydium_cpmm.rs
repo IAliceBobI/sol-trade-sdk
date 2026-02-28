@@ -161,7 +161,7 @@ fn swap_base_input(
 ///
 /// # Arguments
 /// * `base_reserve` - The current reserve amount of the base token in the pool
-/// * `quote_reserve` - The current reserve amount of the quote token in the pool  
+/// * `quote_reserve` - The current reserve amount of the quote token in the pool
 /// * `is_base_in` - Whether the input token is the base token (true) or quote token (false)
 /// * `amount_in` - The amount of input tokens to swap
 /// * `slippage_basis_points` - The acceptable slippage in basis points (e.g., 100 for 1%)
@@ -207,6 +207,82 @@ pub fn compute_swap_amount(
     }
 }
 
+/// Exact In Buy 方向的内部计算（用 quote 买 base）
+///
+/// 已知 quote 输入数量，计算能获得多少 base 输出。
+///
+/// # Arguments
+///
+/// * `base_reserve` - Pool 中 base token 的储备量
+/// * `quote_reserve` - Pool 中 quote token 的储备量
+/// * `quote_in` - 输入的 quote 数量（精确输入）
+/// * `slippage_basis_points` - 滑点容忍度（基点，100 = 1%）
+/// * `trade_fee_rate` - 交易费率
+/// * `protocol_fee_rate` - 协议费率
+/// * `fund_fee_rate` - 资金费率
+///
+/// # 返回
+///
+/// `ComputeSwapParams` 包含输出金额、最小输出金额和费用
+pub fn buy_exact_in_internal(
+    base_reserve: u64,
+    quote_reserve: u64,
+    quote_in: u64,
+    slippage_basis_points: u64,
+    trade_fee_rate: u64,
+    protocol_fee_rate: u64,
+    fund_fee_rate: u64,
+) -> ComputeSwapParams {
+    compute_swap_amount(
+        base_reserve,
+        quote_reserve,
+        false, // is_base_in = false, 输入是 quote
+        quote_in,
+        slippage_basis_points,
+        trade_fee_rate,
+        protocol_fee_rate,
+        fund_fee_rate,
+    )
+}
+
+/// Exact In Sell 方向的内部计算（用 base 卖成 quote）
+///
+/// 已知 base 输入数量，计算能获得多少 quote 输出。
+///
+/// # Arguments
+///
+/// * `base_reserve` - Pool 中 base token 的储备量
+/// * `quote_reserve` - Pool 中 quote token 的储备量
+/// * `base_in` - 输入的 base 数量（精确输入）
+/// * `slippage_basis_points` - 滑点容忍度（基点，100 = 1%）
+/// * `trade_fee_rate` - 交易费率
+/// * `protocol_fee_rate` - 协议费率
+/// * `fund_fee_rate` - 资金费率
+///
+/// # 返回
+///
+/// `ComputeSwapParams` 包含输出金额、最小输出金额和费用
+pub fn sell_exact_in_internal(
+    base_reserve: u64,
+    quote_reserve: u64,
+    base_in: u64,
+    slippage_basis_points: u64,
+    trade_fee_rate: u64,
+    protocol_fee_rate: u64,
+    fund_fee_rate: u64,
+) -> ComputeSwapParams {
+    compute_swap_amount(
+        base_reserve,
+        quote_reserve,
+        true, // is_base_in = true, 输入是 base
+        base_in,
+        slippage_basis_points,
+        trade_fee_rate,
+        protocol_fee_rate,
+        fund_fee_rate,
+    )
+}
+
 /// Result of an exact-out swap calculation
 #[derive(Debug, Clone)]
 pub struct QuoteExactOutResult {
@@ -218,30 +294,10 @@ pub struct QuoteExactOutResult {
     pub price_impact_bps: Option<u64>,
 }
 
-/// Quote an exact-out swap against a Raydium CPMM pool
+/// 内部函数：Exact Out 计算（通用）
 ///
-/// Calculates the required input amount to obtain a specific output amount.
-///
-/// # Arguments
-///
-/// * `base_reserve` - Current reserve of base token in the pool
-/// * `quote_reserve` - Current reserve of quote token in the pool
-/// * `amount_out` - Desired output amount
-/// * `is_base_in` - true if base token is the input, false if quote token is the input
-/// * `trade_fee_rate` - Trading fee rate (除以 1_000_000 得到百分比)
-/// * `protocol_fee_rate` - Protocol fee rate (除以 1_000_000 得到百分比)
-/// * `fund_fee_rate` - Fund fee rate (除以 1_000_000 得到百分比)
-///
-/// # Returns
-///
-/// Returns `QuoteExactOutResult` containing the required input amount and fees
-///
-/// # Errors
-///
-/// Returns error if:
-/// - Insufficient liquidity (amount_out >= output reserve)
-/// - Calculation overflow
-pub fn quote_exact_out(
+/// 计算获得指定输出金额所需的输入金额。
+fn quote_exact_out_internal(
     base_reserve: u64,
     quote_reserve: u64,
     amount_out: u64,
@@ -307,4 +363,74 @@ pub fn quote_exact_out(
         fee_amount: total_fee,
         price_impact_bps,
     })
+}
+
+/// Exact Out Buy 方向的内部计算（用 quote 买 base）
+///
+/// 已知想要获得的 base 数量，计算需要多少 quote 作为输入。
+///
+/// # Arguments
+///
+/// * `base_reserve` - Pool 中 base token 的储备量
+/// * `quote_reserve` - Pool 中 quote token 的储备量
+/// * `base_out` - 想要获得的 base 数量（精确输出）
+/// * `trade_fee_rate` - 交易费率
+/// * `protocol_fee_rate` - 协议费率
+/// * `fund_fee_rate` - 资金费率
+///
+/// # 返回
+///
+/// `QuoteExactOutResult` 包含所需输入金额和费用
+pub fn buy_exact_out_internal(
+    base_reserve: u64,
+    quote_reserve: u64,
+    base_out: u64,
+    trade_fee_rate: u64,
+    protocol_fee_rate: u64,
+    fund_fee_rate: u64,
+) -> Result<QuoteExactOutResult, String> {
+    quote_exact_out_internal(
+        base_reserve,
+        quote_reserve,
+        base_out,
+        false, // is_base_in = false, 输入是 quote，输出是 base
+        trade_fee_rate,
+        protocol_fee_rate,
+        fund_fee_rate,
+    )
+}
+
+/// Exact Out Sell 方向的内部计算（用 base 卖成 quote）
+///
+/// 已知想要获得的 quote 数量，计算需要多少 base 作为输入。
+///
+/// # Arguments
+///
+/// * `base_reserve` - Pool 中 base token 的储备量
+/// * `quote_reserve` - Pool 中 quote token 的储备量
+/// * `quote_out` - 想要获得的 quote 数量（精确输出）
+/// * `trade_fee_rate` - 交易费率
+/// * `protocol_fee_rate` - 协议费率
+/// * `fund_fee_rate` - 资金费率
+///
+/// # 返回
+///
+/// `QuoteExactOutResult` 包含所需输入金额和费用
+pub fn sell_exact_out_internal(
+    base_reserve: u64,
+    quote_reserve: u64,
+    quote_out: u64,
+    trade_fee_rate: u64,
+    protocol_fee_rate: u64,
+    fund_fee_rate: u64,
+) -> Result<QuoteExactOutResult, String> {
+    quote_exact_out_internal(
+        base_reserve,
+        quote_reserve,
+        quote_out,
+        true, // is_base_in = true, 输入是 base，输出是 quote
+        trade_fee_rate,
+        protocol_fee_rate,
+        fund_fee_rate,
+    )
 }

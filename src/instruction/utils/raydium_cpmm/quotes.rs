@@ -228,15 +228,28 @@ pub(crate) async fn quote_exact_out(
         .saturating_sub(pool_state.protocol_fees_token1)
         .saturating_sub(pool_state.fund_fees_token1);
 
-    let result = crate::utils::calc::raydium_cpmm::quote_exact_out(
-        token0_reserve_without_fees, // 使用扣除累积手续费后的储备金
-        token1_reserve_without_fees, // 使用扣除累积手续费后的储备金
-        params.amount_out,
-        is_token0_in,
-        fees.trade_fee_rate,
-        fees.protocol_fee_rate,
-        fees.fund_fee_rate,
-    )
+    // 使用内部函数进行计算
+    let result = if is_token0_in {
+        // token0 -> token1 (Sell 方向)
+        crate::utils::calc::raydium_cpmm::sell_exact_out_internal(
+            token0_reserve_without_fees,
+            token1_reserve_without_fees,
+            params.amount_out,
+            fees.trade_fee_rate,
+            fees.protocol_fee_rate,
+            fees.fund_fee_rate,
+        )
+    } else {
+        // token1 -> token0 (Buy 方向)
+        crate::utils::calc::raydium_cpmm::buy_exact_out_internal(
+            token0_reserve_without_fees,
+            token1_reserve_without_fees,
+            params.amount_out,
+            fees.trade_fee_rate,
+            fees.protocol_fee_rate,
+            fees.fund_fee_rate,
+        )
+    }
     .map_err(|e| anyhow!("Quote exact out failed: {}", e))?;
 
     Ok(QuoteExactOutResult {
