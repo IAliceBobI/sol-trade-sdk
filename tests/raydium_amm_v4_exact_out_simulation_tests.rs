@@ -130,7 +130,7 @@ pub async fn verify_exact_out_buy_full(
         output_mint: protocol_params.pc_mint, // USDC
         output_token_program: Some(sol_trade_sdk::constants::TOKEN_PROGRAM),
         input_amount: Some(local_result.amount_in), // 使用本地计算的输入金额
-        slippage_basis_points: Some(0),              // 0% 滑点
+        slippage_basis_points: Some(10),             // 0.1% 滑点（允许1单位的精度误差）
         address_lookup_table_account: None,
         recent_blockhash: None,
         wait_transaction_confirmed: false,

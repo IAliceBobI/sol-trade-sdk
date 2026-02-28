@@ -70,15 +70,22 @@ impl InstructionBuilder for RaydiumAmmV4InstructionBuilder {
             || protocol_params.coin_mint == crate::constants::USDC_TOKEN_ACCOUNT;
         // 🔧 修复：使用已经解包的 input_amount
         let amount_in: u64 = input_amount;
+        let slippage = params.slippage_basis_points.unwrap_or(DEFAULT_SLIPPAGE);
         let swap_result = compute_swap_amount(
             protocol_params.coin_reserve,
             protocol_params.pc_reserve,
             is_base_in,
             amount_in,
-            params.slippage_basis_points.unwrap_or(DEFAULT_SLIPPAGE),
+            slippage,
         );
         let minimum_amount_out = match params.fixed_output_amount {
-            Some(fixed) => fixed,
+            Some(fixed) => {
+                // Exact Out 模式下应用滑点：允许实际输出比期望输出少一定的百分比
+                // 使用 u128 避免乘法溢出
+                let min_out = (fixed as u128 * (10_000 - slippage) as u128 / 10_000) as u64;
+                // 确保 min_out 不会为 0（当 fixed 很小时）
+                if min_out == 0 && fixed > 0 { fixed } else { min_out }
+            },
             None => swap_result.min_amount_out,
         };
 
@@ -193,15 +200,22 @@ impl InstructionBuilder for RaydiumAmmV4InstructionBuilder {
         // ========================================
         let is_base_in = protocol_params.pc_mint == crate::constants::WSOL_TOKEN_ACCOUNT
             || protocol_params.pc_mint == crate::constants::USDC_TOKEN_ACCOUNT;
+        let slippage = params.slippage_basis_points.unwrap_or(DEFAULT_SLIPPAGE);
         let swap_result = compute_swap_amount(
             protocol_params.coin_reserve,
             protocol_params.pc_reserve,
             is_base_in,
             params.input_amount.unwrap_or(0),
-            params.slippage_basis_points.unwrap_or(DEFAULT_SLIPPAGE),
+            slippage,
         );
         let minimum_amount_out = match params.fixed_output_amount {
-            Some(fixed) => fixed,
+            Some(fixed) => {
+                // Exact Out 模式下应用滑点：允许实际输出比期望输出少一定的百分比
+                // 使用 u128 避免乘法溢出
+                let min_out = (fixed as u128 * (10_000 - slippage) as u128 / 10_000) as u64;
+                // 确保 min_out 不会为 0（当 fixed 很小时）
+                if min_out == 0 && fixed > 0 { fixed } else { min_out }
+            },
             None => swap_result.min_amount_out,
         };
 
