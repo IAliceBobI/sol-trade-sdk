@@ -17,6 +17,8 @@
 mod test_helpers;
 use test_helpers::create_test_client;
 
+use sol_trade_test_utils::ensure_token_balance;
+
 use sol_trade_sdk::{
     common::SolanaRpcClient,
     instruction::pumpswap::PumpSwapInstructionBuilder,
@@ -24,7 +26,7 @@ use sol_trade_sdk::{
     trading::core::params::{DexParamEnum, PumpSwapParams, SwapParams},
     trading::core::traits::InstructionBuilder,
     utils::{
-        calc::pumpswap::buy_exact_out_base_internal,
+        calc::pumpswap::{buy_exact_out_base_internal, sell_exact_out_quote_internal},
         simulation_based_calc::{SimulatedSwapResult, simulate_swap_transaction},
     },
 };
@@ -408,4 +410,180 @@ async fn test_exact_out_buy_tiny_verification() {
     assert!(result.actual_input > 0, "实际输入应该大于 0");
 
     println!("\n✅ Exact Out Buy 极小金额验证测试通过!");
+}
+
+// ============================================================================
+// Sell 方向 Exact Out 验证
+// ============================================================================
+
+/// Exact Out Sell 完整验证测试
+///
+/// 测试目标：验证本地计算与链上模拟的一致性
+/// Sell Exact Out = 用户指定想获得的 quote 数量，计算需要卖出多少 base
+#[tokio::test]
+#[serial_test::serial(pumpswap_exact_out_sim)]
+async fn test_exact_out_sell_full_verification() {
+    let client = create_test_client().await;
+    let pool_address = get_test_pool_address();
+
+    // 测试金额：期望获得 10,000 quote (WSOL)
+    let amount_out = 10_000u64;
+    let tolerance_percent = 1.0; // Sell 方向允许 1% 误差
+
+    println!("\n========================================");
+    println!("PumpSwap Exact Out Sell 验证");
+    println!("========================================");
+    println!("Pool 地址: {}", pool_address);
+    println!("期望输出数量 (quote token): {}", amount_out);
+
+    // 1. 获取 Pool 参数
+    println!("\n[步骤 1] 获取 Pool 参数...");
+    let protocol_params = PumpSwapParams::from_pool_address_by_rpc(&client.rpc, &pool_address)
+        .await
+        .expect("获取 Pool 参数失败");
+
+    println!("  Base Reserves: {}", protocol_params.pool_base_token_reserves);
+    println!("  Quote Reserves: {}", protocol_params.pool_quote_token_reserves);
+
+    // 2. 本地计算所需 base 数量
+    println!("\n[步骤 2] 本地计算所需 base 数量...");
+    let coin_creator = protocol_params.coin_creator_vault_authority;
+    let local_result = sell_exact_out_quote_internal(
+        amount_out,
+        0, // 0% 滑点
+        protocol_params.pool_base_token_reserves,
+        protocol_params.pool_quote_token_reserves,
+        &coin_creator,
+    )
+    .expect("本地计算失败");
+
+    println!("  本地计算结果:");
+    println!("    内部 quote 数量: {}", local_result.internal_raw_quote);
+    println!("    需要 base 数量: {}", local_result.base);
+
+    // 2.5. 给测试账户空投 PUMP token（Sell 需要持有 base token）
+    println!("\n[步骤 2.5] 空投 PUMP token...");
+    let rpc_url = "http://127.0.0.1:8899";
+    let base_needed = local_result.base;
+    // 多空投一些，确保有足够的余额（乘以 2）
+    let base_to_airdrop = base_needed * 2;
+    // PUMP token decimals = 6，需要转换为格式化字符串
+    let base_formatted = format!("{}", base_to_airdrop as f64 / 1_000_000.0);
+
+    ensure_token_balance(
+        &client.rpc,
+        rpc_url,
+        client.payer.as_ref(),
+        &protocol_params.base_mint,
+        &base_formatted,
+    )
+    .await
+    .expect("空投 PUMP token 失败");
+    println!("  ✅ PUMP token 余额已设置: {}", base_formatted);
+
+    // 3. 构建 SwapParams
+    // 注意：Sell 方向目前需要设置 input_amount（使用本地计算结果）
+    println!("\n[步骤 3] 构建 SwapParams...");
+    let gas_fee_strategy = sol_trade_test_utils::create_test_gas_fee_strategy();
+
+    let swap_params = SwapParams {
+        rpc: Some(client.rpc.clone()),
+        payer: Arc::new(client.payer.insecure_clone()),
+        trade_type: TradeType::Sell,
+        input_mint: protocol_params.base_mint,  // 卖出 base
+        input_token_program: Some(protocol_params.base_token_program),
+        output_mint: protocol_params.quote_mint, // 获得 quote (WSOL)
+        output_token_program: Some(protocol_params.quote_token_program),
+        input_amount: Some(local_result.base), // 使用本地计算的 base 数量
+        slippage_basis_points: Some(0),
+        address_lookup_table_account: None,
+        recent_blockhash: None,
+        wait_transaction_confirmed: false,
+        protocol_params: DexParamEnum::PumpSwap(protocol_params.clone()),
+        open_seed_optimize: false,
+        swqos_clients: vec![],
+        middleware_manager: None,
+        durable_nonce: None,
+        with_tip: false,
+        create_input_mint_ata: true,
+        close_input_mint_ata: false,
+        create_output_mint_ata: true,
+        close_output_mint_ata: true,
+        fixed_output_amount: Some(amount_out), // Exact Out: 设置期望的输出金额
+        gas_fee_strategy,
+        simulate: true,
+        on_transaction_signed: None,
+        callback_execution_mode: None,
+        enable_jito_sandwich_protection: None,
+    };
+
+    // 4. 构建 sell 指令
+    println!("\n[步骤 4] 构建卖出指令...");
+    let builder = PumpSwapInstructionBuilder;
+    let instructions = builder
+        .build_sell_instructions(&swap_params)
+        .await
+        .expect("构建指令失败");
+    println!("  指令数量: {}", instructions.len());
+
+    // 5. 获取用户 ATA 地址
+    let user_base_token_account = get_associated_token_address_with_program_id(
+        &client.payer.pubkey(),
+        &protocol_params.base_mint,
+        &protocol_params.base_token_program,
+    );
+    let user_quote_token_account = get_associated_token_address_with_program_id(
+        &client.payer.pubkey(),
+        &protocol_params.quote_mint,
+        &protocol_params.quote_token_program,
+    );
+
+    // 6. 模拟执行
+    println!("\n[步骤 5] 模拟执行...");
+    let simulated_result: SimulatedSwapResult = simulate_swap_transaction(
+        &client.rpc,
+        client.payer.as_ref(),
+        instructions,
+        user_base_token_account,    // 输入账户 (base)
+        user_quote_token_account,   // 输出账户 (quote)
+        protocol_params.base_mint,  // 输入 mint (base)
+        protocol_params.quote_mint, // 输出 mint (quote)
+    )
+    .await
+    .expect("模拟执行失败");
+
+    println!("  模拟成功: {}", simulated_result.success);
+    println!("  实际输入金额 (base): {}", simulated_result.actual_input_amount);
+    println!("  实际输出金额 (quote): {}", simulated_result.actual_output_amount);
+
+    if let Some(error) = &simulated_result.error {
+        panic!("模拟执行失败: {}", error);
+    }
+
+    // 7. 计算误差率
+    let expected_base = local_result.base;
+    let actual_base = simulated_result.actual_input_amount;
+    let diff = expected_base.abs_diff(actual_base);
+    let error_rate_percent =
+        if actual_base > 0 { (diff as f64 / actual_base as f64) * 100.0 } else { 100.0 };
+
+    println!("\n[步骤 6] 对比结果");
+    println!("  本地计算的 base 金额: {}", expected_base);
+    println!("  链上模拟的 base 金额: {}", actual_base);
+    println!("  差值: {}", diff);
+    println!("  误差率: {:.4}%", error_rate_percent);
+
+    let passed = error_rate_percent <= tolerance_percent;
+    println!("\n验证结果: {}", if passed { "✅ 通过" } else { "❌ 失败" });
+
+    // 验证
+    assert!(
+        passed,
+        "验证未通过: 误差率 {:.4}% > {}%",
+        error_rate_percent, tolerance_percent
+    );
+
+    assert!(actual_base > 0, "实际输入应该大于 0");
+
+    println!("\n✅ Exact Out Sell 完整验证测试通过!");
 }
