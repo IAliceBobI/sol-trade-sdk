@@ -24,5 +24,8 @@ pub use price::*;
 // quote_exact_in 和 quote_exact_out 现在是内部实现，使用 client.buy_quote() / client.sell_quote() 代替
 pub use tick_array_bitmap::*;
 
+// 显式公开导出 get_tick_array_start_index（用于测试）
+pub use helpers::get_tick_array_start_index;
+
 // 内部重新导出（crate 内部可访问）
 pub(crate) use quotes::{quote_exact_in, quote_exact_out};

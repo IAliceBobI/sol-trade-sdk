@@ -70,7 +70,7 @@ pub(crate) fn get_tick_array_bitmap_extension_pda(pool_id: &Pubkey) -> (Pubkey, 
 /// array_index = tick_current / ticks_in_array (向下取整到负无穷)
 /// start_index = array_index * ticks_in_array
 /// ```
-pub(crate) fn get_tick_array_start_index(tick_current: i32, tick_spacing: u16) -> i32 {
+pub fn get_tick_array_start_index(tick_current: i32, tick_spacing: u16) -> i32 {
     let ticks_in_array = TICKS_PER_ARRAY * tick_spacing as i32;
 
     // 纯整数实现：向下取整（向负无穷方向）
