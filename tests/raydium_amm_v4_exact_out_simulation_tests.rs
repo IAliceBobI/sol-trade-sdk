@@ -124,7 +124,7 @@ pub async fn verify_exact_out_buy_full(
         output_mint: protocol_params.pc_mint, // USDC
         output_token_program: Some(sol_trade_sdk::constants::TOKEN_PROGRAM),
         input_amount: Some(local_result.amount_in), // 使用本地计算的输入金额
-        slippage_basis_points: Some(10),             // 0.1% 滑点（允许1单位的精度误差）
+        slippage_basis_points: Some(10),            // 0.1% 滑点（允许1单位的精度误差）
         address_lookup_table_account: None,
         recent_blockhash: None,
         wait_transaction_confirmed: false,
@@ -173,8 +173,8 @@ pub async fn verify_exact_out_buy_full(
         rpc,
         payer,
         instructions,
-        user_base_token_account, // 输入账户 (WSOL)
-        user_quote_token_account, // 输出账户 (USDC)
+        user_base_token_account,   // 输入账户 (WSOL)
+        user_quote_token_account,  // 输出账户 (USDC)
         protocol_params.coin_mint, // 输入 mint (SOL)
         protocol_params.pc_mint,   // 输出 mint (USDC)
     )
@@ -205,12 +205,7 @@ pub async fn verify_exact_out_buy_full(
     let passed = error_rate_percent <= tolerance_percent;
     println!("\n验证结果: {}", if passed { "✅ 通过" } else { "❌ 失败" });
 
-    Ok(VerificationResult {
-        expected_input,
-        actual_input,
-        error_rate_percent,
-        passed,
-    })
+    Ok(VerificationResult { expected_input, actual_input, error_rate_percent, passed })
 }
 
 // ============================================================================
@@ -245,8 +240,7 @@ async fn test_exact_out_buy_full_verification() {
     assert!(
         result.passed,
         "验证未通过: 误差率 {:.4}% > {}%",
-        result.error_rate_percent,
-        tolerance_percent
+        result.error_rate_percent, tolerance_percent
     );
 
     // 验证 error_rate_percent < 0.5%

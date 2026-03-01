@@ -490,7 +490,7 @@ async fn test_exact_out_sell_full_verification() {
         rpc: Some(client.rpc.clone()),
         payer: Arc::new(client.payer.insecure_clone()),
         trade_type: TradeType::Sell,
-        input_mint: protocol_params.base_mint,  // 卖出 base
+        input_mint: protocol_params.base_mint, // 卖出 base
         input_token_program: Some(protocol_params.base_token_program),
         output_mint: protocol_params.quote_mint, // 获得 quote (WSOL)
         output_token_program: Some(protocol_params.quote_token_program),
@@ -520,10 +520,7 @@ async fn test_exact_out_sell_full_verification() {
     // 4. 构建 sell 指令
     println!("\n[步骤 4] 构建卖出指令...");
     let builder = PumpSwapInstructionBuilder;
-    let instructions = builder
-        .build_sell_instructions(&swap_params)
-        .await
-        .expect("构建指令失败");
+    let instructions = builder.build_sell_instructions(&swap_params).await.expect("构建指令失败");
     println!("  指令数量: {}", instructions.len());
 
     // 5. 获取用户 ATA 地址
@@ -577,11 +574,7 @@ async fn test_exact_out_sell_full_verification() {
     println!("\n验证结果: {}", if passed { "✅ 通过" } else { "❌ 失败" });
 
     // 验证
-    assert!(
-        passed,
-        "验证未通过: 误差率 {:.4}% > {}%",
-        error_rate_percent, tolerance_percent
-    );
+    assert!(passed, "验证未通过: 误差率 {:.4}% > {}%", error_rate_percent, tolerance_percent);
 
     assert!(actual_base > 0, "实际输入应该大于 0");
 

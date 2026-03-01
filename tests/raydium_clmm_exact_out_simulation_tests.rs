@@ -115,12 +115,10 @@ pub async fn verify_exact_out_buy_full(
 
     // 2. 获取 Pool 状态
     println!("\n[步骤 2] 获取 Pool 状态...");
-    let pool_state = sol_trade_sdk::instruction::utils::raydium_clmm::get_pool_by_address(
-        rpc,
-        pool_address,
-    )
-    .await
-    .map_err(|e| anyhow::anyhow!("获取 Pool 状态失败: {}", e))?;
+    let pool_state =
+        sol_trade_sdk::instruction::utils::raydium_clmm::get_pool_by_address(rpc, pool_address)
+            .await
+            .map_err(|e| anyhow::anyhow!("获取 Pool 状态失败: {}", e))?;
 
     println!("  当前价格 (sqrt_price_x64): {}", pool_state.sqrt_price_x64);
     println!("  当前流动性: {}", pool_state.liquidity);
@@ -240,7 +238,7 @@ pub async fn verify_exact_out_buy_full(
         output_mint,
         output_token_program: Some(output_token_program),
         input_amount: Some(local_result.amount_in), // 使用本地计算的输入金额
-        slippage_basis_points: Some(10),             // 0.1% 滑点
+        slippage_basis_points: Some(10),            // 0.1% 滑点
         address_lookup_table_account: None,
         recent_blockhash: None,
         wait_transaction_confirmed: false,
@@ -321,12 +319,7 @@ pub async fn verify_exact_out_buy_full(
     let passed = error_rate_percent <= tolerance_percent;
     println!("\n验证结果: {}", if passed { "✅ 通过" } else { "❌ 失败" });
 
-    Ok(VerificationResult {
-        expected_input,
-        actual_input,
-        error_rate_percent,
-        passed,
-    })
+    Ok(VerificationResult { expected_input, actual_input, error_rate_percent, passed })
 }
 
 // ============================================================================
@@ -361,8 +354,7 @@ async fn test_exact_out_buy_full_verification() {
     assert!(
         result.passed,
         "验证未通过: 误差率 {:.4}% > {}%",
-        result.error_rate_percent,
-        tolerance_percent
+        result.error_rate_percent, tolerance_percent
     );
 
     // 验证 error_rate_percent < 0.5%

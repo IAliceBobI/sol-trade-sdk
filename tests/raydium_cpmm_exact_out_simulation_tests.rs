@@ -16,7 +16,6 @@
 mod test_helpers;
 use test_helpers::create_test_client;
 
-use sol_trade_test_utils::{ensure_token_balance, usdc_mint};
 use sol_trade_sdk::{
     common::SolanaRpcClient,
     instruction::raydium_cpmm::RaydiumCpmmInstructionBuilder,
@@ -28,6 +27,7 @@ use sol_trade_sdk::{
         simulation_based_calc::{SimulatedSwapResult, simulate_swap_transaction},
     },
 };
+use sol_trade_test_utils::{ensure_token_balance, usdc_mint};
 use solana_sdk::{
     pubkey::Pubkey,
     signature::{Keypair, Signer},
@@ -165,8 +165,8 @@ pub async fn verify_exact_out_buy_full(
     let gas_fee_strategy = sol_trade_test_utils::create_test_gas_fee_strategy();
 
     // 确定输入和输出 mint
-    let input_mint = protocol_params.quote_mint;  // 输入 quote
-    let output_mint = protocol_params.base_mint;  // 输出 base
+    let input_mint = protocol_params.quote_mint; // 输入 quote
+    let output_mint = protocol_params.base_mint; // 输出 base
 
     let swap_params = SwapParams {
         rpc: Some(rpc.clone()),
@@ -177,7 +177,7 @@ pub async fn verify_exact_out_buy_full(
         output_mint,
         output_token_program: Some(protocol_params.base_token_program),
         input_amount: Some(local_result.amount_in), // 使用本地计算的输入金额
-        slippage_basis_points: Some(10),             // 0.1% 滑点
+        slippage_basis_points: Some(10),            // 0.1% 滑点
         address_lookup_table_account: None,
         recent_blockhash: None,
         wait_transaction_confirmed: false,
@@ -269,12 +269,7 @@ pub async fn verify_exact_out_buy_full(
     let passed = error_rate_percent <= tolerance_percent;
     println!("\n验证结果: {}", if passed { "✅ 通过" } else { "❌ 失败" });
 
-    Ok(VerificationResult {
-        expected_input,
-        actual_input,
-        error_rate_percent,
-        passed,
-    })
+    Ok(VerificationResult { expected_input, actual_input, error_rate_percent, passed })
 }
 
 // ============================================================================
@@ -311,8 +306,7 @@ async fn test_exact_out_buy_full_verification() {
     assert!(
         result.passed,
         "验证未通过: 误差率 {:.4}% > {}%",
-        result.error_rate_percent,
-        tolerance_percent
+        result.error_rate_percent, tolerance_percent
     );
 
     // 验证 error_rate_percent < 0.5%
