@@ -4,7 +4,7 @@
 //!
 //! # 测试目标
 //!
-//! 验证 `quote_exact_out` 的本地计算与链上模拟执行结果的一致性
+//! 验证 `buy_exact_out_internal` 的本地计算与链上模拟执行结果的一致性
 //!
 //! # 运行测试
 //!
@@ -23,10 +23,11 @@ use sol_trade_sdk::{
     trading::core::params::{DexParamEnum, RaydiumClmmParams, SwapParams},
     trading::core::traits::InstructionBuilder,
     utils::{
-        calc::raydium_clmm::quote_exact_out,
+        calc::raydium_clmm::buy_exact_out_internal,
         simulation_based_calc::{SimulatedSwapResult, simulate_swap_transaction},
     },
 };
+use sol_trade_test_utils::{ensure_token_balance, wsol_mint};
 use solana_sdk::{
     pubkey::Pubkey,
     signature::{Keypair, Signer},
@@ -48,9 +49,11 @@ pub struct VerificationResult {
     pub passed: bool,
 }
 
-/// solett-wsol Pool 地址（Raydium CLMM mainnet）
+/// JUP-WSOL Pool 地址（Raydium CLMM mainnet）
+/// Pool: EZVkeboWeXygtq8LMyENHyXdF5wpYrtExRNH9UwB1qYw
+/// JUP Mint: JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN
 fn get_test_pool_address() -> Pubkey {
-    Pubkey::from_str("CYJQ19fbryujjHFDiik6GZmVpPuqi4Ew31orj43cAupT").expect("Invalid pool address")
+    Pubkey::from_str("EZVkeboWeXygtq8LMyENHyXdF5wpYrtExRNH9UwB1qYw").expect("Invalid pool address")
 }
 
 /// 完整的 Exact Out Buy 验证流程
@@ -86,6 +89,18 @@ pub async fn verify_exact_out_buy_full(
     println!("========================================");
     println!("Pool 地址: {}", pool_address);
     println!("期望输出数量: {}", amount_out);
+
+    // 0. 确保测试账户有足够的 WSOL 余额
+    println!("\n[步骤 0] 确保 WSOL 余额...");
+    let rpc_url = "http://127.0.0.1:8899";
+    let wsol = wsol_mint();
+    // 确保足够多的 WSOL（10 WSOL）用于测试
+    if let Err(e) = ensure_token_balance(rpc, rpc_url, payer, &wsol, "10").await {
+        println!("⚠️  确保 WSOL 余额警告: {}", e);
+        println!("继续测试，但可能因余额不足而失败...");
+    } else {
+        println!("  ✅ WSOL 余额已确保");
+    }
 
     // 1. 使用 RaydiumClmmParams::from_pool_address_by_rpc 获取所有参数
     println!("\n[步骤 1] 获取 Pool 参数...");
@@ -182,23 +197,20 @@ pub async fn verify_exact_out_buy_full(
         .collect();
 
     // 5. 确定交易方向
-    // 假设 token0 是输入，token1 是输出（或者根据 Pool 判断）
-    let is_token0_in = protocol_params.token1_mint == sol_trade_sdk::constants::WSOL_TOKEN_ACCOUNT
-        || protocol_params.token1_mint == sol_trade_sdk::constants::USDC_TOKEN_ACCOUNT;
-    let zero_for_one = is_token0_in;
+    // Buy 操作：用 quote token（WSOL/USDC）买 base token
+    // 对于 JUP-WSOL pool：token0=JUP(base), token1=WSOL(quote)
+    // Buy = 用 WSOL 买 JUP = 输入 token1，输出 token0
+    println!("  Buy: 输入 WSOL，输出 JUP");
 
-    println!("  交易方向: token0 -> token1 = {}", zero_for_one);
-
-    // 6. 调用 quote_exact_out 进行本地计算
+    // 6. 调用 buy_exact_out_internal 进行本地计算
     println!("\n[步骤 4] 本地计算所需输入数量...");
-    let local_result = quote_exact_out(
+    let local_result = buy_exact_out_internal(
         amount_out,
         pool_state.sqrt_price_x64,
         pool_state.liquidity,
         pool_state.tick_current,
         pool_state.tick_spacing,
         fee_rate,
-        zero_for_one,
         &tick_data,
     )
     .map_err(|e| anyhow::anyhow!("本地计算失败: {}", e))?;
@@ -211,27 +223,13 @@ pub async fn verify_exact_out_buy_full(
     println!("\n[步骤 5] 构建 SwapParams...");
     let gas_fee_strategy = sol_trade_test_utils::create_test_gas_fee_strategy();
 
-    // 确定输入和输出 mint
-    let input_mint = if zero_for_one {
-        protocol_params.token0_mint
-    } else {
-        protocol_params.token1_mint
-    };
-    let output_mint = if zero_for_one {
-        protocol_params.token1_mint
-    } else {
-        protocol_params.token0_mint
-    };
-    let input_token_program = if zero_for_one {
-        protocol_params.token0_program
-    } else {
-        protocol_params.token1_program
-    };
-    let output_token_program = if zero_for_one {
-        protocol_params.token1_program
-    } else {
-        protocol_params.token0_program
-    };
+    // Buy 操作的输入输出 mint
+    // 输入 = quote token (token1 = WSOL)
+    // 输出 = base token (token0 = JUP)
+    let input_mint = protocol_params.token1_mint;
+    let output_mint = protocol_params.token0_mint;
+    let input_token_program = protocol_params.token1_program;
+    let output_token_program = protocol_params.token0_program;
 
     let swap_params = SwapParams {
         rpc: Some(rpc.clone()),

@@ -225,3 +225,89 @@ pub fn calculate_swap_amount_with_tick_arrays(
         fee_amount: state.fee_amount,
     })
 }
+
+/// Exact In Buy 方向的内部计算（用 quote 买 base）
+///
+/// 已知输入的 quote 数量，计算能获得多少 base。
+///
+/// 对于 CLMM pool，假设：
+/// - token1 是 quote token（WSOL/USDC）
+/// - token0 是 base token（其他代币）
+/// - Buy = 用 quote 买 base = token1 -> token0 = zero_for_one = false
+///
+/// # Arguments
+///
+/// * `amount_in` - 输入的 quote 数量（固定）
+/// * `sqrt_price_x64` - 当前平方根价格
+/// * `liquidity` - 当前流动性
+/// * `tick_current` - 当前 tick
+/// * `tick_spacing` - tick 间距
+/// * `fee_rate` - 手续费率
+/// * `tick_arrays` - tick array 数据 (从 RPC 获取)
+///
+/// # 返回
+///
+/// `SwapCalculationResult` 包含输出金额和费用
+pub fn buy_exact_in_internal(
+    amount_in: u64,
+    sqrt_price_x64: u128,
+    liquidity: u128,
+    tick_current: i32,
+    tick_spacing: u16,
+    fee_rate: u32,
+    tick_arrays: &[(i32, Vec<(i32, i128, u128)>)],
+) -> Result<SwapCalculationResult, &'static str> {
+    calculate_swap_amount_with_tick_arrays(
+        amount_in,
+        sqrt_price_x64,
+        liquidity,
+        tick_current,
+        tick_spacing,
+        fee_rate,
+        false, // zero_for_one = false, token1 -> token0 (quote -> base)
+        tick_arrays,
+    )
+}
+
+/// Exact In Sell 方向的内部计算（用 base 卖成 quote）
+///
+/// 已知输入的 base 数量，计算能获得多少 quote。
+///
+/// 对于 CLMM pool，假设：
+/// - token1 是 quote token（WSOL/USDC）
+/// - token0 是 base token（其他代币）
+/// - Sell = 用 base 卖成 quote = token0 -> token1 = zero_for_one = true
+///
+/// # Arguments
+///
+/// * `amount_in` - 输入的 base 数量（固定）
+/// * `sqrt_price_x64` - 当前平方根价格
+/// * `liquidity` - 当前流动性
+/// * `tick_current` - 当前 tick
+/// * `tick_spacing` - tick 间距
+/// * `fee_rate` - 手续费率
+/// * `tick_arrays` - tick array 数据 (从 RPC 获取)
+///
+/// # 返回
+///
+/// `SwapCalculationResult` 包含输出金额和费用
+pub fn sell_exact_in_internal(
+    amount_in: u64,
+    sqrt_price_x64: u128,
+    liquidity: u128,
+    tick_current: i32,
+    tick_spacing: u16,
+    fee_rate: u32,
+    tick_arrays: &[(i32, Vec<(i32, i128, u128)>)],
+) -> Result<SwapCalculationResult, &'static str> {
+    calculate_swap_amount_with_tick_arrays(
+        amount_in,
+        sqrt_price_x64,
+        liquidity,
+        tick_current,
+        tick_spacing,
+        fee_rate,
+        true, // zero_for_one = true, token0 -> token1 (base -> quote)
+        tick_arrays,
+    )
+}

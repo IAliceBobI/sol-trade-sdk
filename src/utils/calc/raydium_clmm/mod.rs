@@ -47,8 +47,8 @@ pub use types::{
 };
 
 // Export swap functions
-pub use quote::{quote_exact_out, quote_exact_out_simplified};
-pub use swap_exact_in::calculate_swap_amount_with_tick_arrays;
+pub use quote::{buy_exact_out_internal, quote_exact_out, quote_exact_out_simplified, sell_exact_out_internal};
+pub use swap_exact_in::{buy_exact_in_internal, calculate_swap_amount_with_tick_arrays, sell_exact_in_internal};
 pub use swap_exact_out::calculate_swap_exact_out_with_tick_arrays;
 
 #[cfg(test)]
