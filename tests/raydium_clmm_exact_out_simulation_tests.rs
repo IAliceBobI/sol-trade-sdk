@@ -48,9 +48,9 @@ pub struct VerificationResult {
     pub passed: bool,
 }
 
-/// WSOL-USDC Pool 地址（Raydium CLMM mainnet）
+/// solett-wsol Pool 地址（Raydium CLMM mainnet）
 fn get_test_pool_address() -> Pubkey {
-    Pubkey::from_str("8sLbNZo6u597CYT3wS3QYy4bHJR6J6tHwdAj8YQHbeyr").expect("Invalid pool address")
+    Pubkey::from_str("CYJQ19fbryujjHFDiik6GZmVpPuqi4Ew31orj43cAupT").expect("Invalid pool address")
 }
 
 /// 完整的 Exact Out Buy 验证流程
@@ -158,6 +158,14 @@ pub async fn verify_exact_out_buy_full(
     .map_err(|e| anyhow::anyhow!("获取 Tick Arrays 失败: {}", e))?;
 
     println!("  获取到 {} 个 Tick Arrays", tick_arrays.len());
+
+    // 如果没有 tick arrays（fork 网络上可能不存在），跳过测试
+    if tick_arrays.is_empty() {
+        return Err(anyhow::anyhow!(
+            "Tick arrays 不存在于 fork 网络，跳过测试。Pool: {}",
+            pool_address
+        ));
+    }
 
     // 转换为计算所需的格式
     let tick_data: Vec<(i32, Vec<(i32, i128, u128)>)> = tick_arrays

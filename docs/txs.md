@@ -47,7 +47,7 @@ cpmm pool: 7Cvz28TyKnGuL8GAtbsVFu1FJ3Po7A37Zc8JSJqkSPDp, usdc-prts(prts 3PQkX8yf
 cpmm pool: GarGiGTMQrZyot44J9hc71NeGNeEaxnq3nefKxBruEsS, usdc-cib(cib GarGiGTMQrZyot44J9hc71NeGNeEaxnq3nefKxBruEsS token2022)
 
 clmm pool: ExcBWu8fGPdJiaF1b1z3iEef38sjQJks8xvj6M85pPY6, usdt-wsol(usdt Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB)
-clmm pool: EZVkeboWeXygtq8LMyENHyXdF5wpYrtExRNH9UwB1qYw, ju-wsol(solett JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN)
+clmm pool: EZVkeboWeXygtq8LMyENHyXdF5wpYrtExRNH9UwB1qYw, jup-wsol(jup JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN)
 clmm pool: CYJQ19fbryujjHFDiik6GZmVpPuqi4Ew31orj43cAupT, solett-wsol(solett token2022 RRiB8JNqJvSQ3YJqFASQ3h5BBHPK1KHFrHgCFhxHjoM)
 
 ammv4 pool: 58oQChx4yWmvKdwLLZzBi4ChoCc2fqCUWBkwMihLYQo2, usdc-wsol
