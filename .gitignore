@@ -38,7 +38,6 @@ tmp_*.log
 IFLOW.md
 .iflowignore
 .claude
-CLAUDE.md
 .mcp.json
 .qoder
 .qoderignore
