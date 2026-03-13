@@ -6,6 +6,7 @@
     "spec": "0.1.0",
     "description": "Created with Anchor"
   },
+  "instructions": [],
   "accounts": [
     {
       "name": "Pool",
@@ -120,5 +121,8 @@
         ]
       }
     }
-  ]
+  ],
+  "events": [],
+  "errors": [],
+  "constants": []
 }

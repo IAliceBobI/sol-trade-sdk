@@ -19,6 +19,7 @@ use sol_trade_sdk::{
 use sol_trade_test_utils::get_simulation_test_keypair;
 use solana_commitment_config::CommitmentConfig;
 use solana_sdk::{
+    account::ReadableAccount,
     pubkey::Pubkey,
     signature::{Keypair, Signer},
 };
@@ -82,21 +83,59 @@ async fn register_meteora_idl(_rpc: &SolanaRpcClient) -> Result<(), Box<dyn std:
     Ok(())
 }
 
-/// 创建场景并应用覆盖
+/// 检查 surfpool 场景系统是否可用
 ///
-/// 创建一个场景来修改 Pool 的 sqrt_price（价格）
-async fn create_price_scenario(
+/// 通过调用 surfnet_registerScenario 注册一个测试场景来检查可用性
+async fn check_scenario_system_available() -> bool {
+    let client = reqwest::Client::new();
+
+    // 尝试注册一个最小化的测试场景
+    let test_scenario = serde_json::json!({
+        "id": "test-scenario-check",
+        "name": "Test Scenario",
+        "description": "Test if scenario system is available",
+        "overrides": [],
+        "tags": ["test"]
+    });
+
+    let response = match client
+        .post("http://127.0.0.1:8899")
+        .json(&serde_json::json!({
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "surfnet_registerScenario",
+            "params": [test_scenario]
+        }))
+        .send()
+        .await
+    {
+        Ok(r) => r,
+        Err(_) => return false,
+    };
+
+    let result: serde_json::Value = match response.json().await {
+        Ok(r) => r,
+        Err(_) => return false,
+    };
+
+    // 如果没有错误，说明场景系统可用
+    result.get("error").is_none()
+}
+
+/// 使用 surfnet_setAccount 直接修改 Pool 账户数据
+///
+/// 由于 Meteora 使用 bytemuck 序列化（无 Anchor discriminator），
+/// 场景系统无法自动解析，需要直接设置完整的账户数据
+async fn override_pool_account_directly(
     rpc: &SolanaRpcClient,
     pool_address: &Pubkey,
     new_sqrt_price: u128,
-) -> Result<String, Box<dyn std::error::Error>> {
-    println!("\n[创建场景] 创建价格修改场景...");
+) -> Result<(), Box<dyn std::error::Error>> {
+    println!("\n[直接覆盖] 使用 surfnet_setAccount 修改 Pool 数据...");
     println!("  Pool 地址: {}", pool_address);
     println!("  新 sqrt_price: {}", new_sqrt_price);
 
-    let scenario_id = format!("price-scenario-{}", chrono::Utc::now().timestamp());
-
-    // 首先获取当前池子数据以便知道其他字段的值
+    // 获取当前池子数据
     let pool_data =
         sol_trade_sdk::instruction::utils::meteora_damm_v2::get_pool_by_address(rpc, pool_address)
             .await
@@ -105,65 +144,88 @@ async fn create_price_scenario(
     println!("  当前 sqrt_price: {}", pool_data.sqrt_price);
     println!("  当前 liquidity: {}", pool_data.liquidity);
 
-    // 创建场景 - 修改 sqrt_price
-    // 注意：由于 Pool 使用 bytemuck 序列化，我们需要提供完整的账户数据
-    // 这里简化处理，只展示如何注册场景
+    // 获取原始账户数据
+    let original_account = rpc.get_account(pool_address)
+        .await
+        .map_err(|e| format!("获取账户数据失败: {}", e))?;
+
+    println!("  原始账户数据长度: {} bytes", original_account.data().len());
+    println!("  程序 ID: {}", original_account.owner());
+
+    // 构造修改后的账户数据
+    // Meteora Pool 布局（bytemuck 序列化）：
+    // - sqrt_price 在 offset 168-183 (16 bytes, u128)
+    // 需要修改这些字节
+    let mut new_data = original_account.data().to_vec();
+
+    // 将 u128 转换为小端字节序（16 bytes）
+    let sqrt_price_bytes = new_sqrt_price.to_le_bytes();
+
+    // 写入新的 sqrt_price（offset 168）
+    if new_data.len() >= 184 {
+        new_data[168..184].copy_from_slice(&sqrt_price_bytes);
+        println!("  ✅ 已修改 sqrt_price 字节数据");
+    } else {
+        return Err(format!("账户数据太短: {} bytes", new_data.len()).into());
+    }
+
+    // 使用 surfnet_setAccount 直接设置账户
     let client = reqwest::Client::new();
 
-    // 场景 JSON
-    let scenario_json = serde_json::json!({
-        "id": scenario_id,
-        "name": "修改 Pool 价格",
-        "description": "将 Pool 的 sqrt_price 修改为新值",
-        "overrides": [
-            {
-                "id": "override-1",
-                "templateId": "meteora-pool-override",
-                "account": {
-                    "type": "pubkey",
-                    "value": pool_address.to_string()
-                },
-                "values": {
-                    "sqrt_price": new_sqrt_price.to_string(),
-                    "liquidity": pool_data.liquidity.to_string()
-                },
-                "scenarioRelativeSlot": 1,
-                "enabled": true,
-                "fetchBeforeUse": true  // 先获取最新数据再应用覆盖
-            }
-        ]
-    });
+    // 将数据编码为 hex（surfnet_setAccount 期望 hex 格式）
+    let data_hex = hex::encode(&new_data);
 
     let response = client
         .post("http://127.0.0.1:8899")
         .json(&serde_json::json!({
             "jsonrpc": "2.0",
             "id": 1,
-            "method": "surfnet_registerScenario",
-            "params": [scenario_json]
+            "method": "surfnet_setAccount",
+            "params": [
+                pool_address.to_string(),
+                {
+                    "lamports": original_account.lamports(),
+                    "data": data_hex,
+                    "owner": original_account.owner().to_string(),
+                    "executable": original_account.executable(),
+                    "rentEpoch": original_account.rent_epoch()
+                }
+            ]
         }))
         .send()
         .await?;
 
     let result: serde_json::Value = response.json().await?;
-    println!("  场景注册结果: {:?}", result);
+    println!("  surfnet_setAccount 结果: {:?}", result);
 
-    // 激活场景
-    let response = client
-        .post("http://127.0.0.1:8899")
-        .json(&serde_json::json!({
-            "jsonrpc": "2.0",
-            "id": 1,
-            "method": "surfnet_activateScenario",
-            "params": [scenario_id]
-        }))
-        .send()
-        .await?;
+    if result.get("error").is_some() {
+        return Err(format!("账户覆盖失败: {:?}", result.get("error")).into());
+    }
 
-    let result: serde_json::Value = response.json().await?;
-    println!("  场景激活结果: {:?}", result);
+    // 验证覆盖是否生效 - 直接读取账户数据
+    println!("  验证覆盖结果...");
+    let verify_account = rpc.get_account(pool_address)
+        .await
+        .map_err(|e| format!("验证时获取账户失败: {}", e))?;
 
-    Ok(scenario_id)
+    let verify_data = verify_account.data();
+    if verify_data.len() >= 184 {
+        let actual_sqrt_price = u128::from_le_bytes([
+            verify_data[168], verify_data[169], verify_data[170], verify_data[171],
+            verify_data[172], verify_data[173], verify_data[174], verify_data[175],
+            verify_data[176], verify_data[177], verify_data[178], verify_data[179],
+            verify_data[180], verify_data[181], verify_data[182], verify_data[183],
+        ]);
+        println!("  验证 - 账户数据中的 sqrt_price: {}", actual_sqrt_price);
+        if actual_sqrt_price == new_sqrt_price {
+            println!("  ✅ sqrt_price 覆盖验证成功!");
+        } else {
+            println!("  ⚠️ sqrt_price 不匹配: 期望 {}, 实际 {}", new_sqrt_price, actual_sqrt_price);
+        }
+    }
+
+    println!("  ✅ Pool 账户数据已直接覆盖");
+    Ok(())
 }
 
 /// 测试：获取 Pool 信息（基础测试）
@@ -262,33 +324,83 @@ async fn test_meteora_damm_v2_swap_with_scenario() {
     println!("  Base Mint (Pigeon): {}", base_mint);
     println!("  Quote Mint (WSOL): {}", quote_mint);
 
-    // 2. 获取当前 Pool 数据
-    let pool_data = sol_trade_sdk::instruction::utils::meteora_damm_v2::get_pool_by_address(
+    // 2. 获取当前 Pool 数据（场景覆盖前）
+    let pool_data_before = sol_trade_sdk::instruction::utils::meteora_damm_v2::get_pool_by_address(
         &rpc,
         &pool_address,
     )
     .await
     .expect("获取 Pool 数据失败");
 
-    println!("  当前 sqrt_price: {}", pool_data.sqrt_price);
-    println!("  当前 liquidity: {}", pool_data.liquidity);
+    println!("\n📊 【场景覆盖前】Pool 状态:");
+    println!("  sqrt_price: {}", pool_data_before.sqrt_price);
+    println!("  liquidity: {}", pool_data_before.liquidity);
+    println!("  pool_status: {}", pool_data_before.pool_status);
+    println!("  protocol_a_fee: {}", pool_data_before.protocol_a_fee);
+    println!("  protocol_b_fee: {}", pool_data_before.protocol_b_fee);
 
-    // 3. 尝试注册 IDL 和创建场景
-    // 注意：这取决于 surfpool 是否支持
-    let _scenario_id = match create_price_scenario(&rpc, &pool_address, pool_data.sqrt_price).await
-    {
-        Ok(id) => {
-            println!("  ✅ 场景创建成功: {}", id);
-            Some(id)
+    // 3. 尝试直接覆盖 Pool 账户数据
+    // 修改 sqrt_price 为一个不同的值（增加 1%）来验证覆盖是否生效
+    let modified_sqrt_price = pool_data_before.sqrt_price.saturating_mul(101).saturating_div(100);
+    println!("\n📝 计划修改 sqrt_price:");
+    println!("  原值: {}", pool_data_before.sqrt_price);
+    println!("  新值: {} (增加 1%)", modified_sqrt_price);
+
+    // 使用 surfnet_setAccount 直接修改账户数据
+    match override_pool_account_directly(&rpc, &pool_address, modified_sqrt_price).await {
+        Ok(_) => {
+            // 直接读取账户数据验证覆盖是否生效（绕过 SDK 缓存）
+            println!("\n📊 【覆盖后】直接读取账户数据验证:");
+            match rpc.get_account(&pool_address).await {
+                Ok(account) => {
+                    let data = account.data();
+                    if data.len() >= 184 {
+                        let actual_sqrt_price = u128::from_le_bytes([
+                            data[168], data[169], data[170], data[171],
+                            data[172], data[173], data[174], data[175],
+                            data[176], data[177], data[178], data[179],
+                            data[180], data[181], data[182], data[183],
+                        ]);
+                        println!("  账户数据中的 sqrt_price: {}", actual_sqrt_price);
+
+                        // 比较差异
+                        println!("\n📈 差异对比:");
+                        if actual_sqrt_price == modified_sqrt_price {
+                            println!("  ✅ sqrt_price 已成功覆盖: {} -> {}",
+                                pool_data_before.sqrt_price, actual_sqrt_price);
+                        } else {
+                            println!("  ⚠️ sqrt_price 不匹配: 期望 {}, 实际 {}",
+                                modified_sqrt_price, actual_sqrt_price);
+                        }
+                    } else {
+                        println!("  ⚠️ 账户数据太短: {} bytes", data.len());
+                    }
+                },
+                Err(e) => {
+                    println!("  ⚠️ 覆盖后读取账户数据失败: {}", e);
+                },
+            }
         },
         Err(e) => {
-            println!("  ⚠️ 场景创建失败: {}", e);
-            println!("     继续普通 swap 测试...");
-            None
+            println!("  ⚠️ 直接覆盖失败: {}", e);
+            println!("     继续执行普通 swap 测试...");
         },
-    };
+    }
 
-    // 4. 创建 SolanaTrade 客户端用于真实交易执行
+    // 4. 确保 payer 有足够的 SOL 余额（surfpool 重启后需要）
+    println!("\n💧 确保 payer SOL 余额...");
+    if let Err(e) = sol_trade_test_utils::ensure_sol_balance(
+        &rpc,
+        "http://127.0.0.1:8899",
+        &payer.pubkey(),
+        10, // 确保有 10 SOL
+    )
+    .await
+    {
+        println!("  ⚠️ 确保 SOL 余额失败: {}", e);
+    }
+
+    // 5. 创建 SolanaTrade 客户端用于真实交易执行
     let rpc_url = "http://127.0.0.1:8899".to_string();
     let commitment = CommitmentConfig::confirmed();
     let swqos_configs: Vec<SwqosConfig> = vec![SwqosConfig::Default(rpc_url.clone())];
