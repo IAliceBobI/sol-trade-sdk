@@ -140,23 +140,14 @@ async fn test_meteora_damm_v2_buy() {
     // 4. 构建 buy 指令
     println!("\n[步骤 3] 构建买入指令...");
     let builder = MeteoraDammV2InstructionBuilder;
-    let instructions = builder
-        .build_buy_instructions(&swap_params)
-        .await
-        .expect("构建指令失败");
+    let instructions = builder.build_buy_instructions(&swap_params).await.expect("构建指令失败");
     println!("  指令数量: {}", instructions.len());
 
     // 5. 获取用户 ATA 地址
-    let user_base_token_account = get_associated_token_address_with_program_id(
-        &payer.pubkey(),
-        &base_mint,
-        &base_program,
-    );
-    let user_quote_token_account = get_associated_token_address_with_program_id(
-        &payer.pubkey(),
-        &quote_mint,
-        &quote_program,
-    );
+    let user_base_token_account =
+        get_associated_token_address_with_program_id(&payer.pubkey(), &base_mint, &base_program);
+    let user_quote_token_account =
+        get_associated_token_address_with_program_id(&payer.pubkey(), &quote_mint, &quote_program);
 
     println!("  用户 Base ATA: {}", user_base_token_account);
     println!("  用户 Quote ATA: {}", user_quote_token_account);
@@ -185,10 +176,7 @@ async fn test_meteora_damm_v2_buy() {
 
     // 7. 验证结果
     assert!(simulated_result.success, "模拟执行失败");
-    assert!(
-        simulated_result.actual_output_amount > 0,
-        "输出金额应该大于 0"
-    );
+    assert!(simulated_result.actual_output_amount > 0, "输出金额应该大于 0");
 
     println!("\n✅ Meteora DAMM V2 Buy 测试通过!");
 }
@@ -281,16 +269,10 @@ async fn test_meteora_damm_v2_sell() {
         .await
         .expect("构建买入指令失败");
 
-    let user_base_token_account = get_associated_token_address_with_program_id(
-        &payer.pubkey(),
-        &base_mint,
-        &base_program,
-    );
-    let user_quote_token_account = get_associated_token_address_with_program_id(
-        &payer.pubkey(),
-        &quote_mint,
-        &quote_program,
-    );
+    let user_base_token_account =
+        get_associated_token_address_with_program_id(&payer.pubkey(), &base_mint, &base_program);
+    let user_quote_token_account =
+        get_associated_token_address_with_program_id(&payer.pubkey(), &quote_mint, &quote_program);
 
     let buy_result = simulate_swap_transaction(
         &rpc,
@@ -313,17 +295,12 @@ async fn test_meteora_damm_v2_sell() {
     let rpc_url = "http://127.0.0.1:8899";
     // Pigeon token 使用 Token-2022 Program，decimals 需要查询
     let base_decimals = 6; // 假设 Pigeon 是 6 decimals，实际需要查询确认
-    let base_amount_formatted = format!("{}", base_balance as f64 / 10f64.powi(base_decimals as i32));
+    let base_amount_formatted =
+        format!("{}", base_balance as f64 / 10f64.powi(base_decimals as i32));
 
-    ensure_token_balance(
-        &rpc,
-        rpc_url,
-        payer.as_ref(),
-        &base_mint,
-        &base_amount_formatted,
-    )
-    .await
-    .expect("空投 Pigeon token 失败");
+    ensure_token_balance(&rpc, rpc_url, payer.as_ref(), &base_mint, &base_amount_formatted)
+        .await
+        .expect("空投 Pigeon token 失败");
     println!("  ✅ Pigeon token 余额已设置: {}", base_amount_formatted);
 
     // 3. 准备卖出参数
@@ -398,10 +375,7 @@ async fn test_meteora_damm_v2_sell() {
 
     // 7. 验证结果
     assert!(sell_result.success, "卖出模拟失败");
-    assert!(
-        sell_result.actual_output_amount > 0,
-        "WSOL 输出金额应该大于 0"
-    );
+    assert!(sell_result.actual_output_amount > 0, "WSOL 输出金额应该大于 0");
 
     println!("\n✅ Meteora DAMM V2 Sell 测试通过!");
 }

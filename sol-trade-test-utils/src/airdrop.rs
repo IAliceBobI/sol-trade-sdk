@@ -99,10 +99,7 @@ pub async fn set_sol_balance(rpc_url: &str, pubkey: &Pubkey, lamports: u64) -> R
         .await
         .map_err(|e| format!("HTTP 请求失败: {}", e))?;
 
-    let response_text = response
-        .text()
-        .await
-        .map_err(|e| format!("读取响应失败: {}", e))?;
+    let response_text = response.text().await.map_err(|e| format!("读取响应失败: {}", e))?;
     let response_json: Value =
         serde_json::from_str(&response_text).map_err(|e| format!("解析 JSON 失败: {}", e))?;
 
