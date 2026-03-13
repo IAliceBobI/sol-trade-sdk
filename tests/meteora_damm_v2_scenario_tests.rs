@@ -10,14 +10,14 @@
 //! ```
 
 use sol_trade_sdk::{
+    SolanaTrade, TradeBuyParams, TradeTokenType,
+    common::GasFeeStrategy,
     common::SolanaRpcClient,
-    instruction::meteora_damm_v2::MeteoraDammV2InstructionBuilder,
-    swqos::TradeType,
-    trading::core::params::{DexParamEnum, MeteoraDammV2Params, SwapParams},
-    trading::core::traits::InstructionBuilder,
-    utils::simulation_based_calc::{SimulatedSwapResult, simulate_swap_transaction},
+    swqos::SwqosConfig,
+    trading::core::params::{DexParamEnum, MeteoraDammV2Params},
 };
 use sol_trade_test_utils::get_simulation_test_keypair;
+use solana_commitment_config::CommitmentConfig;
 use solana_sdk::{
     pubkey::Pubkey,
     signature::{Keypair, Signer},
@@ -223,7 +223,7 @@ async fn test_register_meteora_idl() {
     }
 }
 
-/// 测试：创建场景并执行 swap
+/// 测试：创建场景并执行真实 swap 交易
 #[tokio::test]
 #[serial_test::serial(meteora_damm_v2_scenario)]
 async fn test_meteora_damm_v2_swap_with_scenario() {
@@ -231,7 +231,7 @@ async fn test_meteora_damm_v2_swap_with_scenario() {
     let pool_address = get_test_pool_address();
 
     println!("\n========================================");
-    println!("Meteora DAMM V2 Swap 场景测试");
+    println!("Meteora DAMM V2 Swap 场景测试（真实执行）");
     println!("========================================");
 
     // 1. 获取 Pool 参数
@@ -243,7 +243,7 @@ async fn test_meteora_damm_v2_swap_with_scenario() {
     let wsol_mint = sol_trade_sdk::constants::WSOL_TOKEN_ACCOUNT;
     let is_token_a_wsol = protocol_params.token_a_mint == wsol_mint;
 
-    let (base_mint, base_program, quote_mint, quote_program) = if is_token_a_wsol {
+    let (base_mint, base_program, quote_mint, _quote_program) = if is_token_a_wsol {
         (
             protocol_params.token_b_mint,
             protocol_params.token_b_program,
@@ -288,79 +288,96 @@ async fn test_meteora_damm_v2_swap_with_scenario() {
         },
     };
 
-    // 3. 执行 swap 测试
+    // 4. 创建 SolanaTrade 客户端用于真实交易执行
+    let rpc_url = "http://127.0.0.1:8899".to_string();
+    let commitment = CommitmentConfig::confirmed();
+    let swqos_configs: Vec<SwqosConfig> = vec![SwqosConfig::Default(rpc_url.clone())];
+    let trade_config = sol_trade_sdk::TradeConfig::new(rpc_url, swqos_configs, commitment)
+        .with_wsol_ata_config(true, false);
+    let client = SolanaTrade::new(payer.clone(), trade_config).await;
+
+    // 5. 确保有足够的 WSOL 余额用于交易
     let quote_amount_in = 1_000_000u64; // 0.001 WSOL
-    let min_base_amount_out = 1u64;
-
-    let gas_fee_strategy = sol_trade_test_utils::create_test_gas_fee_strategy();
-
-    let swap_params = SwapParams {
-        rpc: Some(rpc.clone()),
-        payer: Arc::new(payer.insecure_clone()),
-        trade_type: TradeType::Buy,
-        input_mint: quote_mint,
-        input_token_program: Some(quote_program),
-        output_mint: base_mint,
-        output_token_program: Some(base_program),
-        input_amount: Some(quote_amount_in),
-        slippage_basis_points: Some(500),
-        address_lookup_table_account: None,
-        recent_blockhash: None,
-        wait_transaction_confirmed: false,
-        protocol_params: DexParamEnum::MeteoraDammV2(protocol_params.clone()),
-        open_seed_optimize: false,
-        swqos_clients: vec![],
-        middleware_manager: None,
-        durable_nonce: None,
-        with_tip: false,
-        create_input_mint_ata: true,
-        close_input_mint_ata: true,
-        create_output_mint_ata: true,
-        close_output_mint_ata: false,
-        fixed_output_amount: Some(min_base_amount_out),
-        gas_fee_strategy,
-        simulate: true,
-        on_transaction_signed: None,
-        callback_execution_mode: None,
-        enable_jito_sandwich_protection: None,
-    };
-
-    // 构建 buy 指令
-    let builder = MeteoraDammV2InstructionBuilder;
-    let instructions = builder.build_buy_instructions(&swap_params).await.expect("构建指令失败");
-
-    // 获取用户 ATA 地址
-    let user_base_token_account =
-        get_associated_token_address_with_program_id(&payer.pubkey(), &base_mint, &base_program);
-    let user_quote_token_account =
-        get_associated_token_address_with_program_id(&payer.pubkey(), &quote_mint, &quote_program);
-
-    // 模拟执行
-    let simulated_result: SimulatedSwapResult = simulate_swap_transaction(
+    println!("\n  确保 WSOL 余额...");
+    if let Err(e) = sol_trade_test_utils::ensure_token_balance(
         &rpc,
+        "http://127.0.0.1:8899",
         payer.as_ref(),
-        instructions,
-        user_quote_token_account,
-        user_base_token_account,
-        quote_mint,
-        base_mint,
+        &quote_mint,
+        "0.01", // 确保有 0.01 WSOL
     )
     .await
-    .expect("模拟执行失败");
-
-    println!("\nSwap 结果:");
-    println!("  模拟成功: {}", simulated_result.success);
-    println!("  实际输入金额 (WSOL): {}", simulated_result.actual_input_amount);
-    println!("  实际输出金额 (Pigeon): {}", simulated_result.actual_output_amount);
-
-    if let Some(error) = &simulated_result.error {
-        println!("  错误: {}", error);
+    {
+        panic!("❌ 确保 WSOL 余额失败: {}", e);
     }
 
-    assert!(simulated_result.success, "模拟执行失败");
-    assert!(simulated_result.actual_output_amount > 0, "输出金额应该大于 0");
+    // 获取最新的 blockhash
+    let recent_blockhash = rpc
+        .get_latest_blockhash()
+        .await
+        .expect("获取 blockhash 失败");
 
-    println!("\n✅ Meteora DAMM V2 场景测试通过!");
+    // 6. 设置 Gas 策略
+    let gas_fee_strategy = GasFeeStrategy::new();
+    gas_fee_strategy.set_global_fee_strategy(150_000, 150_000, 500_000, 500_000, 0.001, 0.001);
+
+    // 7. 构建买入参数并执行真实交易
+    let buy_params = TradeBuyParams {
+        dex_type: sol_trade_sdk::DexType::MeteoraDammV2,
+        input_token_type: TradeTokenType::WSOL,
+        mint: base_mint,
+        input_token_amount: quote_amount_in,
+        slippage_basis_points: Some(500), // 5% 滑点
+        recent_blockhash: Some(recent_blockhash),
+        extension_params: DexParamEnum::MeteoraDammV2(protocol_params.clone()),
+        address_lookup_table_account: None,
+        wait_transaction_confirmed: true, // 等待交易确认
+        create_input_token_ata: true,
+        close_input_token_ata: false,
+        create_mint_ata: true,
+        durable_nonce: None,
+        enable_jito_sandwich_protection: Some(false),
+        fixed_output_token_amount: Some(1u64), // 最小输出 1 个 base token
+        gas_fee_strategy,
+        simulate: false, // 真实执行，不使用模拟
+        on_transaction_signed: None,
+        callback_execution_mode: None,
+    };
+
+    println!("\n  执行买入交易...");
+    let (success, signatures, error) = client
+        .buy(buy_params)
+        .await
+        .expect("买入交易执行失败");
+
+    println!("\nSwap 结果:");
+    println!("  交易成功: {}", success);
+
+    if success {
+        println!("  交易签名数量: {}", signatures.len());
+        for (i, sig) in signatures.iter().enumerate() {
+            println!("  签名[{}]: {}", i, sig);
+        }
+
+        // 获取交易后的 base token 余额
+        let user_base_ata =
+            get_associated_token_address_with_program_id(&payer.pubkey(), &base_mint, &base_program);
+        match rpc.get_token_account_balance(&user_base_ata).await {
+            Ok(token_balance) => {
+                let ui_amount = token_balance.ui_amount.unwrap_or(0.0);
+                println!("  Base Token 余额: {}", ui_amount);
+                assert!(ui_amount > 0.0, "买入后应有 base token 余额");
+            },
+            Err(e) => {
+                println!("  ⚠️ 获取 Base Token 余额失败: {}", e);
+            },
+        }
+    } else {
+        println!("  交易失败: {:?}", error);
+        panic!("买入交易失败: {:?}", error);
+    }
+
+    println!("\n✅ Meteora DAMM V2 真实交易测试通过!");
 }
 
 // 手动使用说明：
