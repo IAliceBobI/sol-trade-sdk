@@ -9,7 +9,7 @@
 //! cargo nextest run meteora_damm_v2_swap --nocapture 2>&1
 //! ```
 
-use sol_trade_test_utils::{ensure_token_balance, get_simulation_test_keypair};
+use sol_trade_test_utils::{ensure_sol_balance, ensure_token_balance, get_simulation_test_keypair};
 
 use sol_trade_sdk::{
     common::SolanaRpcClient,
@@ -50,6 +50,22 @@ fn setup_test() -> (Arc<SolanaRpcClient>, Arc<Keypair>) {
 async fn test_meteora_damm_v2_buy() {
     let (rpc, payer) = setup_test();
     let pool_address = get_test_pool_address();
+
+    // 先给payer设置余额：10 WSOL 和 1000000 Pigeon
+    let rpc_url = "http://127.0.0.1:8899";
+    let wsol_mint = sol_trade_sdk::constants::WSOL_TOKEN_ACCOUNT;
+    let pigeon_mint = Pubkey::from_str("4fSWEw2wbYEUCcMtitzmeGUfqinoafXxkhqZrA9Gpump")
+        .expect("Invalid Pigeon mint");
+
+    // 设置 10 WSOL 余额
+    ensure_sol_balance(&rpc, rpc_url, &payer.pubkey(), 10)
+        .await
+        .expect("设置 WSOL 余额失败");
+
+    // 设置 1000000 Pigeon 余额
+    ensure_token_balance(&rpc, rpc_url, payer.as_ref(), &pigeon_mint, "1000000")
+        .await
+        .expect("设置 Pigeon 余额失败");
 
     println!("\n========================================");
     println!("Meteora DAMM V2 Buy 测试");
