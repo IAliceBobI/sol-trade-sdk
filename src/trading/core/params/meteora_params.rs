@@ -43,11 +43,14 @@ impl MeteoraDammV2Params {
             crate::instruction::utils::meteora_damm_v2::get_pool_by_address(rpc, pool_address)
                 .await?;
 
-        // 获取 Token Program（使用缓存，避免重复 RPC 调用）
-        let token_a_program =
-            crate::utils::token::get_token_program_with_cache(rpc, &pool_data.token_a_mint).await?;
-        let token_b_program =
-            crate::utils::token::get_token_program_with_cache(rpc, &pool_data.token_b_mint).await?;
+        // 🔧 获取 Token Program（从 Vault 账户的 owner）
+        // Meteora DAMM V2 验证的是 Vault 账户的 owner 而不是 Mint 账户的 owner
+        // 参考: ./temp/meteora/dlmm/damm-v2/programs/cp-amm/src/instructions/swap/ix_swap.rs
+        // require!(token_a_vault.owner() == token_a_program.key(), ErrorCode::ConstraintTokenTokenProgram);
+        let token_a_vault_account = rpc.get_account(&pool_data.token_a_vault).await?;
+        let token_b_vault_account = rpc.get_account(&pool_data.token_b_vault).await?;
+        let token_a_program = token_a_vault_account.owner;
+        let token_b_program = token_b_vault_account.owner;
 
         Ok(Self {
             pool: *pool_address,
