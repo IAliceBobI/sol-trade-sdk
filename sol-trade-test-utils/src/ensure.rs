@@ -2,7 +2,7 @@
 //!
 //! 提供便捷的测试辅助函数，确保账户有足够的余额和流动性
 
-use crate::airdrop::airdrop_and_wait;
+use crate::airdrop::set_sol_balance;
 use crate::token::{get_mint_info, parse_formatted_amount};
 use solana_rpc_client::nonblocking::rpc_client::RpcClient;
 use solana_sdk::{
@@ -20,7 +20,9 @@ use sol_trade_sdk::liquidity::cpmm::{build_deposit_instruction, CpmmDepositParam
 
 /// 确保账户有足够的 SOL 余额
 ///
-/// 如果余额不足，会自动空投
+/// 如果余额不足，会使用 surfnet_setAccount 直接设置余额（比空投更快）
+///
+/// ⚠️ 仅适用于测试环境（surfpool）
 ///
 /// # 参数
 /// * `rpc_client` - RPC 客户端
@@ -47,10 +49,11 @@ pub async fn ensure_sol_balance(
 
     if balance < min_balance_lamports {
         println!(
-            "💰 SOL 余额不足: {} lamports (需要 {} lamports)，正在空投...",
+            "💰 SOL 余额不足: {} lamports (需要 {} lamports)，正在设置...",
             balance, min_balance_lamports
         );
-        airdrop_and_wait(rpc_url, payer, min_balance_sol).await?;
+        // 使用 surfnet_setAccount 直接设置余额，比空投更快
+        set_sol_balance(rpc_url, payer, min_balance_lamports).await?;
     } else {
         println!(
             "✅ SOL 余额充足: {} lamports ({:.2} SOL)",

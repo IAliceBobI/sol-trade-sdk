@@ -1,5 +1,7 @@
 //! 空投相关功能
 
+use reqwest::Client;
+use serde_json::Value;
 use solana_rpc_client::nonblocking::rpc_client::RpcClient;
 use solana_sdk::{native_token::LAMPORTS_PER_SOL, pubkey::Pubkey};
 
@@ -54,4 +56,60 @@ pub async fn airdrop_and_wait(
         },
         Err(e) => Err(format!("空投失败: {}", e)),
     }
+}
+
+/// 直接设置账户的 SOL 余额（使用 surfnet_setAccount）
+///
+/// 比空投更快，无需等待交易确认。仅适用于 surfpool 测试环境。
+///
+/// # 参数
+/// * `rpc_url` - RPC URL
+/// * `pubkey` - 账户公钥
+/// * `lamports` - 目标余额（lamports）
+///
+/// # 返回
+/// * `Ok(())` - 设置成功
+/// * `Err(String)` - 设置失败
+///
+/// # 示例
+/// ```ignore
+/// // 设置账户余额为 10 SOL
+/// set_sol_balance("http://127.0.0.1:8899", &pubkey, 10_000_000_000).await?;
+/// ```
+pub async fn set_sol_balance(rpc_url: &str, pubkey: &Pubkey, lamports: u64) -> Result<(), String> {
+    let http_client = Client::new();
+
+    // 构造 surfnet_setAccount RPC 请求
+    let request_body = format!(
+        r#"{{"jsonrpc":"2.0","id":1,"method":"surfnet_setAccount","params":["{}",{{"lamports":{} }}]}}"#,
+        pubkey, lamports
+    );
+
+    println!(
+        "💰 直接设置 SOL 余额: {} lamports ({:.2} SOL)",
+        lamports,
+        lamports as f64 / 1_000_000_000.0
+    );
+
+    let response = http_client
+        .post(rpc_url)
+        .header("Content-Type", "application/json")
+        .body(request_body)
+        .send()
+        .await
+        .map_err(|e| format!("HTTP 请求失败: {}", e))?;
+
+    let response_text = response
+        .text()
+        .await
+        .map_err(|e| format!("读取响应失败: {}", e))?;
+    let response_json: Value =
+        serde_json::from_str(&response_text).map_err(|e| format!("解析 JSON 失败: {}", e))?;
+
+    if let Some(error) = response_json.get("error") {
+        return Err(format!("RPC 错误: {}", error));
+    }
+
+    println!("   ✅ SOL 余额设置成功\n");
+    Ok(())
 }

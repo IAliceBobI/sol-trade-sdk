@@ -35,7 +35,7 @@ pub mod test_params;
 pub mod token;
 
 // 重新导出常用类型
-pub use airdrop::airdrop_and_wait;
+pub use airdrop::{airdrop_and_wait, set_sol_balance};
 pub use ensure::{
     ensure_cpmm_liquidity, ensure_pipe_pool_liquidity_via_swap, ensure_sol_balance,
     ensure_token_balance, ensure_usdc_prts_pool_usdc_liquidity,
