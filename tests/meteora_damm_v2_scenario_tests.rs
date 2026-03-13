@@ -86,6 +86,7 @@ async fn register_meteora_idl(_rpc: &SolanaRpcClient) -> Result<(), Box<dyn std:
 /// 检查 surfpool 场景系统是否可用
 ///
 /// 通过调用 surfnet_registerScenario 注册一个测试场景来检查可用性
+#[allow(dead_code)]
 async fn check_scenario_system_available() -> bool {
     let client = reqwest::Client::new();
 
@@ -145,7 +146,8 @@ async fn override_pool_account_directly(
     println!("  当前 liquidity: {}", pool_data.liquidity);
 
     // 获取原始账户数据
-    let original_account = rpc.get_account(pool_address)
+    let original_account = rpc
+        .get_account(pool_address)
         .await
         .map_err(|e| format!("获取账户数据失败: {}", e))?;
 
@@ -204,17 +206,30 @@ async fn override_pool_account_directly(
 
     // 验证覆盖是否生效 - 直接读取账户数据
     println!("  验证覆盖结果...");
-    let verify_account = rpc.get_account(pool_address)
+    let verify_account = rpc
+        .get_account(pool_address)
         .await
         .map_err(|e| format!("验证时获取账户失败: {}", e))?;
 
     let verify_data = verify_account.data();
     if verify_data.len() >= 184 {
         let actual_sqrt_price = u128::from_le_bytes([
-            verify_data[168], verify_data[169], verify_data[170], verify_data[171],
-            verify_data[172], verify_data[173], verify_data[174], verify_data[175],
-            verify_data[176], verify_data[177], verify_data[178], verify_data[179],
-            verify_data[180], verify_data[181], verify_data[182], verify_data[183],
+            verify_data[168],
+            verify_data[169],
+            verify_data[170],
+            verify_data[171],
+            verify_data[172],
+            verify_data[173],
+            verify_data[174],
+            verify_data[175],
+            verify_data[176],
+            verify_data[177],
+            verify_data[178],
+            verify_data[179],
+            verify_data[180],
+            verify_data[181],
+            verify_data[182],
+            verify_data[183],
         ]);
         println!("  验证 - 账户数据中的 sqrt_price: {}", actual_sqrt_price);
         if actual_sqrt_price == new_sqrt_price {
@@ -232,7 +247,7 @@ async fn override_pool_account_directly(
 ///
 /// 为 surfpool 未同步的 token mint 创建一个最小化的账户结构
 async fn create_token_mint_account(
-    rpc: &SolanaRpcClient,
+    _rpc: &SolanaRpcClient,
     mint_address: &Pubkey,
 ) -> Result<(), Box<dyn std::error::Error>> {
     println!("  创建/覆盖 Mint 账户: {}", mint_address);
@@ -259,9 +274,8 @@ async fn create_token_mint_account(
     // bytes 46-49 already 0
 
     // Token Program ID
-    let token_program = solana_sdk::pubkey::Pubkey::from_str(
-        "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
-    )?;
+    let token_program =
+        solana_sdk::pubkey::Pubkey::from_str("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA")?;
 
     // 使用 surfnet_setAccount 创建账户
     let client = reqwest::Client::new();
@@ -377,9 +391,9 @@ async fn test_meteora_damm_v2_swap_with_scenario() {
 
     // 手动构建 Pool 参数（避免 surfpool 未同步 token mint 账户的问题）
     // 使用标准 Token Program ID（WSOL 和普通 token 都使用同一个）
-    let token_program = solana_sdk::pubkey::Pubkey::from_str(
-        "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
-    ).expect("Invalid token program");
+    let token_program =
+        solana_sdk::pubkey::Pubkey::from_str("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA")
+            .expect("Invalid token program");
 
     let protocol_params = MeteoraDammV2Params::new(
         pool_address,
@@ -441,9 +455,8 @@ async fn test_meteora_damm_v2_swap_with_scenario() {
                     let data = account.data();
                     if data.len() >= 184 {
                         let actual_sqrt_price = u128::from_le_bytes([
-                            data[168], data[169], data[170], data[171],
-                            data[172], data[173], data[174], data[175],
-                            data[176], data[177], data[178], data[179],
+                            data[168], data[169], data[170], data[171], data[172], data[173],
+                            data[174], data[175], data[176], data[177], data[178], data[179],
                             data[180], data[181], data[182], data[183],
                         ]);
                         println!("  账户数据中的 sqrt_price: {}", actual_sqrt_price);
@@ -451,11 +464,15 @@ async fn test_meteora_damm_v2_swap_with_scenario() {
                         // 比较差异
                         println!("\n📈 差异对比:");
                         if actual_sqrt_price == modified_sqrt_price {
-                            println!("  ✅ sqrt_price 已成功覆盖: {} -> {}",
-                                pool_data_before.sqrt_price, actual_sqrt_price);
+                            println!(
+                                "  ✅ sqrt_price 已成功覆盖: {} -> {}",
+                                pool_data_before.sqrt_price, actual_sqrt_price
+                            );
                         } else {
-                            println!("  ⚠️ sqrt_price 不匹配: 期望 {}, 实际 {}",
-                                modified_sqrt_price, actual_sqrt_price);
+                            println!(
+                                "  ⚠️ sqrt_price 不匹配: 期望 {}, 实际 {}",
+                                modified_sqrt_price, actual_sqrt_price
+                            );
                         }
                     } else {
                         println!("  ⚠️ 账户数据太短: {} bytes", data.len());
@@ -515,10 +532,7 @@ async fn test_meteora_damm_v2_swap_with_scenario() {
     }
 
     // 获取最新的 blockhash
-    let recent_blockhash = rpc
-        .get_latest_blockhash()
-        .await
-        .expect("获取 blockhash 失败");
+    let recent_blockhash = rpc.get_latest_blockhash().await.expect("获取 blockhash 失败");
 
     // 6. 设置 Gas 策略
     let gas_fee_strategy = GasFeeStrategy::new();
@@ -548,10 +562,7 @@ async fn test_meteora_damm_v2_swap_with_scenario() {
     };
 
     println!("\n  执行买入交易...");
-    let (success, signatures, error) = client
-        .buy(buy_params)
-        .await
-        .expect("买入交易执行失败");
+    let (success, signatures, error) = client.buy(buy_params).await.expect("买入交易执行失败");
 
     println!("\nSwap 结果:");
     println!("  交易成功: {}", success);
@@ -563,8 +574,11 @@ async fn test_meteora_damm_v2_swap_with_scenario() {
         }
 
         // 获取交易后的 base token 余额
-        let user_base_ata =
-            get_associated_token_address_with_program_id(&payer.pubkey(), &base_mint, &base_program);
+        let user_base_ata = get_associated_token_address_with_program_id(
+            &payer.pubkey(),
+            &base_mint,
+            &base_program,
+        );
         match rpc.get_token_account_balance(&user_base_ata).await {
             Ok(token_balance) => {
                 let ui_amount = token_balance.ui_amount.unwrap_or(0.0);
