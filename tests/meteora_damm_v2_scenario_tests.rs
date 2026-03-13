@@ -499,7 +499,6 @@ async fn test_meteora_damm_v2_swap_with_scenario() {
     println!("\n💧 确保 payer SOL 余额...");
     if let Err(e) = sol_trade_test_utils::ensure_sol_balance(
         &rpc,
-        "http://127.0.0.1:8899",
         &payer.pubkey(),
         10, // 确保有 10 SOL
     )
@@ -521,7 +520,6 @@ async fn test_meteora_damm_v2_swap_with_scenario() {
     println!("\n  确保 WSOL 余额...");
     if let Err(e) = sol_trade_test_utils::ensure_token_balance(
         &rpc,
-        "http://127.0.0.1:8899",
         payer.as_ref(),
         &quote_mint,
         "0.01", // 确保有 0.01 WSOL

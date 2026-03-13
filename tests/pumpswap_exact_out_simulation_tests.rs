@@ -472,7 +472,6 @@ async fn test_exact_out_sell_full_verification() {
 
     ensure_token_balance(
         &client.rpc,
-        rpc_url,
         client.payer.as_ref(),
         &protocol_params.base_mint,
         &base_formatted,

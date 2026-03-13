@@ -118,7 +118,7 @@ async fn test_raydium_clmm_usdt_wsol_exact_in_buy_with_framework() {
 
     // 确保 WSOL 余额（Token Program）
     if let Err(e) =
-        ensure_token_balance(&client.rpc, rpc_url, client.payer.as_ref(), &wsol_mint(), "10").await
+        ensure_token_balance(&client.rpc, client.payer.as_ref(), &wsol_mint(), "10").await
     {
         panic!("❌ 确保 WSOL 余额失败: {}", e);
     }
@@ -197,7 +197,6 @@ async fn test_raydium_clmm_usdt_wsol_sell_exact_in() {
     // 确保 USDT 余额（Token Program，卖出需要持有 USDT）
     if let Err(e) = ensure_token_balance(
         &client.rpc,
-        rpc_url,
         client.payer.as_ref(),
         &usdt_mint(),
         "1000", // 1,000 USDT（足够卖出 10 USDT）

@@ -26,17 +26,15 @@ use sol_trade_sdk::liquidity::cpmm::{build_deposit_instruction, CpmmDepositParam
 ///
 /// # 参数
 /// * `rpc_client` - RPC 客户端
-/// * `rpc_url` - RPC URL
 /// * `payer` - 账户地址
 /// * `min_balance_sol` - 最小 SOL 余额
 ///
 /// # 示例
 /// ```ignore
-/// ensure_sol_balance(&rpc, "http://127.0.0.1:8899", &payer.pubkey(), 10).await?;
+/// ensure_sol_balance(&rpc, &payer.pubkey(), 10).await?;
 /// ```
 pub async fn ensure_sol_balance(
     rpc_client: &Arc<RpcClient>,
-    rpc_url: &str,
     payer: &Pubkey,
     min_balance_sol: u64,
 ) -> Result<(), String> {
@@ -53,7 +51,8 @@ pub async fn ensure_sol_balance(
             balance, min_balance_lamports
         );
         // 使用 surfnet_setAccount 直接设置余额，比空投更快
-        set_sol_balance(rpc_url, payer, min_balance_lamports).await?;
+        let rpc_url = rpc_client.url();
+        set_sol_balance(&rpc_url, payer, min_balance_lamports).await?;
     } else {
         println!(
             "✅ SOL 余额充足: {} lamports ({:.2} SOL)",
@@ -71,18 +70,16 @@ pub async fn ensure_sol_balance(
 ///
 /// # 参数
 /// * `rpc_client` - RPC 客户端
-/// * `rpc_url` - RPC URL
 /// * `payer` - 账户 Keypair
 /// * `mint` - Token mint 地址
 /// * `amount_formatted` - 格式化的金额（如 "100" 表示 100 个代币）
 ///
 /// # 示例
 /// ```ignore
-/// ensure_token_balance(&rpc, "http://127.0.0.1:8899", &payer, &usdc_mint, "1000").await?;
+/// ensure_token_balance(&rpc, &payer, &usdc_mint, "1000").await?;
 /// ```
 pub async fn ensure_token_balance(
     rpc_client: &Arc<RpcClient>,
-    rpc_url: &str,
     payer: &Keypair,
     mint: &Pubkey,
     amount_formatted: &str,
@@ -124,7 +121,8 @@ pub async fn ensure_token_balance(
         amount_formatted, current_amount, target_amount
     );
 
-    crate::token::set_token_balance(rpc_client, rpc_url, payer, mint, &decimal_formatted).await
+    let rpc_url = rpc_client.url();
+    crate::token::set_token_balance(rpc_client, &rpc_url, payer, mint, &decimal_formatted).await
 }
 
 /// 通过大额 Swap 确保 PIPE-WSOL Pool 流动性（推荐方法）
@@ -186,7 +184,6 @@ pub async fn ensure_pipe_pool_liquidity_via_swap(
     let wsol_mint = crate::test_params::wsol_mint();
     ensure_token_balance(
         rpc_client,
-        rpc_url,
         payer,
         &wsol_mint,
         &format!("{}", swap_amount_sol * 2),
@@ -197,7 +194,7 @@ pub async fn ensure_pipe_pool_liquidity_via_swap(
 
     // 1.5. 确保 payer 有足够的原生 SOL 余额（WSOL 需要原生 SOL 支持）
     println!("\n📋 步骤 1.5: 确保原生 SOL 余额...");
-    ensure_sol_balance(rpc_client, rpc_url, &payer.pubkey(), swap_amount_sol * 3)
+    ensure_sol_balance(rpc_client, &payer.pubkey(), swap_amount_sol * 3)
         .await
         .map_err(|e| format!("确保 SOL 余额失败: {}", e))?;
     println!("✅ 原生 SOL 余额充足");
@@ -580,7 +577,7 @@ pub async fn ensure_usdc_prts_pool_usdc_liquidity(
 /// ```
 pub async fn ensure_cpmm_liquidity(
     rpc_client: &Arc<RpcClient>,
-    rpc_url: &str,
+    _rpc_url: &str,
     payer: &Keypair,
     pool_address: &Pubkey,
     lp_token_amount: u64,
@@ -616,7 +613,6 @@ pub async fn ensure_cpmm_liquidity(
     // 确保 Token0 余额
     ensure_token_balance(
         rpc_client,
-        rpc_url,
         payer,
         &pool_state.token0_mint,
         token0_amount_formatted,
@@ -626,7 +622,6 @@ pub async fn ensure_cpmm_liquidity(
     // 确保 Token1 余额
     ensure_token_balance(
         rpc_client,
-        rpc_url,
         payer,
         &pool_state.token1_mint,
         token1_amount_formatted,

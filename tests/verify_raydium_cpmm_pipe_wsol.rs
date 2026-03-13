@@ -76,14 +76,14 @@ async fn test_cpmm_exact_in_buy_three_stage_verification_with_framework() {
 
     // 确保 WSOL 余额
     if let Err(e) =
-        ensure_token_balance(&client.rpc, rpc_url, client.payer.as_ref(), &wsol_mint(), "10").await
+        ensure_token_balance(&client.rpc, client.payer.as_ref(), &wsol_mint(), "10").await
     {
         panic!("❌ 确保 WSOL 余额失败: {}", e);
     }
 
     // 确保 PIPE 余额（确保 ATA 存在）
     if let Err(e) =
-        ensure_token_balance(&client.rpc, rpc_url, client.payer.as_ref(), &pipe_mint(), "1").await
+        ensure_token_balance(&client.rpc, client.payer.as_ref(), &pipe_mint(), "1").await
     {
         panic!("❌ 确保 PIPE 余额失败: {}", e);
     }
@@ -166,7 +166,6 @@ async fn test_cpmm_exact_in_sell_three_stage_verification_with_framework() {
     // 注意：由于上面的 swap 已经获得了 PIPE，这里只需要确保 ATA 存在即可
     if let Err(e) = ensure_token_balance(
         &client.rpc,
-        rpc_url,
         client.payer.as_ref(),
         &pipe_mint(),
         "2000", // 确保有足够的 PIPE（测试卖出 1000 PIPE）
@@ -178,7 +177,7 @@ async fn test_cpmm_exact_in_sell_three_stage_verification_with_framework() {
 
     // 确保 WSOL 余额（确保 WSOL ATA 存在，用于接收卖出的 WSOL）
     if let Err(e) =
-        ensure_token_balance(&client.rpc, rpc_url, client.payer.as_ref(), &wsol_mint(), "1").await
+        ensure_token_balance(&client.rpc, client.payer.as_ref(), &wsol_mint(), "1").await
     {
         panic!("❌ 确保 WSOL 余额失败: {}", e);
     }

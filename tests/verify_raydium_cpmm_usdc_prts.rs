@@ -74,7 +74,7 @@ async fn test_cpmm_usdc_prts_exact_in_buy_with_framework() {
 
     // 确保 USDC 余额（Token Program）
     if let Err(e) =
-        ensure_token_balance(&client.rpc, rpc_url, client.payer.as_ref(), &usdc_mint(), "10").await
+        ensure_token_balance(&client.rpc, client.payer.as_ref(), &usdc_mint(), "10").await
     {
         panic!("❌ 确保 USDC 余额失败: {}", e);
     }
@@ -159,7 +159,6 @@ async fn test_cpmm_usdc_prts_sell_exact_in() {
     // 确保 PRTS 余额（Token-2022，卖出需要持有 PRTS）
     if let Err(e) = ensure_token_balance(
         &client.rpc,
-        rpc_url,
         client.payer.as_ref(),
         &prts_mint(),
         "200000", // 200,000 PRTS（足够卖出 100,000 PRTS）

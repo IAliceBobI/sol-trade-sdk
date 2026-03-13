@@ -94,7 +94,7 @@ pub async fn verify_exact_out_buy_full(
     let usdc = usdc_mint();
     // 计算所需的 USDC 数量（本地计算的最大可能输入 + 缓冲）
     // 为了测试，我们直接确保足够多的 USDC（1000 USDC）
-    if let Err(e) = ensure_token_balance(rpc, rpc_url, payer, &usdc, "1000").await {
+    if let Err(e) = ensure_token_balance(rpc, payer, &usdc, "1000").await {
         println!("⚠️  确保 USDC 余额警告: {}", e);
         println!("继续测试，但可能因余额不足而失败...");
     } else {

@@ -73,7 +73,7 @@ async fn test_pumpswap_wsol_bonk_exact_in_buy_with_framework() {
 
     // 确保 WSOL 余额（Token Program）
     if let Err(e) =
-        ensure_token_balance(&client.rpc, rpc_url, client.payer.as_ref(), &wsol_mint(), "10").await
+        ensure_token_balance(&client.rpc, client.payer.as_ref(), &wsol_mint(), "10").await
     {
         panic!("❌ 确保 WSOL 余额失败: {}", e);
     }
@@ -151,7 +151,6 @@ async fn test_pumpswap_wsol_bonk_sell_exact_in() {
     // 确保 BONK 余额（Token Program，卖出需要持有 BONK）
     if let Err(e) = ensure_token_balance(
         &client.rpc,
-        rpc_url,
         client.payer.as_ref(),
         &bonk_mint(),
         "10000000", // 10,000,000 BONK（足够卖出 1,000,000 BONK）

@@ -52,18 +52,22 @@ async fn test_meteora_damm_v2_buy() {
     let pool_address = get_test_pool_address();
 
     // 先给payer设置余额：10 WSOL 和 1000000 Pigeon
-    let rpc_url = "http://127.0.0.1:8899";
     let wsol_mint = sol_trade_sdk::constants::WSOL_TOKEN_ACCOUNT;
     let pigeon_mint = Pubkey::from_str("4fSWEw2wbYEUCcMtitzmeGUfqinoafXxkhqZrA9Gpump")
         .expect("Invalid Pigeon mint");
 
     // 设置 10 WSOL 余额
-    ensure_sol_balance(&rpc, rpc_url, &payer.pubkey(), 10)
+    ensure_sol_balance(&rpc, &payer.pubkey(), 10)
         .await
         .expect("设置 WSOL 余额失败");
 
+    // 设置 10 wsol 余额
+    ensure_token_balance(&rpc, payer.as_ref(), &wsol_mint, "10")
+        .await
+        .expect("设置 wsol 余额失败");
+
     // 设置 1000000 Pigeon 余额
-    ensure_token_balance(&rpc, rpc_url, payer.as_ref(), &pigeon_mint, "1000000")
+    ensure_token_balance(&rpc, payer.as_ref(), &pigeon_mint, "1000000")
         .await
         .expect("设置 Pigeon 余额失败");
 
@@ -308,13 +312,12 @@ async fn test_meteora_damm_v2_sell() {
 
     // 2.5 给测试账户空投 Pigeon token（模拟交易不会真正改变余额）
     println!("\n[步骤 2.5] 空投 Pigeon token 到测试账户...");
-    let rpc_url = "http://127.0.0.1:8899";
     // Pigeon token 使用 Token-2022 Program，decimals 需要查询
     let base_decimals = 6; // 假设 Pigeon 是 6 decimals，实际需要查询确认
     let base_amount_formatted =
         format!("{}", base_balance as f64 / 10f64.powi(base_decimals as i32));
 
-    ensure_token_balance(&rpc, rpc_url, payer.as_ref(), &base_mint, &base_amount_formatted)
+    ensure_token_balance(&rpc, payer.as_ref(), &base_mint, &base_amount_formatted)
         .await
         .expect("空投 Pigeon token 失败");
     println!("  ✅ Pigeon token 余额已设置: {}", base_amount_formatted);

@@ -310,13 +310,13 @@ async fn test_raydium_cpmm_buy_sell_usdc_prts() {
     println!("\n💧 确保测试账户有足够的代币余额...");
 
     // 确保 USDC 余额（用于买入）
-    ensure_token_balance(&client.rpc, rpc_url, client.payer.as_ref(), &usdc_mint, "1000")
+    ensure_token_balance(&client.rpc, client.payer.as_ref(), &usdc_mint, "1000")
         .await
         .expect("Failed to ensure USDC balance");
     println!("✅ USDC 余额已确保");
 
     // 确保 PRTS 余额（用于卖出测试）
-    ensure_token_balance(&client.rpc, rpc_url, client.payer.as_ref(), &prts_mint, "100000000")
+    ensure_token_balance(&client.rpc, client.payer.as_ref(), &prts_mint, "100000000")
         .await
         .expect("Failed to ensure PRTS balance");
     println!("✅ PRTS 余额已确保");

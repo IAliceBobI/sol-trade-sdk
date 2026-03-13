@@ -95,7 +95,7 @@ pub async fn verify_exact_out_buy_full(
     let rpc_url = "http://127.0.0.1:8899";
     let wsol = wsol_mint();
     // 确保足够多的 WSOL（10 WSOL）用于测试
-    if let Err(e) = ensure_token_balance(rpc, rpc_url, payer, &wsol, "10").await {
+    if let Err(e) = ensure_token_balance(rpc, payer, &wsol, "10").await {
         println!("⚠️  确保 WSOL 余额警告: {}", e);
         println!("继续测试，但可能因余额不足而失败...");
     } else {

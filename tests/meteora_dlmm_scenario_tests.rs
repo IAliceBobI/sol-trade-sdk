@@ -448,7 +448,7 @@ async fn test_meteora_dlmm_direct_override() {
     // 确保 payer 有 SOL
     println!("\n💧 确保 payer SOL 余额...");
     if let Err(e) =
-        sol_trade_test_utils::ensure_sol_balance(&rpc, "http://127.0.0.1:8899", &payer.pubkey(), 10)
+        sol_trade_test_utils::ensure_sol_balance(&rpc, &payer.pubkey(), 10)
             .await
     {
         println!("  ⚠️ 确保 SOL 余额失败: {}", e);
