@@ -1,0 +1,21 @@
+{
+  "id": "meteora-price-test",
+  "name": "Meteora Pool 价格测试",
+  "description": "修改 Meteora DAMM V2 Pool 的 sqrt_price 来测试不同价格场景",
+  "overrides": [
+    {
+      "id": "pool-price-override",
+      "templateId": "meteora-pool-template",
+      "account": {
+        "type": "pubkey",
+        "value": "qHcjwRN2wKJHy8BdcgrQZjLutFhBWPNKSgUWitb929B"
+      },
+      "values": {
+        "sqrt_price": "100000000000000000000000000000"
+      },
+      "scenarioRelativeSlot": 1,
+      "enabled": true,
+      "fetchBeforeUse": true
+    }
+  ]
+}
