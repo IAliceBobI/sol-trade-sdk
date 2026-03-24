@@ -101,8 +101,7 @@ async fn test_ammv4_exact_in_buy_three_stage_verification_with_framework() {
 
     // 确保 USDC 余额（确保 ATA 存在）
     if let Err(e) =
-        ensure_token_balance(&client.rpc, client.payer.as_ref(), &usdc_mint(), "1000")
-            .await
+        ensure_token_balance(&client.rpc, client.payer.as_ref(), &usdc_mint(), "1000").await
     {
         panic!("❌ 确保 USDC 余额失败: {}", e);
     }

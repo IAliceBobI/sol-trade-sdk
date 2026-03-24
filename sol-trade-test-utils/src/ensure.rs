@@ -182,14 +182,9 @@ pub async fn ensure_pipe_pool_liquidity_via_swap(
     // 1. 确保 payer 有足够的 WSOL 余额
     println!("\n📋 步骤 1: 确保 WSOL 余额...");
     let wsol_mint = crate::test_params::wsol_mint();
-    ensure_token_balance(
-        rpc_client,
-        payer,
-        &wsol_mint,
-        &format!("{}", swap_amount_sol * 2),
-    )
-    .await
-    .map_err(|e| format!("确保 WSOL 余额失败: {}", e))?;
+    ensure_token_balance(rpc_client, payer, &wsol_mint, &format!("{}", swap_amount_sol * 2))
+        .await
+        .map_err(|e| format!("确保 WSOL 余额失败: {}", e))?;
     println!("✅ WSOL 余额充足");
 
     // 1.5. 确保 payer 有足够的原生 SOL 余额（WSOL 需要原生 SOL 支持）
@@ -611,22 +606,12 @@ pub async fn ensure_cpmm_liquidity(
     println!("\n📝 检查用户代币余额...");
 
     // 确保 Token0 余额
-    ensure_token_balance(
-        rpc_client,
-        payer,
-        &pool_state.token0_mint,
-        token0_amount_formatted,
-    )
-    .await?;
+    ensure_token_balance(rpc_client, payer, &pool_state.token0_mint, token0_amount_formatted)
+        .await?;
 
     // 确保 Token1 余额
-    ensure_token_balance(
-        rpc_client,
-        payer,
-        &pool_state.token1_mint,
-        token1_amount_formatted,
-    )
-    .await?;
+    ensure_token_balance(rpc_client, payer, &pool_state.token1_mint, token1_amount_formatted)
+        .await?;
 
     // 4. 获取当前金库余额
     let token0_balance = rpc_client.get_token_account_balance(&pool_state.token0_vault).await;

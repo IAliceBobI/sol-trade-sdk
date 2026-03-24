@@ -57,9 +57,7 @@ async fn test_meteora_damm_v2_buy() {
         .expect("Invalid Pigeon mint");
 
     // 设置 10 WSOL 余额
-    ensure_sol_balance(&rpc, &payer.pubkey(), 10)
-        .await
-        .expect("设置 WSOL 余额失败");
+    ensure_sol_balance(&rpc, &payer.pubkey(), 10).await.expect("设置 WSOL 余额失败");
 
     // 设置 10 wsol 余额
     ensure_token_balance(&rpc, payer.as_ref(), &wsol_mint, "10")

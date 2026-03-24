@@ -41,9 +41,6 @@ impl InstructionBuilder for MeteoraDammV2InstructionBuilder {
             return Err(anyhow!("Pool must contain WSOL or USDC"));
         }
 
-
-        panic!("暂停一遍分析代码");
-
         // ========================================
         // Trade calculation and account address preparation
         // ========================================
