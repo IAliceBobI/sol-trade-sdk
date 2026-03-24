@@ -463,7 +463,7 @@ async fn test_exact_out_sell_full_verification() {
 
     // 2.5. 给测试账户空投 PUMP token（Sell 需要持有 base token）
     println!("\n[步骤 2.5] 空投 PUMP token...");
-    let rpc_url = "http://127.0.0.1:8899";
+    let _rpc_url = "http://127.0.0.1:8899";
     let base_needed = local_result.base;
     // 多空投一些，确保有足够的余额（乘以 2）
     let base_to_airdrop = base_needed * 2;

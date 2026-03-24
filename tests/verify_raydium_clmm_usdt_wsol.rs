@@ -85,7 +85,7 @@ async fn test_raydium_clmm_usdt_wsol_exact_in_buy_with_framework() {
     // - 1 WSOL = 1,000,000,000 lamports
     // - 0.01 SOL = 10,000,000 lamports
     let input_amount = 10_000_000u64; // 0.01 SOL
-    let rpc_url = "http://127.0.0.1:8899";
+    let _rpc_url = "http://127.0.0.1:8899";
 
     // 使用 Pool 注册表获取配置
     let pool_config = RaydiumClmmPoolRegistry::usdt_wsol();
@@ -180,7 +180,7 @@ async fn test_raydium_clmm_usdt_wsol_sell_exact_in() {
     // - 1 USDT = 1,000,000 units
     // - 10 USDT = 10,000,000 units
     let input_amount = 10_000_000u64; // 卖出 10 USDT (USDT decimals = 6)
-    let rpc_url = "http://127.0.0.1:8899";
+    let _rpc_url = "http://127.0.0.1:8899";
     let pool_config = RaydiumClmmPoolRegistry::usdt_wsol();
 
     let config = DexVerifyConfig {

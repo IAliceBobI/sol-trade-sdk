@@ -90,7 +90,7 @@ pub async fn verify_exact_out_buy_full(
 
     // 0. 确保测试账户有足够的 USDC 余额
     println!("\n[步骤 0] 确保 USDC 余额...");
-    let rpc_url = "http://127.0.0.1:8899";
+    let _rpc_url = "http://127.0.0.1:8899";
     let usdc = usdc_mint();
     // 计算所需的 USDC 数量（本地计算的最大可能输入 + 缓冲）
     // 为了测试，我们直接确保足够多的 USDC（1000 USDC）

@@ -54,7 +54,7 @@ async fn test_cpmm_usdc_prts_exact_in_buy_with_framework() {
     // ⚠️ 注意：USDC decimals = 6，所以：
     // - 1 USDC = 1,000,000 units
     let input_amount = 1_000_000u64; // 1 USDC
-    let rpc_url = "http://127.0.0.1:8899";
+    let _rpc_url = "http://127.0.0.1:8899";
 
     // 使用 Pool 注册表获取配置
     let pool_config = RaydiumCpmmPoolRegistry::usdc_prts();
@@ -142,7 +142,7 @@ async fn test_cpmm_usdc_prts_sell_exact_in() {
     // - 1 PRTS = 1,000,000,000 units
     // - 100,000 PRTS = 100,000,000,000,000 units
     let input_amount = 100_000_000_000_000u64; // 卖出 100,000 PRTS (PRTS decimals = 9)
-    let rpc_url = "http://127.0.0.1:8899";
+    let _rpc_url = "http://127.0.0.1:8899";
     let pool_config = RaydiumCpmmPoolRegistry::usdc_prts();
 
     let config = DexVerifyConfig {

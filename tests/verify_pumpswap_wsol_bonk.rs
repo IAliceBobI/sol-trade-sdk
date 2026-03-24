@@ -53,7 +53,7 @@ async fn test_pumpswap_wsol_bonk_exact_in_buy_with_framework() {
     // - 1 WSOL = 1,000,000,000 lamports
     // - 0.001 SOL = 1,000,000 lamports
     let input_amount = 1_000_000u64; // 0.001 SOL
-    let rpc_url = "http://127.0.0.1:8899";
+    let _rpc_url = "http://127.0.0.1:8899";
 
     // 使用 Pool 注册表获取配置
     let pool_config = PumpSwapPoolRegistry::bonk_wsol();
@@ -134,7 +134,7 @@ async fn test_pumpswap_wsol_bonk_sell_exact_in() {
     // - 1 BONK = 100,000 units
     // - 1,000,000 BONK = 100,000,000,000 units
     let input_amount = 100_000_000_000u64; // 卖出 1,000,000 BONK (BONK decimals = 5)
-    let rpc_url = "http://127.0.0.1:8899";
+    let _rpc_url = "http://127.0.0.1:8899";
     let pool_config = PumpSwapPoolRegistry::bonk_wsol();
 
     let config = DexVerifyConfig {

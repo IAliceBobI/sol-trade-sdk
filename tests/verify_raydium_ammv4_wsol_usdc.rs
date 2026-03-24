@@ -74,7 +74,7 @@ impl BuyParamsBuilder for WsolUsdcParamsBuilder {
 async fn test_ammv4_exact_in_buy_three_stage_verification_with_framework() {
     // ===== 测试配置（仅此部分需要修改）=====
     let input_amount = 20_000_000u64; // 0.02 SOL（买入少量 USDC）
-    let rpc_url = "http://127.0.0.1:8899";
+    let _rpc_url = "http://127.0.0.1:8899";
 
     // 使用 Pool 注册表获取配置
     let pool_config = RaydiumAmmV4PoolRegistry::wsol_usdc();
@@ -186,7 +186,7 @@ impl SellParamsBuilder for WsolUsdcSellExactInParamsBuilder {
 async fn test_ammv4_exact_in_sell_three_stage_verification_with_framework() {
     // ===== 测试配置（仅此部分需要修改）=====
     let input_amount = 1_000_000u64; // 卖出 1 USDC
-    let rpc_url = "http://127.0.0.1:8899";
+    let _rpc_url = "http://127.0.0.1:8899";
 
     // 使用 Pool 注册表获取配置
     let pool_config = RaydiumAmmV4PoolRegistry::wsol_usdc();

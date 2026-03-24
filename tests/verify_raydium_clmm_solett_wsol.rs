@@ -63,7 +63,7 @@ async fn test_raydium_clmm_solett_wsol_exact_in_buy_with_framework() {
     // - 1 WSOL = 1,000,000,000 lamports
     // - 0.01 SOL = 10,000,000 lamports
     let input_amount = 10_000_000u64; // 0.01 SOL
-    let rpc_url = "http://127.0.0.1:8899";
+    let _rpc_url = "http://127.0.0.1:8899";
 
     // 使用 Pool 注册表获取配置
     let pool_config = RaydiumClmmPoolRegistry::solett_wsol();
@@ -153,7 +153,7 @@ async fn test_raydium_clmm_solett_wsol_sell_exact_in() {
     // ⚠️ 注意：SOLETT 的 decimals = 9（与 WSOL 相同）
     // 增加卖出金额以避免 "amount too small" 错误
     let input_amount = 1_000_000_000u64; // 卖出 1 SOLETT (SOLETT decimals = 9)
-    let rpc_url = "http://127.0.0.1:8899";
+    let _rpc_url = "http://127.0.0.1:8899";
     let pool_config = RaydiumClmmPoolRegistry::solett_wsol();
 
     let config = DexVerifyConfig {
