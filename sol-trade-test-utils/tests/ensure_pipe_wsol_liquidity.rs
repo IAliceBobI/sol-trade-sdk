@@ -24,7 +24,7 @@ async fn test_ensure_pipe_pool_wsol_liquidity() {
 
     // 确保账户有足够的 SOL 余额来支付交易费用
     println!("💰 确保账户 SOL 余额...");
-    ensure_sol_balance(&rpc, &rpc_url, &payer.pubkey(), 10)
+    ensure_sol_balance(&rpc, &payer.pubkey(), 10)
         .await
         .expect("SOL 余额不足");
 

@@ -1,7 +1,7 @@
 # Makefile for sol-trade-sdk with cargo nextest support
 # 使用方法: make <target>
 
-.PHONY: help test test-all test-fast test-slow list clean test-cargo test-legacy show-all show-clmm show-amm-v4 show-cpmm show-pumpswap
+.PHONY: help check test test-all test-fast test-slow list clean test-cargo test-legacy show-all show-clmm show-amm-v4 show-cpmm show-pumpswap
 
 # 默认目标
 .DEFAULT_GOAL := help
@@ -9,6 +9,9 @@
 # 帮助信息
 help:
 	@echo "sol-trade-sdk 测试命令（推荐使用 Nextest）"
+	@echo ""
+	@echo "检查:"
+	@echo "  make check                   检查编译（包含测试和所有 features）"
 	@echo ""
 	@echo "快速测试:"
 	@echo "  make test-fast               运行快速单元测试（10秒超时）"
@@ -41,6 +44,11 @@ help:
 	@echo ""
 	@echo "CI 测试:"
 	@echo "  make test-ci                 运行 CI 环境测试（更严格）"
+
+# 检查编译（包含测试和所有 features）
+check:
+	@echo "检查编译（包含测试和所有 features）..."
+	cargo check --tests --all-features --workspace
 
 # 运行所有测试
 test-all: test
